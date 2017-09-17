@@ -6,6 +6,9 @@ const swig = require("swig");
 const querystring = require("querystring");
 const crypto = require("crypto");
 
+const settings = require("./settings.json");
+console.log(settings)
+
 var server = http.createServer(function(req, res) {
     /*res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
