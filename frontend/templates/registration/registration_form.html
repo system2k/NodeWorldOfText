@@ -1,0 +1,56 @@
+{% extends "../base.html" %}
+
+{% block title %}
+Registration | {{ block_super }}
+{% endblock %}
+
+{% block header %}
+<h1>Sign up for a Your World of Text account</h1>
+{% endblock %}
+
+{% block content %}
+<form action="{{ url_registration_register }}" method="POST">{{ csrf_token|safe }}
+<table>
+<tr>
+    <td align="right" valign="top">Username:</td>
+    <td>
+        {{ form_username|safe }} <br/>
+        {% for error in form_username_errors %}
+        <span style="color:red">{{ error }}</span>
+        {% endfor %}
+    </td>
+</tr>
+<tr>
+    <td align="right" valign="top">Email:</td>
+    <td>
+        {{ form_email|safe }} <br/>
+        {% for error in form_email_errors %}
+        <span style="color:red">{{ error }}</span>
+        {% endfor %}
+    </td>
+</tr>
+<tr>
+    <td align="right" valign="top">Password:</td>
+    <td>
+        {{ form_password1|safe }} <br/>
+        {% for error in form_password1_errors %}
+        <span style="color:red">{{ error }}</span>
+        {% endfor %}
+    </td>
+</tr>
+<tr>
+    <td align="right" valign="top">Password (again):</td>
+    <td>
+        {{ form_password2|safe }} <br/>
+        {% for error in form_password2_errors %}
+        <span style="color:red">{{ error }}</span>
+        {% endfor %}
+    </td>
+</tr>
+<tr>
+    <td>&nbsp;</td>
+    <td><input type="submit" value="Register" /></td>
+</tr>
+</table>
+</form>
+{% endblock %}

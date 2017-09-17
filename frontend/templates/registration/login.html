@@ -1,0 +1,27 @@
+{% extends "../base.html" %}
+{% block header %}
+    <h1>Log in to Your World of Text</h1>
+{% endblock %}
+{% block content %}
+{% if form_errors %}
+    <p>Your username and password didn't match. Please try again.</p>
+{% endif %}
+<form method="post" action="{{ url_auth_login }}">{{ csrf_token|safe }}
+<table>
+<tr>
+    <td>{{ form_username_label_tag|safe }}</td>
+    <td>{{ form_username|safe }}</td>
+</tr>
+<tr>
+    <td>{{ form_password_label_tag|safe }}</td>
+    <td>{{ form_password|safe }}</td>
+</tr>
+</table>
+
+<input type="submit" value="login" />
+<a href="{{ url_registration_register }}">Don't have an account?</a>
+<input type="hidden" name="next" value="{{ next }}" />
+</form>
+
+{% endblock %}
+
