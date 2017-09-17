@@ -17,7 +17,12 @@ var static_path_web = "static/"
 
 var template_data = {}; // data used by the server
 var templates_path = "./frontend/templates/";
-dump_dir(template_data, templates_path, "");
+dump_dir(template_data, templates_path, "", true);
+for(var i in template_data) {
+    if(template_data[i].endsWith(".html")) {
+        template_data[i] = swig.compileFile(template_data[i]);
+    }
+}
 
 var static_data = {}; // html data to be returned (text data for values)
 dump_dir(static_data, static_path, static_path_web);
@@ -281,8 +286,6 @@ var Month  = 2628002880;
 var Year   = 31536034560;
 var Decade = 315360345600;
 
-// 302 to redirect
-
 var url_regexp = [ // regexp , function/redirect to
     ["^(\\w*)$", pages.yourworld],
     ["^(beta/(.*))$", pages.yourworld],
@@ -308,7 +311,7 @@ var url_regexp = [ // regexp , function/redirect to
 function static_file_returner(req, serve) {
     var parse = url.parse(req.url).pathname.substr(1)
     var mime_type = mime(parse.replace(/.*[\.\/\\]/, '').toLowerCase());
-    serve(static_data[parse]/*.toString("utf-8")*/, 200, { mime_type })
+    serve(static_data[parse], 200, { mime: mime_type })
 }
 
 for (var i in static_data) {
@@ -321,12 +324,13 @@ var server = http.createServer(function(req, res) {
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");*/
     
-    var URL = req.url.substr(1);
-
-    //res.end("TEST: " + URL);
+    var URL = url.parse(req.url).pathname;
+    if(URL.charAt(0) == "/") {
+        URL = URL.substr(1);
+    }
 
     function dispatch(data, status_code, params) {
-        // cookie, mime, redirect
+        // params: { cookie, mime, redirect } (all optional)
         var info = {}
         if(!params) {
             params = {};
@@ -352,7 +356,7 @@ var server = http.createServer(function(req, res) {
         if(!data) {
             data = "";
         }
-        res.end(data, "binary")
+        res.end(data)
     }
 
     var found_url = false;
@@ -361,7 +365,7 @@ var server = http.createServer(function(req, res) {
         if(URL.match(row[0])) {
             found_url = true;
             if(typeof row[1] == "function") {
-                row[1](req, dispatch, { template_data }) // 3rd arg is temp. going to have to think of a better solution
+                row[1](req, dispatch, global_data)
             } else if(typeof row[1] == "string") { // it's a path and must be redirected to
                 dispatch(null, null, { redirect: row[1] })
             } else {
@@ -386,6 +390,10 @@ function start_server() {
         var addr = server.address();
         console.log("Server is running.\nAddress: " + addr.address + "\nPort: " + addr.port);
     });
+}
+
+var global_data = {
+    template_data
 }
 
 // https thing: https://gist.github.com/davestevens/c9e437afbb41c1d5c3ab

@@ -1,14 +1,18 @@
 // recursive directory dumper
 
 var fs = require("fs");
-function listDir(addr, MP, dsu) {
+function listDir(addr, MP, dsu, po) { // object, file path, web path, path only
 	var con = fs.readdirSync(MP)
 	for(i in con) {
 		var currentPath = MP + con[i]
 		if(!fs.lstatSync(currentPath).isDirectory()) {
-			addr[dsu + con[i]] = fs.readFileSync(currentPath, undefined)
+			if(!po) {
+				addr[dsu + con[i]] = fs.readFileSync(currentPath)
+			} else {
+				addr[dsu + con[i]] = currentPath;
+			}
 		} else {
-			listDir(addr, MP + con[i] + "/", dsu + con[i] + "/")
+			listDir(addr, MP + con[i] + "/", dsu + con[i] + "/", po)
 		}
 	}
 }

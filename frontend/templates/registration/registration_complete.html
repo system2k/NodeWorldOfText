@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "../base.html" %}
 
 {% block title %}
 Activate Account | {{ block.super }}
@@ -10,5 +10,5 @@ Activate Account | {{ block.super }}
 
 {% block content %}
 Thank you for signing up. An email with the activation code has been send to your inbox. 
-After clicking it, <a href="{% url auth_login %}">you can log in here</a>.
+After clicking it, <a href="{{ url_auth_login }}">you can log in here</a>.
 {% endblock %}
