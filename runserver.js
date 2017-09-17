@@ -7,15 +7,40 @@ const querystring   = require("querystring");
 const crypto        = require("crypto");
 const mime          = require("./backend/mime.js");
 const prompt        = require("./backend/prompt.js");
+const dump_dir      = require("./backend/dump_dir");
 
 const settings = require("./settings.json");
 const database = new sql.Database(settings.DATABASE_PATH);
 
-var static_path = "./program/html/static/";
-var template_path = "./program/html/templates/";
+var static_path = "./frontend/static/";
+var static_path_web = "static/"
+
+var template_data = {}; // data used by the server
+var templates_path = "./frontend/templates/";
+dump_dir(template_data, templates_path, "");
+
+var static_data = {}; // html data to be returned (text data for values)
+dump_dir(static_data, static_path, static_path_web);
 
 var sql_table_init = "./backend/default.sql";
 var sql_indexes_init = "./backend/indexes.sql";
+
+const pages = {
+    configure           : require("./backend/pages/configure.js"),
+    coordlink           : require("./backend/pages/coordlink.js"),
+    home                : require("./backend/pages/home.js"),
+    login               : require("./backend/pages/login.js"),
+    logout              : require("./backend/pages/logout.js"),
+    member_autocomplete : require("./backend/pages/member_autocomplete.js"),
+    private             : require("./backend/pages/private.js"),
+    profile             : require("./backend/pages/profile.js"),
+    protect             : require("./backend/pages/protect.js"),
+    register            : require("./backend/pages/register.js"),
+    timemachine         : require("./backend/pages/timemachine.js"),
+    unprotect           : require("./backend/pages/unprotect.js"),
+    urllink             : require("./backend/pages/urllink.js"),
+    yourworld           : require("./backend/pages/yourworld.js")
+}
 
 const db = {
     // gets data from the database (only 1 row at a time)
@@ -249,12 +274,46 @@ function account_prompt() {
 //Time in milliseconds
 var Second = 1000;
 var Minute = 60000;
-var Hour = 3600000;
-var Day = 86400000;
-var Week = 604800000;
-var Month = 2628002880;
-var Year = 31536034560;
+var Hour   = 3600000;
+var Day    = 86400000;
+var Week   = 604800000;
+var Month  = 2628002880;
+var Year   = 31536034560;
 var Decade = 315360345600;
+
+// 302 to redirect
+
+var url_regexp = [ // regexp , function/redirect to
+    ["^(\\w*)$", pages.yourworld],
+    ["^(beta/(.*))$", pages.yourworld],
+    ["^(frontpage/(.*))$", pages.yourworld],
+    ["^favicon\.ico$", "/static/favicon.png"],
+    ["^home/$", pages.home],
+    ["^accounts/login", pages.login],
+    ["^accounts/logout", pages.logout],
+    ["^accounts/register", pages.register],
+    ["^ajax/protect/$", pages.protect],
+    ["^ajax/unprotect/$", pages.unprotect],
+    ["^ajax/coordlink/$", pages.coordlink],
+    ["^ajax/urllink/$", pages.urllink],
+    ["^accounts/profile/", pages.profile],
+    ["^accounts/private/", pages.private],
+    ["^accounts/configure/$", "/accounts/profile/"],
+    ["^accounts/configure/(.*)/$", pages.configure],
+    ["^accounts/configure/(beta/\\w+)/$", pages.configure],
+    ["^accounts/member_autocomplete/$", pages.member_autocomplete],
+    ["^accounts/timemachine/(.*)/$", pages.timemachine]
+]
+
+function static_file_returner(req, serve) {
+    var parse = url.parse(req.url).pathname.substr(1)
+    var mime_type = mime(parse.replace(/.*[\.\/\\]/, '').toLowerCase());
+    serve(static_data[parse]/*.toString("utf-8")*/, 200, { mime_type })
+}
+
+for (var i in static_data) {
+    url_regexp.push(["^" + i + "$", static_file_returner])
+}
 
 var server = http.createServer(function(req, res) {
     // use this if you do not want the request data to be cached
@@ -264,7 +323,58 @@ var server = http.createServer(function(req, res) {
     
     var URL = req.url.substr(1);
 
-    res.end("TEST: " + URL);
+    //res.end("TEST: " + URL);
+
+    function dispatch(data, status_code, params) {
+        // cookie, mime, redirect
+        var info = {}
+        if(!params) {
+            params = {};
+        }
+        if(params.cookie) {
+            info["Set-Cookie"] = params.cookie;
+        }
+        if(Math.floor(status_code / 100) * 100 == 300 || params.redirect !== void 0) { // 3xx status code
+            if(params.redirect) {
+                if(!status_code) {
+                    status_code = 302;
+                }
+                info.Location = params.redirect
+            }
+        }
+        if(params.mime) {
+            info["Content-Type"] = params.mime;
+        }
+        if(!status_code) {
+            status_code = 200;
+        }
+        res.writeHead(status_code, info);
+        if(!data) {
+            data = "";
+        }
+        res.end(data, "binary")
+    }
+
+    var found_url = false;
+    for(var i in url_regexp) {
+        var row = url_regexp[i];
+        if(URL.match(row[0])) {
+            found_url = true;
+            if(typeof row[1] == "function") {
+                row[1](req, dispatch, { template_data }) // 3rd arg is temp. going to have to think of a better solution
+            } else if(typeof row[1] == "string") { // it's a path and must be redirected to
+                dispatch(null, null, { redirect: row[1] })
+            } else {
+                found_url = false; // nevermind, it's not found because the type is invalid
+            }
+            break;
+        }
+    }
+
+    if(!found_url) {
+        res.statusCode = 404;
+        res.end("Not found. TODO: add a 404 page.")
+    }
 })
 function start_server() {
     (async function clear_expired_sessions() {
