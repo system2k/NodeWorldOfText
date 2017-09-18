@@ -308,7 +308,8 @@ var url_regexp = [ // regexp , function/redirect to
     ["^accounts/timemachine/(.*)/$", pages.timemachine]
 ]
 
-function static_file_returner(req, serve) {
+var static_file_returner = {}
+static_file_returner.GET = function(req, serve) {
     var parse = url.parse(req.url).pathname.substr(1)
     var mime_type = mime(parse.replace(/.*[\.\/\\]/, '').toLowerCase());
     serve(static_data[parse], 200, { mime: mime_type })
@@ -318,7 +319,72 @@ for (var i in static_data) {
     url_regexp.push(["^" + i + "$", static_file_returner])
 }
 
-var server = http.createServer(function(req, res) {
+function parseCookie(cookie) {
+    try {
+        if(typeof cookie !== "string") {
+            return {};
+        }
+        cookie = cookie.split(";");
+        var list = {}
+        for(var i in cookie) {
+            var c = cookie[i].split("=");
+            if(c.length > 2) {
+                var ar = c;
+                var var2 = ar.pop();
+                ar = ar.join("=")
+                ar = ar.replace(/ /g, "");
+                var2 = var2.replace(/ /g, "");
+                list[ar] = var2
+            } else if(c.length === 2) {
+                list[decodeURIComponent(c[0].replace(/ /g, ""))] = decodeURIComponent(c[1].replace(/ /g, ""))
+            } else if(c.length === 1) {
+                if(c[0] !== "") list[c[0]] = null
+            }
+        }
+        return list;
+    } catch(e) {
+        return {};
+    }
+}
+
+function objIncludes(defaultObj, include) {
+    var new_obj = {};
+    for(var i in defaultObj) {
+        new_obj[i] = defaultObj[i]
+    }
+    for(var i in include) {
+        new_obj[i] = include[i];
+    }
+    return new_obj;
+}
+
+function wait_response_data(req, dispatch) {
+    var queryData = {}
+    var error = false;
+    return new Promise(function(resolve) {
+        req.on("data", function(data) {
+            queryData += data;
+            if (queryData.length > 10000000) {
+                queryData = "";
+                dispatch("Payload too large", 413)
+                error = true
+                req.connection.destroy();
+                resolve(null);
+            }
+        });
+        req.on("end", function() {
+            if(!error) {
+                try {
+                    resolve(querystring.parse(queryData, null, null, {maxKeys: 1000}))
+                } catch(e) {
+                    resolve(null);
+                }
+            }
+        });
+    })
+}
+
+var server = http.createServer(async function(req, res) {
     // use this if you do not want the request data to be cached
     /*res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
@@ -329,7 +395,10 @@ var server = http.createServer(function(req, res) {
         URL = URL.substr(1);
     }
 
+    var request_resolved = false;
+
     function dispatch(data, status_code, params) {
+        request_resolved = true;
         // params: { cookie, mime, redirect } (all optional)
         var info = {}
         if(!params) {
@@ -364,8 +433,29 @@ var server = http.createServer(function(req, res) {
         var row = url_regexp[i];
         if(URL.match(row[0])) {
             found_url = true;
-            if(typeof row[1] == "function") {
-                row[1](req, dispatch, global_data)
+            if(typeof row[1] == "object") {
+                var method = req.method.toUpperCase();
+                var post_data = {};
+                var query_data = querystring.parse(url.parse(req.url).query)
+                if(method == "POST") {
+                    var error = false;
+                    var queryData = "";
+                    var dat = await wait_response_data(req, dispatch);
+                    if(!dat) {
+                        return;
+                    }
+                    post_data = dat;
+                }
+                var vars = objIncludes(global_data, {
+                    cookies: parseCookie(req.headers.cookie),
+                    post_data,
+                    query_data
+                })
+                if(row[1][method]) {
+                    await row[1][method](req, dispatch, vars);
+                } else {
+                    dispatch("Method " + method + " not allowed.", 405)
+                }
             } else if(typeof row[1] == "string") { // it's a path and must be redirected to
                 dispatch(null, null, { redirect: row[1] })
             } else {
@@ -375,9 +465,14 @@ var server = http.createServer(function(req, res) {
         }
     }
 
+    if(!request_resolved) {
+        res.statusCode = 500;
+        return res.end("Internal server error.")
+    }
+
     if(!found_url) {
         res.statusCode = 404;
-        res.end("Not found. TODO: add a 404 page.")
+        return res.end("Not found. TODO: add a 404 page.")
     }
 })
 function start_server() {
