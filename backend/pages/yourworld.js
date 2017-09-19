@@ -158,7 +158,7 @@ module.exports.POST = async function(req, serve, vars) {
 
     // begin writing the edits
     for(var i in tiles) {
-        var tile_data = new Array(128).fill(" ")
+        var tile_data = " ".repeat(128).split("");
 
         var properties = {
             color: Array(128).fill(0)

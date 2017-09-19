@@ -384,6 +384,38 @@ function wait_response_data(req, dispatch) {
     })
 }
 
+var token_chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+function new_token(len) {
+    var token = "";
+    for(var i = 0; i < len; i++) {
+        token += token_chars.charAt(Math.floor(Math.random() * token_chars.length))
+    }
+    return token;
+}
+
+function cookie_expire(timeStamp) {
+    var dayWeekList = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    var monthList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    var _DayOfWeek = dayWeekList[new Date(timeStamp).getDay()];
+    var _Day = new Date(timeStamp).getDate();
+    var _Month = monthList[new Date(timeStamp).getMonth()];
+    var _Year = new Date(timeStamp).getFullYear();
+    var _Hour = new Date(timeStamp).getHours();
+    var _Minute = new Date(timeStamp).getMinutes();
+    var _Second = new Date(timeStamp).getSeconds();
+
+    var compile = _DayOfWeek + ", " + _Day + " " + _Month + " " + _Year + " " + _Hour + ":" + _Minute + ":" + _Second + " UTC";
+    return compile
+}
+
+function encode_base64(str) {
+    return new Buffer(str).toString('base64')
+}
+function decode_base64(b64str) {
+    return new Buffer(b64str, 'base64').toString('ascii')
+}
+
 var server = http.createServer(async function(req, res) {
     // use this if you do not want the request data to be cached
     /*res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -397,6 +429,9 @@ var server = http.createServer(async function(req, res) {
 
     var request_resolved = false;
 
+    // server will return cookies to the client if it needs to
+    var include_cookies = [];
+
     function dispatch(data, status_code, params) {
         request_resolved = true;
         // params: { cookie, mime, redirect } (all optional)
@@ -404,8 +439,13 @@ var server = http.createServer(async function(req, res) {
         if(!params) {
             params = {};
         }
+        if(typeof params.cookie == "string" && include_cookies.length > 0) {
+            include_cookies.push(params.cookie)
+        } else if(typeof params.cookie == "object") {
+            include_cookies = include_cookies.concat(params.cookie)
+        }
         if(params.cookie) {
-            info["Set-Cookie"] = params.cookie;
+            info["Set-Cookie"] = include_cookies;
         }
         if(Math.floor(status_code / 100) * 100 == 300 || params.redirect !== void 0) { // 3xx status code
             if(params.redirect) {
@@ -437,6 +477,33 @@ var server = http.createServer(async function(req, res) {
                 var method = req.method.toUpperCase();
                 var post_data = {};
                 var query_data = querystring.parse(url.parse(req.url).query)
+                var cookies = parseCookie(req.headers.cookie);
+                var user = {
+                    authenticated: false,
+                    username: "",
+                    id: 0,
+                    _csrftoken: null
+                }
+                // check if user is logged in
+                if(!cookies.csrftoken) {
+                    var token = new_token(32)
+                    var date = Date.now();
+                    include_cookies.push("csrftoken=" + token + "; expires=" + cookie_expire(date + Year))
+                    user._csrftoken = TKN;
+                } else {
+                    user._csrftoken = cookies.csrftoken;
+                }
+                if(cookies.sessionid) {
+                    // user data from session
+                    var s_data = await db.get("SELECT * FROM auth_session WHERE session_key=?", 
+                        cookies.sessionid);
+                    if(s_data) {
+                        user = JSON.parse(decode_base64(s_data.session_data));
+                        if(user.csrftoken === cookies.csrftoken) {
+                            user.authenticated = true;
+                        }
+                    }
+                }
                 if(method == "POST") {
                     var error = false;
                     var queryData = "";
@@ -447,10 +514,11 @@ var server = http.createServer(async function(req, res) {
                     post_data = dat;
                 }
                 var vars = objIncludes(global_data, {
-                    cookies: parseCookie(req.headers.cookie),
+                    cookies,
                     post_data,
                     query_data,
-                    path: URL
+                    path: URL,
+                    user
                 })
                 if(row[1][method]) {
                     await row[1][method](req, dispatch, vars);
