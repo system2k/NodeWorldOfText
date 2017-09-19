@@ -50,7 +50,7 @@ const pages = {
 const db = {
     // gets data from the database (only 1 row at a time)
     get: async function(command, params) {
-        if(!params) params = []
+        if(params == void 0 || params == null) params = []
         return new Promise(function(r, rej) {
             database.get(command, params, function(err, res) {
                 if(err) {
@@ -62,7 +62,7 @@ const db = {
     },
     // runs a command (insert, update, etc...) and might return "lastID" if needed
     run: async function(command, params) {
-        if(!params) params = []
+        if(params == void 0 || params == null) params = []
         var err = false
         return new Promise(function(r, rej) {
             database.run(command, params, function(err, res) {
@@ -78,7 +78,7 @@ const db = {
     },
     // gets multiple rows in one command
     all: async function(command, params) {
-        if(!params) params = []
+        if(params == void 0 || params == null) params = []
         return new Promise(function(r, rej) {
             database.all(command, params, function(err, res) {
                 if(err) {
@@ -359,7 +359,7 @@ function objIncludes(defaultObj, include) {
 }
 
 function wait_response_data(req, dispatch) {
-    var queryData = {}
+    var queryData = ""
     var error = false;
     return new Promise(function(resolve) {
         req.on("data", function(data) {
@@ -449,7 +449,8 @@ var server = http.createServer(async function(req, res) {
                 var vars = objIncludes(global_data, {
                     cookies: parseCookie(req.headers.cookie),
                     post_data,
-                    query_data
+                    query_data,
+                    path: URL
                 })
                 if(row[1][method]) {
                     await row[1][method](req, dispatch, vars);
@@ -488,7 +489,7 @@ function start_server() {
 }
 
 var global_data = {
-    template_data
+    template_data, db
 }
 
 // https thing: https://gist.github.com/davestevens/c9e437afbb41c1d5c3ab
