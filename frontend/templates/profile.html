@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}
-    Profile | {{ block_super }}
+    Profile | Node World Of Text
 {% endblock %}
 
 {% block header %}
@@ -15,7 +15,7 @@
 			{% if message %}
 				<span style="font-size:80%"><i>{{ message }}</i></span>
 			{% endif %}
-			<form method="POST" action=".">{{ csrf_token|safe }}
+			<form method="POST" action="."><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
 				World name: 
 				<input type="text" name="worldname" value="">
 				<input type="submit" value="Submit">

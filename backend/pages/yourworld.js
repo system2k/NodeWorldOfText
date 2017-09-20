@@ -67,6 +67,7 @@ module.exports.GET = async function(req, serve, vars) {
     var query_data = vars.query_data;
     var path = vars.path;
     var db = vars.db;
+    var redirect = vars.redirect;
 
     var world = await world_get_or_create(path, serve, vars)
     if(!world) return;
@@ -75,7 +76,7 @@ module.exports.GET = async function(req, serve, vars) {
 
     if(!world.public_readable) { // set to members/owners only
         //var whitelist = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?")
-        return serve("redirect to /accounts/private/")
+        return redirect("/accounts/private/")
     }
 
     if(query_data.fetch == 1) { // fetch request
@@ -189,5 +190,5 @@ module.exports.POST = async function(req, serve, vars) {
         }
     }
 
-    serve("This is only a test.")
+    serve()// todo: success edit array
 }

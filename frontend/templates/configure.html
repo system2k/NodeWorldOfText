@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}
-	Options for "{{ world }}" | {{ block_super }}
+	Options for "{{ world }}" | Node World Of Text
 {% endblock %}
 
 {% block endhead %}
@@ -10,14 +10,14 @@
 
 {% block header %}
 	<h1>Options for "{{ world }}"</h1>
-	<span><a href="{{ url_profile }}">« Back to profile</a></span>
+	<span><a href="/accounts/profile/">« Back to profile</a></span>
 {% endblock %}
 
 {% block content %}
 	<div class="content_set">
 		<div class="content_set_title">Access</div>
 		<div class="content_set_content">
-			<form method="POST" action=".">{{ csrf_token|safe }}
+			<form method="POST" action="."><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
 			Visitors who aren't members: <select name="public_perm">
 				<option value="none"{{ op1 }}>cannot view this world at all.</option>
 				<option value="read"{{ op2 }}>can view this world, but not edit it.</option>
@@ -36,7 +36,7 @@
 				Control what features are usable on your world. 
 				When a feature is set to "enabled", any visitor to the world can use it. Otherwise, it is only available for the owner.
 			</div>
-			<form method="POST" action=".">{{ csrf_token|safe }}
+			<form method="POST" action="."><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
 			<table id="feature_choices">
 				<tr>
 					<td class="feature_name">Go to coordinates</td>
@@ -97,7 +97,7 @@
 		<div class="content_set_content">
 			{% if members %}
 				<ul>
-					<form method="POST" action=".">{{ csrf_token|safe }}
+					<form method="POST" action="."><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
 					<input type="hidden" name="form" value="remove_member">
 					{% for member in members %}
 						<li>{{ member.member_name }} <input type="submit" name="remove_{{ member.member_name }}" value="Remove {{ member.member_name }}">
@@ -109,7 +109,7 @@
 			{% endif %}
 			{% if add_member_message %}<div><i>{{ add_member_message }}</i></div>{% endif %}
 			<div style="margin-top:.3em">
-				<form method="POST" action=".">{{ csrf_token|safe }}
+				<form method="POST" action="."><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
 				<label for="choose_member">Add a member: </label>
 				<input id="choose_member" type="text" name="add_member" value="">
 				<input type="hidden" name="form" value="add_member">

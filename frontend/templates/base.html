@@ -17,13 +17,13 @@
                     {% if user_is_authenticated %}
                         Logged in as {{ user }}:
                     {% endif %}
-                    <a href="{{ url_home }}">Home</a>
+                    <a href="/home/">Home</a>
                     {% if user_is_authenticated %}
-                        | <a href="{{ url_profile }}">Your Worlds</a>
-                        | <a href="{{ url_logout }}">Logout</a>
+                        | <a href="/accounts/profile/">Your Worlds</a>
+                        | <a href="/accounts/logout">Logout</a>
                     {% else %}
-                        | <a href="{{ url_auth_login }}">Login</a>
-                        | <a href="{{ url_registration_register }}">Register</a>
+                        | <a href="/accounts/login/">Login</a>
+                        | <a href="/accounts/register/">Register</a>
                     {% endif %}
                 </div>
 

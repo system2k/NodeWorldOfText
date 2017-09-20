@@ -1,7 +1,7 @@
 {% extends "../base.html" %}
 
 {% block title %}
-Registration | {{ block_super }}
+Registration | Node World Of Text
 {% endblock %}
 
 {% block header %}
@@ -9,12 +9,12 @@ Registration | {{ block_super }}
 {% endblock %}
 
 {% block content %}
-<form action="{{ url_registration_register }}" method="POST">{{ csrf_token|safe }}
+<form action="/accounts/register/" method="POST">{{ csrf_token|safe }}
 <table>
 <tr>
     <td align="right" valign="top">Username:</td>
     <td>
-        {{ form_username|safe }} <br/>
+        <input id="id_username" type="text" name="username" maxlength="30"{{ user_error }}/> <br/>
         {% for error in form_username_errors %}
         <span style="color:red">{{ error }}</span>
         {% endfor %}

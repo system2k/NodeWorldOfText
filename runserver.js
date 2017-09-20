@@ -44,7 +44,8 @@ const pages = {
     timemachine         : require("./backend/pages/timemachine.js"),
     unprotect           : require("./backend/pages/unprotect.js"),
     urllink             : require("./backend/pages/urllink.js"),
-    yourworld           : require("./backend/pages/yourworld.js")
+    yourworld           : require("./backend/pages/yourworld.js"),
+    404                 : require("./backend/pages/404.js")
 }
 
 const db = {
@@ -286,6 +287,8 @@ var Month  = 2628002880;
 var Year   = 31536034560;
 var Decade = 315360345600;
 
+var ms = {Second, Minute, Hour, Day, Week, Month, Year, Decade};
+
 var url_regexp = [ // regexp , function/redirect to
     ["^(\\w*)$", pages.yourworld],
     ["^(beta/(.*))$", pages.yourworld],
@@ -308,6 +311,23 @@ var url_regexp = [ // regexp , function/redirect to
     ["^accounts/timemachine/(.*)/$", pages.timemachine]
 ]
 
+/*
+    dispatch page
+    usage: this is to be used in the page modules when
+    the module wants to dispatch a different page module.
+    EG: return dispage("404", { extra parameters for page }, req, serve, vars)
+    (req, serve, and vars should already be defined by the parameters)
+*/
+function dispage(page, params, req, serve, vars) {
+    if(!params) {
+        params = {};
+    }
+    if(!vars) {
+        vars = {};
+    }
+    pages[page].GET(req, serve, vars, params);
+}
+
 var static_file_returner = {}
 static_file_returner.GET = function(req, serve) {
     var parse = url.parse(req.url).pathname.substr(1)
@@ -315,8 +335,50 @@ static_file_returner.GET = function(req, serve) {
     serve(static_data[parse], 200, { mime: mime_type })
 }
 
+// push static file urls to regexp array
 for (var i in static_data) {
     url_regexp.push(["^" + i + "$", static_file_returner])
+}
+
+// trim whitespaces in all items in array
+function ar_str_trim(ar) {
+    for(var i = 0; i < ar.length; i++) {
+        ar[i] = ar[i].trim();
+    }
+    return ar;
+}
+
+function ar_str_decodeURI(ar) {
+    for(var i = 0; i < ar.length; i++) {
+        ar[i] = decodeURIComponent(ar[i]);
+    }
+    return ar;
+}
+
+/*
+    usage:
+    split_limit("a|b|c|d|e|f|g", "|", 3) = ["a", "b", "c", "d|e|f|g"]
+*/
+function split_limit(str, char, limit) {
+    if(!limit && limit != 0) limit = Infinity;
+    var res = [];
+    var mod = 0;
+    for(var i = 0; i < str.length; i++) {
+        if(str.charAt(i) == char && mod < limit) {
+            mod++;
+            continue;
+        }
+        if(!res[mod]) {
+            res[mod] = "";
+        }
+        res[mod] += str.charAt(i);
+    }
+    for(var i = 0; i < res.length; i++) {
+        if(res[i] == undefined) {
+            res[i] = "";
+        }
+    }
+    return res;
 }
 
 function parseCookie(cookie) {
@@ -325,23 +387,20 @@ function parseCookie(cookie) {
             return {};
         }
         cookie = cookie.split(";");
-        var list = {}
-        for(var i in cookie) {
-            var c = cookie[i].split("=");
-            if(c.length > 2) {
-                var ar = c;
-                var var2 = ar.pop();
-                ar = ar.join("=")
-                ar = ar.replace(/ /g, "");
-                var2 = var2.replace(/ /g, "");
-                list[ar] = var2
-            } else if(c.length === 2) {
-                list[decodeURIComponent(c[0].replace(/ /g, ""))] = decodeURIComponent(c[1].replace(/ /g, ""))
-            } else if(c.length === 1) {
-                if(c[0] !== "") list[c[0]] = null
+        var result = {};
+        for(var i = 0; i < cookie.length; i++) {
+            var seg = cookie[i];
+            seg = split_limit(seg, "=", 1);
+            seg = ar_str_trim(seg)
+            seg = ar_str_decodeURI(seg);
+            if(seg.length == 1) {
+                if(seg[0] == "") continue;
+                result[seg[0]] = 1;
+            } else {
+                result[seg[0]] = seg[1];
             }
         }
-        return list;
+        return result;
     } catch(e) {
         return {};
     }
@@ -433,6 +492,7 @@ var server = http.createServer(async function(req, res) {
     var include_cookies = [];
 
     function dispatch(data, status_code, params) {
+        if(request_resolved) return; // if request is already sent
         request_resolved = true;
         // params: { cookie, mime, redirect } (all optional)
         var info = {}
@@ -468,6 +528,9 @@ var server = http.createServer(async function(req, res) {
         res.end(data)
     }
 
+    var vars = {};
+    var vars_joined = false; // is already joined with global_data?
+
     var found_url = false;
     for(var i in url_regexp) {
         var row = url_regexp[i];
@@ -498,11 +561,21 @@ var server = http.createServer(async function(req, res) {
                     var s_data = await db.get("SELECT * FROM auth_session WHERE session_key=?", 
                         cookies.sessionid);
                     if(s_data) {
-                        user = JSON.parse(decode_base64(s_data.session_data));
+                        user = JSON.parse(s_data.session_data);
                         if(user.csrftoken === cookies.csrftoken) {
                             user.authenticated = true;
                         }
                     }
+                }
+                var redirected = false;
+                function redirect(path) {
+                    dispatch(null, null, {
+                        redirect: path
+                    })
+                    redirected = true;
+                }
+                if(redirected) {
+                    return;
                 }
                 if(method == "POST") {
                     var error = false;
@@ -513,13 +586,15 @@ var server = http.createServer(async function(req, res) {
                     }
                     post_data = dat;
                 }
-                var vars = objIncludes(global_data, {
+                vars = objIncludes(global_data, { // extra information
                     cookies,
                     post_data,
                     query_data,
                     path: URL,
-                    user
+                    user,
+                    redirect
                 })
+                vars_joined = true;
                 if(row[1][method]) {
                     await row[1][method](req, dispatch, vars);
                 } else {
@@ -534,14 +609,17 @@ var server = http.createServer(async function(req, res) {
         }
     }
 
-    if(!request_resolved) {
-        res.statusCode = 500;
-        return res.end("Internal server error.")
+    if(!vars.user) vars.user = {}
+    if(!vars.cookies) vars.cookie = {};
+    if(!vars.path) vars.path = URL;
+
+    if(!vars_joined) {
+        vars = objIncludes(global_data, vars)
+        vars_joined = true
     }
 
-    if(!found_url) {
-        res.statusCode = 404;
-        return res.end("Not found. TODO: add a 404 page.")
+    if(!found_url || !request_resolved) {
+        return dispage("404", null, req, dispatch, vars)
     }
 })
 function start_server() {
@@ -557,7 +635,7 @@ function start_server() {
 }
 
 var global_data = {
-    template_data, db
+    template_data, db, dispage, ms, cookie_expire, checkHash, new_token
 }
 
 // https thing: https://gist.github.com/davestevens/c9e437afbb41c1d5c3ab

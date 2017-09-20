@@ -11,5 +11,5 @@ module.exports.GET = async function(req, serve, vars) {
         user: user.username
     };
 
-    serve(template_data["home.html"](data))
+    serve(template_data["404.html"](data))
 }

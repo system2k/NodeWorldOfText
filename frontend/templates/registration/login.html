@@ -6,21 +6,21 @@
 {% if form_errors %}
     <p>Your username and password didn't match. Please try again.</p>
 {% endif %}
-<form method="post" action="{{ url_auth_login }}">{{ csrf_token|safe }}
+<form method="post" action="/accounts/login/"><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
 <table>
 <tr>
-    <td>{{ form_username_label_tag|safe }}</td>
-    <td>{{ form_username|safe }}</td>
+    <td><label for="id_username">Username:</label></td>
+    <td><input id="id_username" type="text" name="username" maxlength="30"{{ user_error }}/></td>
 </tr>
 <tr>
-    <td>{{ form_password_label_tag|safe }}</td>
-    <td>{{ form_password|safe }}</td>
+    <td><label for="id_password">Password:</label></td>
+    <td><input type="password" name="password" id="id_password" /></td>
 </tr>
 </table>
 
 <input type="submit" value="login" />
-<a href="{{ url_registration_register }}">Don't have an account?</a>
-<input type="hidden" name="next" value="{{ next }}" />
+<a href="/accounts/register/">Don't have an account?</a>
+<input type="hidden" name="next" value="" />
 </form>
 
 {% endblock %}
