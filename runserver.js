@@ -443,12 +443,8 @@ function wait_response_data(req, dispatch) {
     })
 }
 
-var token_chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 function new_token(len) {
-    var token = "";
-    for(var i = 0; i < len; i++) {
-        token += token_chars.charAt(Math.floor(Math.random() * token_chars.length))
-    }
+    var token = crypto.randomBytes(len).toString("hex");
     return token;
 }
 
@@ -499,7 +495,7 @@ var server = http.createServer(async function(req, res) {
         if(!params) {
             params = {};
         }
-        if(typeof params.cookie == "string" && include_cookies.length > 0) {
+        if(typeof params.cookie == "string") {
             include_cookies.push(params.cookie)
         } else if(typeof params.cookie == "object") {
             include_cookies = include_cookies.concat(params.cookie)
@@ -545,16 +541,16 @@ var server = http.createServer(async function(req, res) {
                     authenticated: false,
                     username: "",
                     id: 0,
-                    _csrftoken: null
+                    csrftoken: null
                 }
                 // check if user is logged in
                 if(!cookies.csrftoken) {
                     var token = new_token(32)
                     var date = Date.now();
-                    include_cookies.push("csrftoken=" + token + "; expires=" + cookie_expire(date + Year))
-                    user._csrftoken = TKN;
+                    include_cookies.push("csrftoken=" + token + "; expires=" + cookie_expire(date + Year) + "; path=/;")
+                    user.csrftoken = token;
                 } else {
-                    user._csrftoken = cookies.csrftoken;
+                    user.csrftoken = cookies.csrftoken;
                 }
                 if(cookies.sessionid) {
                     // user data from session
@@ -562,9 +558,7 @@ var server = http.createServer(async function(req, res) {
                         cookies.sessionid);
                     if(s_data) {
                         user = JSON.parse(s_data.session_data);
-                        if(user.csrftoken === cookies.csrftoken) {
-                            user.authenticated = true;
-                        }
+                        user.authenticated = true;
                     }
                 }
                 var redirected = false;

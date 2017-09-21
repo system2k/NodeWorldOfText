@@ -44,7 +44,7 @@ module.exports.POST = async function(req, serve, vars) {
 
     var sessionid = new_token(32);
     var new_cookie = "sessionid=" + sessionid + "; expires=" +
-        cookie_expire(expires) + "; path=/";
+        cookie_expire(expires) + "; path=/;";
 
     var data = {
         type: "sessionid_auth",
@@ -57,7 +57,7 @@ module.exports.POST = async function(req, serve, vars) {
     db.run("INSERT INTO auth_session VALUES(?, ?, ?)", [sessionid, JSON.stringify(data), expires])
     db.run("UPDATE auth_user SET last_login=? WHERE id=?", [date_now, user.id])
 
-    serve("Success", null, {
+    serve(null, null, { // TODO: add redirects from ?next=...path...
         cookie: new_cookie,
         redirect: "/accounts/profile/"
     })
