@@ -623,8 +623,8 @@ function start_server() {
         await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
         setTimeout(clear_expired_sessions, Minute);
     })()
-
-    server.listen(settings.port, function() {
+    var IP = process.env.OPENSHIFT_NODEJS_IP;
+    server.listen(process.env.OPENSHIFT_NODEJS_PORT || settings.port, IP || null, function() {
         var addr = server.address();
         console.log("Server is running.\nAddress: " + addr.address + "\nPort: " + addr.port);
     });
