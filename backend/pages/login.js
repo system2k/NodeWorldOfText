@@ -26,6 +26,9 @@ module.exports.POST = async function(req, serve, vars) {
     var new_token = vars.new_token;
     var cookie_expire = vars.cookie_expire;
     var ms = vars.ms;
+    var querystring = vars.querystring;
+    var referer = vars.referer;
+    var url = vars.url;
 
     var username = post_data.username;
     var password = post_data.password;
@@ -57,8 +60,14 @@ module.exports.POST = async function(req, serve, vars) {
     db.run("INSERT INTO auth_session VALUES(?, ?, ?)", [sessionid, JSON.stringify(data), expires])
     db.run("UPDATE auth_user SET last_login=? WHERE id=?", [date_now, user.id])
 
+    var next = "/accounts/profile/";
+    var check_next = querystring.parse(url.parse(referer).query)
+    if(check_next.next) {
+        next = check_next.next;
+    }
+
     serve(null, null, { // TODO: add redirects from ?next=...path...
         cookie: new_cookie,
-        redirect: "/accounts/profile/"
+        redirect: next
     })
 }

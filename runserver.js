@@ -318,14 +318,14 @@ var url_regexp = [ // regexp , function/redirect to
     EG: return dispage("404", { extra parameters for page }, req, serve, vars)
     (req, serve, and vars should already be defined by the parameters)
 */
-function dispage(page, params, req, serve, vars) {
+async function dispage(page, params, req, serve, vars) {
     if(!params) {
         params = {};
     }
     if(!vars) {
         vars = {};
     }
-    pages[page].GET(req, serve, vars, params);
+    await pages[page].GET(req, serve, vars, params);
 }
 
 var static_file_returner = {}
@@ -586,11 +586,13 @@ var server = http.createServer(async function(req, res) {
                     query_data,
                     path: URL,
                     user,
-                    redirect
+                    redirect,
+                    referer: req.headers.referer
                 })
                 vars_joined = true;
                 if(row[1][method]) {
-                    await row[1][method](req, dispatch, vars);
+                    // Return the page
+                    await row[1][method](req, dispatch, vars, {});
                 } else {
                     dispatch("Method " + method + " not allowed.", 405)
                 }
@@ -629,7 +631,7 @@ function start_server() {
 }
 
 var global_data = {
-    template_data, db, dispage, ms, cookie_expire, checkHash, new_token
+    template_data, db, dispage, ms, cookie_expire, checkHash, new_token, querystring, url
 }
 
 // https thing: https://gist.github.com/davestevens/c9e437afbb41c1d5c3ab

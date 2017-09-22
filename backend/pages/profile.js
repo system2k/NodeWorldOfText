@@ -1,6 +1,6 @@
 module.exports = {};
 
-module.exports.GET = async function(req, serve, vars) {
+module.exports.GET = async function(req, serve, vars, params) {
     var template_data = vars.template_data;
     var cookies = vars.cookies;
     var db = vars.db;
@@ -18,7 +18,8 @@ module.exports.GET = async function(req, serve, vars) {
     var owned = await db.all("SELECT * FROM world WHERE owner_id=?", user.id)
     for(var i = 0; i < owned.length; i++) {
         var world = owned[i];
-        var member_total = await db.get("select world_id, count(world_id) as count from whitelist where world_id=?", world.id).count;
+        var member_total = await db.get("select world_id, count(world_id) as count from whitelist where world_id=?", world.id);
+        member_total = member_total.count;
         
         var plural = "";
         if(member_total !== 1) {
@@ -48,6 +49,9 @@ module.exports.GET = async function(req, serve, vars) {
     }
 
     var message = null;
+    if(params.message) {
+        message = params.message;
+    }
 
     var data = {
         user_is_authenticated: user.authenticated,
@@ -60,4 +64,38 @@ module.exports.GET = async function(req, serve, vars) {
     };
 
     serve(template_data["profile.html"](data))
+}
+
+module.exports.POST = async function(req, serve, vars) {
+    var db = vars.db;
+    var post_data = vars.post_data;
+    var user = vars.user;
+    var dispage = vars.dispage;
+
+    if(!user.authenticated) {
+        return serve(null, 403);
+    }
+
+    var message = null;
+
+    var worldname = post_data.worldname;
+    if(worldname.match(/^(\w*)$/g) && worldname.length > 0) {
+        var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", worldname)
+        if(!world) {
+            var date = Date.now();
+            await db.run("INSERT INTO world VALUES(null, ?, ?, ?, ?, 1, 1, '{}')",
+                [worldname, user.id, date, date])
+        } else {
+            if(world.owner_id == null) {
+                await db.run("UPDATE world SET owner_id=? WHERE name=?", [user.id, worldname])
+            } else {
+                message = "World already has an owner";
+            }
+        }
+    } else {
+        message = "Invalid world name";
+    }
+    await dispage("profile", {
+        message: message
+    }, req, serve, vars)
 }
