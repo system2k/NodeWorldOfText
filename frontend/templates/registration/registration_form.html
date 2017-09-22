@@ -9,7 +9,7 @@ Registration | Node World Of Text
 {% endblock %}
 
 {% block content %}
-<form action="/accounts/register/" method="POST">{{ csrf_token|safe }}
+<form action="/accounts/register/" method="POST"><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
 <table>
 <tr>
     <td align="right" valign="top">Username:</td>
@@ -23,7 +23,7 @@ Registration | Node World Of Text
 <tr>
     <td align="right" valign="top">Email:</td>
     <td>
-        {{ form_email|safe }} <br/>
+        <input id="id_email" type="text" class="required" name="email" maxlength="75" /> <br/>
         {% for error in form_email_errors %}
         <span style="color:red">{{ error }}</span>
         {% endfor %}
@@ -32,7 +32,7 @@ Registration | Node World Of Text
 <tr>
     <td align="right" valign="top">Password:</td>
     <td>
-        {{ form_password1|safe }} <br/>
+        <input id="id_password1" type="password" class="required" name="password1" /> <br/>
         {% for error in form_password1_errors %}
         <span style="color:red">{{ error }}</span>
         {% endfor %}
@@ -41,7 +41,7 @@ Registration | Node World Of Text
 <tr>
     <td align="right" valign="top">Password (again):</td>
     <td>
-        {{ form_password2|safe }} <br/>
+        <input id="id_password2" type="password" class="required" name="password2" /> <br/>
         {% for error in form_password2_errors %}
         <span style="color:red">{{ error }}</span>
         {% endfor %}

@@ -45,8 +45,10 @@ function tile_coord(coord) {
     return [parseInt(coord[0]), parseInt(coord[1])];
 }
 
-async function world_get_or_create(name, serve, vars) {
+async function world_get_or_create(name, req, serve, vars) {
     var db = vars.db;
+    var dispage = vars.dispage;
+
     var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
     if(!world) { // world doesn't exist
         if(name.match(/^(\w*)$/g)) {
@@ -55,7 +57,7 @@ async function world_get_or_create(name, serve, vars) {
                 [name, date, date])
             world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name)
         } else { // special worlds (like: /beta/test) are not found and must not be created
-            return serve("404. world not found")
+            return await dispage("404", null, req, serve, vars)
         }
     }
     return world;
@@ -90,7 +92,7 @@ module.exports.GET = async function(req, serve, vars) {
     var redirect = vars.redirect;
     var user = vars.user;
 
-    var world = await world_get_or_create(path, serve, vars)
+    var world = await world_get_or_create(path, req, serve, vars)
     if(!world) return;
 
     var world_properties = JSON.parse(world.properties)
@@ -200,7 +202,7 @@ module.exports.POST = async function(req, serve, vars) {
 
     var edits_limit = 1000;
 
-    var world = await world_get_or_create(path, serve, vars)
+    var world = await world_get_or_create(path, req, serve, vars)
     if(!world) return;
 
     var read_permission = await can_view_world(world, user, db);

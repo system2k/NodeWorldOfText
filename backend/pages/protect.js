@@ -1,6 +1,6 @@
 module.exports = {};
 
-module.exports.POST = async function(req, serve, vars) {
+module.exports.POST = async function(req, serve, vars, params) {
     var db = vars.db;
     var user = vars.user;
     var post_data = vars.post_data;
@@ -22,6 +22,9 @@ module.exports.POST = async function(req, serve, vars) {
         properties = JSON.parse(tile.properties);
     }
     properties.protected = true;
+    if(params.unprotect) { // received an /ajax/unprotect/?
+        delete properties.protected;
+    }
 
     if(tile) { // tile exists, update
         await db.run("UPDATE tile SET properties=? WHERE world_id=? AND tileY=? AND tileX=?",

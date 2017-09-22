@@ -178,7 +178,7 @@ var prompt_account_properties = {
 var prompt_account_yesno = {
 	properties: {
 		yes_no_account: {
-			message: "You just installed the server, which means you don\'t have any superusers defined.\nWould you like to create one now? (yes/no):"
+			message: "You just installed the server,\nwhich means you don\'t have any superusers defined.\nWould you like to create one now? (yes/no):"
 		}
 	}
 };
@@ -251,7 +251,7 @@ function account_prompt() {
 		
 		if(!err){
 			var Date_ = Date.now()
-            var passHash = encryptHash(result['password'])
+            var passHash = encryptHash(result["password"])
 
             db.run("INSERT INTO auth_user VALUES(null, ?, '', '', '', ?, 1, 1, 1, ?, ?)",
                 [result["username"], passHash, Date_, Date_])
@@ -315,17 +315,22 @@ var url_regexp = [ // regexp , function/redirect to
     dispatch page
     usage: this is to be used in the page modules when
     the module wants to dispatch a different page module.
-    EG: return dispage("404", { extra parameters for page }, req, serve, vars)
+    EG: return dispage("404", { extra parameters for page }, req, serve, vars, "POST")
     (req, serve, and vars should already be defined by the parameters)
+    ("POST" is only needed if you need to post something. otherwise, don't include anything)
 */
-async function dispage(page, params, req, serve, vars) {
+async function dispage(page, params, req, serve, vars, method) {
+    if(!method) {
+        method = "GET";
+    }
+    method = method.toUpperCase();
     if(!params) {
         params = {};
     }
     if(!vars) {
         vars = {};
     }
-    await pages[page].GET(req, serve, vars, params);
+    await pages[page][method](req, serve, vars, params);
 }
 
 var static_file_returner = {}
@@ -576,9 +581,10 @@ var server = http.createServer(async function(req, res) {
                 if(method == "POST") {
                     var error = false;
                     var queryData = "";
-                    var dat = await wait_response_data(req, dispatch);
+                    var dat = await wait_response_data(req, dispatch)
                     if(!dat) {
                         return;
+                        
                     }
                     post_data = dat;
                 }
@@ -594,7 +600,7 @@ var server = http.createServer(async function(req, res) {
                 vars_joined = true;
                 if(row[1][method]) {
                     // Return the page
-                    await row[1][method](req, dispatch, vars, {});
+                    await row[1][method](req, dispatch, vars, {})
                 } else {
                     dispatch("Method " + method + " not allowed.", 405)
                 }
@@ -633,7 +639,16 @@ function start_server() {
 }
 
 var global_data = {
-    template_data, db, dispage, ms, cookie_expire, checkHash, new_token, querystring, url
+    template_data,
+    db,
+    dispage,
+    ms,
+    cookie_expire,
+    checkHash,
+    encryptHash,
+    new_token,
+    querystring,
+    url
 }
 
 // https thing: https://gist.github.com/davestevens/c9e437afbb41c1d5c3ab

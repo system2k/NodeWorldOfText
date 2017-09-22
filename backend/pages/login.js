@@ -1,6 +1,6 @@
 module.exports = {};
 
-module.exports.GET = async function(req, serve, vars) {
+module.exports.GET = async function(req, serve, vars, params) {
     var template_data = vars.template_data;
     var cookies = vars.cookies;
     var db = vars.db;
@@ -10,14 +10,14 @@ module.exports.GET = async function(req, serve, vars) {
     var data = {
         user_is_authenticated: user.authenticated,
         user: user.username,
-        form_errors: false, // "your passwords didn't match",
+        form_errors: params.errors, // "Your username and password didn't match. Please try again."
         csrftoken: new_token(32)
     };
 
     serve(template_data["registration/login.html"](data))
 }
 
-module.exports.POST = async function(req, serve, vars) {
+module.exports.POST = async function(req, serve, vars, params) {
     var cookies = vars.cookies;
     var db = vars.db;
     var user = vars.user;
@@ -29,17 +29,22 @@ module.exports.POST = async function(req, serve, vars) {
     var querystring = vars.querystring;
     var referer = vars.referer;
     var url = vars.url;
+    var dispage = vars.dispage;
 
     var username = post_data.username;
     var password = post_data.password;
+    if(params.registered) {
+        username = params.username;
+        password = params.password;
+    }
 
     var user = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username)
     if(!user) {
-        return serve("User does not exist")
+        await dispage("login", {errors: true}, req, serve, vars)
     }
     var valid = checkHash(user.password, password)
     if(!valid) { // wrong password
-        return serve("Wrong password")
+        await dispage("login", {errors: true}, req, serve, vars)
     }
 
     var date_now = Date.now();
@@ -57,8 +62,8 @@ module.exports.POST = async function(req, serve, vars) {
         username: user.username
     }
 
-    db.run("INSERT INTO auth_session VALUES(?, ?, ?)", [sessionid, JSON.stringify(data), expires])
-    db.run("UPDATE auth_user SET last_login=? WHERE id=?", [date_now, user.id])
+    await db.run("INSERT INTO auth_session VALUES(?, ?, ?)", [sessionid, JSON.stringify(data), expires])
+    await db.run("UPDATE auth_user SET last_login=? WHERE id=?", [date_now, user.id])
 
     var next = "/accounts/profile/";
     var check_next = querystring.parse(url.parse(referer).query)
@@ -66,7 +71,7 @@ module.exports.POST = async function(req, serve, vars) {
         next = check_next.next;
     }
 
-    serve(null, null, { // TODO: add redirects from ?next=...path...
+    serve(null, null, {
         cookie: new_cookie,
         redirect: next
     })
