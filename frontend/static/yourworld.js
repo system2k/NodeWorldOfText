@@ -1,6 +1,3 @@
-// File: yourworld.js
-// Author: Andrew Badr <andrewbadr@gmail.com>
-
 var YourWorld = {};
 
 // Shortcut for public API
@@ -1238,7 +1235,6 @@ YourWorld.Tile = function() {
 		var _protected = false;
 		var _cellProps = null;
 		var _colors;
-		var _revision;
 		
 		var updateHTML = function(newContent, highlight, newColors) {
 			var c, charY, charX, cell, color;
@@ -1282,7 +1278,7 @@ YourWorld.Tile = function() {
 			}
 		};
 		
-		var setContent = function(newContent, props, updRev) {
+		var setContent = function(newContent, props) {
 			// newContent is either a string, with a char for each cell, or `null` to mean blank
 
 			// First convert content to a string:
@@ -1305,13 +1301,10 @@ YourWorld.Tile = function() {
 			if(props) {
 				newColors = props;
 			}
-			// Update the content
-			if (_revision !== updRev || !Initted_copy) {
-				updateHTML(newContent, highlight, newColors);
-				_content = newContent; // this must come after updateHTML
-				_colors = newColors.slice(0);
-				_revision = updRev;
-			}
+            // Update the content
+            updateHTML(newContent, highlight, newColors);
+            _content = newContent; // this must come after updateHTML
+            _colors = newColors.slice(0);
 		};
 		
 		var setProtected = function(prot) {
@@ -1376,8 +1369,6 @@ YourWorld.Tile = function() {
 							} else {
 								//throw new Error('Unknown link type');
 							}
-						} else if(propName === '1') {
-							//$(cell)[0].style.color = "#" + ("000000" + (val).toString(16)).substr(-6);
 						} else {
 							throw new Error('Unknown cell property');
 						}
@@ -1406,7 +1397,7 @@ YourWorld.Tile = function() {
 		
 		obj.setProperties = function(p) {
 			// p is either an object or null to mean no data
-			setContent((p && p.content) ? p.content : null, p && p.properties && p.properties.color || null, p && p.properties && p.properties.revision || null);
+			setContent((p && p.content) ? p.content : null, p && p.properties && p.properties.color || null);
 			setProtected(p && p.properties && p.properties['protected'] || false);
 			setCellProps(p && p.properties && p.properties.cell_props || null);
 		};

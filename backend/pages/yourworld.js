@@ -61,6 +61,26 @@ async function world_get_or_create(name, serve, vars) {
     return world;
 }
 
+async function can_view_world(world, user, db) {
+    var permissions = {
+        member: false,
+        owner: false
+    };
+    if(!world.public_readable && world.owner_id != user.id) { // is it set to members/owners only?
+        var whitelist = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
+            [world.id, user.id])
+        if(!whitelist) { // not a member (nor owner)
+            return false;
+        } else {
+            permissions.member = true;
+        }
+    }
+    if(world.owner_id == user.id) {
+        permissions.owner = true;
+    }
+    return permissions;
+}
+
 module.exports.GET = async function(req, serve, vars) {
     var template_data = vars.template_data;
     var cookies = vars.cookies;
@@ -68,14 +88,15 @@ module.exports.GET = async function(req, serve, vars) {
     var path = vars.path;
     var db = vars.db;
     var redirect = vars.redirect;
+    var user = vars.user;
 
     var world = await world_get_or_create(path, serve, vars)
     if(!world) return;
 
     var world_properties = JSON.parse(world.properties)
 
-    if(!world.public_readable) { // set to members/owners only
-        //var whitelist = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?")
+    var read_permission = await can_view_world(world, user, db);
+    if(!read_permission) {
         return redirect("/accounts/private/")
     }
 
@@ -85,10 +106,10 @@ module.exports.GET = async function(req, serve, vars) {
         var max_tileY = parseInt(query_data.max_tileY)
         var max_tileX = parseInt(query_data.max_tileX)
         if(null_or_nan([min_tileY, min_tileX, max_tileY, max_tileX], 2)) {
-            return serve("Invalid querydata.") // might need to return 400 bad request
+            return serve("Invalid querydata")
         }
         if(!(min_tileY < max_tileY && min_tileX < max_tileX)) {
-            return serve("Invalid range.")
+            return serve("Invalid range")
         }
         if(!((max_tileY - min_tileY) * (max_tileX - min_tileX) <= 400)) {
             return serve("Too many tiles")
@@ -116,14 +137,47 @@ module.exports.GET = async function(req, serve, vars) {
         world_properties.views++;
         await db.run("UPDATE world SET properties=? WHERE id=?", [JSON.stringify(world_properties), world.id])
 
+        var canWrite = world.public_writable;
+        var canAdmin = false;
+        var coordLink = false;
+        var urlLink = false;
+        var go_to_coord = false;
+
+        if(world_properties.properties) {
+            if(world_properties.properties.coordLink) {
+                coordLink = true;
+            }
+            if(world_properties.properties.go_to_coord) {
+                go_to_coord = true;
+            }
+            if(world_properties.properties.urlLink) {
+                urlLink = true;
+            }
+        }
+
+        if(read_permission.member) {
+            canWrite = true;
+            coordLink = true;
+            urlLink = true;
+            go_to_coord = true;
+        }
+
+        if(read_permission.owner) {
+            canWrite = true;
+            canAdmin = true;
+            coordLink = true;
+            urlLink = true;
+            go_to_coord = true;
+        }
+
         var state = {
-            canWrite: true,
-            canAdmin: false,
-            worldName: "name",
+            canWrite: canWrite,
+            canAdmin: canAdmin,
+            worldName: world.name,
             features: {
-                coordLink: false,
-                urlLink: false,
-                go_to_coord: false
+                coordLink: coordLink,
+                urlLink: urlLink,
+                go_to_coord: go_to_coord
             }
         }
         if(req.headers["user-agent"].indexOf("MSIE") >= 0) {
@@ -142,11 +196,28 @@ module.exports.POST = async function(req, serve, vars) {
     var path = vars.path;
     var db = vars.db;
     var post_data = vars.post_data;
+    var user = vars.user;
+
+    var edits_limit = 1000;
 
     var world = await world_get_or_create(path, serve, vars)
     if(!world) return;
 
+    var read_permission = await can_view_world(world, user, db);
+    if(!read_permission) {
+        // no permission to view world?
+        return serve(null, 403);
+    }
+    var is_owner = user.id == world.owner_id;
+    if(!world.public_writable) {
+        if(!(read_permission.owner || read_permission.member)) {
+            // no permission to write anywhere?
+            return serve(null, 403)
+        }
+    }
+
     var edits = JSON.parse(post_data.edits);
+    var total_edits = 0;
     var tiles = {};
     // organize edits into tile coordinates
     for(var i = 0; i < edits.length; i++) {
@@ -155,6 +226,10 @@ module.exports.POST = async function(req, serve, vars) {
         }
         if (edits[i][5] == "\n" || edits[i][5] == "\r") edits[i][5] = " ";
         tiles[edits[i][0] + "," + edits[i][1]].push(edits[i])
+        total_edits++;
+        if(total_edits >= edits_limit) { // edit limit reached
+            break;
+        }
     }
 
     // begin writing the edits
@@ -164,30 +239,48 @@ module.exports.POST = async function(req, serve, vars) {
         var properties = {
             color: Array(128).fill(0)
         };
+        var date = Date.now();
 
         var pos = tile_coord(i)
+        var tileY = pos[0];
+        var tileX = pos[1];
         var tile = await db.get("SELECT * FROM tile WHERE world_id=? AND tileY=? AND tileX=?",
-            [world.id, pos[0], pos[1]])
+            [world.id, tileY, tileX])
+
+        var rejected = [];
+        var changes = tiles[i];
         if(tile) {
             var content = tile.content.split("");
             tile_data = content;
+            properties = JSON.parse(tile.properties)
+            if(properties.protected && !is_owner) {
+                // tile is protected but user is not owner
+                rejected = rejected.concat(changes);
+                continue; // go to next tile
+            }
         }
-        var changes = tiles[i];
         for(var e = 0; e < changes.length; e++) {
             var charY = changes[e][2];
             var charX = changes[e][3];
             var char = changes[e][5];
+            var color = changes[e][6];
+            if(!color) {
+                color = 0;
+            }
             var offset = charY * 16 + charX;
             tile_data[offset] = char;
+            properties.color[charY*16 + charX] = color;
         }
         tile_data = tile_data.join("").slice(0, 128);
         if(tile) { // tile exists, update
-            db.run("UPDATE tile SET content=? WHERE world_id=? AND tileY=? AND tileX=?",
-                [tile_data, world.id, pos[0], pos[1]])
+            await db.run("UPDATE tile SET (content, properties)=(?, ?) WHERE world_id=? AND tileY=? AND tileX=?",
+                [tile_data, JSON.stringify(properties), world.id, tileY, tileX])
         } else { // tile doesn't exist, insert
-            db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?)",
-                [world.id, tile_data, pos[0], pos[1], JSON.stringify(properties), Date.now()])
+            await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?)",
+                [world.id, tile_data, tileY, tileX, JSON.stringify(properties), date])
         }
+        await db.run("INSERT INTO edit VALUES(null, ?, null, ?, ?, ?, ?, ?)", // log the edit
+            [user.id, world.id, tileY, tileX, date, JSON.stringify(changes)])
     }
 
     serve()// todo: success edit array

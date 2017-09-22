@@ -558,7 +558,9 @@ var server = http.createServer(async function(req, res) {
                         cookies.sessionid);
                     if(s_data) {
                         user = JSON.parse(s_data.session_data);
-                        user.authenticated = true;
+                        if(cookies.csrftoken == user.csrftoken) { // verify csrftoken
+                            user.authenticated = true;
+                        }
                     }
                 }
                 var redirected = false;
@@ -623,8 +625,8 @@ function start_server() {
         await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
         setTimeout(clear_expired_sessions, Minute);
     })()
-    var IP = process.env.OPENSHIFT_NODEJS_IP;
-    server.listen(process.env.OPENSHIFT_NODEJS_PORT || settings.port, IP || null, function() {
+
+    server.listen(settings.port, function() {
         var addr = server.address();
         console.log("Server is running.\nAddress: " + addr.address + "\nPort: " + addr.port);
     });
