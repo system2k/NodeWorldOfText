@@ -56,7 +56,7 @@ const db = {
         return new Promise(function(r, rej) {
             database.get(command, params, function(err, res) {
                 if(err) {
-                    return rej(false)
+                    rej(err)
                 }
                 r(res)
             })
@@ -69,7 +69,7 @@ const db = {
         return new Promise(function(r, rej) {
             database.run(command, params, function(err, res) {
                 if(err) {
-                    return rej(err)
+                    rej(err)
                 }
                 var info = {
                     lastID: this.lastID
@@ -84,7 +84,7 @@ const db = {
         return new Promise(function(r, rej) {
             database.all(command, params, function(err, res) {
                 if(err) {
-                    return rej(err)
+                    rej(err)
                 }
                 r(res)
             })
@@ -98,18 +98,19 @@ const db = {
         }
         var def = callbacks
         var callback_error = false
+        var cb_err_desc = "callback_error...";
         callbacks = function() {
             try {
                 def(...arguments)
             } catch(e) {
                 callback_error = true
+                cb_err_desc = e;
             }
         }
         return new Promise(function(r, rej) {
             database.each(command, params, callbacks, function(err, res) {
-                if(err || callback_error) {
-                    return rej(err)
-                }
+                if(err) rej(err)
+                if(callback_error) throw rej(cb_err_desc)
                 r(res)
             })
         })
@@ -120,7 +121,7 @@ const db = {
         return new Promise(function(r, rej) {
             database.exec(command, function(err) {
                 if(err) {
-                    return rej(err)
+                    rej(err)
                 }
                 r(true)
             })
@@ -187,15 +188,11 @@ var prompt_account_yesno = {
 const log_error = function(err) {
 	if(settings.error_log) {
 		try {
-			var errs = err;
-			if(typeof errs !== "string") {
-				errs = errs.stack
-			}
-			errs = JSON.stringify(errs);
-			err = "[" + errs + ", " + Date.now() + "]\r\n";
-			fs.appendFile(settings.LOG_PATH, err);
+			err = JSON.stringify(err);
+			err = "TIME: " + Date.now() + "\r\n" + err + "\r\n" + "-".repeat(20) + "\r\n\r\n\r\n";
+			fs.appendFileSync(settings.LOG_PATH, err);
 		} catch(e) {
-			console.log(e)
+			console.log("Error logging error:", e)
 		}
 	}
 }
@@ -475,6 +472,12 @@ var server = https_reference.createServer(options, async function(req, res) {
     } catch(e) {
         res.statusCode = 500;
         res.end(template_data["500.html"]({}))
+        var error = {};
+        var keys = Object.getOwnPropertyNames(e);
+        for(var i = 0; i < keys.length; i++) {
+            error[keys[i]] = e[keys[i]];
+        }
+        log_error(JSON.stringify(error));
     }
 })
 
