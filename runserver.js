@@ -1,4 +1,5 @@
 const https         = require("https");
+const http          = require("http"); // just in case the keys don't exist
 const url           = require("url");
 const sql           = require("sqlite3").verbose();
 const fs            = require("fs");
@@ -448,18 +449,27 @@ function decode_base64(b64str) {
     return new Buffer(b64str, 'base64').toString('ascii')
 }
 
-var options = {
-  key: fs.readFileSync('../le/etc/live/nwot.sytes.net/privkey.pem'),
-  cert: fs.readFileSync('../le/etc/live/nwot.sytes.net/cert.pem'),
-  ca: fs.readFileSync('../le/etc/live/nwot.sytes.net/chain.pem')
-};
+var options = {};
+var https_disabled = false;
+try { // so that ~FP can run it on his own (since he does not have the keys)
+    var options = {
+        key: fs.readFileSync('../le/etc/live/nwot.sytes.net/privkey.pem'),
+        cert: fs.readFileSync('../le/etc/live/nwot.sytes.net/cert.pem'),
+        ca: fs.readFileSync('../le/etc/live/nwot.sytes.net/chain.pem')
+    };
+} catch(e) {
+    https_disabled = true;
+}
+var https_reference = https;
+var prev_cS = http.createServer;
+if(https_disabled) { // incase the keys are not available (if running on FPs machine)
+    http.createServer = function(opt, func) {
+        return prev_cS(func);
+    }
+    https_reference = http
+}
 
-var server = https.createServer(options, async function(req, res) {
-    // use this if you do not want the request data to be cached
-    /*res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");*/
-
+var server = https_reference.createServer(options, async function(req, res) {
     try {
         await process_request(req, res)
     } catch(e) {
@@ -643,4 +653,10 @@ var global_data = {
     split_limit
 }
 
-// https thing: https://gist.github.com/davestevens/c9e437afbb41c1d5c3ab
+/*
+    TODO:
+    -add websockets
+    -add superuser admin panel to view raw edits
+    -certain members could create scripts that would be loaded to their client
+    by default. superusers could add/remove this permission
+*/

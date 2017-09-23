@@ -352,6 +352,9 @@ module.exports.POST = async function(req, serve, vars) {
             if(color > 16777215) color = 16777215;
             var offset = charY * 16 + charX;
             tile_data[offset] = char;
+            if(!properties.color) {
+                properties.color = Array(128).fill(0)
+            }
             properties.color[charY*16 + charX] = color;
 
             if(properties.cell_props) {

@@ -53,6 +53,10 @@ module.exports.GET = async function(req, serve, vars, params) {
         message = params.message;
     }
 
+    // do not display areas if they are empty
+    if(world_list.length == 0) world_list = null;
+    if(memberships.length == 0) memberships = null;
+
     var data = {
         user_is_authenticated: user.authenticated,
         user: user.username,
