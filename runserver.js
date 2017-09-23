@@ -225,26 +225,12 @@ function toUpper(x) {
 function account_prompt() {
     passFunc = function(err, result) {
 		var err = false;
-		if(result['password'] !== result['confirmpw']) {
+		if(result["password"] !== result["confirmpw"]) {
 			console.log("Error: Your passwords didn't match.")
 			err = true;
 			prompt.get(prompt_account_properties, passFunc);
 		} else if(result.password.length > 128) {
 			console.log("The password is too long. It must be 128 characters or less.");
-			err = true;
-			prompt.get(prompt_account_properties, passFunc);
-		}
-
-		if(result.username.length > 30) {
-			console.log("The username must be 30 characters or less.")
-			err = true;
-			prompt.get(prompt_account_properties, passFunc);
-		} else if(result.username.length < 1) {
-			console.log("The username is too short");
-			err = true;
-			prompt.get(prompt_account_properties, passFunc);
-		} else if(!result.username.match(/^(\w*)$/g)) {
-			console.log("The username must contain the following characters: a-z A-Z 0-9 _");
 			err = true;
 			prompt.get(prompt_account_properties, passFunc);
 		}

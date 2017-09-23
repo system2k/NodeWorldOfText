@@ -136,6 +136,7 @@ module.exports.GET = async function(req, serve, vars, params) {
                 world.id);
 
             if(!dr1 || !dr2) {
+                // diagonal text...
                 var e_str = "Cannot view timemachine: There are no edits yet. | ";
                 for (var ty in YTileRange) { // fill in null values
                     for (var tx in XTileRange) {
@@ -162,15 +163,35 @@ module.exports.GET = async function(req, serve, vars, params) {
             dr1 = dr1.time;
             dr2 = dr2.time;
 
-            //console.log(dr1, dr2)
+            var time = params.time;
+            if(!time) {
+                time = Date.now();
+            } else {
+                var range = dr2 - dr1;
+                var div = range / 1000000;
+                time = Math.floor(div * params.time) + dr1
+            }
 
-            /*await db.each("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?", 
-                [world.id, min_tileY, min_tileX, max_tileY, max_tileX], function(e, data) {
-                tiles[data.tileY + "," + data.tileX] = {
-                    content: data.content,
-                    properties: JSON.parse(data.properties)
+            await db.each("SELECT * FROM edit WHERE world_id=? AND time<=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?",
+                [world.id, time, min_tileY, min_tileX, max_tileY, max_tileX], function(e, data) {
+                var con = JSON.parse(data.content);
+                for(var i in con) {
+                    var z = con[i]
+                    if(!tiles[z[0] + "," + z[1]]) {
+                        tiles[z[0] + "," + z[1]] = {
+                            content: " ".repeat(128).split(""),
+                            properties: {}
+                        };
+                    };
+                    tiles[z[0] + "," + z[1]].content[z[2]*16+z[3]] = z[5]
                 }
-            })*/
+            })
+
+            for(var i in tiles) {
+                if(tiles[i]) {
+                    tiles[i].content = tiles[i].content.join("");
+                }
+            }
         } else {
             await db.each("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?", 
                 [world.id, min_tileY, min_tileX, max_tileY, max_tileX], function(e, data) {
