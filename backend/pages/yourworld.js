@@ -340,8 +340,11 @@ module.exports.POST = async function(req, serve, vars) {
         for(var e = 0; e < changes.length; e++) {
             var charY = Math.floor(changes[e][2]);
             var charX = Math.floor(changes[e][3]);
-            var char = Math.floor(changes[e][5]);
+            var char = changes[e][5];
             var color = Math.floor(changes[e][6]);
+            if(typeof char !== "string") {
+                char = "?";
+            }
             if(!color) {
                 color = 0;
             }
