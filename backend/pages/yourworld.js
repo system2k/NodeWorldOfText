@@ -260,7 +260,6 @@ module.exports.GET = async function(req, serve, vars, params) {
             state.canWrite = false;
         }
         var data = {
-            urlhome: "/home/",
             state: JSON.stringify(state),
             css_timemachine
         }
@@ -349,6 +348,14 @@ module.exports.POST = async function(req, serve, vars) {
             var offset = charY * 16 + charX;
             tile_data[offset] = char;
             properties.color[charY*16 + charX] = color;
+
+            if(properties.cell_props) {
+                if(properties.cell_props[charY]) {
+                    if(properties.cell_props[charY][charX]) {
+                        properties.cell_props[charY][charX] = {};
+                    }
+                }
+            }
         }
         tile_data = tile_data.join("").slice(0, 128);
         if(tile) { // tile exists, update
