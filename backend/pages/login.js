@@ -38,11 +38,11 @@ module.exports.POST = async function(req, serve, vars, params) {
         password = params.password;
     }
 
-    var user = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username)
-    if(!user) {
+    var loginuser = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username)
+    if(!loginuser) {
         await dispage("login", {errors: true}, req, serve, vars)
     }
-    var valid = checkHash(user.password, password)
+    var valid = checkHash(loginuser.password, password)
     if(!valid) { // wrong password
         await dispage("login", {errors: true}, req, serve, vars)
     }
@@ -58,12 +58,12 @@ module.exports.POST = async function(req, serve, vars, params) {
         type: "sessionid_auth",
         date: date_now,
         csrftoken: cookies.csrftoken,
-        id: user.id,
-        username: user.username
+        id: loginuser.id,
+        username: loginuser.username
     }
 
     await db.run("INSERT INTO auth_session VALUES(?, ?, ?)", [sessionid, JSON.stringify(data), expires])
-    await db.run("UPDATE auth_user SET last_login=? WHERE id=?", [date_now, user.id])
+    await db.run("UPDATE auth_user SET last_login=? WHERE id=?", [date_now, loginuser.id])
 
     var next = "/accounts/profile/";
     var check_next = querystring.parse(url.parse(referer).query)

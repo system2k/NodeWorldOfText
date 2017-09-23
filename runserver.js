@@ -366,24 +366,10 @@ function ar_str_decodeURI(ar) {
 */
 function split_limit(str, char, limit) {
     if(!limit && limit != 0) limit = Infinity;
-    var res = [];
-    var mod = 0;
-    for(var i = 0; i < str.length; i++) {
-        if(str.charAt(i) == char && mod < limit) {
-            mod++;
-            continue;
-        }
-        if(!res[mod]) {
-            res[mod] = "";
-        }
-        res[mod] += str.charAt(i);
-    }
-    for(var i = 0; i < res.length; i++) {
-        if(res[i] == undefined) {
-            res[i] = "";
-        }
-    }
-    return res;
+    var arr = str.split(char)
+    var result = arr.splice(0, limit);
+    result.push(arr.join(char));
+    return result;
 }
 
 function parseCookie(cookie) {
@@ -481,7 +467,16 @@ var server = http.createServer(async function(req, res) {
     /*res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");*/
-    
+
+    try {
+        await process_request(req, res)
+    } catch(e) {
+        res.statusCode = 500;
+        res.end(template_data["500.html"]({}))
+    }
+})
+
+async function process_request(req, res) {
     var URL = url.parse(req.url).pathname;
     if(URL.charAt(0) == "/") {
         URL = URL.substr(1);
@@ -505,7 +500,10 @@ var server = http.createServer(async function(req, res) {
         } else if(typeof params.cookie == "object") {
             include_cookies = include_cookies.concat(params.cookie)
         }
-        if(params.cookie) {
+        if(include_cookies.length == 1) {
+            include_cookies = include_cookies[0];
+        }
+        if(include_cookies.length > 0) {
             info["Set-Cookie"] = include_cookies;
         }
         if(Math.floor(status_code / 100) * 100 == 300 || params.redirect !== void 0) { // 3xx status code
@@ -625,7 +623,8 @@ var server = http.createServer(async function(req, res) {
     if(!found_url || !request_resolved) {
         return dispage("404", null, req, dispatch, vars)
     }
-})
+}
+
 function start_server() {
     (async function clear_expired_sessions() {
         await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
@@ -648,7 +647,8 @@ var global_data = {
     encryptHash,
     new_token,
     querystring,
-    url
+    url,
+    split_limit
 }
 
 // https thing: https://gist.github.com/davestevens/c9e437afbb41c1d5c3ab

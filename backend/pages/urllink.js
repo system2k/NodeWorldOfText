@@ -40,8 +40,8 @@ module.exports.POST = async function(req, serve, vars, params) {
     }
 
     if(world.public_writable) { // user is probably not owner nor member
-        if(world_properties.properties) {
-            if(world_properties.properties.urlLink) { // links are allowed to regular users
+        if(world_properties.features) {
+            if(world_properties.features.urlLink) { // links are allowed to regular users
                 can_post_link = true;
             }
         }

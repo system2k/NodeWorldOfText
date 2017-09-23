@@ -139,20 +139,19 @@ module.exports.GET = async function(req, serve, vars) {
         world_properties.views++;
         await db.run("UPDATE world SET properties=? WHERE id=?", [JSON.stringify(world_properties), world.id])
 
-        var canWrite = world.public_writable;
+        var canWrite = !!world.public_writable;
         var canAdmin = false;
         var coordLink = false;
         var urlLink = false;
         var go_to_coord = false;
-
-        if(world_properties.properties) {
-            if(world_properties.properties.coordLink) {
+        if(world_properties.features) {
+            if(world_properties.features.coordLink) {
                 coordLink = true;
             }
-            if(world_properties.properties.go_to_coord) {
+            if(world_properties.features.go_to_coord) {
                 go_to_coord = true;
             }
-            if(world_properties.properties.urlLink) {
+            if(world_properties.features.urlLink) {
                 urlLink = true;
             }
         }
@@ -285,5 +284,5 @@ module.exports.POST = async function(req, serve, vars) {
             [user.id, world.id, tileY, tileX, date, JSON.stringify(changes)])
     }
 
-    serve()// todo: success edit array
+    serve(JSON.stringify(edits))
 }
