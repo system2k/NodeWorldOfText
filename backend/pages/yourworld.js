@@ -68,9 +68,9 @@ async function can_view_world(world, user, db) {
         member: false,
         owner: false
     };
+    var whitelist = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
+        [world.id, user.id])
     if(!world.public_readable && world.owner_id != user.id) { // is it set to members/owners only?
-        var whitelist = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
-            [world.id, user.id])
         if(!whitelist) { // not a member (nor owner)
             return false;
         } else {
@@ -80,6 +80,7 @@ async function can_view_world(world, user, db) {
     if(world.owner_id == user.id) {
         permissions.owner = true;
     }
+    permissions.member = !!whitelist;
     return permissions;
 }
 
@@ -225,7 +226,6 @@ module.exports.GET = async function(req, serve, vars, params) {
                 urlLink = true;
             }
         }
-
         if(read_permission.member) {
             canWrite = true;
             coordLink = true;
@@ -338,13 +338,15 @@ module.exports.POST = async function(req, serve, vars) {
         }
         accepted = accepted.concat(changes)
         for(var e = 0; e < changes.length; e++) {
-            var charY = changes[e][2];
-            var charX = changes[e][3];
-            var char = changes[e][5];
-            var color = changes[e][6];
+            var charY = Math.floor(changes[e][2]);
+            var charX = Math.floor(changes[e][3]);
+            var char = Math.floor(changes[e][5]);
+            var color = Math.floor(changes[e][6]);
             if(!color) {
                 color = 0;
             }
+            if(color < 0) color = 0;
+            if(color > 16777215) color = 16777215;
             var offset = charY * 16 + charX;
             tile_data[offset] = char;
             properties.color[charY*16 + charX] = color;
