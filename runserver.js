@@ -1,4 +1,4 @@
-const http          = require("http");
+const https         = require("https");
 const url           = require("url");
 const sql           = require("sqlite3").verbose();
 const fs            = require("fs");
@@ -448,7 +448,13 @@ function decode_base64(b64str) {
     return new Buffer(b64str, 'base64').toString('ascii')
 }
 
-var server = http.createServer(async function(req, res) {
+var options = {
+  key: fs.readFileSync('../le/etc/live/nwot.sytes.net/privkey.pem'),
+  cert: fs.readFileSync('../le/etc/live/nwot.sytes.net/cert.pem'),
+  ca: fs.readFileSync('../le/etc/live/nwot.sytes.net/chain.pem')
+};
+
+var server = https.createServer(options, async function(req, res) {
     // use this if you do not want the request data to be cached
     /*res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
