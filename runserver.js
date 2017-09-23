@@ -9,6 +9,8 @@ const crypto        = require("crypto");
 const mime          = require("./backend/mime.js");
 const prompt        = require("prompt");
 const dump_dir      = require("./backend/dump_dir");
+const zip           = require("adm-zip")
+const path_mod      = require("path");
 
 const settings = require("./settings.json");
 const database = new sql.Database(settings.DATABASE_PATH);
@@ -30,6 +32,22 @@ dump_dir(static_data, static_path, static_path_web);
 
 var sql_table_init = "./backend/default.sql";
 var sql_indexes_init = "./backend/indexes.sql";
+
+var zip_file;
+if(!fs.existsSync(settings.ZIP_LOG_PATH)) {
+    zip_file = new zip();
+} else {
+    zip_file = new zip(settings.ZIP_LOG_PATH);
+}
+if(fs.existsSync(settings.LOG_PATH)) {
+    var file = fs.readFileSync(settings.LOG_PATH)
+    if(file.length > 0) {
+        var log_data = fs.readFileSync(settings.LOG_PATH);
+        zip_file.addFile("NWOT_LOG_" + Date.now() + ".txt", log_data, '', 0644);
+        fs.truncateSync(settings.LOG_PATH);
+    }
+}
+zip_file.writeZip(settings.ZIP_LOG_PATH);
 
 const pages = {
     configure           : require("./backend/pages/configure.js"),
@@ -56,7 +74,10 @@ const db = {
         return new Promise(function(r, rej) {
             database.get(command, params, function(err, res) {
                 if(err) {
-                    return rej(err)
+                    return rej({
+                        sqlite_error: process_error_arg(err),
+                        input: { command, params }
+                    })
                 }
                 r(res)
             })
@@ -69,7 +90,10 @@ const db = {
         return new Promise(function(r, rej) {
             database.run(command, params, function(err, res) {
                 if(err) {
-                    return rej(err)
+                    return rej({
+                        sqlite_error: process_error_arg(err),
+                        input: { command, params }
+                    })
                 }
                 var info = {
                     lastID: this.lastID
@@ -84,7 +108,10 @@ const db = {
         return new Promise(function(r, rej) {
             database.all(command, params, function(err, res) {
                 if(err) {
-                    return rej(err)
+                    return rej({
+                        sqlite_error: process_error_arg(err),
+                        input: { command, params }
+                    })
                 }
                 r(res)
             })
@@ -109,7 +136,10 @@ const db = {
         }
         return new Promise(function(r, rej) {
             database.each(command, params, callbacks, function(err, res) {
-                if(err) return rej(err)
+                if(err) return rej({
+                    sqlite_error: process_error_arg(err),
+                    input: { command, params }
+                })
                 if(callback_error) return rej(cb_err_desc)
                 r(res)
             })
@@ -121,7 +151,10 @@ const db = {
         return new Promise(function(r, rej) {
             database.exec(command, function(err) {
                 if(err) {
-                    return rej(err)
+                    return rej({
+                        sqlite_error: process_error_arg(err),
+                        input: { command, params }
+                    })
                 }
                 r(true)
             })
@@ -466,6 +499,15 @@ if(https_disabled) { // incase the keys are not available (if running on FPs mac
     https_reference = http
 }
 
+function process_error_arg(e) {
+    var error = {};
+    var keys = Object.getOwnPropertyNames(e);
+    for(var i = 0; i < keys.length; i++) {
+        error[keys[i]] = e[keys[i]];
+    }
+    return error;
+}
+
 var server = https_reference.createServer(options, async function(req, res) {
     req_id++;
     try {
@@ -479,11 +521,7 @@ var server = https_reference.createServer(options, async function(req, res) {
         }
         res.statusCode = 500;
         res.end(template_data["500.html"]({}))
-        var error = {};
-        var keys = Object.getOwnPropertyNames(e);
-        for(var i = 0; i < keys.length; i++) {
-            error[keys[i]] = e[keys[i]];
-        }
+        var error = process_error_arg(e);
         log_error(JSON.stringify(error));
     }
 })

@@ -2,5 +2,6 @@
     "port": 443,
     "error_log": true,
     "DATABASE_PATH": "../nwot.sqlite",
-    "LOG_PATH": "../nwot_log.log"
+    "LOG_PATH": "../nwot_log.log",
+    "ZIP_LOG_PATH": "../nwot_error_logs.zip"
 }

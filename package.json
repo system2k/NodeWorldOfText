@@ -1,11 +1,12 @@
 {
     "name": "nodeworldoftext",
-    "version": "0.24.1",
+    "version": "0.25.0",
     "description": "YourWorldOfText written in Node",
     "dependencies": {
         "sqlite3": "*",
         "swig": "*",
-        "prompt": "*"
+        "prompt": "*",
+        "adm-zip": "*"
     },
     "scripts": {
         "start": "node runserver.js"
