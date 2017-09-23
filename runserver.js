@@ -56,7 +56,7 @@ const db = {
         return new Promise(function(r, rej) {
             database.get(command, params, function(err, res) {
                 if(err) {
-                    rej(err)
+                    return rej(err)
                 }
                 r(res)
             })
@@ -69,7 +69,7 @@ const db = {
         return new Promise(function(r, rej) {
             database.run(command, params, function(err, res) {
                 if(err) {
-                    rej(err)
+                    return rej(err)
                 }
                 var info = {
                     lastID: this.lastID
@@ -84,7 +84,7 @@ const db = {
         return new Promise(function(r, rej) {
             database.all(command, params, function(err, res) {
                 if(err) {
-                    rej(err)
+                    return rej(err)
                 }
                 r(res)
             })
@@ -109,8 +109,8 @@ const db = {
         }
         return new Promise(function(r, rej) {
             database.each(command, params, callbacks, function(err, res) {
-                if(err) rej(err)
-                if(callback_error) throw rej(cb_err_desc)
+                if(err) return rej(err)
+                if(callback_error) return rej(cb_err_desc)
                 r(res)
             })
         })
@@ -121,7 +121,7 @@ const db = {
         return new Promise(function(r, rej) {
             database.exec(command, function(err) {
                 if(err) {
-                    rej(err)
+                    return rej(err)
                 }
                 r(true)
             })
