@@ -6,7 +6,7 @@ const swig          = require("swig");
 const querystring   = require("querystring");
 const crypto        = require("crypto");
 const mime          = require("./backend/mime.js");
-const prompt        = require("./backend/prompt.js");
+const prompt        = require("prompt");
 const dump_dir      = require("./backend/dump_dir");
 
 const settings = require("./settings.json");

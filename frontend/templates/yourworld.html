@@ -4,7 +4,10 @@
     <title>Node World of Text</title>
     <meta http-equiv="Content-type" content="text/html;charset=UTF-8"> 
     <link type="text/css" rel="stylesheet" href="/static/yourworld.css?v=1">
-	<link rel="shortcut icon" href="/static/favicon.png">
+    <link rel="shortcut icon" href="/static/favicon.png">
+    {% if css_timemachine %}
+        {{ css_timemachine | safe }}
+    {% endif %}
 </head>
 <body>
 <div id="topbar" class="ui">

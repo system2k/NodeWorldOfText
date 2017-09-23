@@ -83,7 +83,7 @@ async function can_view_world(world, user, db) {
     return permissions;
 }
 
-module.exports.GET = async function(req, serve, vars) {
+module.exports.GET = async function(req, serve, vars, params) {
     var template_data = vars.template_data;
     var cookies = vars.cookies;
     var query_data = vars.query_data;
@@ -92,7 +92,12 @@ module.exports.GET = async function(req, serve, vars) {
     var redirect = vars.redirect;
     var user = vars.user;
 
-    var world = await world_get_or_create(path, req, serve, vars)
+    var world_name = path;
+    if(params.timemachine) {
+        world_name = params.world;
+    }
+
+    var world = await world_get_or_create(world_name, req, serve, vars)
     if(!world) return;
 
     var world_properties = JSON.parse(world.properties)
@@ -124,13 +129,57 @@ module.exports.GET = async function(req, serve, vars) {
                 tiles[YTileRange[ty] + "," + XTileRange[tx]] = null
             }
         }
-        await db.each("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?", 
-            [world.id, min_tileY, min_tileX, max_tileY, max_tileX], function(e, data) {
-            tiles[data.tileY + "," + data.tileX] = {
-                content: data.content,
-                properties: JSON.parse(data.properties)
+        if(params.timemachine) {
+            var dr1 = await db.get("select time from edit where world_id=? limit 1",
+                world.id);
+            var dr2 = await db.get("select time from edit where world_id=? order by id desc limit 1",
+                world.id);
+
+            if(!dr1 || !dr2) {
+                var e_str = "Cannot view timemachine: There are no edits yet. | ";
+                for (var ty in YTileRange) { // fill in null values
+                    for (var tx in XTileRange) {
+                        var str = "";
+                        for(var y = 0; y < 8; y++) {
+                            for(var x = 0; x < 16; x++) {
+                                var posX = tx*16 + x;
+                                var posY = ty*8 + y;
+                                var ind = posX + posY;
+                                var len = e_str.length;
+                                var charPos = ind - Math.floor(ind / len) * len
+                                str += e_str.charAt(charPos);
+                            }
+                        }
+                        tiles[YTileRange[ty] + "," + XTileRange[tx]] = {
+                            content: str,
+                            properties: {}
+                        };
+                    }
+                }
+                return serve(JSON.stringify(tiles));
             }
-        })
+
+            dr1 = dr1.time;
+            dr2 = dr2.time;
+
+            //console.log(dr1, dr2)
+
+            /*await db.each("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?", 
+                [world.id, min_tileY, min_tileX, max_tileY, max_tileX], function(e, data) {
+                tiles[data.tileY + "," + data.tileX] = {
+                    content: data.content,
+                    properties: JSON.parse(data.properties)
+                }
+            })*/
+        } else {
+            await db.each("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?", 
+                [world.id, min_tileY, min_tileX, max_tileY, max_tileX], function(e, data) {
+                tiles[data.tileY + "," + data.tileX] = {
+                    content: data.content,
+                    properties: JSON.parse(data.properties)
+                }
+            })
+        }
         serve(JSON.stringify(tiles))
     } else { // html page
         if(!world_properties.views) {
@@ -184,9 +233,15 @@ module.exports.GET = async function(req, serve, vars) {
         if(req.headers["user-agent"].indexOf("MSIE") >= 0) {
             state.announce = "Sorry, your World of Text doesn't work well with Internet Explorer."
         }
+        var css_timemachine = "";
+        if(params.timemachine) {
+            css_timemachine = "<style>.tilecont {position: absolute;background-color: #ddd;}</style>";
+            state.canWrite = false;
+        }
         var data = {
             urlhome: "/home/",
-            state: JSON.stringify(state)
+            state: JSON.stringify(state),
+            css_timemachine
         }
         serve(template_data["yourworld.html"](data))
     }
@@ -233,7 +288,10 @@ module.exports.POST = async function(req, serve, vars) {
         }
     }
 
+    var accepted = [];
+
     // begin writing the edits
+    await db.run("BEGIN TRANSACTION")
     for(var i in tiles) {
         var tile_data = " ".repeat(128).split("");
 
@@ -248,7 +306,6 @@ module.exports.POST = async function(req, serve, vars) {
         var tile = await db.get("SELECT * FROM tile WHERE world_id=? AND tileY=? AND tileX=?",
             [world.id, tileY, tileX])
 
-        var rejected = [];
         var changes = tiles[i];
         if(tile) {
             var content = tile.content.split("");
@@ -256,10 +313,10 @@ module.exports.POST = async function(req, serve, vars) {
             properties = JSON.parse(tile.properties)
             if(properties.protected && !is_owner) {
                 // tile is protected but user is not owner
-                rejected = rejected.concat(changes);
                 continue; // go to next tile
             }
         }
+        accepted = accepted.concat(changes)
         for(var e = 0; e < changes.length; e++) {
             var charY = changes[e][2];
             var charX = changes[e][3];
@@ -283,6 +340,7 @@ module.exports.POST = async function(req, serve, vars) {
         await db.run("INSERT INTO edit VALUES(null, ?, null, ?, ?, ?, ?, ?)", // log the edit
             [user.id, world.id, tileY, tileX, date, JSON.stringify(changes)])
     }
+    await db.run("COMMIT")
 
-    serve(JSON.stringify(edits))
+    serve(JSON.stringify(accepted))
 }
