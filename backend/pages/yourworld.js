@@ -273,6 +273,7 @@ module.exports.POST = async function(req, serve, vars) {
     var db = vars.db;
     var post_data = vars.post_data;
     var user = vars.user;
+    var transaction = vars.transaction;
 
     var edits_limit = 1000;
 
@@ -311,7 +312,7 @@ module.exports.POST = async function(req, serve, vars) {
     var accepted = [];
 
     // begin writing the edits
-    await db.run("BEGIN TRANSACTION")
+    await transaction.begin();
     for(var i in tiles) {
         var tile_data = " ".repeat(128).split("");
 
@@ -376,7 +377,7 @@ module.exports.POST = async function(req, serve, vars) {
         await db.run("INSERT INTO edit VALUES(null, ?, null, ?, ?, ?, ?, ?)", // log the edit
             [user.id, world.id, tileY, tileX, date, JSON.stringify(changes)])
     }
-    await db.run("COMMIT")
+    await transaction.end();
 
     serve(JSON.stringify(accepted))
 }

@@ -83,7 +83,7 @@ module.exports.POST = async function(req, serve, vars) {
     var message = null;
 
     var worldname = post_data.worldname;
-    if(worldname.match(/^(\w*)$/g) && worldname.length > 0) {
+    if(worldname.match(/^(\w*)$/g) && (worldname.length > 0 || user.superuser)) {
         var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", worldname)
         if(!world) {
             var date = Date.now();

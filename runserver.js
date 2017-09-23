@@ -467,9 +467,16 @@ if(https_disabled) { // incase the keys are not available (if running on FPs mac
 }
 
 var server = https_reference.createServer(options, async function(req, res) {
+    req_id++;
     try {
         await process_request(req, res)
     } catch(e) {
+        if(transaction_active) {
+            transaction_active = false;
+            if(transaction_req_id == req_id) {
+                await db.run("COMMIT");
+            }
+        }
         res.statusCode = 500;
         res.end(template_data["500.html"]({}))
         var error = {};
@@ -481,6 +488,10 @@ var server = https_reference.createServer(options, async function(req, res) {
     }
 })
 
+var transaction_active = false;
+var transaction_req_id = 0;
+var req_id = 0;
+
 async function process_request(req, res) {
     var URL = url.parse(req.url).pathname;
     if(URL.charAt(0) == "/") {
@@ -491,6 +502,22 @@ async function process_request(req, res) {
 
     // server will return cookies to the client if it needs to
     var include_cookies = [];
+
+    var transaction = {
+        begin: async function() {
+            if(!transaction_active) {
+                await db.run("BEGIN TRANSACTION")
+                transaction_req_id = req_id;
+                transaction_active = true;
+            }
+        },
+        end: async function() {
+            if(transaction_active) {
+                await db.run("COMMIT")
+                transaction_active = false;
+            }
+        }
+    }
 
     function dispatch(data, status_code, params) {
         if(request_resolved) return; // if request is already sent
@@ -549,7 +576,8 @@ async function process_request(req, res) {
                     authenticated: false,
                     username: "",
                     id: 0,
-                    csrftoken: null
+                    csrftoken: null,
+                    superuser: false
                 }
                 // check if user is logged in
                 if(!cookies.csrftoken) {
@@ -568,6 +596,8 @@ async function process_request(req, res) {
                         user = JSON.parse(s_data.session_data);
                         if(cookies.csrftoken == user.csrftoken) { // verify csrftoken
                             user.authenticated = true;
+                            user.superuser = (await db.get("SELECT is_superuser FROM auth_user WHERE id=?",
+                                user.id)).is_superuser;
                         }
                     }
                 }
@@ -598,7 +628,8 @@ async function process_request(req, res) {
                     path: URL,
                     user,
                     redirect,
-                    referer: req.headers.referer
+                    referer: req.headers.referer,
+                    transaction
                 })
                 vars_joined = true;
                 if(row[1][method]) {
