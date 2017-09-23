@@ -472,9 +472,9 @@ var server = https_reference.createServer(options, async function(req, res) {
         await process_request(req, res)
     } catch(e) {
         if(transaction_active) {
-            transaction_active = false;
             if(transaction_req_id == req_id) {
                 await db.run("COMMIT");
+                transaction_active = false;
             }
         }
         res.statusCode = 500;
