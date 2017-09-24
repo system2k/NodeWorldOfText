@@ -301,7 +301,7 @@ module.exports.POST = async function(req, serve, vars) {
         if (!tiles[edits[i][0] + "," + edits[i][1]]) {
             tiles[edits[i][0] + "," + edits[i][1]] = []
         }
-        if (edits[i][5] == "\n" || edits[i][5] == "\r") edits[i][5] = " ";
+        if (edits[i][5] == "\n" || edits[i][5] == "\r" || edits[i][5] == "\0") edits[i][5] = " ";
         tiles[edits[i][0] + "," + edits[i][1]].push(edits[i])
         total_edits++;
         if(total_edits >= edits_limit) { // edit limit reached

@@ -635,7 +635,8 @@ async function process_request(req, res) {
         if(!data) {
             data = "";
         }
-        res.end(data)
+        res.write(data, "utf8")
+        res.end()
     }
 
     var vars = {};

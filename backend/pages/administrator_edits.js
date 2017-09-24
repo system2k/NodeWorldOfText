@@ -29,5 +29,7 @@ module.exports.GET = async function(req, serve, vars) {
         edits.push(data);
     })
 
-    serve(JSON.stringify(edits))
+    serve(JSON.stringify(edits), null, {
+        mime: "text/html; charset=utf-8"
+    })
 }
