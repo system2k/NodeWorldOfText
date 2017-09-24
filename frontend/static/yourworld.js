@@ -1142,7 +1142,7 @@ YourWorld.World = function() {
         // Unprotect a tile
         if (_state.canAdmin) {
             s = $(document.createElement('div'));
-            s.text('Undo make owner-only');
+            s.text('Make an area public');
             s.click(unprotectATile);
             s.click(menu.close);
             _menu.addEntry(s[0]);

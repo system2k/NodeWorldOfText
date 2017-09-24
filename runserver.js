@@ -552,8 +552,8 @@ var server = https_reference.createServer(options, async function(req, res) {
     } catch(e) {
         if(transaction_active) {
             if(transaction_req_id == req_id) {
-                await db.run("COMMIT");
                 transaction_active = false;
+                await db.run("COMMIT");
             }
         }
         res.statusCode = 500;
@@ -581,15 +581,15 @@ async function process_request(req, res) {
     var transaction = {
         begin: async function() {
             if(!transaction_active) {
+                transaction_active = true;
                 await db.run("BEGIN TRANSACTION")
                 transaction_req_id = req_id;
-                transaction_active = true;
             }
         },
         end: async function() {
             if(transaction_active) {
-                await db.run("COMMIT")
                 transaction_active = false;
+                await db.run("COMMIT")
             }
         }
     }

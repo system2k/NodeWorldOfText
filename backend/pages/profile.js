@@ -25,13 +25,17 @@ module.exports.GET = async function(req, serve, vars, params) {
         if(member_total !== 1) {
             plural = "s"
         }
+        var world_url = world.name;
+        if(world_url == "") {
+            world_url = "/" + world_url;
+        }
         world_list.push({
             public_writable: world.public_writable,
             public_readable: world.public_readable,
             whitelist_set_count: member_total,
             conf_url: "/accounts/configure/" + world.name + "/",
             get_absolute_url: "/" + world.name,
-            url: world.name,
+            url: world_url,
             pluralize: plural
         })
     }
@@ -40,11 +44,14 @@ module.exports.GET = async function(req, serve, vars, params) {
 
     for(var i = 0; i < whitelists.length; i++) {
         var world_reference = whitelists[i];
-        var name = await db.get("SELECT name from world where id=?", world_reference.world_id);
-        name = name.name;
+        var name = (await db.get("SELECT name from world where id=?", world_reference.world_id)).name;
+        var display_name = name;
+        if(display_name == "") {
+            display_name = "/" + display_name;
+        }
         memberships.push({
             get_absolute_url: "/" + name,
-            url: name
+            url: display_name
         })
     }
 
