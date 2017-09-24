@@ -1,6 +1,6 @@
 {
     "name": "nodeworldoftext",
-    "version": "0.26.2",
+    "version": "0.26.3",
     "description": "YourWorldOfText written in Node",
     "dependencies": {
         "sqlite3": "*",
@@ -10,7 +10,8 @@
         "nodemailer": "*"
     },
     "scripts": {
-        "start": "node runserver.js"
+        "start": "node runserver.js",
+		"dbg": "node --trace-warnings runserver.js"
     },
     "private": true
 }
