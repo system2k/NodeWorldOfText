@@ -14,27 +14,27 @@ Registration | Node World of Text
 <tr>
     <td align="right" valign="top">Username:</td>
     <td>
-        <input id="id_username" type="text" name="username" maxlength="30"{{ user_error }}/> <br/>
+        <input id="id_username" type="text" name="username" maxlength="30" value="{{ username }}" /> <br/>
         {% for error in form_username_errors %}
-        <span style="color:red">{{ error }}</span>
+        <div><span style="color:red">{{ error }}</span></div>
         {% endfor %}
     </td>
 </tr>
 <tr>
     <td align="right" valign="top">Email:</td>
     <td>
-        <input id="id_email" type="text" class="required" name="email" maxlength="75" /> <br/>
+        <input id="id_email" type="text" class="required" name="email" maxlength="75" value="{{ email }}" /> <br/>
         {% for error in form_email_errors %}
-        <span style="color:red">{{ error }}</span>
+        <div><span style="color:red">{{ error }}</span></div>
         {% endfor %}
     </td>
 </tr>
 <tr>
     <td align="right" valign="top">Password:</td>
     <td>
-        <input id="id_password1" type="password" class="required" name="password1" /> <br/>
+        <input id="id_password1" type="password" class="required" name="password1" value="{{ password1 }}" /> <br/>
         {% for error in form_password1_errors %}
-        <span style="color:red">{{ error }}</span>
+        <div><span style="color:red">{{ error }}</span></div>
         {% endfor %}
     </td>
 </tr>
@@ -43,7 +43,7 @@ Registration | Node World of Text
     <td>
         <input id="id_password2" type="password" class="required" name="password2" /> <br/>
         {% for error in form_password2_errors %}
-        <span style="color:red">{{ error }}</span>
+        <div><span style="color:red">{{ error }}</span></div>
         {% endfor %}
     </td>
 </tr>

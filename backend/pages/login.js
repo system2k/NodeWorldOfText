@@ -12,7 +12,8 @@ module.exports.GET = async function(req, serve, vars, params) {
         user: user.username,
         form_errors: params.errors, // "Your username and password didn't match. Please try again."
         csrftoken: new_token(32),
-        message: params.message
+        message: params.message,
+        username: params.username
     };
 
     serve(template_data["registration/login.html"](data))
@@ -41,15 +42,17 @@ module.exports.POST = async function(req, serve, vars, params) {
 
     var loginuser = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username)
     if(!loginuser) {
-        await dispage("login", {errors: true}, req, serve, vars)
+        await dispage("login", {errors: true, username}, req, serve, vars)
     }
     var valid = checkHash(loginuser.password, password)
     if(!valid) { // wrong password
-        await dispage("login", {errors: true}, req, serve, vars)
+        await dispage("login", {errors: true, username}, req, serve, vars)
     }
 
     if(!loginuser.is_active) {
-        await dispage("login", {errors: true, message: "User is not activated yet"}, req, serve, vars)
+        await dispage("login", {
+            errors: true, message: "User is not activated yet", username
+        }, req, serve, vars)
     }
 
     var date_now = Date.now();
