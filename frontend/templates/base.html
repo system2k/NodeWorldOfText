@@ -14,12 +14,15 @@
         <div class="container">
             <div class="span-19">
                 <div id="topbar" class="span-19 last">
-                    {% if user_is_authenticated %}
-                        Logged in as {{ user }}:
+                    {% if user.authenticated %}
+                        Logged in as {{ user.username }}:
                     {% endif %}
                     <a href="/home/">Home</a>
-                    {% if user_is_authenticated %}
+                    {% if user.authenticated %}
                         | <a href="/accounts/profile/">Your Worlds</a>
+                        {% if user.superuser %}
+                            | <a href="/administrator/">Admin Panel</a>
+                        {% endif %}
                         | <a href="/accounts/logout">Logout</a>
                     {% else %}
                         | <a href="/accounts/login/">Login</a>

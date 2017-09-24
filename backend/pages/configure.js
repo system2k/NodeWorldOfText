@@ -74,8 +74,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     if(member_list.length === 0) member_list = null;
 
     var data = {
-        user_is_authenticated: user.authenticated,
-        user: user.username,
+        user,
 
         world: world_name,
         csrftoken: user.csrftoken,

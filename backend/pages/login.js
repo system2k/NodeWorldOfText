@@ -8,8 +8,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var new_token = vars.new_token;
 
     var data = {
-        user_is_authenticated: user.authenticated,
-        user: user.username,
+        user,
         form_errors: params.errors, // "Your username and password didn't match. Please try again."
         csrftoken: new_token(32),
         message: params.message,

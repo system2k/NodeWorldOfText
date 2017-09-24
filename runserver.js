@@ -66,7 +66,9 @@ const pages = {
     register_complete   : require("./backend/pages/register_complete.js"),
     activate            : require("./backend/pages/activate.js"),
     register_failed     : require("./backend/pages/register_failed.js"),
-    activate_complete   : require("./backend/pages/activate_complete.js")
+    activate_complete   : require("./backend/pages/activate_complete.js"),
+    administrator       : require("./backend/pages/administrator.js"),
+    administrator_edits : require("./backend/pages/administrator_edits.js")
 }
 
 const db = {
@@ -339,7 +341,7 @@ var Month  = 2628002880;
 var Year   = 31536034560;
 var Decade = 315360345600;
 
-var ms = {Second, Minute, Hour, Day, Week, Month, Year, Decade};
+var ms = { Second, Minute, Hour, Day, Week, Month, Year, Decade };
 
 var url_regexp = [ // regexp , function/redirect to
     ["^(\\w*)$", pages.yourworld],
@@ -362,7 +364,9 @@ var url_regexp = [ // regexp , function/redirect to
     ["^accounts/member_autocomplete/$", pages.member_autocomplete],
     ["^accounts/timemachine/(.*)/$", pages.timemachine],
     ["^accounts/register/complete/$", pages.register_complete],
-    ["^accounts/activate/(.*)/$", pages.activate]
+    ["^accounts/activate/(.*)/$", pages.activate],
+    ["^administrator/$", pages.administrator],
+    ["^administrator/edits/(.*)/$", pages.administrator_edits]
 ]
 
 /*
@@ -771,5 +775,5 @@ var global_data = {
     -add superuser admin panel to view raw edits
     -certain members could create scripts that would be loaded to their client
     by default. superusers could add/remove this permission
-    -superusers should edit worlds they don't own (using textbox to go to worlds)
+    -superusers should edit world configs they don't own (using textbox to go to worlds)
 */

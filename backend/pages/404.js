@@ -5,8 +5,7 @@ module.exports.GET = async function(req, serve, vars) {
     var user = vars.user;
 
     var data = {
-        user_is_authenticated: user.authenticated,
-        user: user.username
+        user
     };
 
     serve(template_data["404.html"](data))

@@ -5,8 +5,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var user = vars.user;
 
     var data = {
-        user_is_authenticated: user.authenticated,
-        user: user.username,
+        user,
 
         csrftoken: user.csrftoken,
         form_username_errors    : params.form_username_errors  || [],

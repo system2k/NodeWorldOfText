@@ -1,0 +1,41 @@
+<html>
+    <title>Administrator Panel</title>
+    <style>
+        body {
+            background-color: #6ab5b5;
+        }
+        .lnk {
+            color: blue;
+        }
+        .tab {
+            border-style: solid;
+            border-color: rgb(128, 128, 128);
+        }
+    </style>
+    <script>
+        function goto() {
+            window.location.pathname = "/administrator/edits/" + worldname.value + "/";
+        }
+    </script>
+    <body>
+        <a href="/accounts/profile/" class="lnk">Go to profile</a>
+        | <a href="/" class="lnk">Go to front page</a>
+        <br>
+        <div style="width: 100%; background-color: blue;">
+            <span style="color: white; font-size: 25px;">Administrator Panel</span>
+        </div>
+        <span style="float: right;">Logged in as: {{ user.username }}</span>
+        <br>
+        <div style="width: 100%; margin: 0px; padding: 0px; background-color: #cdcdcd" class="tab">
+            <div style="width: 100%; background-color: #c0c0c0">
+                View Raw Edits
+            </div>
+            <div style="margin: 5px;">
+                <span>
+                    <input id="worldname">
+                    <button onclick="goto();">View</button>
+                </span>
+            </div>
+        </div>
+    </body>
+</html>

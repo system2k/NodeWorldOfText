@@ -6,8 +6,7 @@ module.exports.GET = async function(req, serve, vars) {
     var website = vars.website;
 
     var data = {
-        user_is_authenticated: user.authenticated,
-        user: user.username,
+        user,
         website
     };
 

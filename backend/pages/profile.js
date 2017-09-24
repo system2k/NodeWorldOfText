@@ -65,8 +65,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     if(memberships.length == 0) memberships = null;
 
     var data = {
-        user_is_authenticated: user.authenticated,
-        user: user.username,
+        user,
 
         message: message,
         csrftoken: cookies.csrftoken,
