@@ -1,41 +1,31 @@
-<html>
-    <title>Administrator Panel</title>
-    <style>
-        body {
-            background-color: #6ab5b5;
-        }
-        .lnk {
-            color: blue;
-        }
-        .tab {
-            border-style: solid;
-            border-color: rgb(128, 128, 128);
-        }
-    </style>
+{% extends "base.html" %}
+
+{% block title %}
+    Admin Panel | Node World of Text
+{% endblock %}
+
+{% block endhead %}
     <script>
         function goto() {
             window.location.pathname = "/administrator/edits/" + worldname.value + "/";
+            return false;
         }
     </script>
-    <body>
-        <a href="/accounts/profile/" class="lnk">Go to profile</a>
-        | <a href="/" class="lnk">Go to front page</a>
-        <br>
-        <div style="width: 100%; background-color: blue;">
-            <span style="color: white; font-size: 25px;">Administrator Panel</span>
+{% endblock %}
+
+{% block header %}
+    <h1>Administrator Panel</h1>
+{% endblock %}
+
+{% block content %}
+    <div class="content_set">
+        <div class="content_set_title">View Raw Edits</div>
+        <div class="content_set_content">
+            <form onsubmit="return goto();">
+				World name: 
+				<input type="text" name="worldname" id="worldname" value="">
+				<input type="submit" value="View">
+			</form>
         </div>
-        <span style="float: right;">Logged in as: {{ user.username }}</span>
-        <br>
-        <div style="width: 100%; margin: 0px; padding: 0px; background-color: #cdcdcd" class="tab">
-            <div style="width: 100%; background-color: #c0c0c0">
-                View Raw Edits
-            </div>
-            <div style="margin: 5px;">
-                <span>
-                    <input id="worldname">
-                    <button onclick="goto();">View</button>
-                </span>
-            </div>
-        </div>
-    </body>
-</html>
+    </div>
+{% endblock %}
