@@ -4,7 +4,11 @@
 {% endblock %}
 {% block content %}
 {% if form_errors %}
-    <p>Your username and password didn't match. Please try again.</p>
+    {% if !message %}
+        <p>Your username and password didn't match. Please try again.</p>
+    {% else %}
+        <p>{{ message }}</p>
+    {% endif %}
 {% endif %}
 <form method="post" action="/accounts/login/"><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
 <table>

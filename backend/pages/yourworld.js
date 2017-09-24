@@ -252,7 +252,7 @@ module.exports.GET = async function(req, serve, vars, params) {
             }
         }
         if(req.headers["user-agent"].indexOf("MSIE") >= 0) {
-            state.announce = "Sorry, your World of Text doesn't work well with Internet Explorer."
+            state.announce = "Sorry, node World of Text doesn't work well with Internet Explorer."
         }
         var css_timemachine = "";
         if(params.timemachine) {

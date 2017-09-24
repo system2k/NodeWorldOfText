@@ -11,7 +11,8 @@ module.exports.GET = async function(req, serve, vars, params) {
         user_is_authenticated: user.authenticated,
         user: user.username,
         form_errors: params.errors, // "Your username and password didn't match. Please try again."
-        csrftoken: new_token(32)
+        csrftoken: new_token(32),
+        message: params.message
     };
 
     serve(template_data["registration/login.html"](data))
@@ -45,6 +46,10 @@ module.exports.POST = async function(req, serve, vars, params) {
     var valid = checkHash(loginuser.password, password)
     if(!valid) { // wrong password
         await dispage("login", {errors: true}, req, serve, vars)
+    }
+
+    if(!loginuser.is_active) {
+        await dispage("login", {errors: true, message: "User is not activated yet"}, req, serve, vars)
     }
 
     var date_now = Date.now();

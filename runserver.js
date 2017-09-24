@@ -10,7 +10,7 @@ const mime          = require("./backend/mime.js");
 const prompt        = require("prompt");
 const dump_dir      = require("./backend/dump_dir");
 const zip           = require("adm-zip")
-const path_mod      = require("path");
+const nodemailer    = require("nodemailer");
 
 const settings = require("./settings.json");
 const database = new sql.Database(settings.DATABASE_PATH);
@@ -22,9 +22,7 @@ var template_data = {}; // data used by the server
 var templates_path = "./frontend/templates/";
 dump_dir(template_data, templates_path, "", true);
 for(var i in template_data) {
-    if(template_data[i].endsWith(".html")) {
-        template_data[i] = swig.compileFile(template_data[i]);
-    }
+    template_data[i] = swig.compileFile(template_data[i]);
 }
 
 var static_data = {}; // html data to be returned (text data for values)
@@ -64,7 +62,11 @@ const pages = {
     unprotect           : require("./backend/pages/unprotect.js"),
     urllink             : require("./backend/pages/urllink.js"),
     yourworld           : require("./backend/pages/yourworld.js"),
-    404                 : require("./backend/pages/404.js")
+    404                 : require("./backend/pages/404.js"),
+    register_complete   : require("./backend/pages/register_complete.js"),
+    activate            : require("./backend/pages/activate.js"),
+    register_failed     : require("./backend/pages/register_failed.js"),
+    activate_complete   : require("./backend/pages/activate_complete.js")
 }
 
 const db = {
@@ -161,6 +163,39 @@ const db = {
         })
     }
 };
+
+var transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+        user: settings.email.username,
+        pass: settings.email.password
+    }
+});
+var email_available = true;
+try {
+    transporter.verify()
+} catch(e) {
+    email_available = false;
+}
+
+async function send_email(destination, subject, text) {
+    if(!email_available) return false;
+    var options = {
+        from: settings.email.display_email,
+        to: destination,
+        subject: subject,
+        html: text
+    };
+    return new Promise(function(resolve) {
+        transporter.sendMail(options, function(error, info) {
+            if (error) {
+                resolve("error");
+            } else {
+                resolve(info);
+            }
+        });
+    })
+}
 
 (async function() {
     console.log("Starting server...");
@@ -314,7 +349,7 @@ var url_regexp = [ // regexp , function/redirect to
     ["^home/$", pages.home],
     ["^accounts/login", pages.login],
     ["^accounts/logout", pages.logout],
-    ["^accounts/register", pages.register],
+    ["^accounts/register/$", pages.register],
     ["^ajax/protect/$", pages.protect],
     ["^ajax/unprotect/$", pages.unprotect],
     ["^ajax/coordlink/$", pages.coordlink],
@@ -325,7 +360,9 @@ var url_regexp = [ // regexp , function/redirect to
     ["^accounts/configure/(.*)/$", pages.configure],
     ["^accounts/configure/(beta/\\w+)/$", pages.configure],
     ["^accounts/member_autocomplete/$", pages.member_autocomplete],
-    ["^accounts/timemachine/(.*)/$", pages.timemachine]
+    ["^accounts/timemachine/(.*)/$", pages.timemachine],
+    ["^accounts/register/complete/$", pages.register_complete],
+    ["^accounts/activate/(.*)/$", pages.activate]
 ]
 
 /*
@@ -722,7 +759,10 @@ var global_data = {
     new_token,
     querystring,
     url,
-    split_limit
+    split_limit,
+    website: settings.website,
+    send_email,
+    crypto
 }
 
 /*
@@ -731,4 +771,5 @@ var global_data = {
     -add superuser admin panel to view raw edits
     -certain members could create scripts that would be loaded to their client
     by default. superusers could add/remove this permission
+    -superusers should edit worlds they don't own (using textbox to go to worlds)
 */

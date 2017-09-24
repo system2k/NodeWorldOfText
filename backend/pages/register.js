@@ -24,6 +24,10 @@ module.exports.POST = async function(req, serve, vars) {
     var user = vars.user;
     var dispage = vars.dispage;
     var encryptHash = vars.encryptHash;
+    var send_email = vars.send_email;
+    var crypto = vars.crypto;
+    var website = vars.website;
+    var template_data = vars.template_data;
 
     if(post_data.csrfmiddlewaretoken != user.csrftoken) { // csrftokens not matching?
         serve();
@@ -83,12 +87,43 @@ module.exports.POST = async function(req, serve, vars) {
 
     var date = Date.now();
     var password_hash = encryptHash(password1);
-    await db.run("INSERT INTO auth_user VALUES(null, ?, '', '', ?, ?, 0, 1, 0, ?, ?)",
+    var ins = await db.run("INSERT INTO auth_user VALUES(null, ?, '', '', ?, ?, 0, 0, 0, ?, ?)",
         [username, email, password_hash, date, date])
+    var user_id = ins.lastID;
 
-    await dispage("login", {
-        username: username,
-        password: password1,
-        registered: true
-    }, req, serve, vars, "POST")
+    var token = crypto.randomBytes(20).toString("hex")
+
+    if(email) {
+        await db.run("INSERT INTO registration_registrationprofile VALUES(null, ?, ?)",
+            [user_id, token])
+
+        var subject = template_data["registration/activation_email_subject.txt"]();
+        var email_send = await send_email(email, subject, template_data["registration/activation_email.txt"]({
+            website,
+            reg_key: "accounts/activate/" + token + "/"
+        }))
+
+        if(email_send === false) {
+            form_email_errors.push("The email system appears to be down. Try not using an email or wait until it's fixed")
+        } else if(email_send == "error") {
+            form_email_errors.push("An error occured while sending an email to this address")
+        }
+
+        if(form_email_errors.length > 0) {
+            return await dispage("register", {
+                form_email_errors
+            }, req, serve, vars)
+        }
+
+        serve(null, null, {
+            redirect: "/accounts/register/complete/"
+        })
+    } else {
+        await db.run("UPDATE auth_user SET is_active=1 WHERE id=?", user_id)
+        await dispage("login", {
+            username: username,
+            password: password1,
+            registered: true
+        }, req, serve, vars, "POST")
+    }
 }

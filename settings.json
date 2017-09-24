@@ -1,7 +1,13 @@
 {
+    "website": "https://nwot.sytes.net/",
     "port": 443,
     "error_log": true,
     "DATABASE_PATH": "../nwot.sqlite",
     "LOG_PATH": "../nwot_log.log",
-    "ZIP_LOG_PATH": "../nwot_error_logs.zip"
+    "ZIP_LOG_PATH": "../nwot_error_logs.zip",
+    "email": {
+        "username": "nodeworldoftext@gmail.com",
+        "password": "asd10QPS10293847103911zxcZXC",
+        "display_email": "nodeworldoftext@gmail.com"
+    }
 }
