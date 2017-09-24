@@ -110,6 +110,8 @@ module.exports.POST = async function(req, serve, vars) {
         }
 
         if(form_email_errors.length > 0) {
+            // remove user if failed
+            await db.run("DELETE FROM auth_user WHERE id=?", user_id)
             return await dispage("register", {
                 form_email_errors
             }, req, serve, vars)
