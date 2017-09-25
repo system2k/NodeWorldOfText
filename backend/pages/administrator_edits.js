@@ -7,6 +7,7 @@ module.exports.GET = async function(req, serve, vars) {
     var split_limit = vars.split_limit;
     var path = vars.path;
     var db = vars.db;
+    var filename_sanitize = vars.filename_sanitize;
 
     // not a superuser...
     if(!user.superuser) {
@@ -30,6 +31,7 @@ module.exports.GET = async function(req, serve, vars) {
     })
 
     serve(JSON.stringify(edits), null, {
-        mime: "text/html; charset=utf-8"
+        mime: "application/force-download; charset=utf-8",
+        download_file: filename_sanitize("EditHistory_" + world_name + ".txt")
     })
 }

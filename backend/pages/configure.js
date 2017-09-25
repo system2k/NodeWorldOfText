@@ -32,7 +32,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         return await dispage("404", null, req, serve, vars)
     }
 
-    if(world.owner_id != user.id) {
+    if(world.owner_id != user.id && !user.superuser) {
         return serve("Access denied", 403)
     }
 

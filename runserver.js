@@ -455,6 +455,29 @@ function parseCookie(cookie) {
     }
 }
 
+var filename_sanitize = (function() { // do not pollute global scope
+	var illegalRe = /[\/\?<>\\:\*\|":]/g;
+	var controlRe = /[\x00-\x1f\x80-\x9f]/g;
+	var reservedRe = /^\.+$/;
+	var windowsReservedRe = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
+	var windowsTrailingRe = /[\. ]+$/;
+
+	function sanitize(input, replacement) {
+		var sanitized = input
+			.replace(illegalRe, replacement)
+			.replace(controlRe, replacement)
+			.replace(reservedRe, replacement)
+			.replace(windowsReservedRe, replacement)
+			.replace(windowsTrailingRe, replacement);
+		return sanitized;
+	}
+
+	return function(input, options) {
+		var replacement = "_";
+		return sanitize(input, replacement);
+	}
+})()
+
 function objIncludes(defaultObj, include) {
     var new_obj = {};
     for(var i in defaultObj) {
@@ -601,7 +624,12 @@ async function process_request(req, res) {
     function dispatch(data, status_code, params) {
         if(request_resolved) return; // if request is already sent
         request_resolved = true;
-        // params: { cookie, mime, redirect } (all optional)
+        /* params: {
+            cookie: the cookie data
+            mime: mime type (ex: text/plain)
+            redirect: url to redirect to
+            download_file: force browser to download this file as .txt. specifies its name
+        } (all optional)*/
         var info = {}
         if(!params) {
             params = {};
@@ -616,6 +644,9 @@ async function process_request(req, res) {
         }
         if(include_cookies.length > 0) {
             info["Set-Cookie"] = include_cookies;
+        }
+        if(params.download_file) {
+            info["Content-disposition"] = "attachment; filename=" + params.download_file;
         }
         if(Math.floor(status_code / 100) * 100 == 300 || params.redirect !== void 0) { // 3xx status code
             if(params.redirect) {
@@ -767,14 +798,13 @@ var global_data = {
     split_limit,
     website: settings.website,
     send_email,
-    crypto
+    crypto,
+    filename_sanitize
 }
 
 /*
     TODO:
     -add websockets
-    -add superuser admin panel to view raw edits
     -certain members could create scripts that would be loaded to their client
     by default. superusers could add/remove this permission
-    -superusers should edit world configs they don't own (using textbox to go to worlds)
 */
