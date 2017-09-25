@@ -117,7 +117,7 @@ module.exports.POST = async function(req, serve, vars) {
 
     world_name = world.name;
 
-    if(world.owner_id != user.id) {
+    if(world.owner_id != user.id && !user.superuser) {
         return serve("Access denied", 403)
     }
 
