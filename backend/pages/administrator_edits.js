@@ -26,7 +26,7 @@ module.exports.GET = async function(req, serve, vars) {
     }
 
     var edits = [];
-    await db.each("SELECT * FROM edit WHERE world_id=?", world.id, function(e, data) {
+    await db.each("SELECT * FROM edit WHERE world_id=?", world.id, function(data) {
         edits.push(data);
     })
 

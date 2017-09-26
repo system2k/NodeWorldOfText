@@ -7,9 +7,8 @@ CREATE TABLE "auth_user" (
     "last_name" varchar(30) NOT NULL,
     "email" varchar(75) NOT NULL,
     "password" varchar(128) NOT NULL,
-    "is_staff" bool NOT NULL,
     "is_active" bool NOT NULL,
-    "is_superuser" bool NOT NULL,
+    "level" integer NOT NULL,
     "last_login" integer NOT NULL,
     "date_joined" integer NOT NULL
 );
@@ -66,4 +65,13 @@ CREATE TABLE "world" (
     "public_readable" bool NOT NULL,
     "public_writable" bool NOT NULL,
     "properties" text NOT NULL
+);
+
+CREATE TABLE "scripts" (
+    "id" integer NOT NULL PRIMARY KEY,
+    "owner_id" integer,
+    "name" text NOT NULL,
+    "content" text NOT NULL,
+    "created_at" integer NOT NULL,
+    "enabled" bool NOT NULL
 );

@@ -174,7 +174,7 @@ module.exports.GET = async function(req, serve, vars, params) {
             }
 
             await db.each("SELECT * FROM edit WHERE world_id=? AND time<=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?",
-                [world.id, time, min_tileY, min_tileX, max_tileY, max_tileX], function(e, data) {
+                [world.id, time, min_tileY, min_tileX, max_tileY, max_tileX], function(data) {
                 var con = JSON.parse(data.content);
                 for(var i in con) {
                     var z = con[i]
@@ -195,7 +195,7 @@ module.exports.GET = async function(req, serve, vars, params) {
             }
         } else {
             await db.each("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?", 
-                [world.id, min_tileY, min_tileX, max_tileY, max_tileX], function(e, data) {
+                [world.id, min_tileY, min_tileX, max_tileY, max_tileX], function(data) {
                 tiles[data.tileY + "," + data.tileX] = {
                     content: data.content,
                     properties: JSON.parse(data.properties)
@@ -261,7 +261,8 @@ module.exports.GET = async function(req, serve, vars, params) {
         }
         var data = {
             state: JSON.stringify(state),
-            css_timemachine
+            css_timemachine,
+            user
         }
         serve(template_data["yourworld.html"](data))
     }

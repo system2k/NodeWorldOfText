@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}
+	Edit script "{{ name }}" | Node World of Text
+{% endblock %}
+
+{% block endhead %}
+    <script>
+        function update() {
+            script_content_post.value = script_content.value;
+        }
+        onload = function() {
+            script_content.value = scr_content.innerText;
+        }
+    </script>
+{% endblock %}
+
+{% block header %}
+	<h1>Edit script "{{ name }}"</h1>
+	<span><a href="/accounts/profile/">« Back to profile</a></span>
+{% endblock %}
+
+{% block content %}
+    <div id="scr_content" hidden>{{ content }}</div>
+	<div class="content_set">
+        <div class="content_set_title">Script</div>
+        <div class="content_set_content">
+            {% if message %}
+				<span style="font-size:80%"><i>{{ message }}</i></span>
+			{% endif %}
+            <form method="POST" action=".">
+                <span>Script title:</span>
+                <br>
+                <input type="text" name="title" value="{{ name }}" style="width: 400px;">
+                <br>
+                <span>Script content:</span>
+                <br>
+                <textarea id="script_content"></textarea>
+                <input type="text" name="content" id="script_content_post" hidden>
+                <br>
+                <input type="hidden" name="form" value="modify_script">
+                <input type="submit" value="Submit" onclick="update();">
+            </form>
+        </div>
+    </div>
+    <div class="content_set">
+        <div class="content_set_title">Script Status</div>
+        <div class="content_set_content">
+            <form method="POST" action=".">
+                <input type="checkbox" name="enabled" {% if enabled %} checked{% endif %}>
+                <span>enabled</span>
+                <input type="hidden" name="form" value="enable_disable_script">
+                <input type="submit" value="Submit">
+            </form>
+        </div>
+    </div>
+{% endblock %}

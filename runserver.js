@@ -68,7 +68,10 @@ const pages = {
     register_failed     : require("./backend/pages/register_failed.js"),
     activate_complete   : require("./backend/pages/activate_complete.js"),
     administrator       : require("./backend/pages/administrator.js"),
-    administrator_edits : require("./backend/pages/administrator_edits.js")
+    administrator_edits : require("./backend/pages/administrator_edits.js"),
+    script_manager      : require("./backend/pages/script_manager.js"),
+    script_edit         : require("./backend/pages/script_edit.js"),
+    script_view         : require("./backend/pages/script_view.js")
 }
 
 const db = {
@@ -130,9 +133,9 @@ const db = {
         var def = callbacks
         var callback_error = false
         var cb_err_desc = "callback_error...";
-        callbacks = function() {
+        callbacks = function(e, data) {
             try {
-                def(...arguments)
+                def(data)
             } catch(e) {
                 callback_error = true
                 cb_err_desc = e;
@@ -307,7 +310,7 @@ function account_prompt() {
 			var Date_ = Date.now()
             var passHash = encryptHash(result["password"])
 
-            db.run("INSERT INTO auth_user VALUES(null, ?, '', '', '', ?, 1, 1, 1, ?, ?)",
+            db.run("INSERT INTO auth_user VALUES(null, ?, '', '', '', ?, 1, 3, ?, ?)",
                 [result["username"], passHash, Date_, Date_])
 
             console.log("Superuser created successfully.\n");
@@ -366,7 +369,10 @@ var url_regexp = [ // regexp , function/redirect to
     ["^accounts/register/complete/$", pages.register_complete],
     ["^accounts/activate/(.*)/$", pages.activate],
     ["^administrator/$", pages.administrator],
-    ["^administrator/edits/(.*)/$", pages.administrator_edits]
+    ["^administrator/edits/(.*)/$", pages.administrator_edits],
+    ["^script_manager/$", pages.script_manager],
+    ["^script_manager/edit/(.*)/$", pages.script_edit],
+    ["^script_manager/view/(.*)/$", pages.script_view]
 ]
 
 /*
@@ -688,7 +694,8 @@ async function process_request(req, res) {
                     username: "",
                     id: 0,
                     csrftoken: null,
-                    superuser: false
+                    superuser: false,
+                    scripts: []
                 }
                 // check if user is logged in
                 if(!cookies.csrftoken) {
@@ -699,6 +706,13 @@ async function process_request(req, res) {
                 } else {
                     user.csrftoken = cookies.csrftoken;
                 }
+                /*
+                    User Levels:
+                    3: Superuser (Operator)
+                    2: Superuser
+                    1: Staff
+                    0: regular user
+                */
                 if(cookies.sessionid) {
                     // user data from session
                     var s_data = await db.get("SELECT * FROM auth_session WHERE session_key=?", 
@@ -707,8 +721,20 @@ async function process_request(req, res) {
                         user = JSON.parse(s_data.session_data);
                         if(cookies.csrftoken == user.csrftoken) { // verify csrftoken
                             user.authenticated = true;
-                            user.superuser = (await db.get("SELECT is_superuser FROM auth_user WHERE id=?",
-                                user.id)).is_superuser;
+                            var level = (await db.get("SELECT level FROM auth_user WHERE id=?",
+                            user.id)).level
+
+                            var operator = level == 3;
+                            var superuser = level == 2;
+                            var staff = level == 1;
+
+                            user.operator = operator
+                            user.superuser = superuser || operator
+                            user.staff = staff || superuser || operator
+
+                            if(user.staff) {
+                                user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id)
+                            }
                         }
                     }
                 }
@@ -805,6 +831,4 @@ var global_data = {
 /*
     TODO:
     -add websockets
-    -certain members could create scripts that would be loaded to their client
-    by default. superusers could add/remove this permission
 */

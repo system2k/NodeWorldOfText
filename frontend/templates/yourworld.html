@@ -8,6 +8,9 @@
     {% if css_timemachine %}
         {{ css_timemachine | safe }}
     {% endif %}
+    {% for script in user.scripts %}
+        <script src="/script_manager/view/{{ script.name }}/"></script>
+    {% endfor %}
 </head>
 <body>
 <div id="topbar" class="ui">

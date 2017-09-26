@@ -9,6 +9,9 @@
         <link rel="stylesheet" type="text/css" href="/static/css/site.css?v=3">
         <link rel="shortcut icon" href="/static/favicon.png">
         {% block endhead %}{% endblock %}
+        {% for script in user.scripts %}
+            <script src="/script_manager/view/{{ script.name }}/"></script>
+        {% endfor %}
     </head>
     <body>
         <div class="container">
@@ -22,6 +25,9 @@
                         | <a href="/accounts/profile/">Your Worlds</a>
                         {% if user.superuser %}
                             | <a href="/administrator/">Admin Panel</a>
+                        {% endif %}
+                        {% if user.staff %}
+                            | <a href="/script_manager/">Script Manager</a>
                         {% endif %}
                         | <a href="/accounts/logout">Logout</a>
                     {% else %}
