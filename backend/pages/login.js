@@ -41,15 +41,15 @@ module.exports.POST = async function(req, serve, vars, params) {
 
     var loginuser = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username)
     if(!loginuser) {
-        await dispage("login", {errors: true, username}, req, serve, vars)
+        return await dispage("login", {errors: true, username}, req, serve, vars)
     }
     var valid = checkHash(loginuser.password, password)
     if(!valid) { // wrong password
-        await dispage("login", {errors: true, username}, req, serve, vars)
+        return await dispage("login", {errors: true, username}, req, serve, vars)
     }
 
     if(!loginuser.is_active) {
-        await dispage("login", {
+        return await dispage("login", {
             errors: true, message: "User is not activated yet", username
         }, req, serve, vars)
     }
