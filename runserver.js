@@ -71,7 +71,8 @@ const pages = {
     administrator_edits : require("./backend/pages/administrator_edits.js"),
     script_manager      : require("./backend/pages/script_manager.js"),
     script_edit         : require("./backend/pages/script_edit.js"),
-    script_view         : require("./backend/pages/script_view.js")
+    script_view         : require("./backend/pages/script_view.js"),
+    administrator_user  : require("./backend/pages/administrator_user.js")
 }
 
 const db = {
@@ -372,8 +373,17 @@ var url_regexp = [ // regexp , function/redirect to
     ["^administrator/edits/(.*)/$", pages.administrator_edits],
     ["^script_manager/$", pages.script_manager],
     ["^script_manager/edit/(.*)/$", pages.script_edit],
-    ["^script_manager/view/(.*)/$", pages.script_view]
+    ["^script_manager/view/(.*)/$", pages.script_view],
+    ["^administrator/user/(.*)/$", pages.administrator_user]
 ]
+
+function get_third(url, first, second) {
+    var value = split_limit(url, first + "/" + second + "/", 1)[1]
+    if(value.charAt(value.length - 1) === "/") {
+        value = value.substring(0, value.length - 1);
+    }
+    return value;
+}
 
 /*
     dispatch page
@@ -605,6 +615,11 @@ async function process_request(req, res) {
     if(URL.charAt(0) == "/") {
         URL = URL.substr(1);
     }
+    try {
+        URL = decodeURIComponent(URL);
+    } catch (e) {
+        return res.end("URI is malformed");
+    }
 
     var request_resolved = false;
 
@@ -825,7 +840,8 @@ var global_data = {
     website: settings.website,
     send_email,
     crypto,
-    filename_sanitize
+    filename_sanitize,
+    get_third
 }
 
 /*

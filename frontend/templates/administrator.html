@@ -14,7 +14,15 @@
             window.location.pathname = "/accounts/configure/" + worldname_config.value + "/";
             return false;
         }
+        function goto_user() {
+            window.location.pathname = "/administrator/user/" + username_config.value + "/";
+            return false;
+        }
+        onload = function() {
+            $('#username_config').autocomplete('/accounts/member_autocomplete/', {delay: 50})
+        }
     </script>
+    <link rel="stylesheet" type="text/css" href="/static/jquery.autocomplete.css">
 {% endblock %}
 
 {% block header %}
@@ -39,8 +47,52 @@
             <form onsubmit="return goto_config();">
 				World name: 
 				<input type="text" name="worldname" id="worldname_config" value="">
-				<input type="submit" value="View">
+				<input type="submit" value="Edit">
 			</form>
         </div>
     </div>
+
+    {% if user.operator %}
+        <div class="content_set">
+            <div class="content_set_title">Edit Users</div>
+            <div class="content_set_content">
+                <form onsubmit="return goto_user();">
+                    User name: 
+                    <input type="text" name="username" id="username_config" value="">
+                    <input type="submit" value="Edit">
+                </form>
+            </div>
+        </div>
+    {% endif %}
+    <div class="content_set">
+        <div class="content_set_title">All Users with a High Rank</div>
+        <div class="content_set_content">
+            <ul>
+                {% for user_rank in user_ranks %}
+                <li>
+                    <span>{{ user_rank.username }}</span>
+                    
+                    {% if user_rank.level == 1%}
+                        (staff)
+                    {% endif %}
+                    {% if user_rank.level == 2%}
+                        (superuser)
+                    {% endif %}
+                    {% if user_rank.level == 3%}
+                        (operator)
+                    {% endif %}
+
+                    {% if user.operator %}
+                        <a href="/administrator/user/{{ user_rank.username }}/">configure</a>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}
+
+{% block endbody %}
+<script type="text/javascript" src="/static/jquery.autocomplete.min.js"></script>
+<script type="text/javascript" src="/static/profile.js"></script>
 {% endblock %}

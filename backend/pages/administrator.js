@@ -4,6 +4,7 @@ module.exports.GET = async function(req, serve, vars) {
     var template_data = vars.template_data;
     var user = vars.user;
     var dispage = vars.dispage;
+    var db = vars.db;
 
     // not a superuser...
     if(!user.superuser) {
@@ -11,7 +12,8 @@ module.exports.GET = async function(req, serve, vars) {
     }
 
     var data = {
-        user
+        user,
+        user_ranks: await db.all("SELECT * FROM auth_user WHERE level > 0")
     }
 
     serve(template_data["administrator.html"](data))

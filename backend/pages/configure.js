@@ -10,7 +10,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var user = vars.user;
     var url = vars.url;
     var path = vars.path;
-    var split_limit = vars.split_limit;
+    var get_third = vars.get_third;
     var db = vars.db;
     var dispage = vars.dispage;
 
@@ -21,10 +21,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     }
 
     // gets world name from /accounts/configure/{world}/
-    var world_name = split_limit(path, "accounts/configure/", 1)[1]
-    if(world_name.charAt(world_name.length - 1) === "/") {
-        world_name = world_name.substring(0, world_name.length - 1);
-    }
+    var world_name = get_third(path, "accounts", "configure")
 
     var world = await db.get("SELECT * FROM world WHERE name=?", world_name);
 
@@ -95,7 +92,7 @@ module.exports.POST = async function(req, serve, vars) {
     var db = vars.db;
     var post_data = vars.post_data;
     var user = vars.user;
-    var split_limit = vars.split_limit;
+    var get_third = vars.get_third;
     var path = vars.path;
     var dispage = vars.dispage;
     var url = vars.url;
@@ -104,10 +101,7 @@ module.exports.POST = async function(req, serve, vars) {
         serve();
     }
 
-    var world_name = split_limit(path, "accounts/configure/", 1)[1]
-    if(world_name.charAt(world_name.length - 1) === "/") {
-        world_name = world_name.substring(0, world_name.length - 1);
-    }
+    var world_name = get_third(path, "accounts", "configure")
 
     var world = await db.get("SELECT * FROM world WHERE name=?", world_name);
 

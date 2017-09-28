@@ -6,17 +6,9 @@ module.exports.GET = async function(req, serve, vars, params) {
     var dispage = vars.dispage;
     var db = vars.db;
     var path = vars.path;
-    var split_limit = vars.split_limit;
+    var get_third = vars.get_third;
 
-    // not staff
-    if(!user.staff) {
-        return serve();
-    }
-
-    var script_name = split_limit(path, "script_manager/view/", 1)[1]
-    if(script_name.charAt(script_name.length - 1) === "/") {
-        script_name = script_name.substring(0, script_name.length - 1);
-    }
+    var script_name = get_third(path, "script_manager", "view")
 
     var script = await db.get("SELECT * FROM scripts WHERE owner_id=? AND name=?",
         [user.id, script_name])

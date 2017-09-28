@@ -5,15 +5,12 @@ module.exports.GET = async function(req, serve, vars, params) {
     var user = vars.user;
     var url = vars.url;
     var path = vars.path;
-    var split_limit = vars.split_limit;
+    var get_third = vars.get_third;
     var db = vars.db;
     var dispage = vars.dispage;
 
     // gets id from /accounts/activate/{world}/
-    var activation_key = split_limit(path, "accounts/activate/", 1)[1]
-    if(activation_key.charAt(activation_key.length - 1) === "/") {
-        activation_key = activation_key.substring(0, activation_key.length - 1);
-    }
+    var activation_key = get_third(path, "accounts", "activate")
 
     if(activation_key == "complete") {
         return await dispage("activate_complete", null, req, serve, vars)

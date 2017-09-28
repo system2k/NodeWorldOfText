@@ -17,7 +17,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var user = vars.user;
     var url = vars.url;
     var path = vars.path;
-    var split_limit = vars.split_limit;
+    var get_third = vars.get_third;
     var db = vars.db;
     var dispage = vars.dispage;
 
@@ -28,10 +28,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     }
 
     // gets world name from /accounts/configure/{world}/
-    var world_name = split_limit(path, "accounts/timemachine/", 1)[1]
-    if(world_name.charAt(world_name.length - 1) === "/") {
-        world_name = world_name.substring(0, world_name.length - 1);
-    }
+    var world_name = get_third(path, "accounts", "timemachine")
 
     var time = 1000000;
     var sp = world_name.split("/");
