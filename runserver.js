@@ -976,7 +976,7 @@ function start_server() {
     });
 
     var wss = new ws.Server({ server });
-    wss.on("connection", async function (ws, req) {
+    try { wss.on("connection", async function (ws, req) {
         try {
             var location = url.parse(req.url).pathname;
             var world_name;
@@ -1016,11 +1016,19 @@ function start_server() {
                 kind: "channel",
                 sender: channel
             }))
-            ws.on("message", async function(msg) {
+            try { ws.on("message", async function(msg) {
                 req_id++;
                 var current_req_id = req_id;
                 try {
-                    msg = JSON.parse(msg);
+                    try {
+                        msg = JSON.parse(msg);
+                    } catch(e) {
+                        send_ws(JSON.stringify({
+                            kind: "error",
+                            message: "418 I'm a Teapot"
+                        }))
+                        return ws.close()
+                    }
                     var kind = msg.kind;
                     if(websockets[kind]) {
                         function send(msg) {
@@ -1040,11 +1048,15 @@ function start_server() {
                 } catch(e) {
                     handle_ws_error(e);
                 }
-            })
+            }) } catch(e) {
+                console.log("An error occured with ws.on('message')")
+            }
         } catch(e) {
             handle_ws_error(e);
         }
-    });
+    }) } catch(e) {
+        console.log("An error occured with ws.on('connection')")
+    }
 }
 
 function handle_ws_error(e) {
