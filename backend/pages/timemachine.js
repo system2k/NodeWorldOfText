@@ -36,7 +36,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         world_name = int[0];
     }
 
-    var world = await db.get("SELECT * FROM world WHERE name=?", world_name);
+    var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", world_name);
 
     if(!world) {
         return await dispage("404", null, req, serve, vars)

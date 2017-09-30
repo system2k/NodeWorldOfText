@@ -1,6 +1,6 @@
 {
     "name": "nodeworldoftext",
-    "version": "0.34.5",
+    "version": "0.34.6",
     "description": "YourWorldOfText written in Node",
     "dependencies": {
         "sqlite3": "*",

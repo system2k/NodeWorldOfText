@@ -3,6 +3,14 @@ var YourWorld = {};
 var socket;
 var socket_open = false;
 var socket_queue = [];
+var use_ajax = false;
+
+if (window.mozWebSocket)
+    window.WebSocket = window.mozWebSocket;
+
+if(!window.WebSocket)
+    use_ajax = true;
+
 function Send(data) {
     if(socket_open) {
         socket.send(JSON.stringify(data))
@@ -11,11 +19,20 @@ function Send(data) {
     }
 }
 function connect_ws(scheme) {
+    if(use_ajax) {
+        console.log("Cannot connect to WS because websockets are not supported by your browser");
+        console.log("The client will use Ajax instead")
+        return;
+    }
     var ws_scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
     var path = window.location.pathname.replace(/\/$/, "");
     var ws_path = "" + ws_scheme + "://" + window.location.host + path + "/ws/";
     socket = new WebSocket(ws_path);
-    socket.onerror = function(err) {
+    socket.onclose = function(err) {
+        if(err.code == 1006) { // websockets aren't available?
+            use_ajax = true;
+            return;
+        }
         console.log("Disconnected from socket")
         socket_open = false;
         setTimeout(connect_ws, 8000)
@@ -415,10 +432,23 @@ YourWorld.World = function() {
         if (!_edits.length) {
             return;
         }
-        Send({
-            kind: "write",
-            edits: _edits
-        })
+        if(use_ajax) {
+            jQuery.ajax({
+                type: 'POST',
+                url: window.location.pathname,
+                data: {
+                    edits: JSON.stringify(_edits)
+                },
+                success: editsDone,
+                dataType: 'json',
+                error: editsError
+            });
+        } else {
+            Send({
+                kind: "write",
+                edits: _edits
+            })
+        }
         _edits = [];
     };
     
@@ -432,18 +462,35 @@ YourWorld.World = function() {
         }
         _ui.paused.hide();
         var bounds = getMandatoryBounds();
-        Send({
-            kind: "fetch",
-            fetchRectangles: [
-                {
-                    minY: bounds[0],
-                    minX: bounds[1],
-                    maxY: bounds[2],
-                    maxX: bounds[3]
-                }
-            ],
-            v: "3" // version (unused)
-        })
+        if(use_ajax) {
+            jQuery.ajax({
+                type: 'GET',
+                url: window.location.pathname,
+                data: { fetch: 1, 
+                        min_tileY: bounds[0],
+                        min_tileX: bounds[1],
+                        max_tileY: bounds[2],
+                        max_tileX: bounds[3],
+                        v: 3 // version
+                        },
+                success: updateData,
+                dataType: 'json',
+                error: updateError
+            });
+        } else {
+            Send({
+                kind: "fetch",
+                fetchRectangles: [
+                    {
+                        minY: bounds[0],
+                        minX: bounds[1],
+                        maxY: bounds[2],
+                        maxX: bounds[3]
+                    }
+                ],
+                v: "3" // version (unused)
+            })
+        }
     };
     
     var moveCursor = function(dir, opt_from) {

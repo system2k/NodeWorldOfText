@@ -23,7 +23,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     // gets world name from /accounts/configure/{world}/
     var world_name = get_third(path, "accounts", "configure")
 
-    var world = await db.get("SELECT * FROM world WHERE name=?", world_name);
+    var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", world_name);
 
     if(!world) {
         return await dispage("404", null, req, serve, vars)
@@ -103,7 +103,7 @@ module.exports.POST = async function(req, serve, vars) {
 
     var world_name = get_third(path, "accounts", "configure")
 
-    var world = await db.get("SELECT * FROM world WHERE name=?", world_name);
+    var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", world_name);
 
     if(!world) {
         return await dispage("404", null, req, serve, vars)
