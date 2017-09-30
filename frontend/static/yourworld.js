@@ -8,7 +8,7 @@ var use_ajax = false;
 if (window.MozWebSocket)
     window.WebSocket = window.MozWebSocket;
 
-if(!window.WebSocket)
+//if(!window.WebSocket)
     use_ajax = true;
 
 function Send(data) {
