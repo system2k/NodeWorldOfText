@@ -61,6 +61,10 @@ module.exports.POST = async function(req, serve, vars) {
     if(post_data.form == "modify_script") {
         var title = post_data.title;
         var content = post_data.content;
+        content = JSON.parse(content); // example: "test\\n123" -> test\n123
+        if(typeof content !== "string") { // instead of receiving "string", we received {object}
+            content = "";
+        }
         if(title != script_name) {
             if(await db.get("SELECT * FROM scripts WHERE owner_id=? AND name=?", [user.id, title])) {
                 message = "Script name already exists";

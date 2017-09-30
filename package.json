@@ -1,17 +1,18 @@
 {
     "name": "nodeworldoftext",
-    "version": "0.31.0",
+    "version": "0.32.0",
     "description": "YourWorldOfText written in Node",
     "dependencies": {
         "sqlite3": "*",
         "swig": "*",
         "prompt": "*",
         "adm-zip": "*",
-        "nodemailer": "*"
+        "nodemailer": "*",
+        "ws": "*"
     },
     "scripts": {
         "start": "node runserver.js",
-		"dbg": "node --trace-warnings runserver.js"
+        "dbg": "node --trace-warnings runserver.js"
     },
     "private": true
 }

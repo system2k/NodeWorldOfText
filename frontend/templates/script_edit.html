@@ -10,7 +10,7 @@
     <link type="text/css" rel="stylesheet" href="/static/script_syntax/sh_style.css">
     <script>
         function update() {
-            script_content_post.value = script_content.innerText;
+            script_content_post.value = JSON.stringify(script_content.innerText);
         }
         onload = function() {
             script_content.innerText = scr_content.innerText;

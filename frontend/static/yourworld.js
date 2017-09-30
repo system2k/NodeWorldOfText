@@ -1,5 +1,55 @@
 var YourWorld = {};
 
+var socket;
+var retry_http_ws = false;
+var socket_open = false;
+var socket_queue = [];
+function Send(data) {
+    if(socket_open) {
+        socket.send(JSON.stringify(data))
+    } else {
+        socket_queue.push(data)
+    }
+}
+function connect_ws(scheme) {
+    var ws_scheme = scheme || window.location.protocol === 'https:' ? 'wss' : 'ws';
+    var path = window.location.pathname.replace(/\/$/, "");
+    var ws_path = "" + ws_scheme + "://" + window.location.host + path + "/ws/";
+    socket = new WebSocket(ws_path);
+    socket.onerror = function(err) {
+        console.log("Disconnected from socket")
+        socket_open = false;
+        if(!retry_http_ws && ws_scheme == "wss") {
+            // wss doesn't work, try ws
+            retry_http_ws = true;
+            connect_ws("ws")
+        } else {
+            setTimeout(connect_ws, 8000)
+        }
+    }
+    socket.onopen = function() {
+        socket_open = true;
+        console.log("Connected to socket")
+        if(socket_queue) {
+            for(var i in socket_queue) {
+                var data = socket_queue[i];
+                socket_queue.splice(i, 1)
+                Send(data);
+            }
+        }
+    }
+    socket.onmessage = function(msg) {
+        msg = JSON.parse(msg.data);
+        if(msg.kind == "write") {
+            YourWorld.World.editsDone(msg.accepted);
+        }
+        if(msg.kind == "fetch") {
+            YourWorld.World.updateData(msg.tiles);
+        }
+    }
+}
+connect_ws()
+
 // Shortcut for public API
 window.InitWorld = function() {
     YourWorld.World.init.apply(null, arguments);
@@ -342,6 +392,7 @@ YourWorld.World = function() {
             }
         });
     };
+    obj.updateData = updateData;
     
     var updateError = function(xhr) {
         setTimeout(fetchUpdates, 997); // TODO: 997 shared w/above
@@ -353,6 +404,7 @@ YourWorld.World = function() {
             tile.editDone(editArray[2], editArray[3], editArray[4], editArray[5], editArray[6]);
         });
     };
+    obj.editsDone = editsDone;
     
     var editsError = function(xhr) {
         if (xhr.status == 403) {
@@ -365,16 +417,10 @@ YourWorld.World = function() {
         if (!_edits.length) {
             return;
         }
-        jQuery.ajax({
-            type: 'POST',
-            url: window.location.pathname,
-            data: {
-				edits: JSON.stringify(_edits)
-			},
-            success: editsDone,
-            dataType: 'json',
-            error: editsError
-        });
+        Send({
+            kind: "write",
+            edits: _edits
+        })
         _edits = [];
     };
     
@@ -388,20 +434,18 @@ YourWorld.World = function() {
         }
         _ui.paused.hide();
         var bounds = getMandatoryBounds();
-        jQuery.ajax({
-            type: 'GET',
-            url: window.location.pathname,
-            data: { fetch: 1, 
-                    min_tileY: bounds[0],
-                    min_tileX: bounds[1],
-                    max_tileY: bounds[2],
-                    max_tileX: bounds[3],
-                    v: 3 // version
-                    },
-            success: updateData,
-            dataType: 'json',
-            error: updateError
-        });
+        Send({
+            kind: "fetch",
+            fetchRectangles: [
+                {
+                    minY: bounds[0],
+                    minX: bounds[1],
+                    maxY: bounds[2],
+                    maxX: bounds[3]
+                }
+            ],
+            v: "3" // version (unused)
+        })
     };
     
     var moveCursor = function(dir, opt_from) {

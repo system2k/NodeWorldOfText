@@ -11,6 +11,7 @@ const prompt        = require("prompt");
 const dump_dir      = require("./backend/dump_dir");
 const zip           = require("adm-zip")
 const nodemailer    = require("nodemailer");
+const ws            = require("ws");
 
 const settings = require("./settings.json");
 const database = new sql.Database(settings.DATABASE_PATH);
@@ -73,6 +74,12 @@ const pages = {
     script_edit         : require("./backend/pages/script_edit.js"),
     script_view         : require("./backend/pages/script_view.js"),
     administrator_user  : require("./backend/pages/administrator_user.js")
+}
+
+const websockets = {
+    Main: require("./backend/websockets/Main.js"),
+    write: require("./backend/websockets/write.js"),
+    fetch: require("./backend/websockets/fetch.js")
 }
 
 const db = {
@@ -182,6 +189,7 @@ try {
     transporter.verify()
 } catch(e) {
     email_available = false;
+    console.log("Email is disabled because the verification failed (credentials possibly incorrect)")
 }
 
 async function send_email(destination, subject, text) {
@@ -201,6 +209,53 @@ async function send_email(destination, subject, text) {
             }
         });
     })
+}
+
+var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function create_date(time) {
+	var str = "(UTC) ";
+	
+	var date = new Date(time);
+	var month = date.getUTCMonth();
+	str += months[month] + " ";
+	
+	var day = date.getUTCDate();
+	str += day + ", "
+	
+	var year = date.getUTCFullYear();
+	str += year + " "
+	
+	var hour = date.getUTCHours() + 1;
+	var ampm = " AM"
+	if(hour >= 12) {
+		ampm = " PM"
+	}
+	if(hour > 12) {
+		hour = hour - 12
+	}
+	if(hour === 0) {
+		hour = 12;
+	}
+	str += hour
+	
+	var minute = date.getUTCMinutes();
+	minute = ("0" + minute).slice(-2);
+	str += ":" + minute
+	
+	var second = date.getUTCSeconds();
+	second = ("0" + second).slice(-2);
+	str += ":" + second + ampm
+	
+	return str;
+}
+
+// sanitize number input
+function san_nbr(x) {
+    if(typeof x !== "number") {
+        x = parseInt(x);
+        if(!x) x = 0;
+    }
+    return Math.floor(x);
 }
 
 (async function() {
@@ -307,7 +362,7 @@ function account_prompt() {
 			prompt.get(prompt_account_properties, passFunc);
 		}
 		
-		if(!err){
+		if(!err) {
 			var Date_ = Date.now()
             var passHash = encryptHash(result["password"])
 
@@ -553,22 +608,23 @@ function cookie_expire(timeStamp) {
 }
 
 function encode_base64(str) {
-    return new Buffer(str).toString('base64')
+    return new Buffer(str).toString("base64")
 }
 function decode_base64(b64str) {
-    return new Buffer(b64str, 'base64').toString('ascii')
+    return new Buffer(b64str, "base64").toString("ascii")
 }
 
 var options = {};
 var https_disabled = false;
 try { // so that ~FP can run it on his own (since he does not have the keys)
     var options = {
-        key: fs.readFileSync('../le/etc/live/nwot.sytes.net/privkey.pem'),
-        cert: fs.readFileSync('../le/etc/live/nwot.sytes.net/cert.pem'),
-        ca: fs.readFileSync('../le/etc/live/nwot.sytes.net/chain.pem')
+        key: fs.readFileSync("../le/etc/live/nwot.sytes.net/privkey.pem"),
+        cert: fs.readFileSync("../le/etc/live/nwot.sytes.net/cert.pem"),
+        ca: fs.readFileSync("../le/etc/live/nwot.sytes.net/chain.pem")
     };
 } catch(e) {
     https_disabled = true;
+    console.log("Running server in HTTP mode")
 }
 var https_reference = https;
 var prev_cS = http.createServer;
@@ -606,9 +662,139 @@ var server = https_reference.createServer(options, async function(req, res) {
     }
 })
 
+async function get_user_info(cookies, is_websocket) {
+    /*
+        User Levels:
+        3: Superuser (Operator)
+        2: Superuser
+        1: Staff
+        0: regular user
+    */
+    var user = {
+        authenticated: false,
+        username: "",
+        id: 0,
+        csrftoken: null,
+        superuser: false,
+        scripts: []
+    }
+    if(cookies.sessionid) {
+        // user data from session
+        var s_data = await db.get("SELECT * FROM auth_session WHERE session_key=?", 
+            cookies.sessionid);
+        if(s_data) {
+            user = JSON.parse(s_data.session_data);
+            if(cookies.csrftoken == user.csrftoken) { // verify csrftoken
+                user.authenticated = true;
+                var level = (await db.get("SELECT level FROM auth_user WHERE id=?",
+                user.id)).level
+
+                var operator = level == 3;
+                var superuser = level == 2;
+                var staff = level == 1;
+
+                user.operator = operator
+                user.superuser = superuser || operator
+                user.staff = staff || superuser || operator
+
+                if(user.staff && !is_websocket) {
+                    user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id)
+                } else {
+                    user.scripts = [];
+                }
+            }
+        }
+    }
+    return user;
+}
+
+async function world_get_or_create(name, req, serve) {
+    var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
+    if(!world) { // world doesn't exist
+        if(name.match(/^(\w*)$/g)) {
+            var date = Date.now();
+            await db.run("INSERT INTO world VALUES(null, ?, null, ?, ?, 1, 1, '{}')",
+                [name, date, date])
+            world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name)
+        } else { // special worlds (like: /beta/test) are not found and must not be created
+            if(serve) {
+                return await dispage("404", null, req, serve, vars)
+            } else {
+                return;
+            }
+        }
+    }
+    return world;
+}
+
+async function can_view_world(world, user) {
+    var permissions = {
+        member: false,
+        owner: false
+    };
+    var whitelist = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
+        [world.id, user.id])
+    if(!world.public_readable && world.owner_id != user.id) { // is it set to members/owners only?
+        if(!whitelist) { // not a member (nor owner)
+            return false;
+        } else {
+            permissions.member = true;
+        }
+    }
+    if(world.owner_id == user.id) {
+        permissions.owner = true;
+    }
+    permissions.member = !!whitelist;
+    return permissions;
+}
+
+// from: http://stackoverflow.com/questions/8273047/javascript-function-similar-to-python-range
+function xrange(start, stop, step) {
+    if (typeof stop == 'undefined') {
+        stop = start;
+        start = 0;
+    }
+    if (typeof step == 'undefined') {
+        step = 1;
+    }
+    if ((step > 0 && start >= stop) || (step < 0 && start <= stop)) {
+        return [];
+    }
+    var result = [];
+    for (var i = start; step > 0 ? i < stop : i > stop; i += step) {
+        result.push(i);
+    }
+    return result;
+};
+
+function tile_coord(coord) {
+    coord = coord.split(",")
+    return [parseInt(coord[0]), parseInt(coord[1])];
+}
+
 var transaction_active = false;
 var transaction_req_id = 0;
 var req_id = 0;
+
+function transaction_obj(id) {
+    var req_id = id;
+    var fc = {
+        begin: async function(id) {
+            if(!transaction_active) {
+                transaction_active = true;
+                await db.run("BEGIN TRANSACTION")
+                transaction_req_id = req_id;
+            }
+        },
+        end: async function() {
+            if(transaction_active) {
+                transaction_active = false;
+                await db.run("COMMIT")
+            }
+        }
+    }
+    return fc;
+}
 
 async function process_request(req, res) {
     var URL = url.parse(req.url).pathname;
@@ -626,21 +812,7 @@ async function process_request(req, res) {
     // server will return cookies to the client if it needs to
     var include_cookies = [];
 
-    var transaction = {
-        begin: async function() {
-            if(!transaction_active) {
-                transaction_active = true;
-                await db.run("BEGIN TRANSACTION")
-                transaction_req_id = req_id;
-            }
-        },
-        end: async function() {
-            if(transaction_active) {
-                transaction_active = false;
-                await db.run("COMMIT")
-            }
-        }
-    }
+    var transaction = transaction_obj(req_id)
 
     function dispatch(data, status_code, params) {
         if(request_resolved) return; // if request is already sent
@@ -704,14 +876,7 @@ async function process_request(req, res) {
                 var post_data = {};
                 var query_data = querystring.parse(url.parse(req.url).query)
                 var cookies = parseCookie(req.headers.cookie);
-                var user = {
-                    authenticated: false,
-                    username: "",
-                    id: 0,
-                    csrftoken: null,
-                    superuser: false,
-                    scripts: []
-                }
+                var user = await get_user_info(cookies);
                 // check if user is logged in
                 if(!cookies.csrftoken) {
                     var token = new_token(32)
@@ -720,38 +885,6 @@ async function process_request(req, res) {
                     user.csrftoken = token;
                 } else {
                     user.csrftoken = cookies.csrftoken;
-                }
-                /*
-                    User Levels:
-                    3: Superuser (Operator)
-                    2: Superuser
-                    1: Staff
-                    0: regular user
-                */
-                if(cookies.sessionid) {
-                    // user data from session
-                    var s_data = await db.get("SELECT * FROM auth_session WHERE session_key=?", 
-                        cookies.sessionid);
-                    if(s_data) {
-                        user = JSON.parse(s_data.session_data);
-                        if(cookies.csrftoken == user.csrftoken) { // verify csrftoken
-                            user.authenticated = true;
-                            var level = (await db.get("SELECT level FROM auth_user WHERE id=?",
-                            user.id)).level
-
-                            var operator = level == 3;
-                            var superuser = level == 2;
-                            var staff = level == 1;
-
-                            user.operator = operator
-                            user.superuser = superuser || operator
-                            user.staff = staff || superuser || operator
-
-                            if(user.staff) {
-                                user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id)
-                            }
-                        }
-                    }
                 }
                 var redirected = false;
                 function redirect(path) {
@@ -815,7 +948,17 @@ async function process_request(req, res) {
 
 function start_server() {
     (async function clear_expired_sessions() {
+        // clear expires sessions
         await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
+
+        // clear expired registration keys (and accounts that aren't activated yet)
+        await db.each("SELECT id FROM auth_user WHERE is_active=0 AND ? - date_joined >= ?",
+            [Date.now(), Day * settings.activation_key_days_expire], async function(data) {
+            var id = data.id;
+            await db.run("DELETE FROM registration_registrationprofile WHERE user_id=?", id);
+            await db.run("DELETE FROM auth_user WHERE id=?", id)
+        })
+
         setTimeout(clear_expired_sessions, Minute);
     })()
 
@@ -823,6 +966,76 @@ function start_server() {
         var addr = server.address();
         console.log("Server is running.\nAddress: " + addr.address + "\nPort: " + addr.port);
     });
+
+    var wss = new ws.Server({ server });
+    wss.on("connection", async function (ws, req) {
+        try {
+            var location = url.parse(req.url).pathname;
+            var world_name;
+            if(location.match(/(\/ws\/$)/)) {
+                world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
+            } else {
+                ws.send(JSON.stringify({
+                    kind: "error",
+                    message: "Invalid address"
+                }));
+                return ws.close();
+            }
+            var cookies = parseCookie(req.headers.cookie);
+            var user = await get_user_info(cookies, true)
+            var vars = objIncludes(global_data, {
+                user
+            })
+            var status = await websockets.Main(ws, world_name, vars);
+            if(typeof status == "string") {
+                ws.send(JSON.stringify({
+                    kind: "error",
+                    message: status
+                }));
+                return ws.close();
+            }
+            vars.world = status.world;
+            vars.timemachine = status.timemachine
+
+            user.stats = status.permission;
+            var channel = new_token(16);
+            ws.send(JSON.stringify({
+                kind: "channel",
+                sender: channel
+            }))
+            ws.on("message", async function(msg) {
+                req_id++;
+                try {
+                    msg = JSON.parse(msg);
+                    var kind = msg.kind;
+                    if(websockets[kind]) {
+                        function send(msg) {
+                            msg.kind = kind
+                            ws.send(JSON.stringify(msg))
+                        }
+                        var res = await websockets[kind](ws, msg, send, objIncludes(vars, {
+                            transaction: transaction_obj(req_id)
+                        }))
+                        if(typeof res == "string") {
+                            ws.send(JSON.stringify({
+                                kind: "error",
+                                message: res
+                            }));
+                        }
+                    }
+                } catch(e) {
+                    handle_ws_error(e);
+                }
+            })
+        } catch(e) {
+            handle_ws_error(e);
+        }
+    });
+}
+
+function handle_ws_error(e) {
+    log_error(JSON.stringify(process_error_arg(e)));
+    console.log("An error occured [" + Date.now() + "] Check the logs for more information")
 }
 
 var global_data = {
@@ -841,7 +1054,14 @@ var global_data = {
     send_email,
     crypto,
     filename_sanitize,
-    get_third
+    get_third,
+    create_date,
+    get_user_info,
+    world_get_or_create,
+    can_view_world,
+    san_nbr,
+    xrange,
+    tile_coord
 }
 
 /*
