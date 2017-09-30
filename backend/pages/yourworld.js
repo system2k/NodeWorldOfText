@@ -131,8 +131,14 @@ module.exports.POST = async function(req, serve, vars) {
     }
 
     vars.world = world;
+    var edits_parsed;
+    try {
+        edits_parsed = JSON.parse(post_data.edits);
+    } catch(e) {
+        return serve(null, 413)
+    }
     var do_write = await modules.write_data({
-        edits: JSON.parse(post_data.edits)
+        edits: edits_parsed
     }, vars);
 
     serve(JSON.stringify(do_write))

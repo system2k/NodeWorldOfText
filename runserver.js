@@ -73,7 +73,8 @@ const pages = {
     script_manager      : require("./backend/pages/script_manager.js"),
     script_edit         : require("./backend/pages/script_edit.js"),
     script_view         : require("./backend/pages/script_view.js"),
-    administrator_user  : require("./backend/pages/administrator_user.js")
+    administrator_user  : require("./backend/pages/administrator_user.js"),
+    accounts_download   : require("./backend/pages/accounts_download")
 }
 
 const websockets = {
@@ -434,7 +435,8 @@ var url_regexp = [ // regexp , function/redirect to
     ["^script_manager/$", pages.script_manager],
     ["^script_manager/edit/(.*)/$", pages.script_edit],
     ["^script_manager/view/(.*)/$", pages.script_view],
-    ["^administrator/user/(.*)/$", pages.administrator_user]
+    ["^administrator/user/(.*)/$", pages.administrator_user],
+    ["^accounts/download/(.*)/$", pages.accounts_download]
 ]
 
 function get_third(url, first, second) {

@@ -18,6 +18,10 @@
             window.location.pathname = "/administrator/user/" + username_config.value + "/";
             return false;
         }
+        function goto_download() {
+            window.location.pathname = "/accounts/download/" + worldname_download.value + "/";
+            return false;
+        }
         onload = function() {
             $('#username_config').autocomplete('/accounts/member_autocomplete/', {delay: 50})
         }
@@ -48,6 +52,17 @@
 				World name: 
 				<input type="text" name="worldname" id="worldname_config" value="">
 				<input type="submit" value="Edit">
+			</form>
+        </div>
+    </div>
+
+    <div class="content_set">
+        <div class="content_set_title">Download a World</div>
+        <div class="content_set_content">
+            <form onsubmit="return goto_download();">
+				World name: 
+				<input type="text" name="worldname" id="worldname_download" value="">
+				<input type="submit" value="Download">
 			</form>
         </div>
     </div>
