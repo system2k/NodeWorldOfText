@@ -986,7 +986,7 @@ function start_server() {
             if(location.match(/(\/ws\/$)/)) {
                 world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
             } else {
-                ws.send(JSON.stringify({
+                send_ws(JSON.stringify({
                     kind: "error",
                     message: "Invalid address"
                 }));
@@ -999,7 +999,7 @@ function start_server() {
             })
             var status = await websockets.Main(ws, world_name, vars);
             if(typeof status == "string") {
-                ws.send(JSON.stringify({
+                send_ws(JSON.stringify({
                     kind: "error",
                     message: status
                 }));
@@ -1010,7 +1010,7 @@ function start_server() {
 
             user.stats = status.permission;
             var channel = new_token(16);
-            ws.send(JSON.stringify({
+            send_ws(JSON.stringify({
                 kind: "channel",
                 sender: channel
             }))
@@ -1023,13 +1023,13 @@ function start_server() {
                     if(websockets[kind]) {
                         function send(msg) {
                             msg.kind = kind
-                            ws.send(JSON.stringify(msg))
+                            send_ws(JSON.stringify(msg))
                         }
                         var res = await websockets[kind](ws, msg, send, objIncludes(vars, {
                             transaction: transaction_obj(current_req_id)
                         }))
                         if(typeof res == "string") {
-                            ws.send(JSON.stringify({
+                            send_ws(JSON.stringify({
                                 kind: "error",
                                 message: res
                             }));
