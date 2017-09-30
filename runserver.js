@@ -939,8 +939,7 @@ async function process_request(req, res, current_req_id) {
             break;
         }
     }
-
-    if(!vars.user) vars.user = {}
+    if(!vars.user) vars.user = await get_user_info(parseCookie(req.headers.cookie))
     if(!vars.cookies) vars.cookie = {};
     if(!vars.path) vars.path = URL;
 
