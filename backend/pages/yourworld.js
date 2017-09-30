@@ -135,7 +135,7 @@ module.exports.POST = async function(req, serve, vars) {
     try {
         edits_parsed = JSON.parse(post_data.edits);
     } catch(e) {
-        return serve(null, 413)
+        return serve(null, 418)
     }
     var do_write = await modules.write_data({
         edits: edits_parsed
