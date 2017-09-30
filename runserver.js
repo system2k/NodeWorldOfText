@@ -794,6 +794,7 @@ function transaction_obj(id) {
         begin: async function(id) {
             if(!transaction_active) {
                 transaction_active = true;
+                http_s_log.push("[transaction] Started")
                 await db.run("BEGIN TRANSACTION")
                 transaction_req_id = req_id;
             }
@@ -801,6 +802,7 @@ function transaction_obj(id) {
         end: async function() {
             if(transaction_active) {
                 transaction_active = false;
+                http_s_log.push("[transaction] Ended")
                 await db.run("COMMIT")
             }
         }
@@ -810,7 +812,7 @@ function transaction_obj(id) {
 
 process.on("uncaughtException", function(e) {
     fs.writeFileSync(settings.UNCAUGHT_PATH, JSON.stringify(process_error_arg(e)))
-    fs.writeFileSync(settings.LAST_20_REQS, JSON.stringify(http_s_log.slice(-20)))
+    fs.writeFileSync(settings.REQ_LOG, JSON.stringify(http_s_log))
     console.log("Uncaught error:", e);
     process.exit();
 });
@@ -1011,13 +1013,16 @@ function start_server() {
     });
 
     var wss = new ws.Server({ server });
-    try { wss.on("connection", async function (ws, req) {
+    wss.on("connection", async function (ws, req) {
+        http_s_log.push("[ws] Creating a websocket connection...")
         try {
             var location = url.parse(req.url).pathname;
             var world_name;
             function send_ws(data) {
                 if(ws.readyState === ws.OPEN) {
+                    http_s_log.push("[ws] Sending data with length of " + data.length)
                     ws.send(data);
+                    http_s_log.push("[ws] Data sending complete")
                 }
             }
             if(location.match(/(\/ws\/$)/)) {
@@ -1051,7 +1056,8 @@ function start_server() {
                 kind: "channel",
                 sender: channel
             }))
-            try { ws.on("message", async function(msg) {
+            ws.on("message", async function(msg) {
+                http_s_log.push("[ws] Received message event with length of " + msg.length)
                 req_id++;
                 var current_req_id = req_id;
                 try {
@@ -1083,15 +1089,11 @@ function start_server() {
                 } catch(e) {
                     handle_ws_error(e);
                 }
-            }) } catch(e) {
-                console.log("An error occured with ws.on('message')")
-            }
+            })
         } catch(e) {
             handle_ws_error(e);
         }
-    }) } catch(e) {
-        console.log("An error occured with ws.on('connection')")
-    }
+    })
 }
 
 function handle_ws_error(e) {
