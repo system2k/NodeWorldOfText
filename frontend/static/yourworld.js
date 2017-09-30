@@ -1,7 +1,6 @@
 var YourWorld = {};
 
 var socket;
-var retry_http_ws = false;
 var socket_open = false;
 var socket_queue = [];
 function Send(data) {
@@ -12,20 +11,14 @@ function Send(data) {
     }
 }
 function connect_ws(scheme) {
-    var ws_scheme = scheme || window.location.protocol === 'https:' ? 'wss' : 'ws';
+    var ws_scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
     var path = window.location.pathname.replace(/\/$/, "");
     var ws_path = "" + ws_scheme + "://" + window.location.host + path + "/ws/";
     socket = new WebSocket(ws_path);
     socket.onerror = function(err) {
         console.log("Disconnected from socket")
         socket_open = false;
-        if(!retry_http_ws && ws_scheme == "wss") {
-            // wss doesn't work, try ws
-            retry_http_ws = true;
-            connect_ws("ws")
-        } else {
-            setTimeout(connect_ws, 8000)
-        }
+        setTimeout(connect_ws, 8000)
     }
     socket.onopen = function() {
         socket_open = true;

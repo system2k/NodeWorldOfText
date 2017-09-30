@@ -978,6 +978,11 @@ function start_server() {
         try {
             var location = url.parse(req.url).pathname;
             var world_name;
+            function send_ws(data) {
+                if(ws.readyState === ws.OPEN) {
+                    ws.send(data);
+                }
+            }
             if(location.match(/(\/ws\/$)/)) {
                 world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
             } else {
