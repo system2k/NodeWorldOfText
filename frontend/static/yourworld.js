@@ -41,6 +41,9 @@ function connect_ws(scheme) {
         if(msg.kind == "fetch") {
             YourWorld.World.updateData(msg.tiles);
         }
+        if(msg.kind == "error") {
+            throw msg.message;
+        }
     }
 }
 connect_ws()
