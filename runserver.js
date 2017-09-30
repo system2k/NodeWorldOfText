@@ -644,24 +644,6 @@ function process_error_arg(e) {
     return error;
 }
 
-var server = https_reference.createServer(options, async function(req, res) {
-    req_id++;
-    try {
-        await process_request(req, res)
-    } catch(e) {
-        if(transaction_active) {
-            if(transaction_req_id == req_id) {
-                transaction_active = false;
-                await db.run("COMMIT");
-            }
-        }
-        res.statusCode = 500;
-        res.end(template_data["500.html"]({}))
-        var error = process_error_arg(e);
-        log_error(JSON.stringify(error));
-    }
-})
-
 async function get_user_info(cookies, is_websocket) {
     /*
         User Levels:
@@ -796,7 +778,26 @@ function transaction_obj(id) {
     return fc;
 }
 
-async function process_request(req, res) {
+var server = https_reference.createServer(options, async function(req, res) {
+    req_id++;
+    var current_req_id = req_id;
+    try {
+        await process_request(req, res, current_req_id)
+    } catch(e) {
+        if(transaction_active) {
+            if(transaction_req_id == current_req_id) {
+                transaction_active = false;
+                await db.run("COMMIT");
+            }
+        }
+        res.statusCode = 500;
+        res.end(template_data["500.html"]({}))
+        var error = process_error_arg(e);
+        log_error(JSON.stringify(error));
+    }
+})
+
+async function process_request(req, res, current_req_id) {
     var URL = url.parse(req.url).pathname;
     if(URL.charAt(0) == "/") {
         URL = URL.substr(1);
@@ -812,7 +813,7 @@ async function process_request(req, res) {
     // server will return cookies to the client if it needs to
     var include_cookies = [];
 
-    var transaction = transaction_obj(req_id)
+    var transaction = transaction_obj(current_req_id)
 
     function dispatch(data, status_code, params) {
         if(request_resolved) return; // if request is already sent
@@ -1005,6 +1006,7 @@ function start_server() {
             }))
             ws.on("message", async function(msg) {
                 req_id++;
+                var current_req_id = req_id;
                 try {
                     msg = JSON.parse(msg);
                     var kind = msg.kind;
@@ -1014,7 +1016,7 @@ function start_server() {
                             ws.send(JSON.stringify(msg))
                         }
                         var res = await websockets[kind](ws, msg, send, objIncludes(vars, {
-                            transaction: transaction_obj(req_id)
+                            transaction: transaction_obj(current_req_id)
                         }))
                         if(typeof res == "string") {
                             ws.send(JSON.stringify({
