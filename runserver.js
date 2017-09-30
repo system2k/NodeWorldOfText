@@ -82,6 +82,11 @@ const websockets = {
     fetch: require("./backend/websockets/fetch.js")
 }
 
+const modules = {
+    fetch_tiles: require("./backend/modules/fetch_tiles.js"),
+    write_data: require("./backend/modules/write_data.js")
+}
+
 const db = {
     // gets data from the database (only 1 row at a time)
     get: async function(command, params) {
@@ -1063,5 +1068,6 @@ var global_data = {
     can_view_world,
     san_nbr,
     xrange,
-    tile_coord
+    tile_coord,
+    modules
 }
