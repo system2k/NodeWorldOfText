@@ -3,7 +3,7 @@
 var fs = require("fs");
 function listDir(addr, MP, dsu, po) { // object, file path, web path, path only
 	var con = fs.readdirSync(MP)
-	for(i in con) {
+	for(var i in con) {
 		var currentPath = MP + con[i]
 		if(!fs.lstatSync(currentPath).isDirectory()) {
 			if(!po) {

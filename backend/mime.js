@@ -839,7 +839,7 @@ var mime = {
 }
 
 module.exports = function(ext) {
-	for(i in mime) {
+	for(var i in mime) {
 		var ref = mime[i];
 		var index = ref.indexOf(ext);
 		if(ref.indexOf(ext) > -1) {
