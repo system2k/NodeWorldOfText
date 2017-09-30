@@ -808,9 +808,10 @@ function transaction_obj(id) {
     return fc;
 }
 
-process.on("uncaughtException", function() {
-    console.log("Looks like an (uncaught) error occured. Here are the last 20 http requests: ")
-    console.log(http_s_log.slice(-20))
+process.on("uncaughtException", function(e) {
+    fs.writeFileSync(settings.UNCAUGHT_PATH, JSON.stringify(process_error_arg(e)))
+    fs.writeFileSync(settings.LAST_20_REQS, JSON.stringify(http_s_log.slice(-20)))
+    console.log("Uncaught error:", e);
     process.exit();
 });
 

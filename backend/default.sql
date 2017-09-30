@@ -1,4 +1,4 @@
-PRAGMA encoding='UTF-16';
+PRAGMA encoding="UTF-16";
 
 CREATE TABLE "auth_user" (
     "id" integer NOT NULL PRIMARY KEY,
