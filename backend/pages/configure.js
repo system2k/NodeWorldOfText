@@ -161,7 +161,7 @@ module.exports.POST = async function(req, serve, vars) {
             [Date.now(), read, write, world.id])
     } else if(post_data.form == "remove_member") {
         var to_remove;
-        for(key in post_data) {
+        for(var key in post_data) {
             if(key.startsWith("remove_")) to_remove = key;
         }
         var username_to_remove = to_remove.substr("remove_".length)
