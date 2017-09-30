@@ -44,7 +44,7 @@ if(fs.existsSync(settings.LOG_PATH)) {
     var file = fs.readFileSync(settings.LOG_PATH)
     if(file.length > 0) {
         var log_data = fs.readFileSync(settings.LOG_PATH);
-        zip_file.addFile("NWOT_LOG_" + Date.now() + ".txt", log_data, '', 0644);
+        zip_file.addFile("NWOT_LOG_" + Date.now() + ".txt", log_data, "", 0644);
         fs.truncateSync(settings.LOG_PATH);
     }
 }
@@ -297,27 +297,27 @@ prompt.delimiter    = ""; // do not display ":" after "prompt"
 prompt.colors       = false; // disable dark gray color in a black console
 
 var prompt_account_properties = {
-	properties: {
-		username: {
-			message: 'Username: '
-		},
-		password: {
-			description: 'Password: ',
-			replace: '*',
-			hidden: true
-		},
-		confirmpw: {
-			description: 'Password (again): ',
-			replace: '*',
-			hidden: true
-		}
-	}
+    properties: {
+        username: {
+            message: "Username: "
+        },
+        password: {
+            description: "Password: ",
+            replace: "*",
+            hidden: true
+        },
+        confirmpw: {
+            description: "Password (again): ",
+            replace: "*",
+            hidden: true
+        }
+    }
 };
 
 var prompt_account_yesno = {
-	properties: {
-		yes_no_account: {
-			message: "You just installed the server,\nwhich means you don\'t have any superusers defined.\nWould you like to create one now? (yes/no):"
+    properties: {
+        yes_no_account: {
+            message: "You just installed the server,\nwhich means you don\'t have any superusers defined.\nWould you like to create one now? (yes/no):"
 		}
 	}
 };
@@ -382,7 +382,7 @@ function account_prompt() {
 		}
 	}
 	yesNoAccount = function(err, result) {
-		var re = result['yes_no_account'];
+		var re = result["yes_no_account"];
 		if(toUpper(re) === "YES") {
 			prompt.get(prompt_account_properties, passFunc);
 		}
@@ -396,6 +396,28 @@ function account_prompt() {
     }
     prompt.start();
     prompt.get(prompt_account_yesno, yesNoAccount);
+}
+
+var prompt_command_input = {
+    properties: {
+        input: {
+            message: ">>"
+		}
+	}
+};
+
+function command_prompt() {
+    function on_input(err, input) {
+        if(err) return console.log(err);
+        try {
+            console.dir(eval(input.input), { colors: true });
+        } catch(e) {
+            console.dir(e, { colors: true });
+        }
+        command_prompt()
+    }
+    prompt.start();
+    prompt.get(prompt_command_input, on_input);
 }
 
 //Time in milliseconds
@@ -474,7 +496,7 @@ async function dispage(page, params, req, serve, vars, method) {
 var static_file_returner = {}
 static_file_returner.GET = function(req, serve) {
     var parse = url.parse(req.url).pathname.substr(1)
-    var mime_type = mime(parse.replace(/.*[\.\/\\]/, '').toLowerCase());
+    var mime_type = mime(parse.replace(/.*[\.\/\\]/, "").toLowerCase());
     serve(static_data[parse], 200, { mime: mime_type })
 }
 
@@ -740,11 +762,11 @@ async function can_view_world(world, user) {
 
 // from: http://stackoverflow.com/questions/8273047/javascript-function-similar-to-python-range
 function xrange(start, stop, step) {
-    if (typeof stop == 'undefined') {
+    if (typeof stop == "undefined") {
         stop = start;
         start = 0;
     }
-    if (typeof step == 'undefined') {
+    if (typeof step == "undefined") {
         step = 1;
     }
     if ((step > 0 && start >= stop) || (step < 0 && start <= stop)) {
@@ -787,8 +809,8 @@ function transaction_obj(id) {
 }
 
 process.on("uncaughtException", function() {
-    console.log("Looks like an (uncaught) error occured. Here are the last 10 http requests: ")
-    console.log(http_s_log.slice(-10))
+    console.log("Looks like an (uncaught) error occured. Here are the last 20 http requests: ")
+    console.log(http_s_log.slice(-20))
     process.exit();
 });
 
@@ -796,7 +818,7 @@ var http_s_log = [];
 
 var server = https_reference.createServer(options, async function(req, res) {
     http_s_log.push("HTTP(S): " + req.url +
-        " METHOD: " + req.method + " TIME: " + Date.now() + " " + new Date())
+        " METHOD: " + req.method + ", TIME: " + Date.now() + " [" + new Date() + "]")
     req_id++;
     var current_req_id = req_id;
     try {
@@ -977,11 +999,14 @@ function start_server() {
         })
 
         setTimeout(clear_expired_sessions, Minute);
-    })()
+    })();
 
     server.listen(settings.port, function() {
         var addr = server.address();
         console.log("Server is running.\nAddress: " + addr.address + "\nPort: " + addr.port);
+
+        // start listening for commands
+        command_prompt();
     });
 
     var wss = new ws.Server({ server });
