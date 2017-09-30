@@ -5,8 +5,8 @@ var socket_open = false;
 var socket_queue = [];
 var use_ajax = false;
 
-if (window.mozWebSocket)
-    window.WebSocket = window.mozWebSocket;
+if (window.MozWebSocket)
+    window.WebSocket = window.MozWebSocket;
 
 if(!window.WebSocket)
     use_ajax = true;
