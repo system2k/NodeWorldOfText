@@ -575,7 +575,6 @@ function wait_response_data(req, dispatch) {
                 queryData = "";
                 dispatch("Payload too large", 413)
                 error = true
-                req.connection.destroy();
                 resolve(null);
             }
         });
@@ -908,7 +907,6 @@ async function process_request(req, res, current_req_id) {
                     var dat = await wait_response_data(req, dispatch)
                     if(!dat) {
                         return;
-                        
                     }
                     post_data = dat;
                 }

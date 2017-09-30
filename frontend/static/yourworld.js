@@ -34,7 +34,9 @@ function connect_ws(scheme) {
     socket.onmessage = function(msg) {
         msg = JSON.parse(msg.data);
         if(msg.kind == "write") {
-            YourWorld.World.editsDone(msg.accepted);
+            try {
+                YourWorld.World.editsDone(msg.accepted);
+            } catch(e) {}
         }
         if(msg.kind == "fetch") {
             YourWorld.World.updateData(msg.tiles);
