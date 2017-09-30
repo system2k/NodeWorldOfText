@@ -16,6 +16,8 @@ const ws            = require("ws");
 const settings = require("./settings.json");
 const database = new sql.Database(settings.DATABASE_PATH);
 
+Error.stackTraceLimit = Infinity;
+
 var static_path = "./frontend/static/";
 var static_path_web = "static/"
 
