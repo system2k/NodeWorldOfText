@@ -24,7 +24,7 @@ module.exports = async function(data, vars) {
         if (!tiles[edits[i][0] + "," + edits[i][1]]) {
             tiles[edits[i][0] + "," + edits[i][1]] = []
         }
-        edits[i][5] = edits[i][5].replace(/\g/g, " ")
+        edits[i][5] = edits[i][5].replace(/\n/g, " ")
         edits[i][5] = edits[i][5].replace(/\r/g, " ")
         edits[i][5] = edits[i][5].replace(/\0/g, " ")
         tiles[edits[i][0] + "," + edits[i][1]].push(edits[i])
