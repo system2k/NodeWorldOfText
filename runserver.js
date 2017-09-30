@@ -786,7 +786,17 @@ function transaction_obj(id) {
     return fc;
 }
 
+process.on("uncaughtException", function() {
+    console.log("Looks like an (uncaught) error occured. Here are the last 10 http requests: ")
+    console.log(http_s_log.slice(-10))
+    process.exit();
+});
+
+var http_s_log = [];
+
 var server = https_reference.createServer(options, async function(req, res) {
+    http_s_log.push("HTTP(S): " + req.url +
+        " METHOD: " + req.method + " TIME: " + Date.now() + " " + new Date())
     req_id++;
     var current_req_id = req_id;
     try {
@@ -940,7 +950,7 @@ async function process_request(req, res, current_req_id) {
         }
     }
     if(!vars.user) vars.user = await get_user_info(parseCookie(req.headers.cookie))
-    if(!vars.cookies) vars.cookie = {};
+    if(!vars.cookies) vars.cookie = parseCookie(req.headers.cookie);
     if(!vars.path) vars.path = URL;
 
     if(!vars_joined) {
