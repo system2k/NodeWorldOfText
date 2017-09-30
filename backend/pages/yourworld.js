@@ -1,50 +1,5 @@
 module.exports = {};
 
-/*
-    is any variable null/nan?
-    [vars]:
-        list of variables
-    [types]: (optional)
-        0: check for null
-        1: check for NaN
-        2: check for null and NaN
-*/
-function null_or_nan(vars, types) {
-    if(!types) types = 0;
-    for(var i = 0; i < vars.length; i++) {
-        if((vars[i] == null && types == 0) ||
-           (isNaN(vars[i]) && types == 1) ||
-           (vars[i] == null || isNaN(vars[i]) && types == 2)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// from: http://stackoverflow.com/questions/8273047/javascript-function-similar-to-python-range
-function xrange(start, stop, step) {
-    if (typeof stop == 'undefined') {
-        stop = start;
-        start = 0;
-    }
-    if (typeof step == 'undefined') {
-        step = 1;
-    }
-    if ((step > 0 && start >= stop) || (step < 0 && start <= stop)) {
-        return [];
-    }
-    var result = [];
-    for (var i = start; step > 0 ? i < stop : i > stop; i += step) {
-        result.push(i);
-    }
-    return result;
-};
-
-function tile_coord(coord) {
-    coord = coord.split(",")
-    return [parseInt(coord[0]), parseInt(coord[1])];
-}
-
 module.exports.GET = async function(req, serve, vars, params) {
     var template_data = vars.template_data;
     var cookies = vars.cookies;

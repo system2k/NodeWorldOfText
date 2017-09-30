@@ -1063,8 +1063,3 @@ var global_data = {
     xrange,
     tile_coord
 }
-
-/*
-    TODO:
-    -add websockets
-*/

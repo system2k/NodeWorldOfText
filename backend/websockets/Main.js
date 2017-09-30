@@ -23,6 +23,10 @@ module.exports = async function(ws, worldname, vars) {
         return "World does not exist"
     }
 
+    if(timemachine.active && world.owner_id != user.id && !user.superuser) {
+        return "No permission to view the timemachine"
+    }
+
     var permission = await can_view_world(world, user)
     if(!permission && !user.superuser) {
         return "No permission to view this world"

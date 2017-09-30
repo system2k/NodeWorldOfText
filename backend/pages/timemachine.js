@@ -30,11 +30,9 @@ module.exports.GET = async function(req, serve, vars, params) {
     // gets world name from /accounts/configure/{world}/
     var world_name = get_third(path, "accounts", "timemachine")
 
-    var time = 1000000;
     var sp = world_name.split("/");
     if(sp.length > 1) {
         var int = fjoin(sp, "/", sp.length - 1);
-        time = parseInt(int[1]);
         world_name = int[0];
     }
 
@@ -48,16 +46,9 @@ module.exports.GET = async function(req, serve, vars, params) {
         return serve("Access denied", 403)
     }
 
-    if(!time) {
-        time = 0;
-    }
-    if(time < 0) time = 0;
-    if(time > 1000000) time = 1000000;
-
     return await dispage("yourworld", {
         timemachine: true,
-        world: world.name,
-        time
+        world: world.name
     }, req, serve, vars)
     
     serve()
