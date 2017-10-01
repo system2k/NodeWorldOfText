@@ -1004,7 +1004,7 @@ function start_server() {
         setTimeout(clear_expired_sessions, Minute);
     })();
 
-    server.listen(settings.port, function() {
+    server.listen(process.env.PORT || 5000, function() {
         var addr = server.address();
         console.log("Server is running.\nAddress: " + addr.address + "\nPort: " + addr.port);
 
