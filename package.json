@@ -14,5 +14,9 @@
         "start": "node runserver.js",
         "dbg": "node --trace-warnings --stack-trace-limit=1024 runserver.js"
     },
+    "engines": {
+        "node": "0.8.x",
+        "npm":  "1.2.x"
+      },
     "private": true
 }
