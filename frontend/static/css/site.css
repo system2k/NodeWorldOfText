@@ -1,15 +1,19 @@
-/* Blueprint overrides: */
 body {
-    font-family: Verdana, "Helvetica Neue", Arial, Helvetica, sans-serif;
+    font-family: Verdana,"Helvetica Neue",Arial,Helvetica,sans-serif;
 }
+
 .container {
     margin: 0;
+    display: inline;
 }
-ul, ol {
+
+ul,ol {
     padding-left: 1em;
 }
 
-/* end blueprint overrides */
+table,td,th {
+    vertical-align: baseline;
+}
 
 body {
     padding-left: 2em;
@@ -18,6 +22,11 @@ body {
 
 #topbar {
     text-align: right;
+}
+
+#twitter-widget-0 {
+    float: right;
+    margin: 10px;
 }
 
 p {
@@ -32,41 +41,15 @@ li {
     margin-left: 2em;
 }
 
-#updates {
-    background: #ddf;
-    overflow: hidden;
-}
-
-#updates ul, #updates ol {
-    list-style-type: none;
-    padding: 0;
-    margin-bottom:0;
-}
-
-#updates li {
-    padding-top: .5em;
-    padding-bottom: .5em;
-}
-
-#updates_title {
-    font-style: italic;
-    text-align: center;
-    font-size: 80%;
-}
-
-#updates_container {
-    margin-top: .5em;
-}
- 
 .text {
     text-align: left;
     padding-left: 2em;
-    max-width: 360px; /* 9 cols, 30em */
+    max-width: 360px;
 }
 
 .date {
-color: #444;
-font-size: 80%;
+    color: #444;
+    font-size: 80%;
 }
 
 .loading {
@@ -74,39 +57,40 @@ font-size: 80%;
 }
 
 .content_set {
-    background-color:#DDDDDD;
-    border:1px solid #AAAAAA;
-    margin-bottom:1em;
-    padding-bottom:0.3em;
+    background-color: #DDDDDD;
+    border: 1px solid #AAAAAA;
+    margin-bottom: 1em;
+    padding-bottom: 0.3em;
 }
 
 .content_set_content {
-    clear:both;
-    padding:0.2em 0.5em;
+    clear: both;
+    padding: 0.2em 0.5em;
 }
 
 .content_set_title {
     background-color: #eee;
-    float:left;
-    font-size:120%;
-    margin-left:1px;
-    margin-top:1px;
-    padding:0.1em 0.5em;
+    float: left;
+    font-size: 120%;
+    margin-left: 1px;
+    margin-top: 1px;
+    padding: 0.1em 0.5em;
     color: #222;
 }
+
 .set_description {
     font-size: 80%;
     max-width: 80%;
     color: #444;
 }
 
-#feature_choices td {
-    padding-top:0.5em;
-    padding-bottom:0.5em;
+.config_table td {
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
 }
 
 .feature_name {
-    padding-right:0.5em;
+    padding-right: 0.5em;
 }
 
 .feature_description {
@@ -114,4 +98,16 @@ font-size: 80%;
     font-size: 80%;
     color: #444;
     width: 30%;
+}
+
+.message {
+    position: fixed;
+    top: 0;
+    padding: 5px 0px;
+    width: 60%;
+    left: 50%;
+    margin-left: -30%;
+    text-align: center;
+    background: #DDDDDD;
+    color: #333;
 }

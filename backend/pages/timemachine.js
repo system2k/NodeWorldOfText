@@ -20,6 +20,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var get_third = vars.get_third;
     var db = vars.db;
     var dispage = vars.dispage;
+    var world_get_or_create = vars.world_get_or_create;
 
     if(!user.authenticated) {
         return serve(null, null, {
@@ -36,8 +37,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         world_name = int[0];
     }
 
-    var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", world_name);
-
+    var world = await world_get_or_create(world_name)
     if(!world) {
         return await dispage("404", null, req, serve, vars)
     }

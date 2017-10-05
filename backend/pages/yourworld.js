@@ -46,60 +46,38 @@ module.exports.GET = async function(req, serve, vars, params) {
         world_properties.views++;
         await db.run("UPDATE world SET properties=? WHERE id=?",
             [JSON.stringify(world_properties), world.id])
-    
-        var canWrite = !!world.public_writable;
-        var canAdmin = false;
-        var coordLink = false;
-        var urlLink = false;
-        var go_to_coord = false;
-        if(world_properties.features) {
-            if(world_properties.features.coordLink) {
-                coordLink = true;
-            }
-            if(world_properties.features.go_to_coord) {
-                go_to_coord = true;
-            }
-            if(world_properties.features.urlLink) {
-                urlLink = true;
-            }
-        }
-        if(read_permission.member) {
-            canWrite = true;
-            coordLink = true;
-            urlLink = true;
-            go_to_coord = true;
-        }
-    
-        if(read_permission.owner) {
-            canWrite = true;
-            canAdmin = true;
-            coordLink = true;
-            urlLink = true;
-            go_to_coord = true;
-        }
-    
+
         var state = {
-            canWrite: canWrite,
-            canAdmin: canAdmin,
-            worldName: world.name,
-            features: {
-                coordLink: coordLink,
-                urlLink: urlLink,
-                go_to_coord: go_to_coord
+            userModel: {
+                username: user.username,
+                is_superuser: user.superuser,
+                authenticated: user.authenticated,
+                is_member: read_permission.member,
+                is_owner: read_permission.owner
+            },
+            worldModel: {
+                feature_membertiles_addremove: world.feature_membertiles_addremove,
+                writability: world.writability,
+                feature_url_link: world.feature_url_link,
+                path: world.name,
+                feature_go_to_coord: world.feature_go_to_coord,
+                name: world.name,
+                feature_paste: world.feature_paste,
+                namespace: world.name,
+                readability: world.readability,
+                feature_coord_link: world.feature_coord_link
             }
-        }
-        if(req.headers["user-agent"].indexOf("MSIE") >= 0) {
-            state.announce = "Sorry, node World of Text doesn't work well with Internet Explorer."
         }
         var css_timemachine = "";
         if(params.timemachine) {
-            css_timemachine = "<style>.tilecont {position: absolute;background-color: #ddd;}</style>";
-            state.canWrite = false;
+            css_timemachine = "<style>.tilecont {background-color: #ddd;}</style>";
+            state.worldModel.writability = false;
         }
         var data = {
             state: JSON.stringify(state),
             css_timemachine,
-            user
+            user,
+            world
         }
         serve(template_data["yourworld.html"](data))
     }
@@ -122,13 +100,6 @@ module.exports.POST = async function(req, serve, vars) {
         // no permission to view world?
         return serve(null, 403);
     }
-    var is_owner = user.id == world.owner_id;
-    if(!world.public_writable) {
-        if(!(read_permission.owner || read_permission.member)) {
-            // no permission to write anywhere?
-            return serve(null, 403)
-        }
-    }
 
     vars.world = world;
     var edits_parsed;
@@ -141,5 +112,5 @@ module.exports.POST = async function(req, serve, vars) {
         edits: edits_parsed
     }, vars);
 
-    serve(JSON.stringify(do_write))
+    serve(JSON.stringify(do_write.accepted))
 }

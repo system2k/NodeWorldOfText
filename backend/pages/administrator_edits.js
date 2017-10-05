@@ -8,6 +8,7 @@ module.exports.GET = async function(req, serve, vars) {
     var path = vars.path;
     var db = vars.db;
     var filename_sanitize = vars.filename_sanitize;
+    var world_get_or_create = vars.world_get_or_create;
 
     // not a superuser...
     if(!user.superuser) {
@@ -16,8 +17,7 @@ module.exports.GET = async function(req, serve, vars) {
 
     var world_name = get_third(path, "administrator", "edits")
 
-    var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", world_name);
-
+    var world = await world_get_or_create(world_name)
     if(!world) {
         return await dispage("404", null, req, serve, vars)
     }

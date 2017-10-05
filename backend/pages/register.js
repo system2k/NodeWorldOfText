@@ -98,7 +98,7 @@ module.exports.POST = async function(req, serve, vars) {
 
     var date = Date.now();
     var password_hash = encryptHash(password1);
-    var ins = await db.run("INSERT INTO auth_user VALUES(null, ?, '', '', ?, ?, 0, 0, ?, ?)",
+    var ins = await db.run("INSERT INTO auth_user VALUES(null, ?, ?, ?, 0, 0, ?, ?)",
         [username, email, password_hash, date, date])
     var user_id = ins.lastID;
 

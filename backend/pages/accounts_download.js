@@ -21,11 +21,11 @@ module.exports.GET = async function(req, serve, vars) {
     var path = vars.path;
     var db = vars.db;
     var filename_sanitize = vars.filename_sanitize;
+    var world_get_or_create = vars.world_get_or_create;
 
     var world_name = get_third(path, "accounts", "download")
 
-    var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", world_name);
-
+    var world = await world_get_or_create(world_name, req, serve)
     if(!world) {
         return await dispage("404", null, req, serve, vars)
     }

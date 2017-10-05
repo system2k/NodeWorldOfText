@@ -5,6 +5,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var cookies = vars.cookies;
     var db = vars.db;
     var user = vars.user;
+    var plural = vars.plural;
 
     if(!user.authenticated) {
         return serve(null, null, {
@@ -21,22 +22,21 @@ module.exports.GET = async function(req, serve, vars, params) {
         var member_total = await db.get("select world_id, count(world_id) as count from whitelist where world_id=?", world.id);
         member_total = member_total.count;
         
-        var plural = "";
-        if(member_total !== 1) {
-            plural = "s"
-        }
         var world_url = world.name;
         if(world_url == "") {
             world_url = "/" + world_url;
         }
+        var properties = JSON.parse(world.properties)
         world_list.push({
-            public_writable: world.public_writable,
-            public_readable: world.public_readable,
+            public_writable: world.writability == 0,
+            public_readable: world.readability == 0,
             whitelist_set_count: member_total,
             conf_url: "/accounts/configure/" + world.name + "/",
             get_absolute_url: "/" + world.name,
             url: world_url,
-            pluralize: plural
+            member_plural: plural(member_total),
+            views_plural: plural(properties.views),
+            views: properties.views
         })
     }
 
@@ -81,6 +81,7 @@ module.exports.POST = async function(req, serve, vars) {
     var post_data = vars.post_data;
     var user = vars.user;
     var dispage = vars.dispage;
+    var world_get_or_create = vars.world_get_or_create;
 
     if(!user.authenticated) {
         return serve(null, 403);
@@ -90,17 +91,11 @@ module.exports.POST = async function(req, serve, vars) {
 
     var worldname = post_data.worldname;
     if(worldname.match(/^(\w*)$/g) && (worldname.length > 0 || user.superuser)) {
-        var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", worldname)
-        if(!world) {
-            var date = Date.now();
-            await db.run("INSERT INTO world VALUES(null, ?, ?, ?, ?, 1, 1, '{}')",
-                [worldname, user.id, date, date])
+        var world = await world_get_or_create(worldname);
+        if(world.owner_id == null) {
+            await db.run("UPDATE world SET owner_id=? WHERE name=?", [user.id, worldname])
         } else {
-            if(world.owner_id == null) {
-                await db.run("UPDATE world SET owner_id=? WHERE name=?", [user.id, worldname])
-            } else {
-                message = "World already has an owner";
-            }
+            message = "World already has an owner";
         }
     } else {
         message = "Invalid world name";

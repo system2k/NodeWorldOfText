@@ -50,45 +50,20 @@ if(fs.existsSync(settings.LOG_PATH)) {
 }
 zip_file.writeZip(settings.ZIP_LOG_PATH);
 
-const pages = {
-    configure           : require("./backend/pages/configure.js"),
-    coordlink           : require("./backend/pages/coordlink.js"),
-    home                : require("./backend/pages/home.js"),
-    login               : require("./backend/pages/login.js"),
-    logout              : require("./backend/pages/logout.js"),
-    member_autocomplete : require("./backend/pages/member_autocomplete.js"),
-    private             : require("./backend/pages/private.js"),
-    profile             : require("./backend/pages/profile.js"),
-    protect             : require("./backend/pages/protect.js"),
-    register            : require("./backend/pages/register.js"),
-    timemachine         : require("./backend/pages/timemachine.js"),
-    unprotect           : require("./backend/pages/unprotect.js"),
-    urllink             : require("./backend/pages/urllink.js"),
-    yourworld           : require("./backend/pages/yourworld.js"),
-    404                 : require("./backend/pages/404.js"),
-    register_complete   : require("./backend/pages/register_complete.js"),
-    activate            : require("./backend/pages/activate.js"),
-    register_failed     : require("./backend/pages/register_failed.js"),
-    activate_complete   : require("./backend/pages/activate_complete.js"),
-    administrator       : require("./backend/pages/administrator.js"),
-    administrator_edits : require("./backend/pages/administrator_edits.js"),
-    script_manager      : require("./backend/pages/script_manager.js"),
-    script_edit         : require("./backend/pages/script_edit.js"),
-    script_view         : require("./backend/pages/script_view.js"),
-    administrator_user  : require("./backend/pages/administrator_user.js"),
-    accounts_download   : require("./backend/pages/accounts_download")
+// load all modules from directory. EG: "test.js" -> "test"
+function load_modules(default_dir) {
+    var pages = fs.readdirSync(default_dir)
+    var obj = {};
+    for(var i = 0; i < pages.length; i++) {
+        var name = pages[i].split(".js")[0];
+        obj[name] = require(default_dir + pages[i]);
+    }
+    return obj;
 }
 
-const websockets = {
-    Main: require("./backend/websockets/Main.js"),
-    write: require("./backend/websockets/write.js"),
-    fetch: require("./backend/websockets/fetch.js")
-}
-
-const modules = {
-    fetch_tiles: require("./backend/modules/fetch_tiles.js"),
-    write_data: require("./backend/modules/write_data.js")
-}
+const pages = load_modules("./backend/pages/");
+const websockets = load_modules("./backend/websockets/");
+const modules = load_modules("./backend/modules/");
 
 const db = {
     // gets data from the database (only 1 row at a time)
@@ -176,7 +151,7 @@ const db = {
                 if(err) {
                     return rej({
                         sqlite_error: process_error_arg(err),
-                        input: { command, params }
+                        input: { command }
                     })
                 }
                 r(true)
@@ -266,7 +241,7 @@ function san_nbr(x) {
     return Math.floor(x);
 }
 
-(async function() {
+async function initialize_server() {
     console.log("Starting server...");
     if(!await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='server_info'")) {
         // table to inform that the server is initialized
@@ -289,6 +264,15 @@ function san_nbr(x) {
     }
     if(!init) {
         start_server();
+    }
+}
+
+(async function() {
+    try {
+        await initialize_server();
+    } catch(e) {
+        console.log("An error occured during the initialization process:");
+        console.log(e)
     }
 })()
 
@@ -374,7 +358,7 @@ function account_prompt() {
 			var Date_ = Date.now()
             var passHash = encryptHash(result["password"])
 
-            db.run("INSERT INTO auth_user VALUES(null, ?, '', '', '', ?, 1, 3, ?, ?)",
+            db.run("INSERT INTO auth_user VALUES(null, ?, '', ?, 1, 3, ?, ?)",
                 [result["username"], passHash, Date_, Date_])
 
             console.log("Superuser created successfully.\n");
@@ -460,7 +444,8 @@ var url_regexp = [ // regexp , function/redirect to
     ["^script_manager/edit/(.*)/$", pages.script_edit],
     ["^script_manager/view/(.*)/$", pages.script_view],
     ["^administrator/user/(.*)/$", pages.administrator_user],
-    ["^accounts/download/(.*)/$", pages.accounts_download]
+    ["^accounts/download/(.*)/$", pages.accounts_download],
+    ["^world_style.css$", pages.world_style]
 ]
 
 function get_third(url, first, second) {
@@ -687,7 +672,9 @@ async function get_user_info(cookies, is_websocket) {
         username: "",
         id: 0,
         csrftoken: null,
+        operator: false,
         superuser: false,
+        staff: false,
         scripts: []
     }
     if(cookies.sessionid) {
@@ -720,20 +707,24 @@ async function get_user_info(cookies, is_websocket) {
     return user;
 }
 
-async function world_get_or_create(name, req, serve) {
+function plural(int) {
+    var p = "";
+    if(int != 1) {
+        p = "s";
+    }
+    return p;
+}
+
+async function world_get_or_create(name) {
     var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
     if(!world) { // world doesn't exist
         if(name.match(/^(\w*)$/g)) {
             var date = Date.now();
-            await db.run("INSERT INTO world VALUES(null, ?, null, ?, ?, 1, 1, '{}')",
-                [name, date, date])
+            await db.run("INSERT INTO world VALUES(null, ?, null, ?, 2, 0, 2, 2, 2, '', '', '', '', '', '', 0, 0, '{}')",
+                [name, date])
             world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name)
         } else { // special worlds (like: /beta/test) are not found and must not be created
-            if(serve) {
-                return await dispage("404", null, req, serve, vars)
-            } else {
-                return;
-            }
+            return false;
         }
     }
     return world;
@@ -742,21 +733,38 @@ async function world_get_or_create(name, req, serve) {
 async function can_view_world(world, user) {
     var permissions = {
         member: false,
-        owner: false
+        owner: false,
+        can_write: false
     };
-    var whitelist = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
+
+    var is_owner = world.owner_id == user.id;
+
+    if(world.readability == 2 && !is_owner) { // owner only
+        return false;
+    }
+
+    var is_member = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
         [world.id, user.id])
-    if(!world.public_readable && world.owner_id != user.id) { // is it set to members/owners only?
-        if(!whitelist) { // not a member (nor owner)
-            return false;
-        } else {
-            permissions.member = true;
-        }
+
+    if(world.readability == 1 && !is_member && !is_owner) { // members (and owners) only
+        return false;
     }
-    if(world.owner_id == user.id) {
-        permissions.owner = true;
+
+    permissions.member = !!is_member; // !! because is_member is not a boolean
+    permissions.owner = is_owner;
+
+    if(is_owner) {
+        permissions.member = true;
+        // the owner can write by default
+        if(is_owner) permissions.can_write = true;
     }
-    permissions.member = !!whitelist;
+
+    // the readability and writability both have to be less than 2 for members to write
+    if(world.readability < 2 && is_member && world.writability < 2) permissions.can_write = true;
+
+    // anyone can write if anyone can read and write
+    if(world.readability == 0 && world.writability == 0) permissions.can_write = true;
+    
     return permissions;
 }
 
@@ -847,9 +855,7 @@ async function process_request(req, res, current_req_id) {
     }
     try {
         URL = decodeURIComponent(URL);
-    } catch (e) {
-        return res.end("URI is malformed");
-    }
+    } catch (e) {}
 
     var request_resolved = false;
 
@@ -989,6 +995,39 @@ async function process_request(req, res, current_req_id) {
 }
 
 function start_server() {
+    var wss = new ws.Server({ server });
+
+    ws_broadcast = function(data, world) {
+        data = JSON.stringify(data)
+        http_s_log.push("[ws] Begin broadcast client, data size is" + data.length)
+        wss.clients.forEach(function each(client) {
+            try {
+                if(client.readyState == ws.OPEN && toUpper(client.world_name) == toUpper(world)) {
+                    client.send(data);
+                }
+            } catch(e) {
+                console.log("BROADCAST ERROR:", e);
+            }
+        });
+        http_s_log.push("[ws] Finish broadcast client")
+    };
+
+    tile_signal_update = function(world, x, y, content, properties, writability) {
+        ws_broadcast({
+            source: "signal",
+            kind: "tileUpdate",
+            tiles: {
+                [y + "," + x]: {
+                    content,
+                    properties: Object.assign(properties, { writability })
+                }
+            }
+        }, data)
+    };
+
+    global_data.ws_broadcast = ws_broadcast;
+    global_data.tile_signal_update = tile_signal_update;
+
     (async function clear_expired_sessions() {
         // clear expires sessions
         await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
@@ -1011,8 +1050,7 @@ function start_server() {
         // start listening for commands
         command_prompt();
     });
-
-    var wss = new ws.Server({ server });
+    
     wss.on("connection", async function (ws, req) {
         http_s_log.push("[ws] Creating a websocket connection...")
         try {
@@ -1034,10 +1072,13 @@ function start_server() {
                 }));
                 return ws.close();
             }
+            ws.world_name = world_name;
             var cookies = parseCookie(req.headers.cookie);
             var user = await get_user_info(cookies, true)
+            var channel = new_token(16);
             var vars = objIncludes(global_data, {
-                user
+                user,
+                channel
             })
             var status = await websockets.Main(ws, world_name, vars);
             if(typeof status == "string") {
@@ -1051,11 +1092,16 @@ function start_server() {
             vars.timemachine = status.timemachine
 
             user.stats = status.permission;
-            var channel = new_token(16);
             send_ws(JSON.stringify({
                 kind: "channel",
                 sender: channel
             }))
+            ws.on("error", function(err) {
+                http_s_log.push("[ws] An error occured: " + err);
+                console.log("A connection error occured inside WS. Check console for more info.",
+                    Date.now());
+                log_error(JSON.stringify(process_error_arg(err)));
+            });
             ws.on("message", async function(msg) {
                 http_s_log.push("[ws] Received message event with length of " + msg.length)
                 req_id++;
@@ -1076,8 +1122,13 @@ function start_server() {
                             msg.kind = kind
                             send_ws(JSON.stringify(msg))
                         }
+                        function broadcast(data) {
+                            data.source = kind;
+                            ws_broadcast(data, world_name);
+                        }
                         var res = await websockets[kind](ws, msg, send, objIncludes(vars, {
-                            transaction: transaction_obj(current_req_id)
+                            transaction: transaction_obj(current_req_id),
+                            broadcast
                         }))
                         if(typeof res == "string") {
                             send_ws(JSON.stringify({
@@ -1125,5 +1176,6 @@ var global_data = {
     san_nbr,
     xrange,
     tile_coord,
-    modules
+    modules,
+    plural
 }

@@ -39,8 +39,8 @@
 								not publicly visible,
 							{% endif %}
 						{% endif %}
-						{{ world.whitelist_set_count }} member{{ world.pluralize }}.
-
+						{{ world.whitelist_set_count }} member{{ world.member_plural }}.
+						{{ world.views }} view{{ world.views_plural }}.
 						<a href="{{ world.conf_url }}">options</a>
 					</li>
 					{% endfor %}

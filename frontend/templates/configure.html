@@ -16,71 +16,175 @@
 {% block content %}
 	<div class="content_set">
 		<div class="content_set_title">Access</div>
-		<div class="content_set_content">
-			<form method="POST" action="."><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
-			Visitors who aren't members: <select name="public_perm">
-				<option value="none"{{ op1 }}>cannot view this world at all.</option>
-				<option value="read"{{ op2 }}>can view this world, but not edit it.</option>
-				<option value="write"{{ op3 }}>can view this world and edit it.</option>
-			</select>
-			<input type="hidden" name="form" value="public_perm">
-			<input type="submit" value="Submit">
+		<div class="content_set_content" id="world_access">
+			<p class="set_description">
+				Who can visit and write on this world, by default.
+				You can designate members below.
+				Write-permissions can be overridden for particular sections of your world: visit your world, then click the "More" menu for options.
+			</p>
+			<form method="POST" action="">
+				<input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' />
+				<p>
+					Who can visit this world?
+					<select name="readability">
+						<option value="0"{%if readability == 0%} selected{%endif%}>anyone</option>
+						<option value="1"{%if readability == 1%} selected{%endif%}>me and members</option>
+						<option value="2"{%if readability == 2%} selected{%endif%}>only me</option>
+					</select>
+				</p>
+				<p>
+					Who can write on it?
+					<select name="writability">
+						<option value="0"{%if writability == 0%} selected{%endif%}>anyone</option>
+						<option value="1"{%if writability == 1%} selected{%endif%}>me and members</option>
+						<option value="2"{%if writability == 2%} selected{%endif%}>only me</option>
+					</select>
+				</p>
+				<input type="hidden" name="form" value="access_perm">
+				<input type="submit" value="Submit">
 			</form>
 		</div>
 	</div>
 
 	<div class="content_set clearfix">
 		<div class="content_set_title">Features</div>
-		<div class="content_set_content">
-			<div class="set_description">
-				Control what features are usable on your world. 
-				When a feature is set to "enabled", any visitor to the world can use it. Otherwise, it is only available for the owner.
-			</div>
-			<form method="POST" action="."><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
-			<table id="feature_choices">
-				<tr>
-					<td class="feature_name">Go to coordinates</td>
-					<td>
-						<select name="go_to_coord">
-							<option value="0" {% if not go_to_coord %}selected{% endif %}>disabled</option>
-							<option value="1" {% if go_to_coord %}selected{% endif %}>enabled</option>
-						</select>
-					</td>
-					<td class="feature_description">
-						Transports you to any given coordinates on a world. 
-					</td>
-				</tr>
-				<tr>
-					<td class="feature_name">Create link to coordinates</td>
-					<td>
-						<select name="coordLink">
-							<option value="0" {% if not coordLink %}selected{% endif %}>disabled</option>
-							<option value="1" {% if coordLink %}selected{% endif %}>enabled</option>
-						</select>
-					</td>
-					<td class="feature_description">
-						Make a letter link to a different part of the world. 
-					</td>
-				</tr>
-				<tr>
-					<td class="feature_name">Create link to URL</td>
-					<td>
-						<select name="urlLink">
-							<option value="0" {% if not urlLink %}selected{% endif %}>disabled</option>
-							<option value="1" {% if urlLink %}selected{% endif %}>enabled</option>
-						</select>
-					</td>
-					<td class="feature_description">
-						Make a letter link to a URL.
-					</td>
-				</tr>
+		<div class="content_set_content" id="world_features">
+			<p class="set_description">
+				Who can use what features on this world.
+			</p>
+			<form method="POST" action="">
+				<input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' />
+				<table class="config_table">
+					<tr>
+						<td class="feature_name">Go to coordinates</td>
+						<td>
+							<select name="go_to_coord">
+								<option value="0"{%if go_to_coord==0%} selected{%endif%}>anyone</option>
+								<option value="1"{%if go_to_coord==1%} selected{%endif%}>me and members</option>
+								<option value="2"{%if go_to_coord==2%} selected{%endif%}>only me</option>
+							</select>
+						</td>
+						<td class="feature_description">
+							Transports you to any given coordinates on a world.
+						</td>
+					</tr>
+					<tr>
+						<td class="feature_name">Create link to coordinates</td>
+						<td>
+							<select name="coord_link">
+								<option value="0"{%if coord_link==0%} selected{%endif%}>anyone</option>
+								<option value="1"{%if coord_link==1%} selected{%endif%}>me and members</option>
+								<option value="2"{%if coord_link==2%} selected{%endif%}>only me</option>
+							</select>
+						</td>
+						<td class="feature_description">
+							Make a letter be a link to a different part of the world.
+						</td>
+					</tr>
+					<tr>
+						<td class="feature_name">Create link to URL</td>
+						<td>
+							<select name="url_link">
+								<option value="0"{%if url_link==0%} selected{%endif%}>anyone</option>
+								<option value="1"{%if url_link==1%} selected{%endif%}>me and members</option>
+								<option value="2"{%if url_link==2%} selected{%endif%}>only me</option>
+							</select>
+						</td>
+						<td class="feature_description">
+							Make a letter be a link to a URL.
+						</td>
+					</tr>
+					<tr>
+						<td class="feature_name">Paste text</td>
+						<td>
+							<select name="paste">
+								<option value="0"{%if paste==0%} selected{%endif%}>anyone</option>
+								<option value="1"{%if paste==1%} selected{%endif%}>me and members</option>
+								<option value="2"{%if paste==2%} selected{%endif%}>only me</option>
+							</select>
+						</td>
+						<td class="feature_description">
+							Paste a lot of text at once.
+						</td>
+					</tr>
+					<tr>
+						<td class="feature_name">Create members-only areas</td>
+						<td>
+							<select name="membertiles_addremove">
+								<option value="true"{%if membertiles_addremove==1%} selected{%endif%}>me and members</option>
+								<option value="false"{%if membertiles_addremove==0%} selected{%endif%}>only me</option>
+							</select>
+						</td>
+						<td class="feature_description">
+							Allows members to create and remove members-only protected areas.
+						</td>
+					</tr>
+				</table>
+				<input type="hidden" name="form" value="features">
+				<input type="submit" value="Submit">
+			</form>
+		</div>
+	</div>
 
-
-			</table>
-			<input type="hidden" name="form" value="features">
-			<span style="float:right">
-			<input type="submit" value="Submit">
-			</span>
+	<div class="content_set">
+		<div class="content_set_title">Style</div>
+		<div class="content_set_content" id="world_style">
+			<p class="set_description">
+				Custom colors for your world
+			</p>
+			<form method="POST" action="">
+				<input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' />
+				<table class="config_table">
+					<tr>
+						<td class="feature_name">Text color</td>
+						<td>
+							<input name="color" value="{{ color }}" maxlength="20">
+						</td>
+						<td class="feature_description">
+							Use any <a href="http://en.wikipedia.org/wiki/Web_colors">CSS color</a>, such as "#40E0D0".
+						</td>
+					</tr>
+					<tr>
+						<td class="feature_name">Cursor color</td>
+						<td>
+							<input name="cursor_color" value="{{ cursor_color }}" maxlength="20">
+						</td>
+						<td class="feature_description">
+						</td>
+					</tr>
+					<tr>
+						<td class="feature_name">Guest cursor color</td>
+						<td>
+							<input name="cursor_guest_color" value="{{ cursor_guest_color }}" maxlength="20">
+						</td>
+						<td class="feature_description">
+						</td>
+					</tr>
+					<tr>
+						<td class="feature_name">Background color</td>
+						<td>
+							<input name="bg" value="{{ bg }}" maxlength="20">
+						</td>
+						<td class="feature_description">
+						</td>
+					</tr>
+					<tr>
+						<td class="feature_name">Owner area color</td>
+						<td>
+							<input name="owner_color" value="{{ owner_color }}" maxlength="20">
+						</td>
+						<td class="feature_description"></td>
+					</tr>
+					<tr>
+						<td class="feature_name">Member area color</td>
+						<td>
+							<input name="member_color" value="{{ member_color }}" maxlength="20">
+						</td>
+						<td class="feature_description"></td>
+					</tr>
+				</table>
+				<input type="hidden" name="form" value="style">
+				<input type="submit" value="Submit">
 			</form>
 		</div>
 	</div>

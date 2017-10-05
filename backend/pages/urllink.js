@@ -18,32 +18,43 @@ module.exports.POST = async function(req, serve, vars, params) {
     var db = vars.db;
     var user = vars.user;
     var post_data = vars.post_data;
+    var world_get_or_create = vars.world_get_or_create;
+    var can_view_world = vars.can_view_world;
+    var tile_signal_update = vars.tile_signal_update;
 
-    var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", post_data.namespace);
+    var world = await world_get_or_create(post_data.world);
     if(!world) {
         return serve(null, 404);
     }
-    var world_properties = JSON.parse(world.properties)
 
-    var can_post_link = false;
-    var is_member = false;
-
-    if(world.owner_id == user.id) { // is owner?
-        can_post_link = true;
-    } else {
-        var whitelist = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
-            [world.id, user.id])
-        if(whitelist) { // is member?
-            can_post_link = true;
-            is_member = true;
-        }
+    var can_read = await can_view_world(world, user);
+    if(!can_read) {
+        return serve(null, 403)
     }
 
-    if(world.public_writable) { // user is probably not owner nor member
-        if(world_properties.features) {
-            if(world_properties.features.urlLink) { // links are allowed to regular users
-                can_post_link = true;
-            }
+    var link_type = 0;
+    if(params.coordlink) {
+        link_type = 1;
+    }
+
+    var can_link = false;
+    var feature_mode;
+
+    if(link_type == 0) {
+        feature_mode = world.feature_url_link;
+    } else if(link_type == 1) {
+        feature_mode = world.feature_coord_link;
+    }
+
+    if(link_type == 0) {
+        if(feature_mode == 2 && can_read.owner) {
+            can_link = true;
+        }
+        if(feature_mode == 1 && can_read.member && can_read.can_write) {
+            can_link = true;
+        }
+        if(feature_mode == 0 && can_read.can_write) { // if everybody has link permission
+            can_link = true;
         }
     }
 
@@ -51,22 +62,30 @@ module.exports.POST = async function(req, serve, vars, params) {
         [world.id, post_data.tileY, post_data.tileX])
 
     var tile_props = {};
+    var writability = null;
     if(tile) {
         tile_props = JSON.parse(tile.properties);
-        if(tile_props.protected) {
-            if(world.owner_id != user.id) {
-                can_post_link = false;
-            }
-        }
+        writability = tile.writability;
+    } else {
+        writability = world.writability;
     }
 
-    if(!can_post_link) {
+    // only owner can link on owner-only tiles
+    if(writability == 2 && !can_read.owner) {
+        can_link = false;
+    }
+
+    // only members/owners can link on member-only tiles
+    if(writability == 1 && !can_read.member) {
+        can_link = false;
+    }
+
+    if(writability == null && !can_read.can_write) {
+        can_link = false;
+    }
+
+    if(!can_link) {
         return serve(null, 403)
-    }
-
-    var link_type = 0;
-    if(params.coordlink) {
-        link_type = 1;
     }
     
     var tileX = parseInt(post_data.tileX);
@@ -107,13 +126,19 @@ module.exports.POST = async function(req, serve, vars, params) {
         }
     }
 
+    var content = " ".repeat(128);
+    var actual_writability = null;
     if(tile) {
+        content = tile.content;
+        actual_writability = tile.writability;
         await db.run("UPDATE tile SET properties=? WHERE world_id=? AND tileY=? AND tileX=?",
             [JSON.stringify(tile_props), world.id, tileY, tileX])
     } else {
-        await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?)",
+        await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, null, ?)",
             [world.id, " ".repeat(128), tileY, tileX, JSON.stringify(tile_props), Date.now()])
     }
+
+    tile_signal_update(tileX, tileY, content, tile_props, actual_writability)
 
     serve();
 }

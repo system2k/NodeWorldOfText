@@ -11,6 +11,9 @@ module.exports = async function(ws, data, send, vars) {
     if(typeof do_write == "string") {
         return do_write;
     } else {
-        send({ accepted: do_write })
+        send({
+            accepted: do_write.accepted,
+            rejected: do_write.rejected
+        })
     }
 }

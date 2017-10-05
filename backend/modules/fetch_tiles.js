@@ -53,7 +53,9 @@ module.exports = async function(data, vars) {
                         }
                         tiles[YTileRange[ty] + "," + XTileRange[tx]] = {
                             content: str,
-                            properties: {}
+                            properties: {
+                                writability: 2
+                            }
                         };
                     }
                 }
@@ -80,7 +82,9 @@ module.exports = async function(data, vars) {
                     if(!tiles[z[0] + "," + z[1]]) {
                         tiles[z[0] + "," + z[1]] = {
                             content: " ".repeat(128).split(""),
-                            properties: {}
+                            properties: {
+                                writability: 2
+                            }
                         };
                     };
                     tiles[z[0] + "," + z[1]].content[z[2]*16+z[3]] = z[5]
@@ -97,7 +101,9 @@ module.exports = async function(data, vars) {
                 [world.id, minY, minX, maxY, maxX], function(data) {
                 tiles[data.tileY + "," + data.tileX] = {
                     content: data.content,
-                    properties: JSON.parse(data.properties)
+                    properties: Object.assign(JSON.parse(data.properties), {
+                        writability: data.writability
+                    })
                 }
             })
         }

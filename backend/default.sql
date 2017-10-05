@@ -3,8 +3,6 @@ PRAGMA encoding="UTF-16";
 CREATE TABLE "auth_user" (
     "id" integer NOT NULL PRIMARY KEY,
     "username" varchar(30) NOT NULL UNIQUE,
-    "first_name" varchar(30) NOT NULL,
-    "last_name" varchar(30) NOT NULL,
     "email" varchar(75) NOT NULL,
     "password" varchar(128) NOT NULL,
     "is_active" bool NOT NULL,
@@ -28,7 +26,6 @@ CREATE TABLE "registration_registrationprofile" (
 CREATE TABLE "edit" (
     "id" integer NOT NULL PRIMARY KEY,
     "user_id" integer REFERENCES "auth_user" ("id"),
-    "ip" char(15),
     "world_id" integer NOT NULL REFERENCES "world" ("id"),
     "tileY" integer NOT NULL,
     "tileX" integer NOT NULL,
@@ -43,6 +40,7 @@ CREATE TABLE "tile" (
     "tileY" integer NOT NULL,
     "tileX" integer NOT NULL,
     "properties" text NOT NULL,
+    "writability" integer,
     "created_at" integer NOT NULL,
     UNIQUE ("world_id", "tileY", "tileX")
 );
@@ -52,7 +50,6 @@ CREATE TABLE "whitelist" (
     "user_id" integer NOT NULL REFERENCES "auth_user" ("id"),
     "world_id" integer NOT NULL REFERENCES "world" ("id"),
     "created_at" integer NOT NULL,
-    "updated_at" integer NOT NULL,
     UNIQUE ("user_id", "world_id")
 );
 
@@ -61,9 +58,19 @@ CREATE TABLE "world" (
     "name" text NOT NULL UNIQUE,
     "owner_id" integer REFERENCES "auth_user" ("id"),
     "created_at" integer NOT NULL,
-    "updated_at" integer NOT NULL,
-    "public_readable" bool NOT NULL,
-    "public_writable" bool NOT NULL,
+    "feature_go_to_coord" integer NOT NULL,
+    "feature_membertiles_addremove" bool NOT NULL,
+    "feature_paste" integer NOT NULL,
+    "feature_coord_link" integer NOT NULL,
+    "feature_url_link" integer NOT NULL,
+    "custom_bg" text NOT NULL,
+    "custom_cursor" text NOT NULL,
+    "custom_guest_cursor" text NOT NULL,
+    "custom_color" text NOT NULL,
+    "custom_tile_owner" text NOT NULL,
+    "custom_tile_member" text NOT NULL,
+    "writability" integer NOT NULL,
+    "readability" integer NOT NULL,
     "properties" text NOT NULL
 );
 
