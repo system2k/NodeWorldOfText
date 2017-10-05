@@ -84,7 +84,7 @@ module.exports.POST = async function(req, serve, vars, params) {
             [world.id, " ".repeat(128), post_data.tileY, post_data.tileX, writability, date])
     }
 
-    tile_signal_update(post_data.tileX, post_data.tileY, content,
+    tile_signal_update(world.name, post_data.tileX, post_data.tileY, content,
         JSON.parse(properties), protect_type)
 
     serve();

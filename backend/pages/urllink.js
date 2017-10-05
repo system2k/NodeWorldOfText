@@ -138,7 +138,7 @@ module.exports.POST = async function(req, serve, vars, params) {
             [world.id, " ".repeat(128), tileY, tileX, JSON.stringify(tile_props), Date.now()])
     }
 
-    tile_signal_update(tileX, tileY, content, tile_props, actual_writability)
+    tile_signal_update(world.name, tileX, tileY, content, tile_props, actual_writability)
 
     serve();
 }
