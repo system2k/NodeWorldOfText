@@ -241,6 +241,8 @@ function san_nbr(x) {
     return Math.floor(x);
 }
 
+var announcement_cache = "";
+
 async function initialize_server() {
     console.log("Starting server...");
     if(!await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='server_info'")) {
@@ -963,7 +965,8 @@ async function process_request(req, res, current_req_id) {
                     user,
                     redirect,
                     referer: req.headers.referer,
-                    transaction
+                    transaction,
+                    broadcast: global_data.ws_broadcast
                 })
                 vars_joined = true;
                 if(row[1][method]) {
@@ -994,9 +997,32 @@ async function process_request(req, res, current_req_id) {
     }
 }
 
-function start_server() {
-    var wss = new ws.Server({ server });
+function announce(text) {
+    if(!text) text = "";
+    text += "";
+    announcement_cache = text;
+    (async function() {
+        var element = await db.get("SELECT value FROM server_info WHERE name='announcement'");
+        if(!element) {
+            await db.run("INSERT INTO server_info values('announcement', ?)", text);
+        } else {
+            await db.run("UPDATE server_info SET value=? WHERE name='announcement'", text)
+        }
+        console.log("Updated announcement")
+    })();
+}
 
+function start_server() {
+    (async function() {
+        announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
+        if(!announcement_cache) {
+            announcement_cache = "";
+        } else {
+            announcement_cache = announcement_cache.value;
+        }
+    })();
+
+    var wss = new ws.Server({ server });
     ws_broadcast = function(data, world) {
         data = JSON.stringify(data)
         http_s_log.push("[ws] Begin broadcast client, data size is" + data.length)
@@ -1177,5 +1203,6 @@ var global_data = {
     xrange,
     tile_coord,
     modules,
-    plural
+    plural,
+    announcement: function(){ return announcement_cache }
 }

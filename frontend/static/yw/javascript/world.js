@@ -27,7 +27,7 @@ function Send(data) {
 
 function getInitialState() {
 	return {
-		announce: null,
+		announce: state.announce,
 		cursors: {},
 		goToCoord: {},
 		initRendered: false,

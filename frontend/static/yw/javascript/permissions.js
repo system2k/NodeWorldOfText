@@ -18,9 +18,6 @@ Permissions = {
 		if (!user.authenticated) {
 			return false;
 		}
-		if (user.is_superuser) {
-			return true;
-		}
 		return user.is_owner;
 	},
 	can_coordlink: function(user, world, optTile) {

@@ -11,6 +11,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var world_get_or_create = vars.world_get_or_create;
     var can_view_world = vars.can_view_world;
     var modules = vars.modules;
+    var announcement = vars.announcement();
 
     var world_name = path;
     if(params.timemachine) {
@@ -68,6 +69,9 @@ module.exports.GET = async function(req, serve, vars, params) {
                 feature_coord_link: world.feature_coord_link
             }
         }
+        if(announcement) {
+            state.announce = announcement;
+        }
         var css_timemachine = "";
         if(params.timemachine) {
             css_timemachine = "<style>.tilecont {background-color: #ddd;}</style>";
@@ -108,6 +112,8 @@ module.exports.POST = async function(req, serve, vars) {
     } catch(e) {
         return serve(null, 418)
     }
+
+    vars.user.stats = read_permission;
     var do_write = await modules.write_data({
         edits: edits_parsed
     }, vars);

@@ -157,7 +157,7 @@ module.exports = async function(data, vars) {
             kind: "tileUpdate",
             source: "write",
             tiles: upd_tiles
-        })
+        }, world.name)
     }
 
     return { accepted, rejected };
