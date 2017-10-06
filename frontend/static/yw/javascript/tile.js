@@ -22,6 +22,15 @@ function makeDefaultHTML(config) {
 	return html.join("");
 }
 
+function color_array_match(ar1, ar2) {
+	for(var i = 0; i < 128; i++) {
+		if(ar1[i] !== ar2[i]) {
+			return false;
+		}
+	}
+	return true;
+}
+
 function getDefaultHTML(config) {
 	if (!window._defaultTileHTML) {
 		window._defaultTileHTML = makeDefaultHTML(config);
@@ -49,11 +58,11 @@ var Tile = (function() {
 			if(props) {
 				newColors = props;
 			}
-			if (newContent !== _this._content) {
+			if (newContent !== _this._content || !color_array_match(newColors, _this._colors)) {
 				_this._updateHTML(newContent, highlight, newColors);
 				_this._content = newContent;
 			}
-			_colors = newColors.slice(0);
+			_this._colors = newColors.slice(0);
 		};
 		this._setCellProps = function(propsPerCell) {
 			_this._cellProps = propsPerCell;
