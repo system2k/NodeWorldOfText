@@ -1,3 +1,16 @@
+function insert_char_at_index(string, char, index) {
+    string = string.split("");
+    char = char.split("");
+    for(var i = 0; i < char.length; i++) {
+        string[index + i] = char[i];
+    }
+    string = string.join("");
+    string = string.slice(0, 128);
+    var diff_len = 128 - string.length;
+    string = " ".repeat(diff_len) + string;
+    return string;
+}
+
 module.exports = async function(data, vars) {
     var db = vars.db;
     var user = vars.user;
@@ -50,7 +63,7 @@ module.exports = async function(data, vars) {
     // begin writing the edits
     await transaction.begin();
     for(var i in tiles) {
-        var tile_data = " ".repeat(128).split("");
+        var tile_data = " ".repeat(128);
 
         var properties = {
             color: Array(128).fill(0)
@@ -66,7 +79,7 @@ module.exports = async function(data, vars) {
 
         var changes = tiles[i];
         if(tile) {
-            var content = tile.content.split("");
+            var content = tile.content;
             tile_data = content;
             properties = JSON.parse(tile.properties)
             writability = tile.writability;
@@ -106,7 +119,7 @@ module.exports = async function(data, vars) {
             if(color < 0) color = 0;
             if(color > 16777215) color = 16777215;
             var offset = charY * 16 + charX;
-            tile_data[offset] = char;
+            tile_data = insert_char_at_index(tile_data, char, offset);
             if(!properties.color) {
                 properties.color = Array(128).fill(0)
             }
@@ -120,7 +133,6 @@ module.exports = async function(data, vars) {
                 }
             }
         }
-        tile_data = tile_data.join("").slice(0, 128);
         if(tile) { // tile exists, update
             await db.run("UPDATE tile SET (content, properties)=(?, ?) WHERE world_id=? AND tileY=? AND tileX=?",
                 [tile_data, JSON.stringify(properties), world.id, tileY, tileX])
