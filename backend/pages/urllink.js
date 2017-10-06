@@ -46,16 +46,14 @@ module.exports.POST = async function(req, serve, vars, params) {
         feature_mode = world.feature_coord_link;
     }
 
-    if(link_type == 0) {
-        if(feature_mode == 2 && can_read.owner) {
-            can_link = true;
-        }
-        if(feature_mode == 1 && can_read.member && can_read.can_write) {
-            can_link = true;
-        }
-        if(feature_mode == 0 && can_read.can_write) { // if everybody has link permission
-            can_link = true;
-        }
+    if(feature_mode == 2 && can_read.owner) {
+        can_link = true;
+    }
+    if(feature_mode == 1 && can_read.member && can_read.can_write) {
+        can_link = true;
+    }
+    if(feature_mode == 0 && can_read.can_write) { // if everybody has link permission
+        can_link = true;
     }
 
     var tile = await db.get("SELECT * FROM tile WHERE world_id=? AND tileY=? AND tileX=?",
