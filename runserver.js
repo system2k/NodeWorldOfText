@@ -1002,7 +1002,6 @@ function start_server() {
         http_s_log.push("[ws] Begin broadcast client, data size is" + data.length)
         wss.clients.forEach(function each(client) {
             try {
-                console.log(client.world_name, world)
                 if(client.readyState == ws.OPEN && toUpper(client.world_name) == toUpper(world)) {
                     client.send(data);
                 }
