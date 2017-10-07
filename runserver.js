@@ -795,6 +795,8 @@ function tile_coord(coord) {
 }
 
 var transaction_active = false;
+var is_switching_mode = false; // is the sql engine (asynchronous) finished with switching transaction mode?
+var on_switched;
 var transaction_req_id = 0;
 var req_id = 0;
 
@@ -802,18 +804,34 @@ function transaction_obj(id) {
     var req_id = id;
     var fc = {
         begin: async function(id) {
-            if(!transaction_active) {
+            if(!transaction_active && !is_switching_mode) {
                 transaction_active = true;
+                is_switching_mode = true;
                 http_s_log.push("[transaction] Started")
-                await db.run("BEGIN TRANSACTION")
                 transaction_req_id = req_id;
+                await db.run("BEGIN TRANSACTION")
+                is_switching_mode = false;
+                if(on_switched) on_switched();
+            } else if(is_switching_mode) { // the signal hasn't reached, so wait
+                on_switched = function() {
+                    on_switched = null;
+                    fc.begin(); // now begin after the signal completed
+                }
             }
         },
         end: async function() {
-            if(transaction_active) {
+            if(transaction_active && !is_switching_mode) {
                 transaction_active = false;
+                is_switching_mode = true;
                 http_s_log.push("[transaction] Ended")
                 await db.run("COMMIT")
+                is_switching_mode = false;
+                if(on_switched) on_switched();
+            } else if(is_switching_mode) {
+                on_switched = function() {
+                    on_switched = null;
+                    fc.end();
+                }
             }
         }
     }

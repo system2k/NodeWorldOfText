@@ -1,4 +1,6 @@
 function insert_char_at_index(string, char, index) {
+    if(!string) string = "";
+    if(!char) char = "";
     string = string.split("");
     char = char.split("");
     for(var i = 0; i < char.length; i++) {
@@ -14,13 +16,52 @@ function insert_char_at_index(string, char, index) {
 }
 
 function sanitize_color(col) {
-    if(col === null) return null; // to skip over colors
     if(!col) col = 0;
     col = parseInt(col);
     if(!col) col = 0;
+    if(col == -1) return -1; // skips the colors if -1
+    col = Math.floor(col);
     if(col < 0) col = 0;
     if(col > 16777215) col = 16777215;
     return col;
+}
+
+in_queue = [];
+function is_queueing(tileX, tileY, worldID) {
+    for(var i = 0; i < in_queue.length; i++) {
+        if(in_queue[i][0] == tileX && in_queue[i][1] == tileY && in_queue[i][2] == worldID) {
+            return true;
+        }
+    }
+    return false;
+}
+is_waiting = []; // functions
+function wait_queue(tileX, tileY, worldID) {
+    return new Promise(function(resolve) {
+        is_waiting.push([tileX, tileY, worldID, function() {
+            resolve();
+        }])
+    })
+}
+
+function rem_queue(tileX, tileY, worldID) {
+    for(var i = 0; i < in_queue.length; i++) {
+        if(in_queue[i][0] == tileX && in_queue[i][1] == tileY && in_queue[i][2] == worldID) {
+            in_queue.splice(i, 1);
+            break;
+        }
+    }
+}
+
+function resolve_queue(tileX, tileY, worldID) {
+    for(var i = 0; i < is_waiting.length; i++) {
+        if(is_waiting[i][0] == tileX && is_waiting[i][1] == tileY && is_waiting[i][2] == worldID) {
+            var back_function = is_waiting[i][3] // we have to delete the element first, and then call the function
+            is_waiting.splice(i, 1);
+            back_function();
+            break;
+        }
+    }
 }
 
 module.exports = async function(data, vars) {
@@ -85,6 +126,12 @@ module.exports = async function(data, vars) {
         var pos = tile_coord(i)
         var tileY = san_nbr(pos[0]);
         var tileX = san_nbr(pos[1]);
+
+        if(is_queueing(tileX, tileY, world.id)) {
+            await wait_queue(tileX, tileY, world.id); // wait for previous tile to finish
+        }
+        in_queue.push([tileX, tileY, world.id]);
+
         var tile = await db.get("SELECT * FROM tile WHERE world_id=? AND tileY=? AND tileX=?",
             [world.id, tileY, tileX])
 
@@ -143,13 +190,13 @@ module.exports = async function(data, vars) {
             if(Array.isArray(color)) {
                 var color_index = 0;
                 for(var s = charY*16 + charX; s < 128; s++) {
-                    if(color[color_index] !== null) {
+                    if(color[color_index] !== -1) {
                         properties.color[s] = color[color_index];
                     }
                     color_index++;
                 }
             } else {
-                if(color !== null) {
+                if(color !== -1) {
                     properties.color[charY*16 + charX] = color;
                 }
             }
@@ -177,6 +224,8 @@ module.exports = async function(data, vars) {
                 writability
             })
         }
+        resolve_queue(tileX, tileY, world.id);
+        rem_queue(tileX, tileY, world.id);
     }
     await transaction.end();
 
