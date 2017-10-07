@@ -14,7 +14,7 @@ function insert_char_at_index(string, char, index) {
 }
 
 function sanitize_color(col) {
-    if(col == null) return null; // to skip over colors
+    if(col === null) return null; // to skip over colors
     if(!col) col = 0;
     col = parseInt(col);
     if(!col) col = 0;
