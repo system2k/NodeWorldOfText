@@ -11,6 +11,15 @@ function insert_char_at_index(string, char, index) {
     return string;
 }
 
+function sanitize_color(col) {
+    if(!col) col = 0;
+    col = parseInt(col);
+    if(!col) col = 0;
+    if(col < 0) col = 0;
+    if(col > 16777215) col = 16777215;
+    return col;
+}
+
 module.exports = async function(data, vars) {
     var db = vars.db;
     var user = vars.user;
@@ -109,21 +118,35 @@ module.exports = async function(data, vars) {
             if(charX < 0) charX = 0;
             if(charX >= 16) charX = 16;
             if(charY < 0) charY = 0;
-            if(charY >= 16) charY = 16;
+            if(charY >= 8) charY = 8;
             var char = changes[e][5];
-            var color = san_nbr(changes[e][7]);
-            accepted.push(color);
+            accepted.push(changes[e][6]);
+            var color = changes[e][7];
+            if(Array.isArray(color)) {
+                color = color.slice(0, 128);
+                for(var g = 0; g < color.length; g++) {
+                    color[g] = sanitize_color(color[g]);
+                }
+            } else {
+                color = sanitize_color(color);
+            }
             if(typeof char !== "string") {
                 char = "?";
             }
-            if(color < 0) color = 0;
-            if(color > 16777215) color = 16777215;
             var offset = charY * 16 + charX;
             tile_data = insert_char_at_index(tile_data, char, offset);
             if(!properties.color) {
                 properties.color = Array(128).fill(0)
             }
-            properties.color[charY*16 + charX] = color;
+            if(Array.isArray(color)) {
+                var color_index = 0;
+                for(var s = charY*16 + charX; s < 128; s++) {
+                    properties.color[s] = color[color_index];
+                    color_index++;
+                }
+            } else {
+                properties.color[charY*16 + charX] = color;
+            }
 
             if(properties.cell_props) {
                 if(properties.cell_props[charY]) {

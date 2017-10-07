@@ -1204,5 +1204,5 @@ var global_data = {
     tile_coord,
     modules,
     plural,
-    announcement: function(){ return announcement_cache }
+    announcement: function() { return announcement_cache }
 }
