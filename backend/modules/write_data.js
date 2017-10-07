@@ -2,7 +2,9 @@ function insert_char_at_index(string, char, index) {
     string = string.split("");
     char = char.split("");
     for(var i = 0; i < char.length; i++) {
-        string[index + i] = char[i];
+        if(char[i] !== "\0") {
+            string[index + i] = char[i];
+        }
     }
     string = string.join("");
     string = string.slice(0, 128);
@@ -12,6 +14,7 @@ function insert_char_at_index(string, char, index) {
 }
 
 function sanitize_color(col) {
+    if(col == null) return null; // to skip over colors
     if(!col) col = 0;
     col = parseInt(col);
     if(!col) col = 0;
@@ -52,7 +55,6 @@ module.exports = async function(data, vars) {
         }
         edits[i][5] = edits[i][5].replace(/\n/g, " ")
         edits[i][5] = edits[i][5].replace(/\r/g, " ")
-        edits[i][5] = edits[i][5].replace(/\0/g, " ")
         tiles[edits[i][0] + "," + edits[i][1]].push(edits[i])
         if(total_edits >= edits_limit) { // edit limit reached
             break;
@@ -141,11 +143,15 @@ module.exports = async function(data, vars) {
             if(Array.isArray(color)) {
                 var color_index = 0;
                 for(var s = charY*16 + charX; s < 128; s++) {
-                    properties.color[s] = color[color_index];
+                    if(color[color_index] !== null) {
+                        properties.color[s] = color[color_index];
+                    }
                     color_index++;
                 }
             } else {
-                properties.color[charY*16 + charX] = color;
+                if(color !== null) {
+                    properties.color[charY*16 + charX] = color;
+                }
             }
 
             if(properties.cell_props) {
