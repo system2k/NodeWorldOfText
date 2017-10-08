@@ -1,6 +1,6 @@
 {
     "website": "http://ourworldoftext.com/",
-    "port": 443,
+    "port": 11001,
     "error_log": true,
     "DATABASE_PATH": "../nwot.sqlite",
     "LOG_PATH": "../nwot_log.log",

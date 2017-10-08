@@ -433,7 +433,6 @@ var url_regexp = [ // regexp , function/redirect to
     ["^ajax/urllink/$", pages.urllink],
     ["^accounts/profile/", pages.profile],
     ["^accounts/private/", pages.private],
-    ["^accounts/configure/$", "/accounts/profile/"],
     ["^accounts/configure/(.*)/$", pages.configure],
     ["^accounts/configure/(beta/\\w+)/$", pages.configure],
     ["^accounts/member_autocomplete/$", pages.member_autocomplete],
@@ -845,6 +844,36 @@ process.on("uncaughtException", function(e) {
     process.exit();
 });
 
+var start_time = Date.now();
+var _time_ago = ["millisecond", "second", "minute", "hour", "day", "month", "year"];
+function uptime() {
+	var seconds_ago = Math.floor(Date.now() - start_time);
+	var _data = _time_ago[0];
+	if(seconds_ago >= 30067200000) {
+		_data = _time_ago[6];
+		seconds_ago = Math.floor(seconds_ago / 30067200000);
+	} else if(seconds_ago >= 2505600000) {
+		_data = _time_ago[5];
+		seconds_ago = Math.floor(seconds_ago / 2505600000);
+	} else if(seconds_ago >= 86400000) {
+		_data = _time_ago[4];
+		seconds_ago = Math.floor(seconds_ago / 86400000);
+	} else if(seconds_ago >= 3600000) {
+		_data = _time_ago[3];
+		seconds_ago = Math.floor(seconds_ago / 3600000);
+    } else if(seconds_ago >= 60000) {
+		_data = _time_ago[2];
+		seconds_ago = Math.floor(seconds_ago / 60000);
+    } else if(seconds_ago >= 1000) {
+		_data = _time_ago[1];
+		seconds_ago = Math.floor(seconds_ago / 1000);
+	}
+	if(seconds_ago !== 1) {
+		_data += "s";
+	}
+	return seconds_ago + " " + _data;
+}
+
 var http_s_log = [];
 
 var server = https_reference.createServer(options, async function(req, res) {
@@ -1233,5 +1262,6 @@ var global_data = {
     modules,
     plural,
     announcement: function() { return announcement_cache },
-    announce: MODIFY_ANNOUNCEMENT
+    announce: MODIFY_ANNOUNCEMENT,
+    uptime
 }
