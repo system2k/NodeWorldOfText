@@ -1015,18 +1015,27 @@ async function process_request(req, res, current_req_id) {
     }
 }
 
-function announce(text) {
+async function MODIFY_ANNOUNCEMENT(text) {
     if(!text) text = "";
     text += "";
     announcement_cache = text;
+
+    var element = await db.get("SELECT value FROM server_info WHERE name='announcement'");
+    if(!element) {
+        await db.run("INSERT INTO server_info values('announcement', ?)", text);
+    } else {
+        await db.run("UPDATE server_info SET value=? WHERE name='announcement'", text)
+    }
+    ws_broadcast({
+        kind: "announcement",
+        text: text
+    })
+}
+
+function announce(text) {
     (async function() {
-        var element = await db.get("SELECT value FROM server_info WHERE name='announcement'");
-        if(!element) {
-            await db.run("INSERT INTO server_info values('announcement', ?)", text);
-        } else {
-            await db.run("UPDATE server_info SET value=? WHERE name='announcement'", text)
-        }
-        console.log("Updated announcement")
+        await MODIFY_ANNOUNCEMENT(text);
+        console.log("Updated announcement");
     })();
 }
 
@@ -1046,11 +1055,12 @@ function start_server() {
         http_s_log.push("[ws] Begin broadcast client, data size is" + data.length)
         wss.clients.forEach(function each(client) {
             try {
-                if(client.readyState == ws.OPEN && toUpper(client.world_name) == toUpper(world)) {
+                if(client.readyState == ws.OPEN &&
+                world == void 0 || toUpper(client.world_name) == toUpper(world)) {
                     client.send(data);
                 }
             } catch(e) {
-                console.log("BROADCAST ERROR:", e);
+                http_s_log.push("[ws] BROADCAST ERROR: " + JSON.stringify(process_error_arg(e)))
             }
         });
         http_s_log.push("[ws] Finish broadcast client")
@@ -1222,5 +1232,6 @@ var global_data = {
     tile_coord,
     modules,
     plural,
-    announcement: function() { return announcement_cache }
+    announcement: function() { return announcement_cache },
+    announce: MODIFY_ANNOUNCEMENT
 }

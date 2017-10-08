@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}
-    Admin Panel | Node World of Text
+    Admin Panel | Our World of Text
 {% endblock %}
 
 {% block endhead %}
@@ -35,12 +35,12 @@
 
 {% block content %}
     <div class="content_set">
-        <div class="content_set_title">View Raw Edits</div>
+        <div class="content_set_title">Download Raw Edits</div>
         <div class="content_set_content">
             <form onsubmit="return goto_edits();">
 				World name: 
 				<input type="text" name="worldname" id="worldname" value="">
-				<input type="submit" value="View">
+				<input type="submit" value="Download">
 			</form>
         </div>
     </div>
@@ -105,6 +105,20 @@
             </ul>
         </div>
     </div>
+
+    <div class="content_set">
+        <div class="content_set_title">Set Announcement</div>
+        <div class="content_set_content">
+            {% if message %}
+				<span style="font-size:80%"><i>{{ announcement_update_msg }}</i></span>
+			{% endif %}
+            <form method="POST" action=".">
+				Text: 
+				<input type="text" name="announcement" id="announcement" value="{{ announcement }}" style="width: 100%;">
+				<input type="submit" value="Set">
+			</form>
+        </div>
+    </div> 
 {% endblock %}
 
 {% block endbody %}

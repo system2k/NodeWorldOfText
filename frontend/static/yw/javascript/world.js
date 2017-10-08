@@ -68,7 +68,6 @@ var World = (function() {
 			var ws_scheme;
 			supportsWebSockets = "WebSocket" in window;
 			if (!supportsWebSockets) {
-				use_ajax = true;
 				$("#announce").html("Sorry, your browser is not supported").show();
 				return;
 			}
@@ -855,7 +854,12 @@ var World = (function() {
 	}
 	World.prototype.wsAnnouncement = function(data) {
 		log("wsAnnouncement", data);
-		new Announcement(data.announcement).show();
+		if(data.text) {
+			this._ui.announce.html(data.text);
+			this._ui.announce.show();
+		} else {
+			this._ui.announce.hide();
+		}
 	};
 	World.prototype.wsSend = function(data) {
 		log("wsSend", data);

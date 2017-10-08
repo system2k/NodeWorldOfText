@@ -1,5 +1,5 @@
 {
-    "website": "https://nwot.sytes.net/",
+    "website": "http://ourworldoftext.com/",
     "port": 443,
     "error_log": true,
     "DATABASE_PATH": "../nwot.sqlite",
@@ -10,7 +10,7 @@
     "email": {
         "username": "nodeworldoftext@gmail.com",
         "password": "AYbyq*&BYuihmIUMSAYHBY%BY[esab5se5bUN8esnybSE%iu%B#N",
-        "display_email": "\"Node World of Text\" <nodeworldoftext@gmail.com>"
+        "display_email": "\"Our World of Text\" <nodeworldoftext@gmail.com>"
     },
     "activation_key_days_expire": 3
 }

@@ -13,7 +13,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     }
 
     var username = get_third(path, "administrator", "user")
-    var user_edit = await db.get("SELECT * FROM auth_user WHERE username=?", username);
+    var user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
 
     if(!user_edit) {
         return await dispage("404", null, req, serve, vars)
@@ -42,7 +42,7 @@ module.exports.POST = async function(req, serve, vars) {
     }
 
     var username = get_third(path, "administrator", "user")
-    var user_edit = await db.get("SELECT * FROM auth_user WHERE username=?", username);
+    var user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
     if(!user_edit) {
         return;
     }
