@@ -55,6 +55,8 @@ function getInitialUI() {
 if (window.MozWebSocket)
 	window.WebSocket = window.MozWebSocket;
 
+var pingInterval = 50; // seconds
+
 var World = (function() {
 	function World(_container, state, wsaddr) {
 		var _this = this;
@@ -134,6 +136,7 @@ var World = (function() {
 			};
 			setInterval(tryFlushBatchQueue, 1000);
 			_this.socket.onopen = function() {
+				_this.socket.send("2::");
 				return console.log("Connected to socket");
 			};
 			_this.socket.onclose = function() {
@@ -673,6 +676,7 @@ var World = (function() {
 		var wheelScroll;
 		$("#loading").hide();
 		this.socket = null;
+		this.pingTimeout;
 		this.wsQueue = [];
 		this.ableToWrite = true;
 		this.socketChannel = null;
@@ -875,6 +879,12 @@ var World = (function() {
 	};
 	World.prototype.wsChannel = function(data) {
 		this.socketChannel = data.sender;
+	};
+	World.prototype.wsPing = function() {
+		clearTimeout(this.pingTimeout);
+		this.pingTimeout = setTimeout(function() {
+			this.socket.send("2::");
+		}, pingInterval * 1000)
 	};
 	World.prototype.highlightGuestCursor = function(position, highlight) {
 		var $cell;

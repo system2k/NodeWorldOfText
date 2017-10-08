@@ -1190,6 +1190,12 @@ function start_server() {
                 req_id++;
                 var current_req_id = req_id;
                 try {
+                    if(msg == "2::") {
+                        return send_ws(JSON.stringify({
+                            kind: "ping",
+                            result: "pong"
+                        }));
+                    }
                     try {
                         msg = JSON.parse(msg);
                     } catch(e) {
