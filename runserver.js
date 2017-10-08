@@ -343,6 +343,25 @@ function toUpper(x) {
     return x.toString().toUpperCase();
 }
 
+function add(username, level) {
+    level = parseInt(level);
+    if(!level) level = 0;
+    level = Math.trunc(level);
+    if(level < 0) level = 0;
+    if(level >= 3) level = 3;
+    var Date_ = Date.now();
+    ask_password = true;
+    account_to_create = username;
+    (async function() {
+        try {
+            await db.run("INSERT INTO auth_user VALUES(null, ?, '', ?, 1, ?, ?, ?)",
+                [username, "", level, Date_, Date_])
+        } catch(e) {
+            console.log(e);
+        }
+    })();
+}
+
 function account_prompt() {
     passFunc = function(err, result) {
 		var err = false;
@@ -392,6 +411,19 @@ var prompt_command_input = {
 	}
 };
 
+var prompt_password_new_account = {
+    properties: {
+        password: {
+            message: "Enter password for this account: ",
+            replace: "*",
+            hidden: true
+		}
+	}
+};
+
+var ask_password = false;
+var account_to_create = "";
+
 function command_prompt() {
     function on_input(err, input) {
         if(err) return console.log(err);
@@ -400,10 +432,24 @@ function command_prompt() {
         } catch(e) {
             console.dir(e, { colors: true });
         }
-        command_prompt()
+        command_prompt();
+    }
+    function on_password_input(err, input) {
+        if(err) return console.log(err);
+        if(account_to_create == void 0) return;
+        var pass = input.password;
+        db.run("UPDATE auth_user SET password=? WHERE username=?",
+            [encryptHash(pass), account_to_create])
+        account_to_create = void 0;
+        command_prompt();
     }
     prompt.start();
-    prompt.get(prompt_command_input, on_input);
+    if(!ask_password) {
+        prompt.get(prompt_command_input, on_input);
+    } else {
+        ask_password = false;
+        prompt.get(prompt_password_new_account, on_password_input)
+    }
 }
 
 //Time in milliseconds
