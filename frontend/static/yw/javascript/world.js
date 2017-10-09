@@ -57,6 +57,23 @@ if (window.MozWebSocket)
 
 var pingInterval = 50; // seconds
 
+var tileProtectAuto = {
+	selected: {},
+	selectedTile: null,
+	xPos: 0,
+	yPos: 0,
+	mode: 0,
+	ctrlDown: 0,
+	shiftDown: 0,
+	clearSelections: function() {
+		for(var i in tileProtectAuto.selected){
+			tileProtectAuto.selected[i][1].style.backgroundColor = ""
+			delete tileProtectAuto[i];
+		}
+	},
+	active: false
+}
+
 var World = (function() {
 	function World(_container, state, wsaddr) {
 		var _this = this;
@@ -144,6 +161,87 @@ var World = (function() {
 				console.log("Disconnected from socket");
 			};
 		};
+
+		$(_this._container).on("mouseover.tileProtectAuto", function(e) {
+			if(!tileProtectAuto.active) return;
+			var tile = e.target.parentElement.parentElement.parentElement.parentElement;
+			tileProtectAuto.selectedTile = tile;
+			if(tile.className.substr(0, 8) !== "tilecont") return;
+			var attr = tile.attributes["data-tileyx"].value.split(",").map(Number);
+			var tileX = attr[1];
+			var tileY = attr[0];
+			tileProtectAuto.xPos = tileX;
+			tileProtectAuto.yPos = tileY;
+
+			if(tileProtectAuto.ctrlDown) {
+				var mode = tileProtectAuto.mode;
+				tileProtectAuto.selected[tileY + "," + tileX] = [mode, tile];
+				if (mode === 0) tile.style.backgroundColor = "red"
+				if (mode === 1) tile.style.backgroundColor = "green"
+				if (mode === 2) tile.style.backgroundColor = "blue"
+				if (mode === 3) tile.style.backgroundColor = "teal"
+			}
+			if(tileProtectAuto.shiftDown) {
+				var pos = tileY + "," + tileX;
+				if(tileProtectAuto.selected[pos] !== undefined) {
+					tile.style.backgroundColor = ""
+					delete tileProtectAuto.selected[pos];
+				}
+			}
+		})
+		
+		$("body").on("keydown.tileProtectAuto", function(e) {
+			if(e.keyCode === 83 && e.altKey) { // Alt + S to protect tiles
+				var selected = tileProtectAuto.selected;
+				var types = ["owner-only", "member-only", "public"];
+				var keys = Object.keys(selected);
+				if(keys.length == 0) return;
+				var i = 0;
+				function protectLoop() {
+					// get tileX/Y position from key
+					var pos = keys[i].split(",").map(Number);
+					var cstr = keys[i];
+					var prot = selected[cstr][0];
+
+					var tileX = pos[1];
+					var tileY = pos[0];
+					var ajaxStr = "/ajax/protect/"
+					if(prot == 3) ajaxStr = "/ajax/unprotect/"
+					
+					var data = {
+						world: state.worldModel.name,
+						tileY,
+						tileX
+					};
+					if(prot != 3) { // if unprotect type
+						data.type = types[prot];
+					}
+					jQuery.ajax({
+						type: "POST",
+						url: ajaxStr,
+						data: data
+					}).done(function(){
+						selected[cstr][1].style.backgroundColor = ""
+						delete selected[cstr];
+						// advance the loop
+						i++;
+						if(i < keys.length) {
+							protectLoop();
+						}
+					});
+				}
+				protectLoop()
+			} else {
+				tileProtectAuto.ctrlDown = e.ctrlKey;
+				tileProtectAuto.shiftDown = e.shiftKey;
+			}
+		})
+
+		$("body").on("keyup.tileProtectAuto", function(e) {
+			tileProtectAuto.ctrlDown = e.ctrlKey;
+			tileProtectAuto.shiftDown = e.shiftKey;
+		})
+
 		this._wsResendLost = function() {
 			var data;
 			var i;
@@ -444,12 +542,16 @@ var World = (function() {
 		this.doUnprotect = function(tile) {
 			return _this._tileAction("/ajax/unprotect/", tile);
 		};
-		this._actionUI = function(styles, elType, callback, optExtraArgs) {
+		this.tileActionKeyDownTimeout = Date.now();
+		this._actionUI = function(styles, elType, callback, optExtraArgs, isTileAction) {
 			_this._ui.scrolling.stop();
 			styles = [styles.map(function(css) {
 				return Helpers.addCss(css);
 			})];
-			return $(_this._container).one("click", function(e) {
+			return $(_this._container).one("click", function (e) {
+				if(isTileAction == "tileAction") {
+					tileProtectAuto.active = false;
+				}
 				var args;
 				var target;
 				target = $(e.target).closest(elType).get(0);
@@ -1062,10 +1164,18 @@ var World = (function() {
 		return fetchRectangles;
 	};
 	World.prototype._tileActionUI = function(bgColor, callback, optArg) {
+		tileProtectAuto.active = true;
+		if(optArg == void 0) {
+			tileProtectAuto.mode = 3;
+		} else {
+			if(optArg == "owner-only") tileProtectAuto.mode = 0;
+			if(optArg == "member-only") tileProtectAuto.mode = 1;
+			if(optArg == "public") tileProtectAuto.mode = 2;
+		}
 		var styles;
 		log("using bgcolor", bgColor);
 		styles = [".tilecont:hover {background-color: " + bgColor + " !important; cursor:pointer}"];
-		return this._actionUI(styles, ".tilecont", callback, [optArg]);
+		return this._actionUI(styles, ".tilecont", callback, [optArg], "tileAction");
 	};
 	World.prototype._sendCellLink = function(td, url, extraData) {
 		var coords = Helpers.getCellCoords(td);

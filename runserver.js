@@ -786,15 +786,17 @@ async function can_view_world(world, user) {
     };
 
     var is_owner = world.owner_id == user.id;
+    var superuser = user.superuser;
 
-    if(world.readability == 2 && !is_owner) { // owner only
+    if(world.readability == 2 && !is_owner && !superuser) { // owner only
         return false;
     }
 
     var is_member = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
         [world.id, user.id])
 
-    if(world.readability == 1 && !is_member && !is_owner) { // members (and owners) only
+    // members (and owners) only
+    if(world.readability == 1 && !is_member && !is_owner && !superuser) {
         return false;
     }
 
@@ -894,31 +896,57 @@ process.on("uncaughtException", function(e) {
 var start_time = Date.now();
 var _time_ago = ["millisecond", "second", "minute", "hour", "day", "month", "year"];
 function uptime() {
-	var seconds_ago = Math.floor(Date.now() - start_time);
-	var _data = _time_ago[0];
+    // (milliseconds ago)
+	var seconds_ago = Date.now() - start_time;
+    var _data = _time_ago[0];
+    var show_minutes = true; // EG: ... and 20 minutes
+    var divided = 1;
 	if(seconds_ago >= 30067200000) {
-		_data = _time_ago[6];
-		seconds_ago = Math.floor(seconds_ago / 30067200000);
+        _data = _time_ago[6];
+        divided = 30067200000;
+		seconds_ago = Math.floor(seconds_ago / divided);
 	} else if(seconds_ago >= 2505600000) {
-		_data = _time_ago[5];
-		seconds_ago = Math.floor(seconds_ago / 2505600000);
+        _data = _time_ago[5];
+        divided = 2505600000;
+		seconds_ago = Math.floor(seconds_ago / divided);
 	} else if(seconds_ago >= 86400000) {
-		_data = _time_ago[4];
-		seconds_ago = Math.floor(seconds_ago / 86400000);
+        _data = _time_ago[4];
+        divided = 86400000;
+		seconds_ago = Math.floor(seconds_ago / divided);
 	} else if(seconds_ago >= 3600000) {
-		_data = _time_ago[3];
-		seconds_ago = Math.floor(seconds_ago / 3600000);
+        _data = _time_ago[3];
+        divided = 3600000;
+		seconds_ago = Math.floor(seconds_ago / divided);
     } else if(seconds_ago >= 60000) {
-		_data = _time_ago[2];
-		seconds_ago = Math.floor(seconds_ago / 60000);
+        _data = _time_ago[2];
+        divided = 60000;
+        show_minutes = false;
+		seconds_ago = Math.floor(seconds_ago / divided);
     } else if(seconds_ago >= 1000) {
-		_data = _time_ago[1];
-		seconds_ago = Math.floor(seconds_ago / 1000);
-	}
+        _data = _time_ago[1];
+        divided = 1000;
+        show_minutes = false;
+		seconds_ago = Math.floor(seconds_ago / divided);
+	} else {
+        show_minutes = false;
+    }
 	if(seconds_ago !== 1) {
 		_data += "s";
-	}
-	return seconds_ago + " " + _data;
+    }
+    var extra = "";
+    if(show_minutes) {
+        var difference = Date.now() - start_time;
+        difference -= divided;
+        if(difference > 0) {
+            difference %= 3600000
+            difference = Math.floor(difference / 60000);
+            if(difference > 0) {
+                extra = " and " + difference + " minute";
+                if(difference != 1) extra += "s";
+            }
+        }
+    }
+	return seconds_ago + " " + _data + extra;
 }
 
 var http_s_log = [];

@@ -27,6 +27,8 @@ module.exports.GET = async function(req, serve, vars, params) {
             world_url = "/" + world_url;
         }
         var properties = JSON.parse(world.properties)
+        var views = properties.views;
+        if(!views) views = 0;
         world_list.push({
             public_writable: world.writability == 0,
             public_readable: world.readability == 0,
@@ -36,7 +38,7 @@ module.exports.GET = async function(req, serve, vars, params) {
             url: world_url,
             member_plural: plural(member_total),
             views_plural: plural(properties.views),
-            views: properties.views
+            views
         })
     }
 
@@ -93,7 +95,7 @@ module.exports.POST = async function(req, serve, vars) {
     if(worldname.match(/^(\w*)$/g) && (worldname.length > 0 || user.superuser)) {
         var world = await world_get_or_create(worldname);
         if(world.owner_id == null) {
-            await db.run("UPDATE world SET owner_id=? WHERE name=?", [user.id, worldname])
+            await db.run("UPDATE world SET owner_id=? WHERE name=? COLLATE NOCASE", [user.id, worldname])
         } else {
             message = "World already has an owner";
         }
