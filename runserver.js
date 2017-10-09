@@ -938,7 +938,7 @@ function uptime() {
         var difference = Date.now() - start_time;
         difference -= divided;
         if(difference > 0) {
-            difference %= 3600000
+            difference %= divided
             difference = Math.floor(difference / 60000);
             if(difference > 0) {
                 extra = " and " + difference + " minute";
