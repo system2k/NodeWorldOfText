@@ -148,7 +148,7 @@ module.exports.POST = async function(req, serve, vars) {
         if(!adduser) {
             return await dispage("configure", { message: "User not found" }, req, serve, vars)
         }
-        if(adduser.id == user.id) {
+        if(adduser.id == world.owner_id) {
             return await dispage("configure", {
                 message: "User is already the owner of \"" + world_name + "\""
             }, req, serve, vars)
