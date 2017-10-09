@@ -21,7 +21,7 @@ function validatePerms(p) {
     if(p == 0) return 0;
     if(p == 1) return 1;
     if(p == 2) return 2;
-    return r;
+    return 0;
 }
 
 module.exports.GET = async function(req, serve, vars, params) {

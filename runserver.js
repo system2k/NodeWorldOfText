@@ -479,6 +479,7 @@ var url_regexp = [ // regexp , function/redirect to
     ["^ajax/urllink/$", pages.urllink],
     ["^accounts/profile/", pages.profile],
     ["^accounts/private/", pages.private],
+    ["^accounts/configure/$", pages.configure], // for front page configuring
     ["^accounts/configure/(.*)/$", pages.configure],
     ["^accounts/configure/(beta/\\w+)/$", pages.configure],
     ["^accounts/member_autocomplete/$", pages.member_autocomplete],
