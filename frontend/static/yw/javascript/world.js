@@ -648,7 +648,7 @@ var World = (function() {
 			_this._ui.colorInputModal.open(function(color) {
 				var this_color = 0;
 				if(color) {
-					this_color = parseInt(color.substr(1), 16);
+					this_color = parseInt(color, 16);
 				}
 				if(!this_color) {
 					this_color = 0;
