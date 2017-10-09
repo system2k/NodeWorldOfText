@@ -74,6 +74,37 @@ var tileProtectAuto = {
 	active: false
 }
 
+var linkAuto = {
+	selected: {},
+	ctrlDown: 0,
+	shiftDown: 0,
+	mode: 0,
+	url: "",
+	coordTileX: 0,
+	coordTileY: 0,
+	active: false
+}
+
+var seek = ["div.world-container.writability-PUBLIC .tilecont", "div.world-container.writability-MEMBERS .tilecont", "div.world-container.writability-ADMIN .tilecont"]
+var results = [0, 0, 0];
+
+var writability = state.worldModel.writability;
+
+var styles = document.styleSheets;
+for(var i = 0; i < styles.length; i++) {
+	var rules = styles[i].rules;
+	for(var r = 0; r < rules.length; r++) {
+		var current = rules[r];
+		var index = seek.indexOf(current.selectorText);
+		if(index > -1) {
+			var style = current.style.backgroundColor;
+			results[index] = style;
+		}
+	}
+}
+
+var defaultAreaColor = results[writability];
+
 var World = (function() {
 	function World(_container, state, wsaddr) {
 		var _this = this;
@@ -162,6 +193,7 @@ var World = (function() {
 			};
 		};
 
+		// Fast tile protecting
 		$(_this._container).on("mouseover.tileProtectAuto", function(e) {
 			if(!tileProtectAuto.active) return;
 			var tile = e.target.parentElement.parentElement.parentElement.parentElement;
@@ -183,7 +215,7 @@ var World = (function() {
 			}
 			if(tileProtectAuto.shiftDown) {
 				var pos = tileY + "," + tileX;
-				if(tileProtectAuto.selected[pos] !== undefined) {
+				if(tileProtectAuto.selected[pos] !== void 0) {
 					tile.style.backgroundColor = ""
 					delete tileProtectAuto.selected[pos];
 				}
@@ -221,7 +253,7 @@ var World = (function() {
 						url: ajaxStr,
 						data: data
 					}).done(function(){
-						selected[cstr][1].style.backgroundColor = ""
+						selected[cstr][1].style.backgroundColor = "";
 						delete selected[cstr];
 						// advance the loop
 						i++;
@@ -240,6 +272,101 @@ var World = (function() {
 		$("body").on("keyup.tileProtectAuto", function(e) {
 			tileProtectAuto.ctrlDown = e.ctrlKey;
 			tileProtectAuto.shiftDown = e.shiftKey;
+		})
+
+		// Fast linking
+		$(_this._container).on("mouseover.linkAuto", function(e) {
+			if(!linkAuto.active) return;
+			var cell = e.target;
+			var tile = cell.parentElement.parentElement.parentElement.parentElement;
+			
+			var tileX, tileY, cellX, cellY;
+			var pos = tile.attributes["data-tileYX"].value.split(",").map(Number);
+			
+			tileX = pos[1];
+			tileY = pos[0];
+			
+			cellX = cell.cellIndex;
+			cellY = cell.parentElement.rowIndex;
+			
+			if(linkAuto.ctrlDown) {
+				cell.style.backgroundColor = "#33FF33";
+				var ar = [tileX, tileY, cellX, cellY, cell, linkAuto.mode];
+				if(linkAuto.mode == 0) {
+					ar.push([linkAuto.url])
+				} else if(linkAuto.mode == 1) {
+					ar.push([linkAuto.coordTileX, linkAuto.coordTileY]);
+				}
+				linkAuto.selected[tileY + "," + tileX + "," + cellY + "," + cellX] = ar;
+			}
+			if(linkAuto.shiftDown) {
+				var elm = linkAuto.selected[tileY + "," + tileX + "," + cellY + "," + cellX];
+				if(elm !== void 0) {
+					elm[4].style.backgroundColor = "";
+					delete linkAuto.selected[tileY + "," + tileX + "," + cellY + "," + cellX];
+				}
+			}
+		})
+
+		$("body").on("keydown.linkAuto", function(e) {
+			if(e.keyCode === 83 && e.altKey) { // Alt + S to protect tiles
+				var selected = linkAuto.selected;
+				var keys = Object.keys(selected);
+				if(keys.length == 0) return;
+				var i = 0;
+				function protectLoop() {
+					// get tileX/Y position from key
+					var pos = keys[i].split(",").map(Number);
+					var cstr = keys[i];
+
+					var tileX = pos[1];
+					var tileY = pos[0];
+					var cellX = pos[3];
+					var cellY = pos[2];
+
+					var mode = selected[cstr][5];
+					var linkData = selected[cstr][6];
+
+					var ajaxStr = "/ajax/urllink/";
+					if(mode == 1) ajaxStr = "/ajax/coordlink/";
+					
+					var data = {
+						world: state.worldModel.name,
+						tileY,
+						tileX,
+						charY: cellY,
+						charX : cellX
+					};
+					if(mode == 0) {
+						data.url = linkData[0];
+					} else if(mode == 1) {
+						data.link_tileX = linkData[0];
+						data.link_tileY = linkData[1];
+					}
+					jQuery.ajax({
+						type: "POST",
+						url: ajaxStr,
+						data: data
+					}).done(function(){
+						selected[cstr][4].style.backgroundColor = "";
+						delete selected[cstr];
+						// advance the loop
+						i++;
+						if(i < keys.length) {
+							protectLoop();
+						}
+					});
+				}
+				protectLoop()
+			} else {
+				linkAuto.ctrlDown = e.ctrlKey;
+				linkAuto.shiftDown = e.shiftKey;
+			}
+		})
+
+		$("body").on("keyup.linkAuto", function(e) {
+			linkAuto.ctrlDown = e.ctrlKey;
+			linkAuto.shiftDown = e.shiftKey;
 		})
 
 		this._wsResendLost = function() {
@@ -543,14 +670,16 @@ var World = (function() {
 			return _this._tileAction("/ajax/unprotect/", tile);
 		};
 		this.tileActionKeyDownTimeout = Date.now();
-		this._actionUI = function(styles, elType, callback, optExtraArgs, isTileAction) {
+		this._actionUI = function(styles, elType, callback, optExtraArgs, actionType) {
 			_this._ui.scrolling.stop();
 			styles = [styles.map(function(css) {
 				return Helpers.addCss(css);
 			})];
 			return $(_this._container).one("click", function (e) {
-				if(isTileAction == "tileAction") {
+				if(actionType == "tileAction") {
 					tileProtectAuto.active = false;
+				} else if(actionType == "cellAction") {
+					linkAuto.active = false;
 				}
 				var args;
 				var target;
@@ -567,12 +696,21 @@ var World = (function() {
 			});
 		};
 		this._cellActionUI = function(callback, args) {
+			linkAuto.active = true;
+			if(typeof args[0] == "string") {
+				linkAuto.mode = 0;
+				linkAuto.url = args[0];
+			} else {
+				linkAuto.mode = 1;
+				linkAuto.coordTileY = args[0];
+				linkAuto.coordTileX = args[1];
+			}
 			var styles;
 			styles = ["td:hover {background-color: #aaf; cursor:pointer}"];
 			if (!Permissions.can_admin(_this.userModel, _this.worldModel)) {
 				styles.push(".protected td:hover {background-color: inherit; cursor:inherit}");
 			}
-			return _this._actionUI(styles, "td", callback, args);
+			return _this._actionUI(styles, "td", callback, args, "cellAction");
 		};
 		this.protectATile = function(protectType) {
 			var bgColor;
@@ -794,7 +932,7 @@ var World = (function() {
 			this._ui.announce.show();
 		}
 		this._container.css({
-			background: "#ddd",
+			background: defaultAreaColor,
 			fontFamily: "Courier New",
 			overflow: "hidden",
 			position: "relative"
