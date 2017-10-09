@@ -86,13 +86,14 @@ var linkAuto = {
 }
 
 var seek = ["div.world-container.writability-PUBLIC .tilecont", "div.world-container.writability-MEMBERS .tilecont", "div.world-container.writability-ADMIN .tilecont"]
-var results = [0, 0, 0];
+var results = ["#fff", "#eee", "#ddd"];
 
 var writability = state.worldModel.writability;
 
 var styles = document.styleSheets;
 for(var i = 0; i < styles.length; i++) {
 	var rules = styles[i].rules;
+	if(rules == void 0) rules = styles[i].cssRules;
 	for(var r = 0; r < rules.length; r++) {
 		var current = rules[r];
 		var index = seek.indexOf(current.selectorText);
@@ -242,8 +243,8 @@ var World = (function() {
 					
 					var data = {
 						world: state.worldModel.name,
-						tileY,
-						tileX
+						tileY: tileY,
+						tileX: tileX
 					};
 					if(prot != 3) { // if unprotect type
 						data.type = types[prot];
@@ -332,8 +333,8 @@ var World = (function() {
 					
 					var data = {
 						world: state.worldModel.name,
-						tileY,
-						tileX,
+						tileY: tileY,
+						tileX: tileX,
 						charY: cellY,
 						charX : cellX
 					};
