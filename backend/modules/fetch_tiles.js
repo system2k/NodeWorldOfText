@@ -10,6 +10,7 @@ module.exports = async function(data, vars) {
     var tiles = {};
 
     var len = data.fetchRectangles.length
+    if(len >= 1000) len = 1000;
     for(var i = 0; i < len; i++) {
         var rect = data.fetchRectangles[i];
         var minY = san_nbr(rect.minY)
@@ -20,9 +21,9 @@ module.exports = async function(data, vars) {
         if(!(minY < maxY && minX < maxX)) {
             return "Invalid range"
         }
-        if(!((maxY - minY) * (maxX - minX) <= 400)) {
+        /*if(!((maxY - minY) * (maxX - minX) <= 400)) {
             return "Too many tiles"
-        }
+        }*/
         var YTileRange = xrange(minY, maxY + 1);
         var XTileRange = xrange(minX, maxX + 1);
         for (var ty in YTileRange) { // fill in null values

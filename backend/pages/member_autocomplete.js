@@ -1,7 +1,12 @@
 module.exports = {};
 
+var control_chars = "%_";
 function escape_control(str) {
-	return str.replace(/%/g, "\\%").replace(/\\/g, "\\\\");
+    str += "";
+    str = str.replace(/\\/g, "\\\\");
+    str = str.replace(/%/g, "\\%");
+    str = str.replace(/_/g, "\\_");
+    return str;
 }
 
 module.exports.GET = async function(req, serve, vars, props) {

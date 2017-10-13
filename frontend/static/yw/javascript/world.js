@@ -933,7 +933,7 @@ var World = (function() {
 			this._ui.announce.show();
 		}
 		this._container.css({
-			background: defaultAreaColor,
+			background: "#ddd",
 			fontFamily: "Courier New",
 			overflow: "hidden",
 			position: "relative"

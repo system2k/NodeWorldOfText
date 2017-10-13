@@ -467,6 +467,7 @@ var ms = { Second, Minute, Hour, Day, Week, Month, Year, Decade };
 var url_regexp = [ // regexp , function/redirect to
     ["^(\\w*)$", pages.yourworld],
     ["^(beta/(.*))$", pages.yourworld],
+    ["^(betaclient/(.*))$", pages.yourworld_beta],
     ["^(frontpage/(.*))$", pages.yourworld],
     ["^favicon\.ico$", "/static/favicon.png"],
     ["^home/$", pages.home],
@@ -493,7 +494,8 @@ var url_regexp = [ // regexp , function/redirect to
     ["^script_manager/view/(.*)/$", pages.script_view],
     ["^administrator/user/(.*)/$", pages.administrator_user],
     ["^accounts/download/(.*)/$", pages.accounts_download],
-    ["^world_style.css$", pages.world_style]
+    ["^world_style.css$", pages.world_style],
+    ["^world_style_beta/$", pages.world_style_beta]
 ]
 
 function get_third(url, first, second) {
@@ -1212,6 +1214,14 @@ function start_server() {
     wss.on("connection", async function (ws, req) {
         http_s_log.push("[ws] Creating a websocket connection...")
         try {
+            var pre_queue = [];
+            // code isn't ready yet, so push data to array and then send after it's ready
+            function onMessage(msg) {
+                pre_queue.push(msg);
+            }
+            ws.on("message", function(msg) {
+                onMessage(msg);
+            });
             var location = url.parse(req.url).pathname;
             var world_name;
             function send_ws(data) {
@@ -1229,6 +1239,9 @@ function start_server() {
                     message: "Invalid address"
                 }));
                 return ws.close();
+            }
+            if(world_name.startsWith("world_name")) {
+                world_name = world_name.substr("world_name".length);
             }
             ws.world_name = world_name;
             var cookies = parseCookie(req.headers.cookie);
@@ -1260,7 +1273,7 @@ function start_server() {
                     Date.now());
                 log_error(JSON.stringify(process_error_arg(err)));
             });
-            ws.on("message", async function(msg) {
+            onMessage = async function(msg) {
                 http_s_log.push("[ws] Received message event with length of " + msg.length)
                 req_id++;
                 var current_req_id = req_id;
@@ -1304,7 +1317,13 @@ function start_server() {
                 } catch(e) {
                     handle_ws_error(e);
                 }
-            })
+            }
+            if(pre_queue.length > 0) {
+                for(var p = 0; p < pre_queue.length; p++) {
+                    onMessage(pre_queue[p]);
+                    pre_queue.splice(p, 1)
+                }
+            }
         } catch(e) {
             handle_ws_error(e);
         }

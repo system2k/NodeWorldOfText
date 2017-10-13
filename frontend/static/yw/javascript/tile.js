@@ -246,7 +246,7 @@ var Tile = (function() {
 		this._pendingEdits = {};
 		this._cellProps = null;
 		this.writability = void 0;
-		this.node.style.backgroundColor = defaultAreaColor;
+		this.node.style.backgroundColor = "#eee";
 		this.node.innerHTML = getDefaultHTML(this.config);
 	}
 	Tile.Cell = {
