@@ -1,17 +1,23 @@
+// split a string properly with characters containing surrogates and combining characters
+function advancedSplit(str) {
+	str += "";
+	var data = str.match(/([\uD800-\uDBFF][\uDC00-\uDFFF])|(([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+))|.|\n|\r/g)
+	if(data == null) return [];
+	return data;
+}
+
 function insert_char_at_index(string, char, index) {
     if(!string) string = "";
     if(!char) char = "";
-    string = string.split("");
-    char = char.split("");
+    string = advancedSplit(string);
+    char = advancedSplit(char);
     for(var i = 0; i < char.length; i++) {
         if(char[i] !== "\0") {
             string[index + i] = char[i];
         }
     }
-    string = string.join("");
     string = string.slice(0, 128);
-    var diff_len = 128 - string.length;
-    string = " ".repeat(diff_len) + string;
+    string = string.join("");
     return string;
 }
 

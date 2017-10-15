@@ -17,12 +17,6 @@ module.exports.GET = async function(req, serve, vars, params) {
     if(params.timemachine) {
         world_name = params.world;
     }
-    if(world_name.startsWith("betaclient")) {
-        world_name = world_name.substr("betaclient".length);
-    }
-    if(world_name.charAt(0) == "/") {
-        world_name = world_name.substr(1)
-    }
 
     var world = await world_get_or_create(world_name, req, serve)
     if(!world) return;
@@ -89,7 +83,7 @@ module.exports.GET = async function(req, serve, vars, params) {
             user,
             world
         }
-        serve(template_data["yourworldBeta.html"](data))
+        serve(template_data["yourworld.html"](data))
     }
 }
 

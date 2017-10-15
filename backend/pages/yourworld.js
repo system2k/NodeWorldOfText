@@ -57,7 +57,7 @@ module.exports.GET = async function(req, serve, vars, params) {
                 is_owner: read_permission.owner
             },
             worldModel: {
-                feature_membertiles_addremove: world.feature_membertiles_addremove,
+                feature_membertiles_addremove: !!world.feature_membertiles_addremove,
                 writability: world.writability,
                 feature_url_link: world.feature_url_link,
                 path: world.name,
@@ -72,16 +72,18 @@ module.exports.GET = async function(req, serve, vars, params) {
         if(announcement) {
             state.announce = announcement;
         }
-        var css_timemachine = "";
         if(params.timemachine) {
-            css_timemachine = "<style>.tilecont {background-color: #ddd;}</style>";
-            state.worldModel.writability = false;
+            state.worldModel.writability = 0;
+        }
+        var page_title = "Our World of Text";
+        if(world.name) {
+            page_title = "/" + world.name;
         }
         var data = {
             state: JSON.stringify(state),
-            css_timemachine,
             user,
-            world
+            world,
+            page_title
         }
         serve(template_data["yourworld.html"](data))
     }

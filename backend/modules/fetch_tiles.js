@@ -1,3 +1,23 @@
+function generateDiag(text, tileX, tileY) {
+    var str = "";
+    for(var y = 0; y < 8; y++) {
+        for(var x = 0; x < 16; x++) {
+            var posX = tileX*16 + x;
+            var posY = tileY*8 + y;
+            var ind = posX + posY;
+            var len = text.length;
+            var charPos = ind - Math.floor(ind / len) * len
+            str += text.charAt(charPos);
+        }
+    }
+    return {
+        content: str,
+        properties: {
+            writability: 2
+        }
+    };
+}
+
 module.exports = async function(data, vars) {
     var db = vars.db;
     var user = vars.user;
@@ -18,12 +38,12 @@ module.exports = async function(data, vars) {
         var maxY = san_nbr(rect.maxY)
         var maxX = san_nbr(rect.maxX)
 
-        if(!(minY < maxY && minX < maxX)) {
+        if(!(minY <= maxY && minX <= maxX)) {
             return "Invalid range"
         }
-        /*if(!((maxY - minY) * (maxX - minX) <= 400)) {
+        if(!((maxY - minY) * (maxX - minX) <= 2000)) {
             return "Too many tiles"
-        }*/
+        }
         var YTileRange = xrange(minY, maxY + 1);
         var XTileRange = xrange(minX, maxX + 1);
         for (var ty in YTileRange) { // fill in null values
@@ -41,26 +61,12 @@ module.exports = async function(data, vars) {
                 var e_str = "Cannot view timemachine: There are no edits yet. | ";
                 for (var ty in YTileRange) { // fill in null values
                     for (var tx in XTileRange) {
-                        var str = "";
-                        for(var y = 0; y < 8; y++) {
-                            for(var x = 0; x < 16; x++) {
-                                var posX = XTileRange[tx]*16 + x;
-                                var posY = YTileRange[ty]*8 + y;
-                                var ind = posX + posY;
-                                var len = e_str.length;
-                                var charPos = ind - Math.floor(ind / len) * len
-                                str += e_str.charAt(charPos);
-                            }
-                        }
-                        tiles[YTileRange[ty] + "," + XTileRange[tx]] = {
-                            content: str,
-                            properties: {
-                                writability: 2
-                            }
-                        };
+                        var tileX = XTileRange[tx];
+                        var tileY = YTileRange[ty];
+                        tiles[tileY + "," + tileX] = generateDiag(e_str, tileX, tileY);
                     }
                 }
-                return tiles;
+                continue;
             }
 
             dr1 = dr1.time;

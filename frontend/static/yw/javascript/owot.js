@@ -2,13 +2,61 @@ $("#loading").hide();
 var owot = $("#owot")[0];
 var textInput = $("#textInput");
 var textLayer = $("#text")[0];
-buildMenu();
 owot.hidden = false;
 textLayer.hidden = false;
 textLayer.style.pointerEvents = "none";
 owot.style.cursor = "text";
 var width = window.innerWidth;
 var height = window.innerHeight;
+
+var images = {};
+// [data RGB, width, height]
+
+var backgroundImageParser = document.createElement("canvas");
+var backImg = backgroundImageParser.getContext("2d");
+var unloadedImage = new Image();
+unloadedImage.src = "/static/unloaded.png";
+unloadedImage.onload = function() {
+    backImg.drawImage(unloadedImage, 0, 0);
+    images.unloaded = [removeAlpha(backImg.getImageData(0, 0, 16, 16).data), 16, 16];
+    // one all the images are loaded
+    renderTiles();
+    begin();
+}
+
+function removeAlpha(data) {
+    var res = [];
+    var len = data.length / 4;
+    for(var i = 0; i < len; i++) {
+        var indx = i * 4;
+        res.push(data[indx + 0]);
+        res.push(data[indx + 1]);
+        res.push(data[indx + 2]);
+    }
+    return res;
+}
+
+var YourWorld = {
+    Color: 0
+}
+
+$("#coord_Y").text(0);
+$("#coord_X").text(0);
+
+// edit ID
+var nextObjId = 1;
+
+$(window).on("resize", function(e) {
+    width = window.innerWidth;
+    height = window.innerHeight;
+
+    owot.width = width;
+    owot.height = height;
+    textLayer.width = width;
+    textLayer.height = height;
+
+    renderTiles();
+})
 
 owot.width = width;
 owot.height = height;
@@ -19,6 +67,7 @@ canvasTextRender.height = 18 * 8;
 var textRender = canvasTextRender.getContext("2d");
 
 var cursorCoords = null;
+var currentPosition = [0, 0, 0, 0];
 
 var positionX = 0;
 var positionY = 0;
@@ -38,22 +87,29 @@ if (window.MozWebSocket)
 var wsaddr = window.location.host;
 var ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
 var path = window.location.pathname.replace(/\/$/, "");
-path = path.substr("/betaclient".length)
 var ws_path = ws_scheme + "://" + wsaddr + path + "/ws/";
 
 var styles = {};
 
-// get world style
-jQuery.ajax({
-    type: "GET",
-    url: "/world_style_beta/?world=" + window.location.pathname.substr("/betaclient/".length),
-    success: function(e) {
-        createSocket();
-        styles = e;
-        writability_styles = [styles.public, styles.member, styles.owner]
-    },
-    dataType: "json"
-});
+function begin() {
+    // get world style
+    jQuery.ajax({
+        type: "GET",
+        url: "/world_style/?world=" + state.worldModel.name,
+        success: function(e) {
+            createSocket();
+            styles = e;
+
+            // change menu color
+            var menuStyle = document.createElement("style")
+            menuStyle.innerHTML = "#menu.hover, #nav { background: " + styles.menu + "; }"
+            $("head")[0].append(menuStyle)
+
+            writability_styles = [styles.public, styles.member, styles.owner]
+        },
+        dataType: "json"
+    });
+}
 
 var dragStartX = 0;
 var dragStartY = 0;
@@ -62,11 +118,13 @@ var dragPosX = 0;
 var dragPosY = 0;
 var isDragging = false;
 $(document).on("mousedown", function(e) {
+    if(e.target != owot && e.target != linkDiv) return;
     dragStartX = e.pageX;
     dragStartY = e.pageY;
     dragPosX = positionX;
     dragPosY = positionY;
     isDragging = true;
+    textInput[0].value = "";
 })
 function renderCursor(coords) {
     if(cursorCoords) {
@@ -81,9 +139,16 @@ function renderCursor(coords) {
 // tileX, charX
 var lastX = [0, 0];
 $(document).on("mouseup", function(e) {
+    if(e.target != owot && e.target != linkDiv) return;
     var pos = getTileCoordsFromMouseCoords(e.pageX, e.pageY);
     lastX = [pos[0], pos[2]];
-    renderCursor(pos);
+    if(tiles[pos[1] + "," + pos[0]] !== void 0) renderCursor(pos);
+    isDragging = false;
+})
+$(document).on("mouseleave", function(e) {
+    isDragging = false;
+})
+$(document).on("mouseenter", function(e) {
     isDragging = false;
 })
 function is_link(tileX, tileY, charX, charY) {
@@ -121,6 +186,28 @@ function containsNewLine(char) {
     }
 }
 
+function blankColor() {
+    var ar = [];
+    for(var i = 0; i < 128; i++) {
+        ar.push(0);
+    }
+    return ar;
+}
+
+var writeBuffer = [];
+
+var writeInterval = setInterval(function() {
+    if(writeBuffer.length == 0) return;
+    var data = {
+        kind: "write",
+        // get copy of buffer
+        edits: writeBuffer.slice(0)
+    };
+    // clear buffer
+    writeBuffer.splice(0);
+    socket.send(JSON.stringify(data));
+}, 1000)
+
 function writeChar(char) {
     if(cursorCoords) {
         var tileX = cursorCoords[0];
@@ -129,6 +216,22 @@ function writeChar(char) {
         var charY = cursorCoords[3];
         var newLine = containsNewLine(char);
         if(!newLine) {
+            if(!tiles[tileY + "," + tileX]) {
+                tiles[tileY + "," + tileX] = blankTile();
+            }
+            var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
+            if(!cell_props) cell_props = {};
+            var color = tiles[tileY + "," + tileX].properties.color;
+            if(!color) color = blankColor();
+
+            if(cell_props[charY]) {
+                if(cell_props[charY][charX]) {
+                    delete cell_props[charY][charX];
+                }
+            }
+            color[charY * 16 + charX] = YourWorld.Color;
+            tiles[tileY + "," + tileX].properties.cell_props = cell_props;
+
             var con = tiles[tileY + "," + tileX].content;
             con = advancedSplit(con);
             // replace character
@@ -138,6 +241,13 @@ function writeChar(char) {
             // delete from cache to re-render
             delete tilePixelCache[tileY + "," + tileX];
             renderTile(tileX, tileY)
+
+            var editArray = [tileY, tileX, charY, charX, Date.now(), char, nextObjId];
+            if(color) {
+                editArray.push(YourWorld.Color);
+            }
+            writeBuffer.push(editArray);
+            nextObjId++;
         }
         // get copy of cursor coordinates
         var cSCopy = cursorCoords.slice();
@@ -162,21 +272,24 @@ function writeChar(char) {
     }
 }
 
-textInput[0].oninput = function(e) {
+// write characters inputted
+setInterval(function() {
     var value = textInput[0].value;
-    textInput[0].value = "";
+    if(value == "") return;
     value = value.replace(/\r\n/g, "\n");
-    // split all characters (including ones with surrogates and combining chars)
     value = advancedSplit(value);
-    for(var i = 0; i < value.length; i++) {
-        var char = value[i];
-        if(!char) char = " ";
-        writeChar(char);
+    writeChar(value[0]);
+    value.shift();
+    textInput[0].value = value.join("");
+    if (!Permissions.can_paste(state.userModel, state.worldModel)) {
+        textInput[0].value = "";
     }
-}
+}, 10);
 
 $(document).on("keydown", function() {
+    if(w._state.uiModal) return;
     textInput.focus();
+    textInput[0].value = "";
 })
 
 function getTileCoordsFromMouseCoords(x, y) {
@@ -209,10 +322,22 @@ function getRange(x1, y1, x2, y2) {
     return coords;
 }
 
-function getBounds() {
+function getVisibleTiles() {
     var A = getTileCoordsFromMouseCoords(0, 0);
     var B = getTileCoordsFromMouseCoords(width - 1, height - 1);
     return getRange(A[0], A[1], B[0], B[1]);
+}
+
+function getWidth() {
+    var A = getTileCoordsFromMouseCoords(0, 0);
+    var B = getTileCoordsFromMouseCoords(width - 1, 0);
+    return B[0] - A[0] + 1;
+}
+
+function getHeight() {
+    var A = getTileCoordsFromMouseCoords(0, 0);
+    var B = getTileCoordsFromMouseCoords(0, height - 1);
+    return B[1] - A[1] + 1;
 }
 
 function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
@@ -229,17 +354,22 @@ function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
 
 var linkElm = document.createElement("a");
 linkElm.href = "test";
-$("body")[0].append(linkElm);
-linkElm.innerHTML = "<div style=\"width: 10px; height: 18px;\"></div>";
+$("body")[0].appendChild(linkElm);
+var linkDiv = document.createElement("div");
+linkDiv.style.width = "10px";
+linkDiv.style.height = "18px";
+linkElm.appendChild(linkDiv);
 linkElm.style.position = "absolute";
 linkElm.title = "Link to url...";
 linkElm.style.display = "block";
 linkElm.target = "_blank";
+linkElm.style.cursor = "pointer";
 
 var waitTimeout = 33;
 var lastRender = 0;
 $(document).on("mousemove", function(e) {
     var coords = getTileCoordsFromMouseCoords(e.pageX, e.pageY)
+    currentPosition = coords;
     var tileX = coords[0];
     var tileY = coords[1];
     var charX = coords[2];
@@ -264,6 +394,8 @@ $(document).on("mousemove", function(e) {
             linkElm.target = "";
         }
     } else {
+        linkElm.style.top = "-100px";
+        linkElm.style.left = "-100px";
         linkElm.hidden = true;
     }
 
@@ -278,8 +410,109 @@ $(document).on("mousemove", function(e) {
 
     positionX = dragPosX + (posX - dragStartX);
     positionY = dragPosY + (posY - dragStartY);
+
     renderTiles();
 })
+
+// gets list of ranges to fetch
+function cutRanges(map, width, height) {
+    function getPos(x, y) {
+        if(x >= width || y >= height) return
+        return map[y * width + x]
+    }
+    
+    var ranges = [];
+    
+    function fillRange(x1, y1, x2, y2) {
+        ranges.push([x1, y1, x2, y2]);
+        for(var y = y1; y <= y2; y++) {
+            for(var x = x1; x <= x2; x++) {
+                map[y * width + x] = 1;
+            }
+        }
+    }
+    
+    function cut() {
+        var zeros = false
+        var x = 0
+        var y = 0
+        var startX = 0
+        var startY = 0
+        var endX = 0
+        var endY = 0
+        var endXSet = false
+        var lastX = -1
+        for(var i = 0; i < width * height; i++) {
+            var dat = getPos(x, y)
+            if(dat === 0 && !zeros) {
+                zeros = true
+                startX = x
+                startY = y
+            }
+    
+            if(dat === 1 && zeros && x <= endX) {
+                endY--
+                fillRange(startX, startY, endX, endY);
+                break
+            }
+    
+            if(dat === 1 && zeros) {
+                var xTemp = x
+                if(!endXSet && lastX > -1) {
+                    endX = lastX
+                    endXSet = true
+                }
+                x = startX
+                endY++
+                y++
+                if(getPos(x, y)) {
+                    endY--
+                    fillRange(startX, startY, endX, endY);
+                    break
+                }
+                if(y >= height) {
+                    endY--
+                    if(lastX === xTemp) {
+                        endY--
+                    }
+                    fillRange(startX, startY, endX, endY);
+                    break
+                }
+                continue
+            }
+            lastX = x
+            x++
+            if(x >= width) {
+                if(!endXSet && zeros && dat === 0 && lastX > -1) {
+                    endX = lastX
+                    endXSet = true
+                }
+                x = startX
+                y++
+                endY++
+                if(y >= height) {
+                    endY--
+                    fillRange(startX, startY, endX, endY);
+                    break
+                }
+            }
+        }
+    }
+    function containsBlank() {
+        for(var i = 0; i < map.length; i++) {
+            if(map[i] === 0) return true
+        }
+        return false
+    }
+    for(var i = 0; i < width * height; i++) {
+        if(containsBlank()) {
+            cut()
+        } else {
+            break
+        }
+    }
+    return ranges;
+}
 
 function createSocket() {
     socket = new ReconnectingWebSocket(ws_path);
@@ -293,16 +526,72 @@ function createSocket() {
     }
 
     socket.onopen = function(msg) {
+        getAndFetchTiles();
+        fetchInterval = setInterval(function() {
+            getAndFetchTiles();
+        }, 300)
+    }
+}
+
+// fetches only unloaded tiles
+function getAndFetchTiles() {
+    var data = getVisibleTiles();
+    
+    var startX = data[0][0];
+    var startY = data[0][1];
+
+    // fill the map
+    var map = [];
+    for(var i = 0; i < data.length; i++) {
+        var coord = data[i][1] + "," + data[i][0];
+        if(coord in tiles) {
+            map.push(1);
+        } else {
+            map.push(0);
+            tiles[coord] = null;
+        }
+    }
+    var width = getWidth();
+    var height = Math.floor(map.length / width);
+    var ranges = cutRanges(map, width, height);
+
+    var toFetch = [];
+    for(var i = 0; i < ranges.length; i++) {
+        var range = ranges[i];
+        toFetch.push({
+            // the range cutter doesn't handle negative coords, so adjust them
+            minX: range[0] + startX,
+            minY: range[1] + startY,
+            maxX: range[2] + startX,
+            maxY: range[3] + startY
+        });
+    }
+    if(toFetch.length > 0) {
         socket.send(JSON.stringify({
-            fetchRectangles: [{
-                minX: -100,
-                minY: -100,
-                maxX: 100,
-                maxY: 100
-            }],
+            fetchRectangles: toFetch,
             kind: "fetch",
             v: "3"
         }))
+    }
+}
+
+// clears all tiles outside the viewport
+function clearTiles() {
+    var coordinates = getVisibleTiles();
+    // reference to tile coordinates (EG: "5,6")
+    var visible = {};
+    for(var i = 0; i < coordinates.length; i++) {
+        visible[coordinates[i][1] + "," + coordinates[i][0]] = 1;
+    }
+    for(var i in tiles) {
+        if(!(i in visible)) {
+            delete tiles[i];
+        }
+    }
+    for(var i in tilePixelCache) {
+        if(!(i in visible)) {
+            delete tilePixelCache[i];
+        }
     }
 }
 
@@ -354,23 +643,112 @@ var world_writability = state.worldModel.writability;
 // index 0 = public, 1 = member, 2 = owner
 var writability_styles = [];
 
+var highlightFlash = {};
+var inkLimit = 0;
+
+function highlight(tileX, tileY, charX, charY) {
+    if(!highlightFlash[tileY + "," + tileX]) {
+        highlightFlash[tileY + "," + tileX] = {};
+    }
+    if(!highlightFlash[tileY + "," + tileX][charY]) {
+        highlightFlash[tileY + "," + tileX][charY] = {};
+    }
+    if(!highlightFlash[tileY + "," + tileX][charY][charX]) {
+        highlightFlash[tileY + "," + tileX][charY][charX] = [Date.now(), 128];
+        inkLimit++;
+    }
+}
+
+var flashAnimateInterval = setInterval(function() {
+    for(var tile in highlightFlash) {
+        for(var charY in highlightFlash[tile]) {
+            for(var charX in highlightFlash[tile][charY]) {
+                var data = highlightFlash[tile][charY][charX];
+                var time = data[0];
+                if(Date.now() - time >= 500) {
+                    delete highlightFlash[tile][charY][charX]
+                    inkLimit--;
+                } else {
+                    highlightFlash[tile][charY][charX][1] += 2;
+                    if(highlightFlash[tile][charY][charX][1] >= 255) {
+                        highlightFlash[tile][charY][charX][1] = 255;
+                    }
+                }
+                delete tilePixelCache[tile];
+                var pos = getPos(tile);
+                renderTile(pos[0], pos[1]);
+            }
+        }
+    }
+})
+
+function blankTile() {
+    return {
+        content: blank,
+        properties: {
+            cell_props: {},
+            writability: null,
+            color: blankColor()
+        }
+    };
+}
+
 function renderTile(tileX, tileY) {
     var str = tileY + "," + tileX;
+    var offsetX = tileX * 160 + (width / 2 | 0) + positionX;
+    var offsetY = tileY * 144 + (height / 2 | 0) + positionY;
+
+    // unloaded tiles
+    if(!(str in tiles)) {
+        var imgData = textLayerCtx.createImageData(160, 144);
+        var fromData = images.unloaded[0];
+        var img_width = images.unloaded[1];
+        var img_height = images.unloaded[2];
+        var startX = tileX * 160;
+        var startY = tileY * 144;
+        for(var y = 0; y < 144; y++) {
+            for(var x = 0; x < 160; x++) {
+                var posX = startX + x;
+                var posY = startY + y;
+                posX = posX - Math.floor(posX / img_width) * img_width;
+                posY = posY - Math.floor(posY / img_height) * img_height;
+                var index = (posY * img_width + posX) * 3;
+                var destIndex = (y * 160 + x) * 4;
+                imgData.data[destIndex + 0] = fromData[index + 0];
+                imgData.data[destIndex + 1] = fromData[index + 1];
+                imgData.data[destIndex + 2] = fromData[index + 2];
+                imgData.data[destIndex + 3] = 255;
+            }
+        }
+        tilePixelCache[str] = imgData;
+        textLayerCtx.putImageData(tilePixelCache[str], offsetX, offsetY);
+        return;
+    }
+
     var tile = tiles[str];
 
+    if(tile == null) {
+        tiles[str] = blankTile();
+        tile = tiles[str];
+    }
+
     var writability = null;
+
     // make sure tile is not null before getting the writability
     if(tile) writability = tile.properties.writability;
 
     // placeholder in case writability is null
     var temp_writability = writability;
 
-    if(writability == null) temp_writability = world_writability;
-    if(temp_writability == 0) ctx.fillStyle = styles.public;
-    if(temp_writability == 1) ctx.fillStyle = styles.member;
-    if(temp_writability == 2) ctx.fillStyle = styles.owner;
-    var offsetX = tileX * 160 + (width / 2 | 0) + positionX;
-    var offsetY = tileY * 144 + (height / 2 | 0) + positionY;
+    if(!tile.backgroundColor) {
+        if(writability == null) temp_writability = world_writability;
+        if(temp_writability == 0) ctx.fillStyle = styles.public;
+        if(temp_writability == 1) ctx.fillStyle = styles.member;
+        if(temp_writability == 2) ctx.fillStyle = styles.owner;
+    } else {
+        ctx.fillStyle = tile.backgroundColor;
+    }
+
     // fill tile background color
     ctx.fillRect(offsetX, offsetY, 160, 144);
 
@@ -398,9 +776,19 @@ function renderTile(tileX, tileY) {
     if(!props) props = {};
 
     content = advancedSplit(content);
+    var highlight = highlightFlash[str];
+    if(!highlight) highlight = {};
 
     for(var y = 0; y < 8; y++) {
         for(var x = 0; x < 16; x++) {
+            // highlight flash animation
+            if(highlight[y]) {
+                if(highlight[y][x] !== void 0) {
+                    textRender.fillStyle = "rgb(255, 255, " + highlight[y][x][1] + ")";
+                    textRender.fillRect(x * 10, y * 18, 10, 18);
+                }
+            }
+
             var char = content[y * 16 + x];
             var color = colors[y * 16 + x];
             // initialize link color to default text color in case there's no link to color
@@ -436,12 +824,20 @@ function renderTile(tileX, tileY) {
             }
             // ignore whitespace characters
             if(char != "\u0020" && char != "\u00a0") {
-                if(char != "█") {
+                if(char == "█") {
+                    textRender.fillRect(x*10, y*18, 10, 18);
+                } else if(char == "▀") {
+                    textRender.fillRect(x*10, y*18, 10, 9);
+                } else if(char == "▄") {
+                    textRender.fillRect(x*10, y*18 + 9, 10, 9);
+                } else if(char == "▌") {
+                    textRender.fillRect(x*10, y*18 + 9, 5, 18);
+                } else if(char == "▐") {
+                    textRender.fillRect(x*10 + 5, y*18 + 9, 5, 18);
+                } else {
                     if(char.length > 1) textRender.font = "16px sans-serif";
                     textRender.fillText(char, x*10, y*18 + 13)
                     if(char.length > 1) textRender.font = font;
-                } else {
-                    textRender.fillRect(x*10, y*18, 10, 18);
                 }
             }
         }
@@ -452,13 +848,21 @@ function renderTile(tileX, tileY) {
 }
 
 function renderTiles() {
-    ctx.fillStyle = writability_styles[world_writability];
+    // update coordinate display
+    var tileCoordX = Math.floor(-positionX / 160);
+    var tileCoordY = Math.floor(-positionY / 144);
+    var centerY = -Math.floor(tileCoordY / 4);
+    var centerX = Math.floor(tileCoordX / 4);
+    $("#coord_Y").text(centerY);
+    $("#coord_X").text(centerX);
+
+    ctx.fillStyle = "#ddd";
     // clear tile color layer
     ctx.fillRect(0, 0, width, height);
     // clear text layer
     textLayerCtx.clearRect(0, 0, width, height);
     // get all visible tiles
-    var visibleTiles = getBounds();
+    var visibleTiles = getVisibleTiles();
     for(var i in visibleTiles) {
         // get position from string position: "Y,X"
         var tileX = visibleTiles[i][0];
@@ -475,23 +879,23 @@ function buildMenu() {
     }, function() {
         return $("#coords").hide();
     });
-    var _this = {worldModel: state.worldModel, userModel: state.userModel} // TEMPORARY
-    menu.addOption("Change color", _this.color);
-    if (Permissions.can_go_to_coord(_this.userModel, _this.worldModel)) {
-        menu.addOption("Go to coordinates", _this.goToCoord);
+    var _this = {} // TEMPORARY
+    menu.addOption("Change color", w.color);
+    if (Permissions.can_go_to_coord(state.userModel, state.worldModel)) {
+        menu.addOption("Go to coordinates", w.goToCoord);
     }
-    if (Permissions.can_coordlink(_this.userModel, _this.worldModel)) {
+    if (Permissions.can_coordlink(state.userModel, state.worldModel)) {
         menu.addOption("Create link to coordinates", _this.coordLink);
     }
-    if (Permissions.can_urllink(_this.userModel, _this.worldModel)) {
+    if (Permissions.can_urllink(state.userModel, state.worldModel)) {
         menu.addOption("Create link to URL", _this.urlLink);
     }
-    if (Permissions.can_admin(_this.userModel, _this.worldModel)) {
+    if (Permissions.can_admin(state.userModel, state.worldModel)) {
         menu.addOption("Make an area owner-only", function() {
             return _this.protectATile("owner-only");
         });
     }
-    if (Permissions.can_protect_tiles(_this.userModel, _this.worldModel)) {
+    if (Permissions.can_protect_tiles(state.userModel, state.worldModel)) {
         menu.addOption("Make an area member-only", function() {
             return _this.protectATile("member-only");
         });
@@ -502,39 +906,114 @@ function buildMenu() {
     }
 }
 
-if (typeof Object.assign != 'function') {
-    // Must be writable: true, enumerable: false, configurable: true
-    Object.defineProperty(Object, "assign", {
-      value: function assign(target, varArgs) { // .length of function is 2
-        'use strict';
-        if (target == null) { // TypeError if undefined or null
-          throw new TypeError('Cannot convert undefined or null to object');
-        }
-  
-        var to = Object(target);
-  
-        for (var index = 1; index < arguments.length; index++) {
-          var nextSource = arguments[index];
-  
-          if (nextSource != null) { // Skip over if undefined or null
-            for (var nextKey in nextSource) {
-              // Avoid bugs when hasOwnProperty is shadowed
-              if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
-                to[nextKey] = nextSource[nextKey];
-              }
+document.onselectstart = function() {
+    return w._state.uiModal;
+}
+
+var w = {
+    _state: state,
+    _ui: {
+		announce: $("#announce"),
+		coordinateInputModal: new CoordinateInputModal(),
+		scrolling: null,
+		urlInputModal: new URLInputModal(),
+		colorInputModal: new ColorInputModal()
+	},
+    color: function() {
+        w._ui.colorInputModal.open(function(color) {
+            var this_color = 0;
+            if(color) {
+                this_color = parseInt(color, 16);
             }
-          }
+            if(!this_color) {
+                this_color = 0;
+            }
+            YourWorld.Color = this_color;
+        });
+    },
+    goToCoord: function() {
+        w._ui.coordinateInputModal.open("Go to coordinates:", w.doGoToCoord.bind(w));
+    },
+    doGoToCoord: function(y, x) {
+        var scroller;
+        y *= -4;
+        x *= 4;
+        y += 2;
+        x += 2;
+        if (!w._state.goToCoord.initted) {
+            w._state.goToCoord.cancel = function() {
+                clearInterval(w._state.goToCoord.interval);
+                return $(document).trigger("YWOT_GoToCoord_stop");
+            };
+            $(document).bind("YWOT_GoToCoord_start", function() {
+                return $(document).bind("mousedown", w._state.goToCoord.cancel);
+            });
+            $(document).bind("YWOT_GoToCoord_stop", function() {
+                $(document).unbind("mousedown", w._state.goToCoord.cancel);
+            });
+            w._state.goToCoord.initted = true;
         }
-        return to;
-      },
-      writable: true,
-      configurable: true
-    });
-  }
+        scroller = function() {
+            var centerX;
+            var centerY;
+            var distance;
+            var xDiff;
+            var xMove;
+            var yDiff;
+            var yMove;
+            var _ref;
+            _ref = w.getCenterCoords(), centerY = _ref[0], centerX = _ref[1];
+            yDiff = y - centerY;
+            xDiff = x - centerX;
+            yDiff *= 144;
+            xDiff *= 160;
+            distance = Helpers.vectorLen(yDiff, xDiff);
+            yMove = Math.round(yDiff * 20 / distance);
+            xMove = Math.round(xDiff * 20 / distance);
+            if (Helpers.vectorLen(yDiff, xDiff) < 40) {
+                w._state.goToCoord.cancel();
+                return;
+            }
+            yDiff = yDiff - yMove;
+            positionY -= yMove;
+            xDiff = xDiff - xMove;
+            positionX -= xMove;
+            renderTiles();
+        };
+        w._state.goToCoord.interval = setInterval(scroller, 25);
+        return $(document).trigger("YWOT_GoToCoord_start");
+    },
+    getCenterCoords: function() {
+        return [-positionY / 144, -positionX / 160]
+    }
+}
+
+w._state.goToCoord = {};
+w._state.uiModal = false;
+
+buildMenu();
+
+$(document).bind("simplemodal_onopen", function() {
+    return w._state.uiModal = true;
+});
+$(document).bind("simplemodal_onclose", function() {
+    return w._state.uiModal = false;
+});
 
 var ws_functions = {
     fetch: function(data) {
-        Object.assign(tiles, data.tiles)
+        for(var i in data.tiles) {
+            tiles[i] = data.tiles[i];
+            // re-render tile
+            delete tilePixelCache[i];
+        }
+        // too many tiles, remove tiles outside of the viewport
+        if(Object.keys(tiles).length >= 1000) {
+            clearTiles()
+        }
         renderTiles();
+    },
+    colors: function(data) {
+
     }
 };

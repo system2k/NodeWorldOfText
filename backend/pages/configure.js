@@ -6,6 +6,7 @@ function bint(x) {
 }
 
 function validateCSS(c) {
+    c += "";
     if(c == "default") return "";
     if(typeof c !== "string") return "";
     if(c.length > 100) c = c.slice(0, 100);
@@ -14,7 +15,7 @@ function validateCSS(c) {
     c = c.replace(/;/g, "");
     c = c.replace(/\r/g, "");
     c = c.replace(/\n/g, "");
-    return c;
+    return c.slice(0, 20);
 }
 
 function validatePerms(p) {
@@ -52,6 +53,8 @@ module.exports.GET = async function(req, serve, vars, params) {
         return serve("Access denied", 403)
     }
 
+    world_name = world.name;
+
     var members = await db.all("SELECT * FROM whitelist WHERE world_id=?", world.id)
     var member_list = []; // processed list of members
     for(var i = 0; i < members.length; i++) {
@@ -81,6 +84,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var bg = world.custom_bg || "default";
     var owner_color = world.custom_tile_owner || "default";
     var member_color = world.custom_tile_member || "default";
+    var menu_color = properties.custom_menu_color || "default";
 
     var data = {
         user,
@@ -107,7 +111,8 @@ module.exports.GET = async function(req, serve, vars, params) {
         cursor_guest_color,
         bg,
         owner_color,
-        member_color
+        member_color,
+        menu_color
     };
 
     serve(template_data["configure.html"](data))
@@ -140,6 +145,8 @@ module.exports.POST = async function(req, serve, vars) {
     if(world.owner_id != user.id && !user.superuser) {
         return serve("Access denied", 403)
     }
+
+    var properties = JSON.parse(world.properties);
 
     if(post_data.form == "add_member") {
         var username = post_data.add_member;
@@ -202,9 +209,11 @@ module.exports.POST = async function(req, serve, vars) {
         var bg = validateCSS(post_data.bg);
         var owner_color = validateCSS(post_data.owner_color);
         var member_color = validateCSS(post_data.member_color);
+        var menu_color = validateCSS(post_data.menu_color);
+        properties.custom_menu_color = menu_color;
 
-        await db.run("UPDATE world SET (custom_bg,custom_cursor,custom_guest_cursor,custom_color,custom_tile_owner,custom_tile_member)=(?,?,?,?,?,?) WHERE id=?",
-            [bg, cursor_color, cursor_guest_color, color, owner_color, member_color, world.id])
+        await db.run("UPDATE world SET (custom_bg,custom_cursor,custom_guest_cursor,custom_color,custom_tile_owner,custom_tile_member,properties)=(?,?,?,?,?,?,?) WHERE id=?",
+            [bg, cursor_color, cursor_guest_color, color, owner_color, member_color, JSON.stringify(properties), world.id])
         
         ws_broadcast({
             kind: "colors",
@@ -213,7 +222,8 @@ module.exports.POST = async function(req, serve, vars) {
                 text: color,
                 member_area: member_color,
                 background: bg,
-                owner_area: owner_color
+                owner_area: owner_color,
+                menu: menu_color
             }
         }, world.name)
     }

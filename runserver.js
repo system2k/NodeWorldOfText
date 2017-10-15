@@ -467,7 +467,6 @@ var ms = { Second, Minute, Hour, Day, Week, Month, Year, Decade };
 var url_regexp = [ // regexp , function/redirect to
     ["^(\\w*)$", pages.yourworld],
     ["^(beta/(.*))$", pages.yourworld],
-    ["^(betaclient/(.*))$", pages.yourworld_beta],
     ["^(frontpage/(.*))$", pages.yourworld],
     ["^favicon\.ico$", "/static/favicon.png"],
     ["^home/$", pages.home],
@@ -488,14 +487,15 @@ var url_regexp = [ // regexp , function/redirect to
     ["^accounts/register/complete/$", pages.register_complete],
     ["^accounts/activate/(.*)/$", pages.activate],
     ["^administrator/$", pages.administrator],
+    ["^administrator/edits/$", pages.administrator_edits], // for front page downloading
     ["^administrator/edits/(.*)/$", pages.administrator_edits],
     ["^script_manager/$", pages.script_manager],
     ["^script_manager/edit/(.*)/$", pages.script_edit],
     ["^script_manager/view/(.*)/$", pages.script_view],
     ["^administrator/user/(.*)/$", pages.administrator_user],
+    ["^accounts/download/$", pages.accounts_download], // for front page downloading
     ["^accounts/download/(.*)/$", pages.accounts_download],
-    ["^world_style.css$", pages.world_style],
-    ["^world_style_beta/$", pages.world_style_beta]
+    ["^world_style/$", pages.world_style]
 ]
 
 function get_third(url, first, second) {
@@ -1239,9 +1239,6 @@ function start_server() {
                     message: "Invalid address"
                 }));
                 return ws.close();
-            }
-            if(world_name.startsWith("world_name")) {
-                world_name = world_name.substr("world_name".length);
             }
             ws.world_name = world_name;
             var cookies = parseCookie(req.headers.cookie);
