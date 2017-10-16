@@ -111,6 +111,92 @@ function begin() {
     });
 }
 
+function stopLinkUI() {
+    if(!lastLinkHover) return;
+    if(!w.isLinking) return;
+    w.isLinking = false;
+    owot.style.cursor = "text";
+    var tileX = lastLinkHover[0];
+    var tileY = lastLinkHover[1];
+    var charX = lastLinkHover[2];
+    var charY = lastLinkHover[3];
+    // remove highlight
+    uncolorChar(tileX, tileY, charX, charY);
+    delete tilePixelCache[tileY + "," + tileX];
+    renderTile(tileX, tileY);
+}
+
+function stopTileUI() {
+    if(!lastTileHover) return;
+    if(!w.isProtecting) return;
+    w.isProtecting = false;
+    owot.style.cursor = "text";
+    var tileX = lastTileHover[0];
+    var tileY = lastTileHover[1];
+    // remove highlight
+
+    if(tiles[tileY + "," + tileX]) {
+        tiles[tileY + "," + tileX].backgroundColor = "";
+    }
+    delete tilePixelCache[tileY + "," + tileX];
+    renderTile(tileX, tileY);
+}
+
+function doLink() {
+    if(!lastLinkHover) return;
+    stopLinkUI()
+    var tileX = lastLinkHover[0];
+    var tileY = lastLinkHover[1];
+    var charX = lastLinkHover[2];
+    var charY = lastLinkHover[3];
+    var data = {
+        world: state.worldModel.name,
+        tileY: tileY,
+        tileX: tileX,
+        charY: charY,
+        charX: charX
+    }
+    var ajax_url = "";
+    if(w.link_input_type == 0) {
+        ajax_url = "/ajax/urllink/";
+        data.url = w.url_input;
+    } else if(w.link_input_type == 1) {
+        data.link_tileX = w.coord_input_x;
+        data.link_tileY = w.coord_input_y;
+        ajax_url = "/ajax/coordlink/";
+    }
+    $.ajax({
+        type: "POST",
+        url: ajax_url,
+        data: data
+    });
+}
+
+function doProtect() {
+    if(!lastTileHover) return;
+    stopTileUI();
+    var tileX = lastTileHover[0];
+    var tileY = lastTileHover[1];
+    var types = ["public", "member-only", "owner-only"];
+    var data = {
+        world: state.worldModel.name,
+        tileY: tileY,
+        tileX: tileX
+    }
+    var ajax_url = "";
+    if(w.protect_type == null) {
+        ajax_url = "/ajax/unprotect/";
+    } else {
+        ajax_url = "/ajax/protect/";
+        data.type = types[w.protect_type];
+    }
+    $.ajax({
+        type: "POST",
+        url: ajax_url,
+        data: data
+    });
+}
+
 var dragStartX = 0;
 var dragStartY = 0;
 // the offset before clicking to drag
@@ -124,12 +210,47 @@ $(document).on("mousedown", function(e) {
     dragPosX = positionX;
     dragPosY = positionY;
     isDragging = true;
+    // stop paste
+    clearInterval(pasteInterval);
+    write_busy = false;
     textInput[0].value = "";
+
+    if(w.isLinking) {
+        doLink();
+    }
+    if(w.isProtecting) {
+        doProtect();
+    }
 })
+
+// change cursor position
 function renderCursor(coords) {
+    var newTileX = coords[0];
+    var newTileY = coords[1];
+    if(!(newTileY + "," + newTileX in tiles)) return false;
+    var writability = null;
+    if(tiles[newTileY + "," + newTileX]) {
+        writability = tiles[newTileY + "," + newTileX].properties.writability;
+    }
+    var thisTile = {
+        initted: function() { return true },
+        writability: writability
+    }
+    var tileX = 0;
+    var tileY = 0;
     if(cursorCoords) {
-        var tileX = cursorCoords[0];
-        var tileY = cursorCoords[1];
+        tileX = cursorCoords[0];
+        tileY = cursorCoords[1];
+    }
+    if(!Permissions.can_edit_tile(state.userModel, state.worldModel, thisTile)) {
+        if(cursorCoords) {
+            cursorCoords = null;
+            renderTile(tileX, tileY);
+        }
+        return false;
+    }
+
+    if(cursorCoords) {
         cursorCoords = null;
         renderTile(tileX, tileY);
     }
@@ -140,9 +261,23 @@ function renderCursor(coords) {
 var lastX = [0, 0];
 $(document).on("mouseup", function(e) {
     if(e.target != owot && e.target != linkDiv) return;
+
+    // set cursor
     var pos = getTileCoordsFromMouseCoords(e.pageX, e.pageY);
-    lastX = [pos[0], pos[2]];
-    if(tiles[pos[1] + "," + pos[0]] !== void 0) renderCursor(pos);
+    if(tiles[pos[1] + "," + pos[0]] !== void 0) {
+        lastX = [pos[0], pos[2]];
+        // render the cursor and get results
+        if(renderCursor(pos) == false) {
+            // cursor should be removed if on area where user cannot write
+            if(cursorCoords) {
+                var remTileX = cursorCoords[0];
+                var remTileY = cursorCoords[1];
+                cursorCoords = null;
+                renderTile(remTileX, remTileY);
+            }
+        }
+    };
+
     isDragging = false;
 })
 $(document).on("mouseleave", function(e) {
@@ -208,7 +343,41 @@ var writeInterval = setInterval(function() {
     socket.send(JSON.stringify(data));
 }, 1000)
 
-function writeChar(char) {
+function moveCursor(direction) {
+    if(!cursorCoords) return;
+    var cSCopy = cursorCoords.slice();
+    // [tileX, tileY, charX, charY]
+
+    if(direction == "up") {
+        cSCopy[3]--;
+        if(cSCopy[3] < 0) {
+            cSCopy[3] = 7;
+            cSCopy[1]--
+        }
+    } else if(direction == "down") {
+        cSCopy[3]++;
+        if(cSCopy[3] > 7) {
+            cSCopy[3] = 0;
+            cSCopy[1]++;
+        }
+    } else if(direction == "left") {
+        cSCopy[2]--;
+        if(cSCopy[2] < 0) {
+            cSCopy[2] = 15;
+            cSCopy[0]--;
+        }
+    } else if(direction == "right") {
+        cSCopy[2]++;
+        if(cSCopy[2] > 15) {
+            cSCopy[2] = 0;
+            cSCopy[0]++;
+        }
+    }
+    lastX = [cSCopy[0], cSCopy[2]];
+    renderCursor(cSCopy);
+}
+
+function writeChar(char, doNotMoveCursor) {
     if(cursorCoords) {
         var tileX = cursorCoords[0];
         var tileY = cursorCoords[1];
@@ -224,12 +393,16 @@ function writeChar(char) {
             var color = tiles[tileY + "," + tileX].properties.color;
             if(!color) color = blankColor();
 
+            // delete link
             if(cell_props[charY]) {
                 if(cell_props[charY][charX]) {
                     delete cell_props[charY][charX];
                 }
             }
+            // change color
             color[charY * 16 + charX] = YourWorld.Color;
+            tiles[tileY + "," + tileX].properties.color = color;
+            // update cell properties (link positions)
             tiles[tileY + "," + tileX].properties.cell_props = cell_props;
 
             var con = tiles[tileY + "," + tileX].content;
@@ -246,50 +419,94 @@ function writeChar(char) {
             if(color) {
                 editArray.push(YourWorld.Color);
             }
+            var tellEditColor = color;
+            if(!tellEditColor) {
+                tellEditColor = 0;
+            }
+            tellEdit.push([tileX, tileY, charX, charY, char, tellEditColor, nextObjId]);
             writeBuffer.push(editArray);
             nextObjId++;
         }
-        // get copy of cursor coordinates
-        var cSCopy = cursorCoords.slice();
-        // move cursor to right
-        cSCopy[2]++;
-        if(cSCopy[2] >= 16) {
-            cSCopy[2] = 0;
-            cSCopy[0]++;
-        }
-        if(newLine) {
-            // move cursor down
-            cSCopy[3]++;
-            if(cSCopy[3] >= 8) {
-                cSCopy[3] = 0;
-                cSCopy[1]++;
+        if(!doNotMoveCursor) {
+            // get copy of cursor coordinates
+            var cSCopy = cursorCoords.slice();
+            // move cursor to right
+            cSCopy[2]++;
+            if(cSCopy[2] >= 16) {
+                cSCopy[2] = 0;
+                cSCopy[0]++;
             }
-            // move x position to last x position
-            cSCopy[0] = lastX[0];
-            cSCopy[2] = lastX[1];
+            if(newLine) {
+                // move cursor down
+                cSCopy[3]++;
+                if(cSCopy[3] >= 8) {
+                    cSCopy[3] = 0;
+                    cSCopy[1]++;
+                }
+                // move x position to last x position
+                cSCopy[0] = lastX[0];
+                cSCopy[2] = lastX[1];
+            }
+            renderCursor(cSCopy);
         }
-        renderCursor(cSCopy);
     }
 }
 
 // write characters inputted
+var write_busy = false; // busy pasting
+var pasteInterval;
 setInterval(function() {
+    if(write_busy) return;
     var value = textInput[0].value;
     if(value == "") return;
     value = value.replace(/\r\n/g, "\n");
     value = advancedSplit(value);
+    var index = 1;
     writeChar(value[0]);
-    value.shift();
-    textInput[0].value = value.join("");
-    if (!Permissions.can_paste(state.userModel, state.worldModel)) {
+    if(value.length == 1) {
+        textInput[0].value = "";
+        return
+    };
+    if (Permissions.can_paste(state.userModel, state.worldModel)) {
+        write_busy = true;
+        pasteInterval = setInterval(function() {
+            writeChar(value[index]);
+            index++
+            if(index >= value.length) {
+                textInput[0].value = "";
+                clearInterval(pasteInterval);
+                write_busy = false;
+            }
+        }, 1)
+    } else {
         textInput[0].value = "";
     }
 }, 10);
 
-$(document).on("keydown", function() {
+$(document).on("keydown", function(e) {
+    var key = e.keyCode;
     if(w._state.uiModal) return;
     textInput.focus();
     textInput[0].value = "";
+    // stop paste
+    clearInterval(pasteInterval);
+    write_busy = false;
+
+    if(key == 38) {
+        moveCursor("up");
+    } else if(key == 40) {
+        moveCursor("down");
+    } else if(key == 37) {
+        moveCursor("left");
+    } else if(key == 39) {
+        moveCursor("right");
+    } else if(key == 8) { // backspace
+        moveCursor("left");
+        writeChar(" ", true);
+    } else if(key == 27) { // esc
+        stopLinkUI();
+        stopTileUI();
+    }
 })
 
 function getTileCoordsFromMouseCoords(x, y) {
@@ -389,14 +606,59 @@ $(document).on("mousemove", function(e) {
         } else if(link[0].type == "coord") {
             var pos = link[0].link_tileX + "," + link[0].link_tileY;
             linkElm.title = "Link to coordinates " + pos;
-            linkElm.onclick = function() { return false };
-            linkElm.href = "javascript:void(0);";
+            linkElm.href = "javascript:w.doGoToCoord(" +
+                link[0].link_tileY + "," + link[0].link_tileX + ");";
             linkElm.target = "";
         }
     } else {
         linkElm.style.top = "-100px";
         linkElm.style.left = "-100px";
         linkElm.hidden = true;
+    }
+
+    // url/coordinate linking
+    if(w.isLinking) {
+        if(lastLinkHover) {
+            var tileX = lastLinkHover[0];
+            var tileY = lastLinkHover[1];
+            var charX = lastLinkHover[2];
+            var charY = lastLinkHover[3];
+            uncolorChar(tileX, tileY, charX, charY);
+            delete tilePixelCache[tileY + "," + tileX];
+            renderTile(tileX, tileY);
+        }
+        lastLinkHover = currentPosition;
+        var newTileX = currentPosition[0];
+        var newTileY = currentPosition[1];
+        var newCharX = currentPosition[2];
+        var newCharY = currentPosition[3];
+        if(tiles[newTileY + "," + newTileX]) {
+            colorChar(newTileX, newTileY, newCharX, newCharY, "#aaf");
+            // re-render tile
+            delete tilePixelCache[newTileY + "," + newTileX];
+            renderTile(newTileX, newTileY);
+        }
+    }
+    // tile protection
+    if(w.isProtecting) {
+        if(lastTileHover) {
+            var tileX = lastTileHover[0];
+            var tileY = lastTileHover[1];
+            if(tiles[tileY + "," + tileX]) {
+                tiles[tileY + "," + tileX].backgroundColor = "";
+            }
+            delete tilePixelCache[tileY + "," + tileX];
+            renderTile(tileX, tileY);
+        }
+        lastTileHover = currentPosition;
+        var newTileX = currentPosition[0];
+        var newTileY = currentPosition[1];
+        if(tiles[newTileY + "," + newTileX]) {
+            tiles[newTileY + "," + newTileX].backgroundColor = w.protect_bg;
+            // re-render tile
+            delete tilePixelCache[newTileY + "," + newTileX];
+            renderTile(newTileX, newTileY);
+        }
     }
 
     if(!isDragging) return;
@@ -646,39 +908,57 @@ var writability_styles = [];
 var highlightFlash = {};
 var inkLimit = 0;
 
-function highlight(tileX, tileY, charX, charY) {
-    if(!highlightFlash[tileY + "," + tileX]) {
-        highlightFlash[tileY + "," + tileX] = {};
-    }
-    if(!highlightFlash[tileY + "," + tileX][charY]) {
-        highlightFlash[tileY + "," + tileX][charY] = {};
-    }
-    if(!highlightFlash[tileY + "," + tileX][charY][charX]) {
-        highlightFlash[tileY + "," + tileX][charY][charX] = [Date.now(), 128];
-        inkLimit++;
+function highlight(positions) {
+    for(var i = 0; i < positions.length; i++) {
+        var tileX = positions[i][0];
+        var tileY = positions[i][1];
+        var charX = positions[i][2];
+        var charY = positions[i][3];
+        if(inkLimit > 10) return;
+        if(!highlightFlash[tileY + "," + tileX]) {
+            highlightFlash[tileY + "," + tileX] = {};
+        }
+        if(!highlightFlash[tileY + "," + tileX][charY]) {
+            highlightFlash[tileY + "," + tileX][charY] = {};
+        }
+        if(!highlightFlash[tileY + "," + tileX][charY][charX]) {
+            highlightFlash[tileY + "," + tileX][charY][charX] = [Date.now(), 128];
+            inkLimit++;
+        }
     }
 }
 
 var flashAnimateInterval = setInterval(function() {
+    var tileGroup = {}; // tiles to re-render after highlight
     for(var tile in highlightFlash) {
         for(var charY in highlightFlash[tile]) {
             for(var charX in highlightFlash[tile][charY]) {
                 var data = highlightFlash[tile][charY][charX];
                 var time = data[0];
+                // after 500 milliseconds
                 if(Date.now() - time >= 500) {
                     delete highlightFlash[tile][charY][charX]
                     inkLimit--;
                 } else {
+                    // increase color brightness
                     highlightFlash[tile][charY][charX][1] += 2;
                     if(highlightFlash[tile][charY][charX][1] >= 255) {
                         highlightFlash[tile][charY][charX][1] = 255;
                     }
                 }
-                delete tilePixelCache[tile];
-                var pos = getPos(tile);
-                renderTile(pos[0], pos[1]);
+                // mark tile to re-render
+                tileGroup[tile] = 1;
             }
         }
+    }
+    // re-render tiles
+    var tileGroupCount = 0;
+    for(var i in tileGroup) {
+        delete tilePixelCache[i];
+        tileGroupCount++;
+    }
+    if(tileGroupCount > 0) {
+        renderTiles();
     }
 })
 
@@ -691,6 +971,47 @@ function blankTile() {
             color: blankColor()
         }
     };
+}
+
+// format:
+/*
+    {
+        "tileY,tileX": {
+            charY: {
+                charX: colorCode,
+                etc...
+            },
+            etc...
+        },
+        etc...
+    }
+*/
+var coloredChars = {};
+
+function colorChar(tileX, tileY, charX, charY, color) {
+    if(!coloredChars[tileY + "," + tileX]) {
+        coloredChars[tileY + "," + tileX] = {};
+    }
+    if(!coloredChars[tileY + "," + tileX][charY]) {
+        coloredChars[tileY + "," + tileX][charY] = {};
+    }
+    coloredChars[tileY + "," + tileX][charY][charX] = color;
+}
+
+function uncolorChar(tileX, tileY, charX, charY) {
+    if(coloredChars[tileY + "," + tileX]) {
+        if(coloredChars[tileY + "," + tileX][charY]) {
+            if(coloredChars[tileY + "," + tileX][charY][charX]) {
+                delete coloredChars[tileY + "," + tileX][charY][charX];
+            }
+            if(Object.keys(coloredChars[tileY + "," + tileX][charY]).length == 0) {
+                delete coloredChars[tileY + "," + tileX][charY];
+            }
+        }
+        if(Object.keys(coloredChars[tileY + "," + tileX]).length == 0) {
+            delete coloredChars[tileY + "," + tileX];
+        }
+    }
 }
 
 function renderTile(tileX, tileY) {
@@ -781,6 +1102,17 @@ function renderTile(tileX, tileY) {
 
     for(var y = 0; y < 8; y++) {
         for(var x = 0; x < 16; x++) {
+            // fill background if defined
+            if(coloredChars[str]) {
+                if(coloredChars[str][y]) {
+                    if(coloredChars[str][y][x]) {
+                        var color = coloredChars[str][y][x];
+                        textRender.fillStyle = color;
+                        textRender.fillRect(x * 10, y * 18, 10, 18);
+                    }
+                }
+            }
+
             // highlight flash animation
             if(highlight[y]) {
                 if(highlight[y][x] !== void 0) {
@@ -879,38 +1211,49 @@ function buildMenu() {
     }, function() {
         return $("#coords").hide();
     });
-    var _this = {} // TEMPORARY
     menu.addOption("Change color", w.color);
     if (Permissions.can_go_to_coord(state.userModel, state.worldModel)) {
         menu.addOption("Go to coordinates", w.goToCoord);
     }
     if (Permissions.can_coordlink(state.userModel, state.worldModel)) {
-        menu.addOption("Create link to coordinates", _this.coordLink);
+        menu.addOption("Create link to coordinates", w.coordLink);
     }
     if (Permissions.can_urllink(state.userModel, state.worldModel)) {
-        menu.addOption("Create link to URL", _this.urlLink);
+        menu.addOption("Create link to URL", w.urlLink);
     }
     if (Permissions.can_admin(state.userModel, state.worldModel)) {
         menu.addOption("Make an area owner-only", function() {
-            return _this.protectATile("owner-only");
+            return w.doProtect("owner-only");
         });
     }
     if (Permissions.can_protect_tiles(state.userModel, state.worldModel)) {
         menu.addOption("Make an area member-only", function() {
-            return _this.protectATile("member-only");
+            return w.doProtect("member-only");
         });
         menu.addOption("Make an area public", function() {
-            return _this.protectATile("public");
+            return w.doProtect("public");
         });
-        return menu.addOption("Default area protection", _this.unprotectATile);
+        return menu.addOption("Default area protection", w.doUnprotect);
     }
 }
 
 document.onselectstart = function() {
     return w._state.uiModal;
 }
+// [tileX, tileY, charX, charY]
+var lastLinkHover = null;
+// [tileX, tileY]
+var lastTileHover = null;
 
 var w = {
+    isLinking: false,
+    isProtecting: false,
+    url_input: "",
+    coord_input_x: 0,
+    coord_input_y: 0,
+    link_input_type: 0, // 0 = link, 1 = coord,
+    protect_type: null, // null = unprotect, 0 = public, 1 = member, 2 = owner
+    protect_bg: "",
     _state: state,
     _ui: {
 		announce: $("#announce"),
@@ -985,11 +1328,54 @@ var w = {
     },
     getCenterCoords: function() {
         return [-positionY / 144, -positionX / 160]
+    },
+    doUrlLink: function(url) {
+        if(w.isLinking || w.isProtecting) return;
+        w.url_input = url;
+        owot.style.cursor = "pointer";
+        w.isLinking = true;
+        w.link_input_type = 0;
+    },
+    urlLink: function() {
+        w._ui.urlInputModal.open(w.doUrlLink.bind(w));
+    },
+    doCoordLink: function(y, x) {
+        if(w.isLinking || w.isProtecting) return;
+        w.coord_input_x = x;
+        w.coord_input_y = y;
+        owot.style.cursor = "pointer";
+        w.isLinking = true;
+        w.link_input_type = 1;
+    },
+    coordLink: function() {
+        w._ui.coordinateInputModal.open("Enter the coordinates to create a link to. You can then click on a letter to create the link.", w.doCoordLink.bind(w));
+    },
+    doProtect: function(protectType, unprotect) {
+        if(w.isLinking || w.isProtecting) return;
+        owot.style.cursor = "pointer";
+        w.protect_bg = {
+            "owner-only": "#ddd",
+            "member-only": "#eee",
+            "public": "#fff"
+        }[protectType];
+        w.isProtecting = true;
+        if(unprotect) {
+            w.protect_type = null;
+        } else if(protectType == "owner-only") {
+            w.protect_type = 2;
+        } else if(protectType == "member-only") {
+            w.protect_type = 1;
+        } else if(protectType == "public") {
+            w.protect_type = 0;
+        }
+    },
+    doUnprotect: function() {
+        w.doProtect("public", true);
     }
 }
 
 w._state.goToCoord = {};
-w._state.uiModal = false;
+w._state.uiModal = false; // is the UI open? (coord, url, go to coord)
 
 buildMenu();
 
@@ -999,6 +1385,19 @@ $(document).bind("simplemodal_onopen", function() {
 $(document).bind("simplemodal_onclose", function() {
     return w._state.uiModal = false;
 });
+
+var tellEdit = [];
+function searchTellEdit(tileX, tileY, charX, charY) {
+    for(var i = 0; i < tellEdit.length; i++) {
+        if(tellEdit[i][0] == tileX &&
+            tellEdit[i][1] == tileY &&
+            tellEdit[i][2] == charX &&
+            tellEdit[i][3] == charY) {
+            return true;
+        }
+    }
+    return false;
+}
 
 var ws_functions = {
     fetch: function(data) {
@@ -1015,5 +1414,67 @@ var ws_functions = {
     },
     colors: function(data) {
 
-    }
+    },
+    tileUpdate: function(data) {
+        var highlights = [];
+        for(i in data.tiles) {
+            // if tile isn't loaded, load it blank
+            if(!tiles[i]) {
+                tiles[i] = blankTile();
+            }
+            if(!data.tiles[i]) {
+                data.tiles[i] = blankTile();
+            }
+            var pos = getPos(i);
+            var tileX = pos[1];
+            var tileY = pos[0];
+
+            var newContent = blank;
+            var newColors = newColorArray();
+            // get content and colors from new tile data
+            if(data.tiles[i]) {
+                newContent = data.tiles[i].content
+                if(data.tiles[i].properties.color) {
+                    newColors = data.tiles[i].properties.color;
+                }
+            }
+            var oldContent = tiles[i].content;
+            var oldColors = tiles[i].properties.color.slice(0);
+            newContent = advancedSplit(newContent);
+            oldContent = advancedSplit(oldContent);
+            var charX = 0;
+            var charY = 0;
+            // compare data
+            for(var g = 0; g < 128; g++) {
+                var oChar = oldContent[g];
+                var nChar = newContent[g];
+                var oCol = oldColors[g];
+                var nCol = newColors[g];
+                if(oChar != nChar || oCol != nCol) {
+                    // make sure it won't overwrite the clients changes before they get sent
+                    if(!searchTellEdit(tileX, tileY, charX, charY)) {
+                        oldContent[g] = nChar;
+                        oldColors[g] = nCol;
+                    }
+                    highlights.push([tileX, tileY, charX, charY]);
+                }
+                charX++;
+                if(charX >= 16) {
+                    charX = 0;
+                    charY++;
+                }
+            }
+            oldContent = oldContent.join("");
+            delete tilePixelCache[i];
+            tiles[i] = data.tiles[i];
+            tiles[i].content = oldContent;
+            tiles[i].properties.color = oldColors;
+            renderTile(tileX, tileY);
+        }
+        renderTiles();
+        if(highlights.length > 0) highlight(highlights);
+    }/*,
+    write: function(data) {
+        console.log(data)
+    }*/
 };

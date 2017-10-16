@@ -234,11 +234,17 @@ function create_date(time) {
 
 // sanitize number input
 function san_nbr(x) {
-    if(typeof x !== "number") {
-        x = parseInt(x);
-        if(!x) x = 0;
+    x -= 0;
+    if(x >= 9007199254740991) x = 9007199254740991;
+    if(x <= -9007199254740991) x = -9007199254740991;
+    x = parseInt(x);
+    if(!x || isNaN(x) || !isFinite) {
+        x = 0;
     }
-    return Math.floor(x);
+    x = Math.floor(x);
+    if(x >= 9007199254740991) x = 9007199254740991;
+    if(x <= -9007199254740991) x = -9007199254740991;
+    return x;
 }
 
 var announcement_cache = "";

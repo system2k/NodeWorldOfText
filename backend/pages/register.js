@@ -38,7 +38,7 @@ module.exports.POST = async function(req, serve, vars) {
     }
 
     var username = post_data.username;
-    var email = post_data.email;
+    var email = post_data.email.trim();
     var password1 = post_data.password1;
     var password2 = post_data.password2;
 
