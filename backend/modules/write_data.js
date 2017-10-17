@@ -2,7 +2,13 @@
 function advancedSplit(str) {
 	str += "";
 	var data = str.match(/([\uD800-\uDBFF][\uDC00-\uDFFF])|(([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+))|.|\n|\r/g)
-	if(data == null) return [];
+    if(data == null) return [];
+    for(var i = 0; i < data.length; i++) {
+        // contains surrogates without second character?
+        if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
+            data.splice(i, 1)
+        }
+    }
 	return data;
 }
 
@@ -16,7 +22,14 @@ function insert_char_at_index(string, char, index) {
             string[index + i] = char[i];
         }
     }
+    // in case surrogate-character count exceeds 128
     string = string.slice(0, 128);
+    string = string.join("");
+    // just to be sure. this makes sure the splitted result is always 128 in length (any better way?!)
+    // inputting certain surrogate characters without the second character may cause it to behave weird
+    string = advancedSplit(string);
+    if(string.length > 128) string = string.slice(0, 128);
+    if(string.length < 128) string = string.concat(Array(128).fill(" ")).slice(0, 128);
     string = string.join("");
     return string;
 }

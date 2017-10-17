@@ -71,7 +71,7 @@ module.exports.POST = async function(req, serve, vars, params) {
     if(protect_type == null && can_member) {
         writability = null;
     }
-    var content = " ".repeat();
+    var content = " ".repeat(128);
     var properties = "{}";
     if(tile) { // tile exists, update
         content = tile.content;

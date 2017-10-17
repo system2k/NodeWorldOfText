@@ -1272,8 +1272,6 @@ function start_server() {
             }))
             ws.on("error", function(err) {
                 http_s_log.push("[ws] An error occured: " + err);
-                console.log("A connection error occured inside WS. Check console for more info.",
-                    Date.now());
                 log_error(JSON.stringify(process_error_arg(err)));
             });
             onMessage = async function(msg) {
@@ -1335,7 +1333,6 @@ function start_server() {
 
 function handle_ws_error(e) {
     log_error(JSON.stringify(process_error_arg(e)));
-    console.log("An error occured [" + Date.now() + "] Check the logs for more information")
 }
 
 var global_data = {

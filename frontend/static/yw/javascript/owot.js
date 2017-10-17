@@ -308,12 +308,15 @@ function is_link(tileX, tileY, charX, charY) {
 function advancedSplit(str) {
 	str += "";
 	var data = str.match(/([\uD800-\uDBFF][\uDC00-\uDFFF])|(([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+))|.|\n|\r/g)
-	if(data == null) return [];
+    if(data == null) return [];
+    for(var i = 0; i < data.length; i++) {
+        // contains surrogates without second character?
+        if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
+            data.splice(i, 1)
+        }
+    }
 	return data;
 }
-
-var blank = "";
-for(var i = 0; i < 128; i++) blank += " ";
 
 function containsNewLine(char) {
     for(var i = 0; i < char.length; i++) {
@@ -378,6 +381,9 @@ function moveCursor(direction) {
 }
 
 function writeChar(char, doNotMoveCursor) {
+    char = advancedSplit(char);
+    char = char[0];
+    if(char == void 0) return;
     if(cursorCoords) {
         var tileX = cursorCoords[0];
         var tileY = cursorCoords[1];
@@ -419,11 +425,7 @@ function writeChar(char, doNotMoveCursor) {
             if(color) {
                 editArray.push(YourWorld.Color);
             }
-            var tellEditColor = color;
-            if(!tellEditColor) {
-                tellEditColor = 0;
-            }
-            tellEdit.push([tileX, tileY, charX, charY, char, tellEditColor, nextObjId]);
+            tellEdit.push([tileX, tileY, charX, charY, nextObjId]);
             writeBuffer.push(editArray);
             nextObjId++;
         }
@@ -955,12 +957,14 @@ var flashAnimateInterval = setInterval(function() {
     var tileGroupCount = 0;
     for(var i in tileGroup) {
         delete tilePixelCache[i];
+        var pos = getPos(i);
+        renderTile(pos[1], pos[0]);
         tileGroupCount++;
     }
-    if(tileGroupCount > 0) {
-        renderTiles();
-    }
-})
+}, 1)
+
+var blank = "";
+for(var i = 0; i < 128; i++) blank += " ";
 
 function blankTile() {
     return {
@@ -969,7 +973,8 @@ function blankTile() {
             cell_props: {},
             writability: null,
             color: blankColor()
-        }
+        },
+        initted: false
     };
 }
 
@@ -1163,10 +1168,11 @@ function renderTile(tileX, tileY) {
                 } else if(char == "▄") {
                     textRender.fillRect(x*10, y*18 + 9, 10, 9);
                 } else if(char == "▌") {
-                    textRender.fillRect(x*10, y*18 + 9, 5, 18);
+                    textRender.fillRect(x*10, y*18, 5, 18);
                 } else if(char == "▐") {
-                    textRender.fillRect(x*10 + 5, y*18 + 9, 5, 18);
+                    textRender.fillRect(x*10 + 5, y*18, 5, 18);
                 } else {
+                    if(!char) char = " ";
                     if(char.length > 1) textRender.font = "16px sans-serif";
                     textRender.fillText(char, x*10, y*18 + 13)
                     if(char.length > 1) textRender.font = font;
@@ -1371,7 +1377,9 @@ var w = {
     },
     doUnprotect: function() {
         w.doProtect("public", true);
-    }
+    },
+    typeChar: writeChar,
+    socketChannel: null
 }
 
 w._state.goToCoord = {};
@@ -1387,6 +1395,7 @@ $(document).bind("simplemodal_onclose", function() {
 });
 
 var tellEdit = [];
+// tileX, tileY, charX, charY, editID
 function searchTellEdit(tileX, tileY, charX, charY) {
     for(var i = 0; i < tellEdit.length; i++) {
         if(tellEdit[i][0] == tileX &&
@@ -1403,6 +1412,8 @@ var ws_functions = {
     fetch: function(data) {
         for(var i in data.tiles) {
             tiles[i] = data.tiles[i];
+            if(!tiles[i]) tiles[i] = blankTile();
+            tiles[i].initted = true;
             // re-render tile
             delete tilePixelCache[i];
         }
@@ -1424,6 +1435,12 @@ var ws_functions = {
             }
             if(!data.tiles[i]) {
                 data.tiles[i] = blankTile();
+            }
+            if(!data.tiles[i].properties.color) {
+                data.tiles[i].properties.color = blankColor();
+            }
+            if(!tiles[i].properties.color) {
+                tiles[i].properties.color = blankColor();
             }
             var pos = getPos(i);
             var tileX = pos[1];
@@ -1451,11 +1468,13 @@ var ws_functions = {
                 var oCol = oldColors[g];
                 var nCol = newColors[g];
                 if(oChar != nChar || oCol != nCol) {
-                    // make sure it won't overwrite the clients changes before they get sent
-                    if(!searchTellEdit(tileX, tileY, charX, charY)) {
+                    // make sure it won't overwrite the clients changes before they get sent.
+                    // if edits are from client, don't overwrite, but leave the highlight flashes
+                    if(!searchTellEdit(tileX, tileY, charX, charY) && !data.channel == w.socketChannel) {
                         oldContent[g] = nChar;
                         oldColors[g] = nCol;
                     }
+                    // briefly highlight these edits (10 at a time)
                     highlights.push([tileX, tileY, charX, charY]);
                 }
                 charX++;
@@ -1465,16 +1484,27 @@ var ws_functions = {
                 }
             }
             oldContent = oldContent.join("");
-            delete tilePixelCache[i];
-            tiles[i] = data.tiles[i];
-            tiles[i].content = oldContent;
-            tiles[i].properties.color = oldColors;
+            delete tilePixelCache[i]; // force tile to be redrawn
+            tiles[i] = data.tiles[i]; // update tile
+            tiles[i].content = oldContent; // update only necessary character updates
+            tiles[i].properties.color = oldColors; // update only necessary color updates
             renderTile(tileX, tileY);
         }
-        renderTiles();
         if(highlights.length > 0) highlight(highlights);
-    }/*,
+    },
     write: function(data) {
-        console.log(data)
-    }*/
+        // after user has written text, the client should expect list of all edit ids that passed
+        for(var i = 0; i < data.accepted.length; i++) {
+            for(var x = 0; x < tellEdit.length; x++) {
+                if(tellEdit[x][4] == data.accepted[i]) {
+                    tellEdit.splice(x, 1);
+                    // because the element has been removed, so the length of the array is shorter
+                    x--;
+                }
+            }
+        }
+    },
+    channel: function(data) {
+        w.socketChannel = data.sender;
+    }
 };
