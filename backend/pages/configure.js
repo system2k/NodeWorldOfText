@@ -218,12 +218,12 @@ module.exports.POST = async function(req, serve, vars) {
         ws_broadcast({
             kind: "colors",
             colors: {
-                cursor: cursor_color,
-                text: color,
-                member_area: member_color,
-                background: bg,
-                owner_area: owner_color,
-                menu: menu_color
+                cursor: cursor_color || "#ff0",
+                text: color || "#000",
+                member_area: member_color || "#eee",
+                background: bg || "#fff",
+                owner_area: owner_color || "#ddd",
+                menu: menu_color || "#e5e5ff"
             }
         }, world.name)
     }

@@ -1,6 +1,5 @@
 module.exports = {};
 
-var control_chars = "%_";
 function escape_control(str) {
     str += "";
     str = str.replace(/\\/g, "\\\\");

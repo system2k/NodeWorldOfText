@@ -18,7 +18,9 @@ var unloadedImage = new Image();
 unloadedImage.src = "/static/unloaded.png";
 unloadedImage.onload = function() {
     backImg.drawImage(unloadedImage, 0, 0);
-    images.unloaded = [removeAlpha(backImg.getImageData(0, 0, 16, 16).data), 16, 16];
+    var width = unloadedImage.width;
+    var height = unloadedImage.height;
+    images.unloaded = [removeAlpha(backImg.getImageData(0, 0, width, height).data), width, height];
     // one all the images are loaded
     renderTiles();
     begin();
@@ -67,7 +69,9 @@ canvasTextRender.height = 18 * 8;
 var textRender = canvasTextRender.getContext("2d");
 
 var cursorCoords = null;
+var cursorCoordsCurrent = [0, 0, 0, 0, "NOT_INITTED"]; // cursorCoords that don't reset to null
 var currentPosition = [0, 0, 0, 0];
+var currentPositionInitted = false;
 
 var positionX = 0;
 var positionY = 0;
@@ -91,6 +95,16 @@ var ws_path = ws_scheme + "://" + wsaddr + path + "/ws/";
 
 var styles = {};
 
+var menuStyle;
+function menu_color(color) {
+    // change menu color
+    if(!window.menuStyle) {
+        menuStyle = document.createElement("style")
+        $("head")[0].append(menuStyle)
+    }
+    menuStyle.innerHTML = "#menu.hover, #nav { background: " + color + "; }"
+}
+
 function begin() {
     // get world style
     jQuery.ajax({
@@ -99,12 +113,7 @@ function begin() {
         success: function(e) {
             createSocket();
             styles = e;
-
-            // change menu color
-            var menuStyle = document.createElement("style")
-            menuStyle.innerHTML = "#menu.hover, #nav { background: " + styles.menu + "; }"
-            $("head")[0].append(menuStyle)
-
+            menu_color(styles.menu);
             writability_styles = [styles.public, styles.member, styles.owner]
         },
         dataType: "json"
@@ -227,7 +236,8 @@ $(document).on("mousedown", function(e) {
 function renderCursor(coords) {
     var newTileX = coords[0];
     var newTileY = coords[1];
-    if(!(newTileY + "," + newTileX in tiles)) return false;
+    if(!tiles[newTileY + "," + newTileX]) return false;
+    if(!tiles[newTileY + "," + newTileX].initted) return false;
     var writability = null;
     if(tiles[newTileY + "," + newTileX]) {
         writability = tiles[newTileY + "," + newTileX].properties.writability;
@@ -255,8 +265,44 @@ function renderCursor(coords) {
         renderTile(tileX, tileY);
     }
     cursorCoords = coords;
+    cursorCoordsCurrent = coords;
     renderTile(coords[0], coords[1]);
+
+    var pixelX = (coords[0] * 160) + (coords[2] * 10) + positionX + (width / 2 | 0);
+    var pixelY = (coords[1] * 144) + (coords[3] * 18) + positionY + (height / 2 | 0);
+    
+    var diff = null;
+    var posXCompare = positionX;
+    var posYCompare = positionY;
+
+    if(pixelX < 0) { // cursor too far left
+        diff = Math.abs(pixelX);
+        positionX += diff;
+    }
+    if(pixelX + 10 >= width) { // cursor too far right
+        diff = Math.abs(width - pixelX);
+        positionX -= 10 - diff;
+    }
+    if(pixelY < 0) { // cursor too far up
+        diff = Math.abs(pixelY);
+        positionY += diff;
+    }
+    if(pixelY + 18 >= height) { // cursor too far down
+        diff = Math.abs(height - pixelY);
+        positionY -= 18 - diff;
+    }
+
+    if(diff != null && (posXCompare != positionX || posYCompare != positionY)) renderTiles()
 }
+
+// remove cursor from view
+function removeCursor() {
+    var remTileX = cursorCoords[0];
+    var remTileY = cursorCoords[1];
+    cursorCoords = null;
+    renderTile(remTileX, remTileY);
+}
+
 // tileX, charX
 var lastX = [0, 0];
 $(document).on("mouseup", function(e) {
@@ -270,10 +316,7 @@ $(document).on("mouseup", function(e) {
         if(renderCursor(pos) == false) {
             // cursor should be removed if on area where user cannot write
             if(cursorCoords) {
-                var remTileX = cursorCoords[0];
-                var remTileY = cursorCoords[1];
-                cursorCoords = null;
-                renderTile(remTileX, remTileY);
+                removeCursor();
             }
         }
     };
@@ -381,14 +424,18 @@ function moveCursor(direction) {
 }
 
 function writeChar(char, doNotMoveCursor) {
+    var cursor = cursorCoords;
+    if(!cursor && (char == "\n" || char == "\r")) {
+        cursor = cursorCoordsCurrent;
+    }
     char = advancedSplit(char);
     char = char[0];
     if(char == void 0) return;
-    if(cursorCoords) {
-        var tileX = cursorCoords[0];
-        var tileY = cursorCoords[1];
-        var charX = cursorCoords[2];
-        var charY = cursorCoords[3];
+    if(cursor) {
+        var tileX = cursor[0];
+        var tileY = cursor[1];
+        var charX = cursor[2];
+        var charY = cursor[3];
         var newLine = containsNewLine(char);
         if(!newLine) {
             if(!tiles[tileY + "," + tileX]) {
@@ -431,7 +478,7 @@ function writeChar(char, doNotMoveCursor) {
         }
         if(!doNotMoveCursor) {
             // get copy of cursor coordinates
-            var cSCopy = cursorCoords.slice();
+            var cSCopy = cursor.slice();
             // move cursor to right
             cSCopy[2]++;
             if(cSCopy[2] >= 16) {
@@ -471,6 +518,7 @@ setInterval(function() {
     };
     if (Permissions.can_paste(state.userModel, state.worldModel)) {
         write_busy = true;
+        // pasting feature
         pasteInterval = setInterval(function() {
             writeChar(value[index]);
             index++
@@ -508,6 +556,7 @@ $(document).on("keydown", function(e) {
     } else if(key == 27) { // esc
         stopLinkUI();
         stopTileUI();
+        removeCursor();
     }
 })
 
@@ -541,21 +590,24 @@ function getRange(x1, y1, x2, y2) {
     return coords;
 }
 
-function getVisibleTiles() {
-    var A = getTileCoordsFromMouseCoords(0, 0);
-    var B = getTileCoordsFromMouseCoords(width - 1, height - 1);
+function getVisibleTiles(margin) {
+    if(!margin) margin = 0;
+    var A = getTileCoordsFromMouseCoords(0 - margin, 0 - margin);
+    var B = getTileCoordsFromMouseCoords(width - 1 + margin, height - 1 + margin);
     return getRange(A[0], A[1], B[0], B[1]);
 }
 
-function getWidth() {
-    var A = getTileCoordsFromMouseCoords(0, 0);
-    var B = getTileCoordsFromMouseCoords(width - 1, 0);
+function getWidth(margin) {
+    if(!margin) margin = 0;
+    var A = getTileCoordsFromMouseCoords(0 - margin, 0);
+    var B = getTileCoordsFromMouseCoords(width - 1 + margin, 0);
     return B[0] - A[0] + 1;
 }
 
-function getHeight() {
-    var A = getTileCoordsFromMouseCoords(0, 0);
-    var B = getTileCoordsFromMouseCoords(0, height - 1);
+function getHeight(margin) {
+    if(!margin) margin = 0;
+    var A = getTileCoordsFromMouseCoords(0, 0 - margin);
+    var B = getTileCoordsFromMouseCoords(0, height - 1 + margin);
     return B[1] - A[1] + 1;
 }
 
@@ -589,6 +641,7 @@ var lastRender = 0;
 $(document).on("mousemove", function(e) {
     var coords = getTileCoordsFromMouseCoords(e.pageX, e.pageY)
     currentPosition = coords;
+    currentPositionInitted = true;
     var tileX = coords[0];
     var tileY = coords[1];
     var charX = coords[2];
@@ -675,6 +728,18 @@ $(document).on("mousemove", function(e) {
     positionX = dragPosX + (posX - dragStartX);
     positionY = dragPosY + (posY - dragStartY);
 
+    renderTiles();
+})
+$(document).on("wheel", function(e) {
+    if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
+    var deltaX = e.originalEvent.deltaX;
+    var deltaY = e.originalEvent.deltaY;
+    if(e.shiftKey) { // if shift, scroll sideways
+        deltaX = deltaY;
+        deltaY = 0;
+    }
+    positionY -= deltaY;
+    positionX -= deltaX;
     renderTiles();
 })
 
@@ -799,7 +864,8 @@ function createSocket() {
 
 // fetches only unloaded tiles
 function getAndFetchTiles() {
-    var data = getVisibleTiles();
+    var margin = 200;
+    var data = getVisibleTiles(margin);
     
     var startX = data[0][0];
     var startY = data[0][1];
@@ -815,7 +881,7 @@ function getAndFetchTiles() {
             tiles[coord] = null;
         }
     }
-    var width = getWidth();
+    var width = getWidth(margin);
     var height = Math.floor(map.length / width);
     var ranges = cutRanges(map, width, height);
 
@@ -956,7 +1022,6 @@ var flashAnimateInterval = setInterval(function() {
     // re-render tiles
     var tileGroupCount = 0;
     for(var i in tileGroup) {
-        delete tilePixelCache[i];
         var pos = getPos(i);
         renderTile(pos[1], pos[0]);
         tileGroupCount++;
@@ -1086,6 +1151,21 @@ function renderTile(tileX, tileY) {
         ctx.fillRect(offsetX + charX * 10, offsetY + charY * 18, 10, 18);
     }
 
+    var highlight = highlightFlash[str];
+    if(!highlight) highlight = {};
+
+    for(var y = 0; y < 8; y++) {
+        for(var x = 0; x < 16; x++) {
+            // highlight flash animation
+            if(highlight[y]) {
+                if(highlight[y][x] !== void 0) {
+                    ctx.fillStyle = "rgb(255, 255, " + highlight[y][x][1] + ")";
+                    ctx.fillRect(offsetX + x * 10, offsetY + y * 18, 10, 18);
+                }
+            }
+        }
+    }
+
     // tile is null, so don't add text/color data
     if(!tile) return;
     // tile is already written
@@ -1102,8 +1182,6 @@ function renderTile(tileX, tileY) {
     if(!props) props = {};
 
     content = advancedSplit(content);
-    var highlight = highlightFlash[str];
-    if(!highlight) highlight = {};
 
     for(var y = 0; y < 8; y++) {
         for(var x = 0; x < 16; x++) {
@@ -1115,14 +1193,6 @@ function renderTile(tileX, tileY) {
                         textRender.fillStyle = color;
                         textRender.fillRect(x * 10, y * 18, 10, 18);
                     }
-                }
-            }
-
-            // highlight flash animation
-            if(highlight[y]) {
-                if(highlight[y][x] !== void 0) {
-                    textRender.fillStyle = "rgb(255, 255, " + highlight[y][x][1] + ")";
-                    textRender.fillRect(x * 10, y * 18, 10, 18);
                 }
             }
 
@@ -1379,7 +1449,13 @@ var w = {
         w.doProtect("public", true);
     },
     typeChar: writeChar,
-    socketChannel: null
+    socketChannel: null,
+    moveCursor: moveCursor
+}
+
+if (state.announce) {
+    w._ui.announce.html(w._state.announce);
+    w._ui.announce.show();
 }
 
 w._state.goToCoord = {};
@@ -1424,7 +1500,16 @@ var ws_functions = {
         renderTiles();
     },
     colors: function(data) {
-
+        // update all world colors
+        styles.public = data.colors.background;
+        styles.cursor = data.colors.cursor;
+        styles.member = data.colors.member_area;
+        styles.menu = data.colors.menu;
+        styles.owner = data.colors.owner_area;
+        styles.text = data.colors.text;
+        clearTiles();
+        renderTiles();
+        menu_color(styles.menu);
     },
     tileUpdate: function(data) {
         var highlights = [];
@@ -1485,7 +1570,7 @@ var ws_functions = {
             }
             oldContent = oldContent.join("");
             delete tilePixelCache[i]; // force tile to be redrawn
-            tiles[i] = data.tiles[i]; // update tile
+            tiles[i].properties = data.tiles[i].properties; // update tile
             tiles[i].content = oldContent; // update only necessary character updates
             tiles[i].properties.color = oldColors; // update only necessary color updates
             renderTile(tileX, tileY);
@@ -1506,5 +1591,13 @@ var ws_functions = {
     },
     channel: function(data) {
         w.socketChannel = data.sender;
+    },
+    announcement: function(data) {
+        if(data.text) {
+			w._ui.announce.html(data.text);
+			w._ui.announce.show();
+		} else {
+			w._ui.announce.hide();
+		}
     }
 };
