@@ -108,7 +108,10 @@ $(document).on("mousemove.tileProtectAuto", function() {
 })
 
 $("body").on("keydown.tileProtectAuto", function(e) {
-    if(e.keyCode === 83 && e.altKey) { // Alt + S to protect tiles
+    if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to protect tiles
+        if(e.ctrlKey) { // is Ctrl+S
+            e.preventDefault();
+        }
         var selected = tileProtectAuto.selected;
         var types = ["owner-only", "member-only", "public"];
         var keys = Object.keys(selected);
@@ -204,7 +207,10 @@ $(document).on("mousemove.linkAuto", function() {
 })
 
 $("body").on("keydown.linkAuto", function(e) {
-    if(e.keyCode === 83 && e.altKey) { // Alt + S to protect tiles
+    if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to add links
+        if(e.ctrlKey) { // is Ctrl+S
+            e.preventDefault();
+        }
         var selected = linkAuto.selected;
         var keys = Object.keys(selected);
         if(keys.length == 0) return;
@@ -911,7 +917,7 @@ $(document).on("mousemove", function(e) {
         var newCharX = currentPosition[2];
         var newCharY = currentPosition[3];
         if(tiles[newTileY + "," + newTileX]) {
-            colorChar(newTileX, newTileY, newCharX, newCharY, "#aaf");
+            colorChar(newTileX, newTileY, newCharX, newCharY, "#aaf", true);
             // re-render tile
             delete tilePixelCache[newTileY + "," + newTileX];
             renderTile(newTileX, newTileY);
@@ -1282,9 +1288,9 @@ function blankTile() {
 */
 var coloredChars = {};
 
-function colorChar(tileX, tileY, charX, charY, color) {
+function colorChar(tileX, tileY, charX, charY, color, is_link_hovers) {
     var pos = tileY + "," + tileX + "," + charY + "," + charX;
-    if(linkAuto.selected[pos]) return;
+    if(linkAuto.selected[pos] && is_link_hovers) return;
     if(!coloredChars[tileY + "," + tileX]) {
         coloredChars[tileY + "," + tileX] = {};
     }
