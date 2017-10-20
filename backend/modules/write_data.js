@@ -98,6 +98,9 @@ async function write_edits(args) {
     var user = args.user;
     var date = args.date;
     var upd_tiles = args.upd_tiles;
+    var edits_limit = args.edits_limit;
+    var is_owner = args.is_owner;
+    var is_member = args.is_member;
     
     var tile = await db.get("SELECT * FROM tile WHERE world_id=? AND tileY=? AND tileX=?",
         [world.id, tileY, tileX])
@@ -286,7 +289,10 @@ module.exports = async function(data, vars) {
                 accepted,
                 user,
                 date,
-                upd_tiles
+                upd_tiles,
+                edits_limit,
+                is_owner,
+                is_member
             };
             await write_edits(pass_args);
         } catch (e) {

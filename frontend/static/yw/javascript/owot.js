@@ -1404,6 +1404,7 @@ function renderTile(tileX, tileY) {
     // tile is already written
     if(tilePixelCache[str]) {
         textLayerCtx.putImageData(tilePixelCache[str], offsetX, offsetY)
+        //textLayerCtx.drawImage(canvasTextRender, offsetX, offsetY)
         return;
     }
     var content = tile.content;
