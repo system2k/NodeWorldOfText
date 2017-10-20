@@ -84,8 +84,8 @@ module.exports = async function(data, vars) {
             await db.each("SELECT * FROM edit WHERE world_id=? AND time<=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?",
                 [world.id, time, minY, minX, maxY, maxX], function(data) {
                 var con = JSON.parse(data.content);
-                for(var i in con) {
-                    var z = con[i]
+                for(var q in con) {
+                    var z = con[q]
                     if(!tiles[z[0] + "," + z[1]]) {
                         tiles[z[0] + "," + z[1]] = {
                             content: " ".repeat(128).split(""),
@@ -98,9 +98,9 @@ module.exports = async function(data, vars) {
                 }
             })
 
-            for(var i in tiles) {
-                if(tiles[i]) {
-                    tiles[i].content = tiles[i].content.join("");
+            for(var z in tiles) {
+                if(tiles[z]) {
+                    if(typeof tiles[z] == "object") tiles[z].content = tiles[z].content.join("");
                 }
             }
         } else {

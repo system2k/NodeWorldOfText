@@ -9,6 +9,7 @@ owot.style.cursor = "text";
 var width = window.innerWidth;
 var height = window.innerHeight;
 
+var pingInterval = 50; // in seconds
 var images = {};
 // [data RGB, width, height]
 
@@ -47,6 +48,223 @@ $("#coord_X").text(0);
 
 // edit ID
 var nextObjId = 1;
+
+var tileProtectAuto = {
+	selected: {},
+	selectedTile: null,
+	xPos: 0,
+	yPos: 0,
+	mode: 0,
+	ctrlDown: false,
+	shiftDown: false,
+	clearSelections: function() {
+		for(var i in tileProtectAuto.selected){
+            tiles[i].backgroundColor = "";
+			delete tileProtectAuto.selected[i];
+		}
+	},
+	active: false
+}
+
+var linkAuto = {
+	selected: {},
+	ctrlDown: 0,
+	shiftDown: 0,
+	mode: 0,
+	url: "",
+	coordTileX: 0,
+	coordTileY: 0,
+	active: false
+}
+
+// Fast tile protecting
+$(document).on("mousemove.tileProtectAuto", function() {
+    if(!tileProtectAuto.active) return;
+    var tile = tiles[currentPosition[1] + "," + currentPosition[0]];
+    if(!tile) return;
+    if(!tile.initted) return;
+    tileProtectAuto.selectedTile = tile;
+    var tileX = currentPosition[0];
+    var tileY = currentPosition[1];
+    tileProtectAuto.xPos = tileX;
+    tileProtectAuto.yPos = tileY;
+    if(tileProtectAuto.ctrlDown) {
+        var mode = tileProtectAuto.mode;
+        tileProtectAuto.selected[tileY + "," + tileX] = [mode, tile];
+        if (mode === 0) tile.backgroundColor = "red";
+        if (mode === 1) tile.backgroundColor = "green";
+        if (mode === 2) tile.backgroundColor = "blue";
+        if (mode === 3) tile.backgroundColor = "teal";
+        renderTile(tileX, tileY);
+    }
+    if(tileProtectAuto.shiftDown) {
+        var pos = tileY + "," + tileX;
+        if(tileProtectAuto.selected[pos] !== void 0) {
+            tile.backgroundColor = ""
+            delete tileProtectAuto.selected[pos];
+            renderTile(tileX, tileY);
+        }
+    }
+})
+
+$("body").on("keydown.tileProtectAuto", function(e) {
+    if(e.keyCode === 83 && e.altKey) { // Alt + S to protect tiles
+        var selected = tileProtectAuto.selected;
+        var types = ["owner-only", "member-only", "public"];
+        var keys = Object.keys(selected);
+        if(keys.length == 0) return;
+        var i = 0;
+        function protectLoop() {
+            // get tileX/Y position from key
+            var pos = keys[i].split(",").map(Number);
+            var cstr = keys[i];
+            var prot = selected[cstr][0];
+
+            var tileX = pos[1];
+            var tileY = pos[0];
+            var ajaxStr = "/ajax/protect/"
+            if(prot == 3) ajaxStr = "/ajax/unprotect/"
+            
+            var data = {
+                world: state.worldModel.name,
+                tileY: tileY,
+                tileX: tileX
+            };
+            if(prot != 3) { // if unprotect type
+                data.type = types[prot];
+            }
+            jQuery.ajax({
+                type: "POST",
+                url: ajaxStr,
+                data: data
+            }).done(function(){
+                selected[cstr][1].backgroundColor = "";
+                renderTile(tileX, tileY);
+                delete selected[cstr];
+                // advance the loop
+                i++;
+                if(i < keys.length) {
+                    protectLoop();
+                }
+            });
+        }
+        protectLoop()
+    } else {
+        tileProtectAuto.ctrlDown = e.ctrlKey;
+        tileProtectAuto.shiftDown = e.shiftKey;
+    }
+})
+
+$("body").on("keyup.tileProtectAuto", function(e) {
+    tileProtectAuto.ctrlDown = e.ctrlKey;
+    tileProtectAuto.shiftDown = e.shiftKey;
+})
+
+// Fast linking
+$(document).on("mousemove.linkAuto", function() {
+    if(!linkAuto.active) return;
+    var tile = tiles[currentPosition[1] + "," + currentPosition[0]];
+    if(!tile) return;
+    if(!tile.initted) return;
+    
+    var tileX, tileY, charX, charY;
+    
+    tileX = currentPosition[0];
+    tileY = currentPosition[1];
+    
+    charX = currentPosition[2];
+    charY = currentPosition[3];
+    
+    var color = "blue";
+    if(linkAuto.mode == 1) {
+        color = "green";
+    }
+
+    if(linkAuto.ctrlDown) {
+        colorChar(tileX, tileY, charX, charY, color);
+        delete tilePixelCache[tileY + "," + tileX];
+        renderTile(tileX, tileY);
+        var ar = [tileX, tileY, charX, charY, linkAuto.mode];
+        if(linkAuto.mode == 0) {
+            ar.push([linkAuto.url])
+        } else if(linkAuto.mode == 1) {
+            ar.push([linkAuto.coordTileX, linkAuto.coordTileY]);
+        }
+        linkAuto.selected[tileY + "," + tileX + "," + charY + "," + charX] = ar;
+    }
+    if(linkAuto.shiftDown) {
+        var elm = linkAuto.selected[tileY + "," + tileX + "," + charY + "," + charX];
+        if(elm !== void 0) {
+            uncolorChar(tileX, tileY, charX, charY);
+            delete tilePixelCache[tileY + "," + tileX];
+            renderTile(tileX, tileY);
+            delete linkAuto.selected[tileY + "," + tileX + "," + charY + "," + charX];
+        }
+    }
+})
+
+$("body").on("keydown.linkAuto", function(e) {
+    if(e.keyCode === 83 && e.altKey) { // Alt + S to protect tiles
+        var selected = linkAuto.selected;
+        var keys = Object.keys(selected);
+        if(keys.length == 0) return;
+        var i = 0;
+        function protectLoop() {
+            // get tileX/Y position from key
+            var pos = keys[i].split(",").map(Number);
+            var cstr = keys[i];
+
+            var tileX = pos[1];
+            var tileY = pos[0];
+            var charX = pos[3];
+            var charY = pos[2];
+
+            var mode = selected[cstr][4];
+            var linkData = selected[cstr][5];
+
+            var ajaxStr = "/ajax/urllink/";
+            if(mode == 1) ajaxStr = "/ajax/coordlink/";
+            
+            var data = {
+                world: state.worldModel.name,
+                tileY: tileY,
+                tileX: tileX,
+                charY: charY,
+                charX : charX
+            };
+            if(mode == 0) {
+                data.url = linkData[0];
+            } else if(mode == 1) {
+                data.link_tileX = linkData[0];
+                data.link_tileY = linkData[1];
+            }
+            jQuery.ajax({
+                type: "POST",
+                url: ajaxStr,
+                data: data
+            }).done(function(){
+                delete selected[cstr];
+                uncolorChar(tileX, tileY, charX, charY);
+                delete tilePixelCache[tileY + "," + tileX];
+                renderTile(tileX, tileY);
+                // advance the loop
+                i++;
+                if(i < keys.length) {
+                    protectLoop();
+                }
+            });
+        }
+        protectLoop()
+    } else {
+        linkAuto.ctrlDown = e.ctrlKey;
+        linkAuto.shiftDown = e.shiftKey;
+    }
+})
+
+$("body").on("keyup.linkAuto", function(e) {
+    linkAuto.ctrlDown = e.ctrlKey;
+    linkAuto.shiftDown = e.shiftKey;
+})
 
 $(window).on("resize", function(e) {
     width = window.innerWidth;
@@ -230,6 +448,7 @@ $(document).on("mousedown", function(e) {
     if(w.isProtecting) {
         doProtect();
     }
+    owot.style.cursor = "move";
 })
 
 // change cursor position
@@ -297,6 +516,7 @@ function renderCursor(coords) {
 
 // remove cursor from view
 function removeCursor() {
+    if(!cursorCoords) return; // no cursor?
     var remTileX = cursorCoords[0];
     var remTileY = cursorCoords[1];
     cursorCoords = null;
@@ -322,6 +542,7 @@ $(document).on("mouseup", function(e) {
     };
 
     isDragging = false;
+    owot.style.cursor = "text";
 })
 $(document).on("mouseleave", function(e) {
     isDragging = false;
@@ -557,6 +778,8 @@ $(document).on("keydown", function(e) {
         stopLinkUI();
         stopTileUI();
         removeCursor();
+        tileProtectAuto.active = false;
+        linkAuto.active = false;
     }
 })
 
@@ -636,7 +859,7 @@ linkElm.style.display = "block";
 linkElm.target = "_blank";
 linkElm.style.cursor = "pointer";
 
-var waitTimeout = 33;
+var waitTimeout = 0; // 0: no wait timeout
 var lastRender = 0;
 $(document).on("mousemove", function(e) {
     var coords = getTileCoordsFromMouseCoords(e.pageX, e.pageY)
@@ -699,7 +922,7 @@ $(document).on("mousemove", function(e) {
         if(lastTileHover) {
             var tileX = lastTileHover[0];
             var tileY = lastTileHover[1];
-            if(tiles[tileY + "," + tileX]) {
+            if(tiles[tileY + "," + tileX] && !tileProtectAuto.selected[tileY + "," + tileX]) {
                 tiles[tileY + "," + tileX].backgroundColor = "";
             }
             delete tilePixelCache[tileY + "," + tileX];
@@ -708,10 +931,8 @@ $(document).on("mousemove", function(e) {
         lastTileHover = currentPosition;
         var newTileX = currentPosition[0];
         var newTileY = currentPosition[1];
-        if(tiles[newTileY + "," + newTileX]) {
+        if(tiles[newTileY + "," + newTileX] && !tileProtectAuto.selected[newTileY + "," + newTileX]) {
             tiles[newTileY + "," + newTileX].backgroundColor = w.protect_bg;
-            // re-render tile
-            delete tilePixelCache[newTileY + "," + newTileX];
             renderTile(newTileX, newTileY);
         }
     }
@@ -843,8 +1064,10 @@ function cutRanges(map, width, height) {
     return ranges;
 }
 
+var pingTimeout;
 function createSocket() {
     socket = new ReconnectingWebSocket(ws_path);
+    w.socket = socket;
 
     socket.onmessage = function(msg) {
         var data = JSON.parse(msg.data);
@@ -859,6 +1082,7 @@ function createSocket() {
         fetchInterval = setInterval(function() {
             getAndFetchTiles();
         }, 300)
+        socket.send("2::"); // initial ping
     }
 }
 
@@ -1059,6 +1283,8 @@ function blankTile() {
 var coloredChars = {};
 
 function colorChar(tileX, tileY, charX, charY, color) {
+    var pos = tileY + "," + tileX + "," + charY + "," + charX;
+    if(linkAuto.selected[pos]) return;
     if(!coloredChars[tileY + "," + tileX]) {
         coloredChars[tileY + "," + tileX] = {};
     }
@@ -1069,7 +1295,8 @@ function colorChar(tileX, tileY, charX, charY, color) {
 }
 
 function uncolorChar(tileX, tileY, charX, charY) {
-    if(coloredChars[tileY + "," + tileX]) {
+    var pos = tileY + "," + tileX + "," + charY + "," + charX;
+    if(coloredChars[tileY + "," + tileX] && !linkAuto.selected[pos]) {
         if(coloredChars[tileY + "," + tileX][charY]) {
             if(coloredChars[tileY + "," + tileX][charY][charX]) {
                 delete coloredChars[tileY + "," + tileX][charY][charX];
@@ -1400,12 +1627,16 @@ var w = {
             renderTiles();
         };
         w._state.goToCoord.interval = setInterval(scroller, 25);
-        return $(document).trigger("YWOT_GoToCoord_start");
+        $(document).trigger("YWOT_GoToCoord_start");
     },
     getCenterCoords: function() {
         return [-positionY / 144, -positionX / 160]
     },
     doUrlLink: function(url) {
+        linkAuto.active = true;
+        linkAuto.mode = 0;
+        linkAuto.url = url;
+
         if(w.isLinking || w.isProtecting) return;
         w.url_input = url;
         owot.style.cursor = "pointer";
@@ -1416,6 +1647,11 @@ var w = {
         w._ui.urlInputModal.open(w.doUrlLink.bind(w));
     },
     doCoordLink: function(y, x) {
+        linkAuto.active = true;
+        linkAuto.mode = 1;
+        linkAuto.coordTileY = y;
+        linkAuto.coordTileX = x;
+
         if(w.isLinking || w.isProtecting) return;
         w.coord_input_x = x;
         w.coord_input_y = y;
@@ -1427,6 +1663,16 @@ var w = {
         w._ui.coordinateInputModal.open("Enter the coordinates to create a link to. You can then click on a letter to create the link.", w.doCoordLink.bind(w));
     },
     doProtect: function(protectType, unprotect) {
+        tileProtectAuto.active = true;
+		if(unprotect) { // default area protection
+			tileProtectAuto.mode = 3;
+		} else {
+			if(protectType == "owner-only") tileProtectAuto.mode = 0;
+			if(protectType == "member-only") tileProtectAuto.mode = 1;
+			if(protectType == "public") tileProtectAuto.mode = 2;
+        }
+        console.log(protectType, unprotect)
+
         if(w.isLinking || w.isProtecting) return;
         owot.style.cursor = "pointer";
         w.protect_bg = {
@@ -1507,7 +1753,7 @@ var ws_functions = {
         styles.menu = data.colors.menu;
         styles.owner = data.colors.owner_area;
         styles.text = data.colors.text;
-        clearTiles();
+        tilePixelCache = {};
         renderTiles();
         menu_color(styles.menu);
     },
@@ -1555,7 +1801,8 @@ var ws_functions = {
                 if(oChar != nChar || oCol != nCol) {
                     // make sure it won't overwrite the clients changes before they get sent.
                     // if edits are from client, don't overwrite, but leave the highlight flashes
-                    if(!searchTellEdit(tileX, tileY, charX, charY) && !data.channel == w.socketChannel) {
+
+                    if(!searchTellEdit(tileX, tileY, charX, charY) && data.channel != w.socketChannel) {
                         oldContent[g] = nChar;
                         oldColors[g] = nCol;
                     }
@@ -1599,5 +1846,11 @@ var ws_functions = {
 		} else {
 			w._ui.announce.hide();
 		}
+    },
+    ping: function() {
+        clearTimeout(pingTimeout);
+		pingTimeout = setTimeout(function() {
+			socket.send("2::");
+		}, pingInterval * 1000)
     }
 };

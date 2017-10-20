@@ -896,7 +896,7 @@ function transaction_obj(id) {
 
 process.on("uncaughtException", function(e) {
     fs.writeFileSync(settings.UNCAUGHT_PATH, JSON.stringify(process_error_arg(e)))
-    fs.writeFileSync(settings.REQ_LOG, JSON.stringify(http_s_log))
+    fs.writeFileSync(settings.REQ_LOG, JSON.stringify(http_s_log, null, 4))
     console.log("Uncaught error:", e);
     process.exit();
 });
@@ -1164,7 +1164,7 @@ function start_server() {
     var wss = new ws.Server({ server });
     ws_broadcast = function(data, world) {
         data = JSON.stringify(data)
-        http_s_log.push("[ws] Begin broadcast client, data size is" + data.length)
+        http_s_log.push("[ws] Begin broadcast client, data size is " + data.length)
         wss.clients.forEach(function each(client) {
             try {
                 if(client.readyState == ws.OPEN &&
@@ -1321,7 +1321,7 @@ function start_server() {
             }
             if(pre_queue.length > 0) {
                 for(var p = 0; p < pre_queue.length; p++) {
-                    onMessage(pre_queue[p]);
+                    onMessage(pre_queue[0]);
                     pre_queue.splice(p, 1)
                 }
             }

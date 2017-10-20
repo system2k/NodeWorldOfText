@@ -4,6 +4,7 @@
         <title>{{ page_title }}</title>
         <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="An infinite grid of text editable by any visitor.">
         <link type="text/css" rel="stylesheet" href="/static/yourworld.css">
         <link rel="shortcut icon" href="/static/favicon.png">
         {% for script in user.scripts %}
@@ -31,7 +32,7 @@
             X: <span id="coord_X"></span>
             Y: <span id="coord_Y"></span>
         </div>
-        <div id="coordinate_input_modal" style="display:none" ;>
+        <div id="coordinate_input_modal" style="display:none">
             <form method="get" action="#" id="coord_input_form">
                 <div id="coord_input_title" style="max-width:20em">Go to coordinates:</div>
                 <br>
@@ -89,15 +90,6 @@
         <script type="text/javascript" src="/static/yw/javascript/helpers.js"></script>
         <script type="text/javascript" src="/static/yw/javascript/permissions.js"></script>
         <script type="text/javascript" src="/static/yw/javascript/owot.js"></script>
-
-        <!--
-        
-        <script type="text/javascript" src="/static/yw/javascript/world.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/tile.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/tilestore.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/tileRenderer.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/begin.js"></script>
-        -->
         <script type="text/javascript" src="/static/jscolor.min.js"></script>
     </body>
 </html>

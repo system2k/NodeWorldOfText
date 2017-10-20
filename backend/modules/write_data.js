@@ -83,6 +83,122 @@ function resolve_queue(tileX, tileY, worldID) {
     }
 }
 
+async function write_edits(args) {
+    var i = args.i;
+    var db = args.db;
+    var free_queue = args.free_queue;
+    var tileX = args.tileX;
+    var tileY = args.tileY;
+    var world = args.world;
+    var rej_edits = args.rej_edits;
+    var tiles = args.tiles;
+    var can_write = args.can_write;
+    var san_nbr = args.san_nbr;
+    var accepted = args.accepted;
+    var user = args.user;
+    var date = args.date;
+    var upd_tiles = args.upd_tiles;
+    
+    var tile = await db.get("SELECT * FROM tile WHERE world_id=? AND tileY=? AND tileX=?",
+        [world.id, tileY, tileX])
+
+    var changes = tiles[i];
+    if(tile) {
+        var content = tile.content;
+        tile_data = content;
+        properties = JSON.parse(tile.properties)
+        writability = tile.writability;
+    } else {
+        writability = world.writability;
+    }
+    // tile is owner-only, but user is not owner
+    if(writability == 2 && !is_owner) {
+        rej_edits(changes)
+        free_queue();
+        return;
+    }
+
+    // tile is member-only, but user is not member (nor owner)
+    if(writability == 1 && !is_owner && !is_member) {
+        rej_edits(changes)
+        free_queue();
+        return;
+    }
+
+    // this tile has no protection settings, and this user has no write perms
+    if(writability == null && !can_write) {
+        rej_edits(changes)
+        free_queue();
+        return;
+    }
+    for(var e = 0; e < changes.length; e++) {
+        var charY = san_nbr(changes[e][2]);
+        var charX = san_nbr(changes[e][3]);
+        if(charX < 0) charX = 0;
+        if(charX >= 16) charX = 16;
+        if(charY < 0) charY = 0;
+        if(charY >= 8) charY = 8;
+        var char = changes[e][5];
+        accepted.push(changes[e][6]);
+        var color = changes[e][7];
+        if(Array.isArray(color)) {
+            color = color.slice(0, 128);
+            for(var g = 0; g < color.length; g++) {
+                color[g] = sanitize_color(color[g]);
+            }
+        } else {
+            color = sanitize_color(color);
+        }
+        if(typeof char !== "string") {
+            char = "?";
+        }
+        var offset = charY * 16 + charX;
+        tile_data = insert_char_at_index(tile_data, char, offset);
+        if(!properties.color) {
+            properties.color = Array(128).fill(0)
+        }
+        if(Array.isArray(color)) {
+            var color_index = 0;
+            for(var s = charY*16 + charX; s < 128; s++) {
+                if(color[color_index] !== -1) {
+                    properties.color[s] = color[color_index];
+                }
+                color_index++;
+            }
+        } else {
+            if(color !== -1) {
+                properties.color[charY*16 + charX] = color;
+            }
+        }
+
+        if(properties.cell_props) {
+            if(properties.cell_props[charY]) {
+                if(properties.cell_props[charY][charX]) {
+                    properties.cell_props[charY][charX] = {};
+                }
+            }
+        }
+    }
+    if(tile) { // tile exists, update
+        await db.run("UPDATE tile SET (content, properties)=(?, ?) WHERE world_id=? AND tileY=? AND tileX=?",
+            [tile_data, JSON.stringify(properties), world.id, tileY, tileX])
+    } else { // tile doesn't exist, insert
+        await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, null, ?)",
+            [world.id, tile_data, tileY, tileX, JSON.stringify(properties), date])
+    }
+    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)", // log the edit
+        [user.id, world.id, tileY, tileX, date, JSON.stringify(changes)])
+
+    // return updated tiles to client
+    upd_tiles[tileY + "," + tileX] = {
+        content: tile_data,
+        properties: Object.assign(properties, {
+            writability
+        })
+    }
+    free_queue();
+}
+
 module.exports = async function(data, vars) {
     var db = vars.db;
     var user = vars.user;
@@ -150,101 +266,33 @@ module.exports = async function(data, vars) {
             await wait_queue(tileX, tileY, world.id); // wait for previous tile to finish
         }
         in_queue.push([tileX, tileY, world.id]);
-
-        var tile = await db.get("SELECT * FROM tile WHERE world_id=? AND tileY=? AND tileX=?",
-            [world.id, tileY, tileX])
-
-        var changes = tiles[i];
-        if(tile) {
-            var content = tile.content;
-            tile_data = content;
-            properties = JSON.parse(tile.properties)
-            writability = tile.writability;
-        } else {
-            writability = world.writability;
+        function free_queue() {
+            resolve_queue(tileX, tileY, world.id);
+            rem_queue(tileX, tileY, world.id);
         }
-        // tile is owner-only, but user is not owner
-        if(writability == 2 && !is_owner) {
-            rej_edits(changes)
-            continue; // next tile
+        // write the edits with caution
+        try {
+            var pass_args = {
+                i,
+                db,
+                free_queue,
+                tileX,
+                tileY,
+                world,
+                rej_edits,
+                tiles,
+                can_write,
+                san_nbr,
+                accepted,
+                user,
+                date,
+                upd_tiles
+            };
+            await write_edits(pass_args);
+        } catch (e) {
+            free_queue();
+            throw e;
         }
-
-        // tile is member-only, but user is not member (nor owner)
-        if(writability == 1 && !is_owner && !is_member) {
-            rej_edits(changes)
-            continue;
-        }
-
-        // this tile has no protection settings, and this user has no write perms
-        if(writability == null && !can_write) {
-            rej_edits(changes)
-            continue;
-        }
-        for(var e = 0; e < changes.length; e++) {
-            var charY = san_nbr(changes[e][2]);
-            var charX = san_nbr(changes[e][3]);
-            if(charX < 0) charX = 0;
-            if(charX >= 16) charX = 16;
-            if(charY < 0) charY = 0;
-            if(charY >= 8) charY = 8;
-            var char = changes[e][5];
-            accepted.push(changes[e][6]);
-            var color = changes[e][7];
-            if(Array.isArray(color)) {
-                color = color.slice(0, 128);
-                for(var g = 0; g < color.length; g++) {
-                    color[g] = sanitize_color(color[g]);
-                }
-            } else {
-                color = sanitize_color(color);
-            }
-            if(typeof char !== "string") {
-                char = "?";
-            }
-            var offset = charY * 16 + charX;
-            tile_data = insert_char_at_index(tile_data, char, offset);
-            if(!properties.color) {
-                properties.color = Array(128).fill(0)
-            }
-            if(Array.isArray(color)) {
-                var color_index = 0;
-                for(var s = charY*16 + charX; s < 128; s++) {
-                    if(color[color_index] !== -1) {
-                        properties.color[s] = color[color_index];
-                    }
-                    color_index++;
-                }
-            } else {
-                if(color !== -1) {
-                    properties.color[charY*16 + charX] = color;
-                }
-            }
-
-            if(properties.cell_props) {
-                if(properties.cell_props[charY]) {
-                    if(properties.cell_props[charY][charX]) {
-                        properties.cell_props[charY][charX] = {};
-                    }
-                }
-            }
-        }
-        if(tile) { // tile exists, update
-            await db.run("UPDATE tile SET (content, properties)=(?, ?) WHERE world_id=? AND tileY=? AND tileX=?",
-                [tile_data, JSON.stringify(properties), world.id, tileY, tileX])
-        } else { // tile doesn't exist, insert
-            await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, null, ?)",
-                [world.id, tile_data, tileY, tileX, JSON.stringify(properties), date])
-        }
-        await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)", // log the edit
-            [user.id, world.id, tileY, tileX, date, JSON.stringify(changes)])
-        upd_tiles[tileY + "," + tileX] = {
-            content: tile_data,
-            properties: Object.assign(properties, {
-                writability
-            })
-        }
-        resolve_queue(tileX, tileY, world.id);
-        rem_queue(tileX, tileY, world.id);
     }
     await transaction.end();
 
