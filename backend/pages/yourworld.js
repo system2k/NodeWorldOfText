@@ -41,12 +41,14 @@ module.exports.GET = async function(req, serve, vars, params) {
         }, vars)
         serve(JSON.stringify(tiles))
     } else { // the HTML page
-        if(!world_properties.views) {
-            world_properties.views = 0;
+        if(!read_permission.access_denied) {
+            if(!world_properties.views) {
+                world_properties.views = 0;
+            }
+            world_properties.views++;
+            await db.run("UPDATE world SET properties=? WHERE id=?",
+                [JSON.stringify(world_properties), world.id])
         }
-        world_properties.views++;
-        await db.run("UPDATE world SET properties=? WHERE id=?",
-            [JSON.stringify(world_properties), world.id])
 
         var state = {
             userModel: {
@@ -71,6 +73,9 @@ module.exports.GET = async function(req, serve, vars, params) {
         }
         if(announcement) {
             state.announce = announcement;
+        }
+        if(read_permission.access_denied) {
+            state.announce = "You are viewing a private world as an administrator";
         }
         if(params.timemachine) {
             state.worldModel.writability = 0;

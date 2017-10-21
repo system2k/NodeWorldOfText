@@ -790,22 +790,25 @@ async function can_view_world(world, user) {
     var permissions = {
         member: false,
         owner: false,
-        can_write: false
+        can_write: false,
+        access_denied: false // superusers can access private worlds (but not write)
     };
 
     var is_owner = world.owner_id == user.id;
     var superuser = user.superuser;
 
-    if(world.readability == 2 && !is_owner && !superuser) { // owner only
-        return false;
+    if(world.readability == 2 && !is_owner) { // owner only
+        permissions.access_denied = true;
+        if(!superuser) return false;
     }
 
     var is_member = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
         [world.id, user.id])
 
     // members (and owners) only
-    if(world.readability == 1 && !is_member && !is_owner && !superuser) {
-        return false;
+    if(world.readability == 1 && !is_member && !is_owner) {
+        permissions.access_denied = true;
+        if(!superuser) return false;
     }
 
     permissions.member = !!is_member; // !! because is_member is not a boolean
