@@ -2,8 +2,8 @@ function generateDiag(text, tileX, tileY) {
     var str = "";
     for(var y = 0; y < 8; y++) {
         for(var x = 0; x < 16; x++) {
-            var posX = tileX*16 + x;
-            var posY = tileY*8 + y;
+            var posX = tileX * 16 + x;
+            var posY = tileY * 8 + y;
             var ind = posX + posY;
             var len = text.length;
             var charPos = ind - Math.floor(ind / len) * len
@@ -28,6 +28,7 @@ module.exports = async function(data, vars) {
     if(!timemachine) timemachine = {};
 
     var tiles = {};
+    var editLimit = 100000; // don't overload server
 
     var len = data.fetchRectangles.length
     if(len >= 1000) len = 1000;
@@ -56,9 +57,14 @@ module.exports = async function(data, vars) {
                 world.id);
             var dr2 = await db.get("select time from edit where world_id=? order by id desc limit 1",
                 world.id);
-            if(!dr1 || !dr2) {
+            var editCount = await db.get("SELECT count(*) as CNT FROM edit WHERE world_id=?", world.id);
+            editCount = editCount.CNT;
+            if((!dr1 || !dr2) || editCount >= editLimit) {
                 // diagonal text...
                 var e_str = "Cannot view timemachine: There are no edits yet. | ";
+                if(editCount >= editLimit) {
+                    e_str = "There are too many edits in this world. | ";
+                }
                 for (var ty in YTileRange) { // fill in null values
                     for (var tx in XTileRange) {
                         var tileX = XTileRange[tx];
@@ -81,7 +87,7 @@ module.exports = async function(data, vars) {
                 time = Math.floor(div * timemachine.time) + dr1
             }
 
-            await db.each("SELECT * FROM edit WHERE world_id=? AND time<=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?",
+            await db.each("SELECT * FROM edit WHERE world_id=? AND time <= ? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?",
                 [world.id, time, minY, minX, maxY, maxX], function(data) {
                 var con = JSON.parse(data.content);
                 for(var q in con) {
@@ -100,7 +106,7 @@ module.exports = async function(data, vars) {
 
             for(var z in tiles) {
                 if(tiles[z]) {
-                    if(typeof tiles[z] == "object") tiles[z].content = tiles[z].content.join("");
+                    if(typeof tiles[z].content == "object") tiles[z].content = tiles[z].content.join("");
                 }
             }
         } else {

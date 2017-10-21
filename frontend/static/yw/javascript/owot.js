@@ -864,7 +864,7 @@ linkElm.style.display = "block";
 linkElm.target = "_blank";
 linkElm.style.cursor = "pointer";
 
-var waitTimeout = 0; // 0: no wait timeout
+var waitTimeout = Math.floor(1000 / 60); // 0: no wait timeout
 var lastRender = 0;
 $(document).on("mousemove", function(e) {
     var coords = getTileCoordsFromMouseCoords(e.pageX, e.pageY)
