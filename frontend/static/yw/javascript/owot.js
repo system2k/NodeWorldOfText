@@ -348,6 +348,7 @@ function stopLinkUI() {
     if(!lastLinkHover) return;
     if(!w.isLinking) return;
     w.isLinking = false;
+    linkAuto.active = false;
     owot.style.cursor = "text";
     var tileX = lastLinkHover[0];
     var tileY = lastLinkHover[1];
@@ -363,6 +364,7 @@ function stopTileUI() {
     if(!lastTileHover) return;
     if(!w.isProtecting) return;
     w.isProtecting = false;
+    tileProtectAuto.active = false;
     owot.style.cursor = "text";
     var tileX = lastTileHover[0];
     var tileY = lastTileHover[1];
@@ -529,6 +531,11 @@ function removeCursor() {
     renderTile(remTileX, remTileY);
 }
 
+function stopDragging() {
+    isDragging = false;
+    owot.style.cursor = "text";
+}
+
 // tileX, charX
 var lastX = [0, 0];
 $(document).on("mouseup", function(e) {
@@ -547,14 +554,13 @@ $(document).on("mouseup", function(e) {
         }
     };
 
-    isDragging = false;
-    owot.style.cursor = "text";
+    stopDragging();
 })
 $(document).on("mouseleave", function(e) {
-    isDragging = false;
+    stopDragging();
 })
 $(document).on("mouseenter", function(e) {
-    isDragging = false;
+    stopDragging();
 })
 function is_link(tileX, tileY, charX, charY) {
     if(tiles[tileY + "," + tileX]) {
@@ -886,14 +892,17 @@ $(document).on("mousemove", function(e) {
         linkElm.hidden = false;
         linkElm.onclick = "";
         linkElm.target = "_blank";
+        linkElm.href = "";
         if(link[0].type == "url") {
             linkElm.title = "Link to URL " + link[0].url;
             linkElm.href = link[0].url;
         } else if(link[0].type == "coord") {
             var pos = link[0].link_tileX + "," + link[0].link_tileY;
             linkElm.title = "Link to coordinates " + pos;
-            linkElm.href = "javascript:w.doGoToCoord(" +
-                link[0].link_tileY + "," + link[0].link_tileX + ");";
+            linkElm.href = "javascript:void(0);";
+            linkElm.onclick = function() {
+                w.doGoToCoord(link[0].link_tileY, link[0].link_tileX)
+            }
             linkElm.target = "";
         }
     } else {
@@ -945,14 +954,16 @@ $(document).on("mousemove", function(e) {
         }
     }
 
+    var posX = e.pageX;
+    var posY = e.pageY;
+
+    if(posX >= width || posY >= height || posX < 0 || posY < 0) stopDragging();
+
     if(!isDragging) return;
 
     // wait before updating coords and tiles
     if(Date.now() - lastRender < waitTimeout) return;
     lastRender = Date.now();
-
-    var posX = e.pageX;
-    var posY = e.pageY;
 
     positionX = dragPosX + (posX - dragStartX);
     positionY = dragPosY + (posY - dragStartY);
@@ -1590,53 +1601,9 @@ var w = {
         w._ui.coordinateInputModal.open("Go to coordinates:", w.doGoToCoord.bind(w));
     },
     doGoToCoord: function(y, x) {
-        var scroller;
-        y *= -4;
-        x *= 4;
-        y += 2;
-        x += 2;
-        if (!w._state.goToCoord.initted) {
-            w._state.goToCoord.cancel = function() {
-                clearInterval(w._state.goToCoord.interval);
-                return $(document).trigger("YWOT_GoToCoord_stop");
-            };
-            $(document).bind("YWOT_GoToCoord_start", function() {
-                return $(document).bind("mousedown", w._state.goToCoord.cancel);
-            });
-            $(document).bind("YWOT_GoToCoord_stop", function() {
-                $(document).unbind("mousedown", w._state.goToCoord.cancel);
-            });
-            w._state.goToCoord.initted = true;
-        }
-        scroller = function() {
-            var centerX;
-            var centerY;
-            var distance;
-            var xDiff;
-            var xMove;
-            var yDiff;
-            var yMove;
-            var _ref;
-            _ref = w.getCenterCoords(), centerY = _ref[0], centerX = _ref[1];
-            yDiff = y - centerY;
-            xDiff = x - centerX;
-            yDiff *= 144;
-            xDiff *= 160;
-            distance = Helpers.vectorLen(yDiff, xDiff);
-            yMove = Math.round(yDiff * 20 / distance);
-            xMove = Math.round(xDiff * 20 / distance);
-            if (Helpers.vectorLen(yDiff, xDiff) < 40) {
-                w._state.goToCoord.cancel();
-                return;
-            }
-            yDiff = yDiff - yMove;
-            positionY -= yMove;
-            xDiff = xDiff - xMove;
-            positionX -= xMove;
-            renderTiles();
-        };
-        w._state.goToCoord.interval = setInterval(scroller, 25);
-        $(document).trigger("YWOT_GoToCoord_start");
+        positionX = -x * 160 * 4;
+        positionY = y * 144 * 4;
+        renderTiles();
     },
     getCenterCoords: function() {
         return [-positionY / 144, -positionX / 160]
@@ -1680,7 +1647,6 @@ var w = {
 			if(protectType == "member-only") tileProtectAuto.mode = 1;
 			if(protectType == "public") tileProtectAuto.mode = 2;
         }
-        console.log(protectType, unprotect)
 
         if(w.isLinking || w.isProtecting) return;
         owot.style.cursor = "pointer";
@@ -1705,7 +1671,9 @@ var w = {
     },
     typeChar: writeChar,
     socketChannel: null,
-    moveCursor: moveCursor
+    moveCursor: moveCursor,
+    fetchUpdates: getAndFetchTiles,
+    acceptOwnEdits: false
 }
 
 if (state.announce) {
@@ -1811,7 +1779,7 @@ var ws_functions = {
                     // make sure it won't overwrite the clients changes before they get sent.
                     // if edits are from client, don't overwrite, but leave the highlight flashes
 
-                    if(!searchTellEdit(tileX, tileY, charX, charY) && data.channel != w.socketChannel) {
+                    if(!searchTellEdit(tileX, tileY, charX, charY) && (data.channel != w.socketChannel || w.acceptOwnEdits)) {
                         oldContent[g] = nChar;
                         oldColors[g] = nCol;
                     }
