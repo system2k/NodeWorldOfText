@@ -9,6 +9,9 @@ function advancedSplit(str) {
             data.splice(i, 1)
         }
     }
+    for(var i = 0; i < data.length; i++) {
+        data[i] = data[i].slice(0, 100);
+    }
 	return data;
 }
 

@@ -13,6 +13,8 @@ var pingInterval = 50; // in seconds
 var images = {};
 // [data RGB, width, height]
 
+var font = "16px 'Courier New', monospace";
+
 var backgroundImageParser = document.createElement("canvas");
 var backImg = backgroundImageParser.getContext("2d");
 var unloadedImage = new Image();
@@ -22,7 +24,7 @@ unloadedImage.onload = function() {
     var width = unloadedImage.width;
     var height = unloadedImage.height;
     images.unloaded = [removeAlpha(backImg.getImageData(0, 0, width, height).data), width, height];
-    // one all the images are loaded
+    // once all the images are loaded
     renderTiles();
     begin();
 }
@@ -185,8 +187,7 @@ $(document).on("mousemove.linkAuto", function() {
 
     if(linkAuto.ctrlDown) {
         colorChar(tileX, tileY, charX, charY, color);
-        delete tilePixelCache[tileY + "," + tileX];
-        renderTile(tileX, tileY);
+        renderTile(tileX, tileY, true);
         var ar = [tileX, tileY, charX, charY, linkAuto.mode];
         if(linkAuto.mode == 0) {
             ar.push([linkAuto.url])
@@ -199,8 +200,7 @@ $(document).on("mousemove.linkAuto", function() {
         var elm = linkAuto.selected[tileY + "," + tileX + "," + charY + "," + charX];
         if(elm !== void 0) {
             uncolorChar(tileX, tileY, charX, charY);
-            delete tilePixelCache[tileY + "," + tileX];
-            renderTile(tileX, tileY);
+            renderTile(tileX, tileY, true);
             delete linkAuto.selected[tileY + "," + tileX + "," + charY + "," + charX];
         }
     }
@@ -251,8 +251,7 @@ $("body").on("keydown.linkAuto", function(e) {
             }).done(function(){
                 delete selected[cstr];
                 uncolorChar(tileX, tileY, charX, charY);
-                delete tilePixelCache[tileY + "," + tileX];
-                renderTile(tileX, tileY);
+                renderTile(tileX, tileY, true);
                 // advance the loop
                 i++;
                 if(i < keys.length) {
@@ -286,11 +285,6 @@ $(window).on("resize", function(e) {
 
 owot.width = width;
 owot.height = height;
-
-var canvasTextRender = document.createElement("canvas");
-canvasTextRender.width = 10 * 16;
-canvasTextRender.height = 18 * 8;
-var textRender = canvasTextRender.getContext("2d");
 
 var cursorCoords = null;
 var cursorCoordsCurrent = [0, 0, 0, 0, "NOT_INITTED"]; // cursorCoords that don't reset to null
@@ -356,8 +350,7 @@ function stopLinkUI() {
     var charY = lastLinkHover[3];
     // remove highlight
     uncolorChar(tileX, tileY, charX, charY);
-    delete tilePixelCache[tileY + "," + tileX];
-    renderTile(tileX, tileY);
+    renderTile(tileX, tileY, true);
 }
 
 function stopTileUI() {
@@ -373,8 +366,7 @@ function stopTileUI() {
     if(tiles[tileY + "," + tileX]) {
         tiles[tileY + "," + tileX].backgroundColor = "";
     }
-    delete tilePixelCache[tileY + "," + tileX];
-    renderTile(tileX, tileY);
+    renderTile(tileX, tileY, true);
 }
 
 function doLink() {
@@ -699,9 +691,8 @@ function writeChar(char, doNotMoveCursor) {
             con[charY * 16 + charX] = char;
             // join splitted content string
             tiles[tileY + "," + tileX].content = con.join("");
-            // delete from cache to re-render
-            delete tilePixelCache[tileY + "," + tileX];
-            renderTile(tileX, tileY)
+            // re-render
+            renderTile(tileX, tileY, true)
 
             var editArray = [tileY, tileX, charY, charX, Date.now(), char, nextObjId];
             if(color) {
@@ -919,8 +910,7 @@ $(document).on("mousemove", function(e) {
             var charX = lastLinkHover[2];
             var charY = lastLinkHover[3];
             uncolorChar(tileX, tileY, charX, charY);
-            delete tilePixelCache[tileY + "," + tileX];
-            renderTile(tileX, tileY);
+            renderTile(tileX, tileY, true);
         }
         lastLinkHover = currentPosition;
         var newTileX = currentPosition[0];
@@ -930,8 +920,7 @@ $(document).on("mousemove", function(e) {
         if(tiles[newTileY + "," + newTileX]) {
             colorChar(newTileX, newTileY, newCharX, newCharY, "#aaf", true);
             // re-render tile
-            delete tilePixelCache[newTileY + "," + newTileX];
-            renderTile(newTileX, newTileY);
+            renderTile(newTileX, newTileY, true);
         }
     }
     // tile protection
@@ -942,8 +931,7 @@ $(document).on("mousemove", function(e) {
             if(tiles[tileY + "," + tileX] && !tileProtectAuto.selected[tileY + "," + tileX]) {
                 tiles[tileY + "," + tileX].backgroundColor = "";
             }
-            delete tilePixelCache[tileY + "," + tileX];
-            renderTile(tileX, tileY);
+            renderTile(tileX, tileY, true);
         }
         lastTileHover = currentPosition;
         var newTileX = currentPosition[0];
@@ -1198,9 +1186,6 @@ function fixedCharAt(str, idx) {
     return ret;
 }
 
-var font = "16px 'Courier New'"
-textRender.font = font;
-
 function newColorArray() {
     var ar = [];
     for(var i = 0; i < 128; i++) {
@@ -1357,8 +1342,21 @@ function renderTile(tileX, tileY, redraw) {
                 imgData.data[destIndex + 3] = 255;
             }
         }
-        tilePixelCache[str] = imgData;
-        textLayerCtx.putImageData(tilePixelCache[str], offsetX, offsetY);
+        var textRenderCanvas = tilePixelCache[str];
+        var textRender;
+        if(!textRenderCanvas) {
+            textRenderCanvas = document.createElement("canvas");
+            textRenderCanvas.width = 10 * 16;
+            textRenderCanvas.height = 18 * 8;
+            textRender = textRenderCanvas.getContext("2d");
+            textRender.font = font;
+            tilePixelCache[str] = [textRenderCanvas, textRender];
+        } else {
+            textRender = tilePixelCache[str][1];
+        }
+        textRender.putImageData(imgData, 0, 0);
+        textLayerCtx.clearRect(offsetX, offsetY, 160, 144);
+        textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
         return;
     }
 
@@ -1416,10 +1414,26 @@ function renderTile(tileX, tileY, redraw) {
     if(!tile) return;
     // tile is already written
     if(tilePixelCache[str] && !redraw) {
-        textLayerCtx.putImageData(tilePixelCache[str], offsetX, offsetY)
-        //textLayerCtx.drawImage(canvasTextRender, offsetX, offsetY)
+        textLayerCtx.clearRect(offsetX, offsetY, 160, 144);
+        textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
         return;
     }
+    var textRenderCanvas = tilePixelCache[str];
+    var textRender;
+    if(!textRenderCanvas) {
+        textRenderCanvas = document.createElement("canvas");
+        textRenderCanvas.width = 10 * 16;
+        textRenderCanvas.height = 18 * 8;
+        textRender = textRenderCanvas.getContext("2d");
+        textRender.font = font;
+        tilePixelCache[str] = [textRenderCanvas, textRender];
+    } else {
+        textRender = tilePixelCache[str][1];
+    }
+
+    // first, clear text renderer canvas
+    textRender.clearRect(0, 0, width, height);
+
     var content = tile.content;
     var colors = tile.properties.color;
     // color data doesn't exist, use empty array as placeholder
@@ -1468,7 +1482,7 @@ function renderTile(tileX, tileY, redraw) {
                     }
                 }
             }
-            // make sure colored text stays colored after linking
+            // make sure colored text stays the same color after linking
             if(color == 0) {
                 textRender.fillStyle = linkColor;
             }
@@ -1476,8 +1490,7 @@ function renderTile(tileX, tileY, redraw) {
             if(isLink) {
                 textRender.fillRect(x * 10, (y * 18 + (13 + 1)), 10, 1)
             }
-            // ignore whitespace characters
-            if(char != "\u0020" && char != "\u00a0") {
+            if(char != "\u0020" && char != "\u00a0") { // ignore whitespace characters
                 if(char == "█") {
                     textRender.fillRect(x*10, y*18, 10, 18);
                 } else if(char == "▀") {
@@ -1497,9 +1510,9 @@ function renderTile(tileX, tileY, redraw) {
             }
         }
     }
-    tilePixelCache[str] = textRender.getImageData(0, 0, 160, 144);
-    textLayerCtx.putImageData(tilePixelCache[str], offsetX, offsetY)
-    textRender.putImageData(textRender.createImageData(160, 144), 0, 0);
+    // add image to main canvas
+    textLayerCtx.clearRect(offsetX, offsetY, 160, 144);
+    textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
 }
 
 function renderTiles() {
@@ -1713,14 +1726,13 @@ var ws_functions = {
             tiles[i] = data.tiles[i];
             if(!tiles[i]) tiles[i] = blankTile();
             tiles[i].initted = true;
-            // re-render tile
-            delete tilePixelCache[i];
+            var pos = getPos(i);
+            renderTile(pos[1], pos[0], true);
         }
         // too many tiles, remove tiles outside of the viewport
         if(Object.keys(tiles).length >= 1000) {
             clearTiles()
         }
-        renderTiles();
     },
     colors: function(data) {
         // update all world colors
@@ -1793,11 +1805,10 @@ var ws_functions = {
                 }
             }
             oldContent = oldContent.join("");
-            delete tilePixelCache[i]; // force tile to be redrawn
             tiles[i].properties = data.tiles[i].properties; // update tile
             tiles[i].content = oldContent; // update only necessary character updates
             tiles[i].properties.color = oldColors; // update only necessary color updates
-            renderTile(tileX, tileY);
+            renderTile(tileX, tileY, true);
         }
         if(highlights.length > 0) highlight(highlights);
     },
