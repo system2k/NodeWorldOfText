@@ -616,7 +616,7 @@ var writeInterval = setInterval(function() {
     socket.send(JSON.stringify(data));
 }, 1000)
 
-function moveCursor(direction) {
+function moveCursor(direction, do_not_change_enter_x) {
     if(!cursorCoords) return;
     var cSCopy = cursorCoords.slice();
     // [tileX, tileY, charX, charY]
@@ -646,7 +646,9 @@ function moveCursor(direction) {
             cSCopy[0]++;
         }
     }
-    lastX = [cSCopy[0], cSCopy[2]];
+    if(!do_not_change_enter_x) {
+        lastX = [cSCopy[0], cSCopy[2]];
+    }
     renderCursor(cSCopy);
 }
 
@@ -778,7 +780,7 @@ $(document).on("keydown", function(e) {
     } else if(key == 39) {
         moveCursor("right");
     } else if(key == 8) { // backspace
-        moveCursor("left");
+        moveCursor("left", true);
         writeChar(" ", true);
     } else if(key == 27) { // esc
         stopLinkUI();
@@ -1317,7 +1319,7 @@ function uncolorChar(tileX, tileY, charX, charY) {
     }
 }
 
-function renderTile(tileX, tileY) {
+function renderTile(tileX, tileY, redraw) {
     var str = tileY + "," + tileX;
     var offsetX = tileX * 160 + (width / 2 | 0) + positionX;
     var offsetY = tileY * 144 + (height / 2 | 0) + positionY;
@@ -1402,7 +1404,7 @@ function renderTile(tileX, tileY) {
     // tile is null, so don't add text/color data
     if(!tile) return;
     // tile is already written
-    if(tilePixelCache[str]) {
+    if(tilePixelCache[str] && !redraw) {
         textLayerCtx.putImageData(tilePixelCache[str], offsetX, offsetY)
         //textLayerCtx.drawImage(canvasTextRender, offsetX, offsetY)
         return;
