@@ -1,3 +1,33 @@
+if (typeof Object.assign != 'function') { // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign#Polyfill
+  // Must be writable: true, enumerable: false, configurable: true
+  Object.defineProperty(Object, "assign", {
+    value: function assign(target, varArgs) { // .length of function is 2
+      'use strict';
+      if (target == null) { // TypeError if undefined or null
+        throw new TypeError('Cannot convert undefined or null to object');
+      }
+
+      var to = Object(target);
+
+      for (var index = 1; index < arguments.length; index++) {
+        var nextSource = arguments[index];
+
+        if (nextSource != null) { // Skip over if undefined or null
+          for (var nextKey in nextSource) {
+            // Avoid bugs when hasOwnProperty is shadowed
+            if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
+              to[nextKey] = nextSource[nextKey];
+            }
+          }
+        }
+      }
+      return to;
+    },
+    writable: true,
+    configurable: true
+  });
+}
+
 $("#loading").hide();
 var owot = $("#owot")[0];
 var textInput = $("#textInput");
@@ -592,7 +622,7 @@ function containsNewLine(char) {
     }
 }
 
-blankColor = (function() {
+var blankColor = (function() {
     var ar = [];
     for(var i = 0; i < 128; i++) {
         ar.push(0);
@@ -666,12 +696,12 @@ function writeChar(char, doNotMoveCursor) {
         var newLine = containsNewLine(char);
         if(!newLine) {
             if(!tiles[tileY + "," + tileX]) {
-                tiles[tileY + "," + tileX] = blankTile;
+                tiles[tileY + "," + tileX] = Object.assign({}, blankTile);
             }
             var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
             if(!cell_props) cell_props = {};
             var color = tiles[tileY + "," + tileX].properties.color;
-            if(!color) color = blankColor;
+            if(!color) color = Object.assign({}, blankColor);
 
             // delete link
             if(cell_props[charY]) {
@@ -1264,7 +1294,7 @@ var blankTile = {
 	properties: {
 		cell_props: {},
 		writability: null,
-		color: blankColor
+		color: Object.assign({}, blankColor)
 	},
 	initted: false
 }
@@ -1361,7 +1391,7 @@ function renderTile(tileX, tileY, redraw) {
     var tile = tiles[str];
 
     if(tile == null) {
-        tiles[str] = blankTile;
+        tiles[str] = Object.assign({}, blankTile);
         tile = tiles[str];
     }
 
@@ -1773,7 +1803,7 @@ var ws_functions = {
 				stopAnimation(i);
 			}
             tiles[i] = tile;
-            if(!tiles[i]) tiles[i] = blankTile;
+            if(!tiles[i]) tiles[i] = Object.assign({}, blankTile);
             tiles[i].initted = true;
             var pos = getPos(i);
             renderTile(pos[1], pos[0], true);
@@ -1800,13 +1830,13 @@ var ws_functions = {
         for(i in data.tiles) {
             // if tile isn't loaded, load it blank
             if(!tiles[i]) {
-                tiles[i] = blankTile;
+                tiles[i] = Object.assign({}, blankTile);
             }
             if(!data.tiles[i]) {
-                data.tiles[i] = blankTile;
+                data.tiles[i] = Object.assign({}, blankTile);
             }
             if(!data.tiles[i].properties.color) {
-                data.tiles[i].properties.color = blankColor;
+                data.tiles[i].properties.color = Object.assign({}, blankColor);
             }
 			if (data.tiles[i].properties.animation) {
 				animateTile(data.tiles[i], i); // if it's already animated it will stop the old animation
@@ -1814,7 +1844,7 @@ var ws_functions = {
 				stopAnimation(i);
 			}
             if(!tiles[i].properties.color) {
-                tiles[i].properties.color = blankColor;
+                tiles[i].properties.color = Object.assign({}, blankColor);
             }
             var pos = getPos(i);
             var tileX = pos[1];

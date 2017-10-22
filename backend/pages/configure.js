@@ -65,7 +65,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     }
 
     var properties = JSON.parse(world.properties)
-    var go_to_coord = false;
+  /*var go_to_coord = false;
     var coordLink = false;
     var urlLink = false;
 	var animate = false;
@@ -74,7 +74,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         if(properties.features.coordLink) coordLink = properties.features.coordLink
         if(properties.features.urlLink) urlLink = properties.features.urlLink
 		if(properties.features.animate) animate = properties.features.animate;
-    }
+    }*/
 
     // if empty, make sure server knows it's empty
     // ([] is considered to not be empty through boolean conversion)
@@ -94,10 +94,6 @@ module.exports.GET = async function(req, serve, vars, params) {
         world: world_name,
         csrftoken: user.csrftoken,
         members: member_list,
-        go_to_coord,
-        coordLink,
-        urlLink,
-		animate,
         add_member_message: params.message,
 
         readability: world.readability,
@@ -108,6 +104,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         url_link: world.feature_url_link,
         paste: world.feature_paste,
         membertiles_addremove: world.feature_membertiles_addremove,
+		animate: world.feature_animate,
 
         color,
         cursor_color,
