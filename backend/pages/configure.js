@@ -68,10 +68,12 @@ module.exports.GET = async function(req, serve, vars, params) {
     var go_to_coord = false;
     var coordLink = false;
     var urlLink = false;
+	var animate = false;
     if(properties.features) {
         if(properties.features.go_to_coord) go_to_coord = properties.features.go_to_coord
         if(properties.features.coordLink) coordLink = properties.features.coordLink
         if(properties.features.urlLink) urlLink = properties.features.urlLink
+		if(properties.features.animate) animate = properties.features.animate;
     }
 
     // if empty, make sure server knows it's empty
@@ -95,6 +97,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         go_to_coord,
         coordLink,
         urlLink,
+		animate,
         add_member_message: params.message,
 
         readability: world.readability,
@@ -190,6 +193,7 @@ module.exports.POST = async function(req, serve, vars) {
         var go_to_coord = validatePerms(post_data.go_to_coord);
         var coord_link = validatePerms(post_data.coord_link);
         var url_link = validatePerms(post_data.url_link);
+		var animate = validatePerms(post_data.animate);
         var paste = validatePerms(post_data.paste);
         var membertiles_addremove = post_data.membertiles_addremove;
         if(membertiles_addremove == "false") {
@@ -200,8 +204,8 @@ module.exports.POST = async function(req, serve, vars) {
             membertiles_addremove = 0;
         }
 
-        await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link)=(?,?,?,?,?) WHERE id=?",
-            [go_to_coord, membertiles_addremove, paste, coord_link, url_link, world.id])
+        await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link,feature_animate)=(?,?,?,?,?,?) WHERE id=?",
+            [go_to_coord, membertiles_addremove, paste, coord_link, url_link, animate, world.id])
     } else if(post_data.form == "style") {
         var color = validateCSS(post_data.color);
         var cursor_color = validateCSS(post_data.cursor_color);

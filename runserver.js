@@ -685,22 +685,20 @@ function decode_base64(b64str) {
     return new Buffer(b64str, "base64").toString("ascii")
 }
 
+var https_reference = https;
+var prev_cS = http.createServer;
+
 var options = {};
-var https_disabled = false;
+
 try { // so that ~FP can run it on his own (since he does not have the keys)
     var options = {
         key: fs.readFileSync("../le/etc/live/nwot.sytes.net/privkey.pem"),
         cert: fs.readFileSync("../le/etc/live/nwot.sytes.net/cert.pem"),
         ca: fs.readFileSync("../le/etc/live/nwot.sytes.net/chain.pem")
     };
-} catch(e) {
-    https_disabled = true;
+} catch(e) { // incase the keys are not available (if running on FPs machine)
     console.log("Running server in HTTP mode")
-}
-var https_reference = https;
-var prev_cS = http.createServer;
-if(https_disabled) { // incase the keys are not available (if running on FPs machine)
-    http.createServer = function(opt, func) {
+	http.createServer = function(opt, func) {
         return prev_cS(func);
     }
     https_reference = http
@@ -776,7 +774,7 @@ async function world_get_or_create(name) {
     if(!world) { // world doesn't exist
         if(name.match(/^(\w*)$/g)) {
             var date = Date.now();
-            await db.run("INSERT INTO world VALUES(null, ?, null, ?, 2, 0, 2, 2, 2, '', '', '', '', '', '', 0, 0, '{}')",
+            await db.run("INSERT INTO world VALUES(null, ?, null, ?, 2, 0, 2, 2, 2, 2, '', '', '', '', '', '', 0, 0, '{}')",
                 [name, date])
             world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name)
         } else { // special worlds (like: /beta/test) are not found and must not be created

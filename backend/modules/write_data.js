@@ -1,7 +1,7 @@
 // split a string properly with characters containing surrogates and combining characters
 function advancedSplit(str) {
-	str += "";
-	var data = str.match(/([\uD800-\uDBFF][\uDC00-\uDFFF])|(([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+))|.|\n|\r/g)
+    str += "";
+    var data = str.match(/([\uD800-\uDBFF][\uDC00-\uDFFF])|(([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+))|.|\n|\r/g)
     if(data == null) return [];
     for(var i = 0; i < data.length; i++) {
         // contains surrogates without second character?
@@ -12,7 +12,7 @@ function advancedSplit(str) {
     for(var i = 0; i < data.length; i++) {
         data[i] = data[i].slice(0, 100);
     }
-	return data;
+    return data;
 }
 
 function insert_char_at_index(string, char, index) {
@@ -85,6 +85,20 @@ function resolve_queue(tileX, tileY, worldID) {
         }
     }
 }
+
+function fixColors(colors) {
+	if(Array.isArray(colors)) {
+		colors = colors.slice(0, 128);
+		for(var g = 0; g < colors.length; g++) {
+			colors[g] = sanitize_color(colors[g]);
+		}
+	} else {
+		colors = sanitize_color(colors);
+	}
+	return colors;
+}
+
+var NOT_SO_SECRET = "@^&$%!#*%^#*)~@$^*#!)~*%38259`25equfahgrqieavkj4bh8ofweieagrHG*FNV#@#OIFENUOGIVEOSFKNL<CDOLFKEWNSCOIEAFM:COGPEWWRG>BVPZL:MBGOEWSV";
 
 module.exports = async function(data, vars) {
     var db = vars.db;
@@ -192,22 +206,52 @@ module.exports = async function(data, vars) {
                 return;
             }
             for(var e = 0; e < changes.length; e++) {
-                var charY = san_nbr(changes[e][2]);
-                var charX = san_nbr(changes[e][3]);
+                // edit --> [tileY, tileX, charY, charX, timestamp, char, id, colors, animation]
+				var change = changes[e];
+                var charY = san_nbr(change[2]);
+				if(charY < 0) charY = 0;
+				if(charY >= 8) charY = 8;
+                var charX = san_nbr(change[3]);
                 if(charX < 0) charX = 0;
                 if(charX >= 16) charX = 16;
-                if(charY < 0) charY = 0;
-                if(charY >= 8) charY = 8;
-                var char = changes[e][5];
-                accepted.push(changes[e][6]);
-                var color = changes[e][7];
-                if(Array.isArray(color)) {
-                    color = color.slice(0, 128);
-                    for(var g = 0; g < color.length; g++) {
-                        color[g] = sanitize_color(color[g]);
-                    }
-                } else {
-                    color = sanitize_color(color);
+                var char = change[5];
+                accepted.push(change[6]);
+                var color = fixColors(change[7]);
+				// animation --> [notSoSecret, changeInterval, repeat, frames]
+				// notSoSecret must be the value of NOT_SO_SECRET, changeInterval is in milliseconds (1/1000 of a second) and repeat is a boolean (true/false)
+                // frames --> [frame0, frame1, ..., frameN], maximum 999 frames
+                // frame --> [TEXT, COLORS] where TEXT is a 128 character string, and COLORS is an array of 128 colors
+                var animation = change[8];
+                if(Array.isArray(animation) && (animation.length === 4)) {
+                    //ANIMATION CODE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+					var notSoSecret = animation[0]
+					if ((typeof notSoSecret == "string") && (notSoSecret === NOT_SO_SECRET)) {
+						var changeInterval = san_nbr(animation[1]);
+						if (changeInterval < 500) changeInterval = 500; // so it won't be very very fast
+						var repeat = animation[2];
+						if (typeof repeat != "boolean") {
+							repeat = false;
+						}
+						var frames = animation[3];
+						if (Array.isArray(frames) && (frames.length > 0) && (frames.length < 1000)) { // 999 is maximum frames
+							var okFrames = [];
+							for (var f = 0; f < frames.length; f++) {
+								var frame = frames[f];
+								var frameText = frame[0];
+								var frameColors = fixColors(frame[1]);
+								if ((typeof frameText == "string") && (frameText.length == 128)) {
+									okFrames.push([frameText, frameColors]);
+								}
+							}
+							if (okFrames.length /* > 0*/) {
+								properties.animation = {
+									changeInterval,
+									repeat,
+									frames: okFrames
+								};
+							}
+						}
+					}
                 }
                 if(typeof char !== "string") {
                     char = "?";

@@ -592,13 +592,13 @@ function containsNewLine(char) {
     }
 }
 
-function blankColor() {
+blankColor = (function() {
     var ar = [];
     for(var i = 0; i < 128; i++) {
         ar.push(0);
     }
     return ar;
-}
+})();
 
 var writeBuffer = [];
 
@@ -666,12 +666,12 @@ function writeChar(char, doNotMoveCursor) {
         var newLine = containsNewLine(char);
         if(!newLine) {
             if(!tiles[tileY + "," + tileX]) {
-                tiles[tileY + "," + tileX] = blankTile();
+                tiles[tileY + "," + tileX] = blankTile;
             }
             var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
             if(!cell_props) cell_props = {};
             var color = tiles[tileY + "," + tileX].properties.color;
-            if(!color) color = blankColor();
+            if(!color) color = blankColor;
 
             // delete link
             if(cell_props[charY]) {
@@ -1259,16 +1259,14 @@ var flashAnimateInterval = setInterval(function() {
 var blank = "";
 for(var i = 0; i < 128; i++) blank += " ";
 
-function blankTile() {
-    return {
-        content: blank,
-        properties: {
-            cell_props: {},
-            writability: null,
-            color: blankColor()
-        },
-        initted: false
-    };
+var blankTile = {
+	content: blank,
+	properties: {
+		cell_props: {},
+		writability: null,
+		color: blankColor
+	},
+	initted: false
 }
 
 // format:
@@ -1363,7 +1361,7 @@ function renderTile(tileX, tileY, redraw) {
     var tile = tiles[str];
 
     if(tile == null) {
-        tiles[str] = blankTile();
+        tiles[str] = blankTile;
         tile = tiles[str];
     }
 
@@ -1710,7 +1708,7 @@ var tellEdit = [];
 // tileX, tileY, charX, charY, editID
 function searchTellEdit(tileX, tileY, charX, charY) {
     for(var i = 0; i < tellEdit.length; i++) {
-        if(tellEdit[i][0] == tileX &&
+        if (tellEdit[i][0] == tileX &&
             tellEdit[i][1] == tileY &&
             tellEdit[i][2] == charX &&
             tellEdit[i][3] == charY) {
@@ -1720,11 +1718,62 @@ function searchTellEdit(tileX, tileY, charX, charY) {
     return false;
 }
 
+var tilesAnimated = {};
+
+function stopAnimation(posStr) {
+	clearInterval(tilesAnimated[posStr]);
+	delete tilesAnimated[posStr];
+}
+
+function isAnimated(posStr) {
+	return tilesAnimated[posStr] != null;
+}
+
+function animateTile(tile, posStr) {
+	if (isAnimated(posStr))
+		stopAnimation(posStr);
+	setTimeout(function() { // delay it a bit, so the parent code is fully executed
+		var pos = posStr.split(',');
+		var tileY = pos[0];
+		var tileX = pos[1];
+		var animation = tile.properties.animation;
+		var changeInterval = animation.changeInterval;
+		var repeat = animation.repeat;
+		var frames = animation.frames;
+		var framenum = frames.length;
+		var animationInterval;
+		var atFrame = 0;
+		var animationInterval = tilesAnimated[posStr] = setInterval(function doAnimation() {
+			if (!tiles[posStr]) // not visible
+				stopAnimation(posStr);
+			var frame = frames[atFrame];
+			var newTile = tile;
+			newTile.content = frame[0];
+			newTile.properties.color = frame[1];
+			tiles[posStr] = newTile;
+			delete tilePixelCache[posStr];
+			renderTile(tileX, tileY);
+			if (atFrame++ > framenum) {
+				if (repeat)
+					atFrame = 0;
+				else
+					stopAnimation(posStr);
+			}
+		}.bind(this), animationInterval);
+	}.bind(this), 200);
+}
+
 var ws_functions = {
     fetch: function(data) {
         for(var i in data.tiles) {
-            tiles[i] = data.tiles[i];
-            if(!tiles[i]) tiles[i] = blankTile();
+			var tile = data.tiles[i];
+			if (tile && tile.properties && tile.properties.animation) {
+				animateTile(tile, i); // if it's already animated it will stop the old animation
+			} else if (isAnimated(i)) {
+				stopAnimation(i);
+			}
+            tiles[i] = tile;
+            if(!tiles[i]) tiles[i] = blankTile;
             tiles[i].initted = true;
             var pos = getPos(i);
             renderTile(pos[1], pos[0], true);
@@ -1751,16 +1800,21 @@ var ws_functions = {
         for(i in data.tiles) {
             // if tile isn't loaded, load it blank
             if(!tiles[i]) {
-                tiles[i] = blankTile();
+                tiles[i] = blankTile;
             }
             if(!data.tiles[i]) {
-                data.tiles[i] = blankTile();
+                data.tiles[i] = blankTile;
             }
             if(!data.tiles[i].properties.color) {
-                data.tiles[i].properties.color = blankColor();
+                data.tiles[i].properties.color = blankColor;
             }
+			if (data.tiles[i].properties.animation) {
+				animateTile(data.tiles[i], i); // if it's already animated it will stop the old animation
+			} else if (isAnimated(i)) {
+				stopAnimation(i);
+			}
             if(!tiles[i].properties.color) {
-                tiles[i].properties.color = blankColor();
+                tiles[i].properties.color = blankColor;
             }
             var pos = getPos(i);
             var tileX = pos[1];
