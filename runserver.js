@@ -774,7 +774,7 @@ async function world_get_or_create(name) {
     if(!world) { // world doesn't exist
         if(name.match(/^(\w*)$/g)) {
             var date = Date.now();
-            await db.run("INSERT INTO world VALUES(null, ?, null, ?, 2, 0, 2, 2, 2, '', '', '', '', '', '', 0, 0, '{}')",
+            await db.run("INSERT INTO world VALUES(null, ?, null, ?, 2, 0, 2, 0, 0, '', '', '', '', '', '', 0, 0, '{}')",
                 [name, date])
             world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name)
         } else { // special worlds (like: /beta/test) are not found and must not be created

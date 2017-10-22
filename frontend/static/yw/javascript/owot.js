@@ -1,31 +1,28 @@
-if (typeof Object.assign != 'function') { // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign#Polyfill
-  // Must be writable: true, enumerable: false, configurable: true
-  Object.defineProperty(Object, "assign", {
-    value: function assign(target, varArgs) { // .length of function is 2
-      'use strict';
-      if (target == null) { // TypeError if undefined or null
-        throw new TypeError('Cannot convert undefined or null to object');
-      }
-
-      var to = Object(target);
-
-      for (var index = 1; index < arguments.length; index++) {
-        var nextSource = arguments[index];
-
-        if (nextSource != null) { // Skip over if undefined or null
-          for (var nextKey in nextSource) {
-            // Avoid bugs when hasOwnProperty is shadowed
-            if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
-              to[nextKey] = nextSource[nextKey];
-            }
-          }
-        }
-      }
-      return to;
-    },
-    writable: true,
-    configurable: true
-  });
+if (typeof Object.assign != "function") { // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign#Polyfill
+	// Must be writable: true, enumerable: false, configurable: true
+	Object.defineProperty(Object, "assign", {
+		value: function assign(target, varArgs) { // .length of function is 2
+			"use strict";
+			if (target == null) { // TypeError if undefined or null
+				throw new TypeError("Cannot convert undefined or null to object");
+			}
+			var to = Object(target);
+			for (var index = 1; index < arguments.length; index++) {
+				var nextSource = arguments[index];
+				if (nextSource != null) { // Skip over if undefined or null
+					for (var nextKey in nextSource) {
+						// Avoid bugs when hasOwnProperty is shadowed
+						if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
+							to[nextKey] = nextSource[nextKey];
+						}
+					}
+				}
+			}
+			return to;
+		},
+		writable: true,
+		configurable: true
+	});
 }
 
 $("#loading").hide();
@@ -40,6 +37,7 @@ var width = window.innerWidth;
 var height = window.innerHeight;
 
 var pingInterval = 50; // in seconds
+var gridEnabled = false;
 var images = {};
 // [data RGB, width, height]
 
@@ -348,7 +346,7 @@ function menu_color(color) {
     // change menu color
     if(!window.menuStyle) {
         menuStyle = document.createElement("style")
-        $("head")[0].append(menuStyle)
+        $("head").append(menuStyle)
     }
     menuStyle.innerHTML = "#menu.hover, #nav { background: " + color + "; }"
 }
@@ -701,7 +699,7 @@ function writeChar(char, doNotMoveCursor) {
             var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
             if(!cell_props) cell_props = {};
             var color = tiles[tileY + "," + tileX].properties.color;
-            if(!color) color = Object.assign({}, blankColor);
+            if(!color) color = Object.assign([], blankColor);
 
             // delete link
             if(cell_props[charY]) {
@@ -1294,7 +1292,7 @@ var blankTile = {
 	properties: {
 		cell_props: {},
 		writability: null,
-		color: Object.assign({}, blankColor)
+		color: Object.assign([], blankColor)
 	},
 	initted: false
 }
@@ -1343,13 +1341,29 @@ function uncolorChar(tileX, tileY, charX, charY) {
     }
 }
 
+function getTileCanvas(str) {
+    var textRenderCanvas = tilePixelCache[str];
+    var textRender;
+    if(!textRenderCanvas) {
+        textRenderCanvas = document.createElement("canvas");
+        textRenderCanvas.width = 10 * 16;
+        textRenderCanvas.height = 18 * 8;
+        textRender = textRenderCanvas.getContext("2d");
+        textRender.font = font;
+        tilePixelCache[str] = [textRenderCanvas, textRender];
+    } else {
+        textRender = tilePixelCache[str][1];
+    }
+    return [textRenderCanvas, textRender];
+}
+
 function renderTile(tileX, tileY, redraw) {
     var str = tileY + "," + tileX;
     var offsetX = tileX * 160 + (width / 2 | 0) + positionX;
     var offsetY = tileY * 144 + (height / 2 | 0) + positionY;
 
     // unloaded tiles
-    if(!(str in tiles)) {
+    if(!(str in tiles) || (tiles[str] && !tiles[str].initted)) {
         var imgData = textLayerCtx.createImageData(160, 144);
         var fromData = images.unloaded[0];
         var img_width = images.unloaded[1];
@@ -1370,18 +1384,9 @@ function renderTile(tileX, tileY, redraw) {
                 imgData.data[destIndex + 3] = 255;
             }
         }
-        var textRenderCanvas = tilePixelCache[str];
-        var textRender;
-        if(!textRenderCanvas) {
-            textRenderCanvas = document.createElement("canvas");
-            textRenderCanvas.width = 10 * 16;
-            textRenderCanvas.height = 18 * 8;
-            textRender = textRenderCanvas.getContext("2d");
-            textRender.font = font;
-            tilePixelCache[str] = [textRenderCanvas, textRender];
-        } else {
-            textRender = tilePixelCache[str][1];
-        }
+        var tileCanv = getTileCanvas(str);
+        var textRenderCanvas = tileCanv[0];
+        var textRender = tileCanv[1];
         textRender.putImageData(imgData, 0, 0);
         textLayerCtx.clearRect(offsetX, offsetY, 160, 144);
         textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
@@ -1423,6 +1428,13 @@ function renderTile(tileX, tileY, redraw) {
         ctx.fillRect(offsetX + charX * 10, offsetY + charY * 18, 10, 18);
     }
 
+    // draw the grid
+    if(gridEnabled) {
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(offsetX, offsetY + 143, 160, 1);
+        ctx.fillRect(offsetX + 160 - 1, offsetY, 1, 144);
+    }
+
     var highlight = highlightFlash[str];
     if(!highlight) highlight = {};
 
@@ -1446,18 +1458,9 @@ function renderTile(tileX, tileY, redraw) {
         textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
         return;
     }
-    var textRenderCanvas = tilePixelCache[str];
-    var textRender;
-    if(!textRenderCanvas) {
-        textRenderCanvas = document.createElement("canvas");
-        textRenderCanvas.width = 10 * 16;
-        textRenderCanvas.height = 18 * 8;
-        textRender = textRenderCanvas.getContext("2d");
-        textRender.font = font;
-        tilePixelCache[str] = [textRenderCanvas, textRender];
-    } else {
-        textRender = tilePixelCache[str][1];
-    }
+    var tileCanv = getTileCanvas(str);
+    var textRenderCanvas = tileCanv[0];
+    var textRender = tileCanv[1];
 
     // first, clear text renderer canvas
     textRender.clearRect(0, 0, width, height);
@@ -1574,6 +1577,13 @@ function buildMenu() {
         return $("#coords").show();
     }, function() {
         return $("#coords").hide();
+    });
+    menu.addCheckboxOption(" Toggle grid", function() {
+        gridEnabled = true;
+        renderTiles();
+    }, function() {
+        gridEnabled = false;
+        renderTiles();
     });
     menu.addOption("Change color", w.color);
     if (Permissions.can_go_to_coord(state.userModel, state.worldModel)) {
@@ -1763,7 +1773,7 @@ function animateTile(tile, posStr) {
 	if (isAnimated(posStr))
 		stopAnimation(posStr);
 	setTimeout(function() { // delay it a bit, so the parent code is fully executed
-		var pos = posStr.split(',');
+        var pos = getPos(posStr);
 		var tileY = pos[0];
 		var tileX = pos[1];
 		var animation = tile.properties.animation;
@@ -1781,8 +1791,7 @@ function animateTile(tile, posStr) {
 			newTile.content = frame[0];
 			newTile.properties.color = frame[1];
 			tiles[posStr] = newTile;
-			delete tilePixelCache[posStr];
-			renderTile(tileX, tileY);
+			renderTile(tileX, tileY, true);
 			if (atFrame++ > framenum) {
 				if (repeat)
 					atFrame = 0;
@@ -1821,8 +1830,10 @@ var ws_functions = {
         styles.menu = data.colors.menu;
         styles.owner = data.colors.owner_area;
         styles.text = data.colors.text;
-        tilePixelCache = {};
-        renderTiles();
+        for(var i in tiles) {
+            var pos = getPos(i);
+            renderTile(pos[1], pos[0], true);
+        }
         menu_color(styles.menu);
     },
     tileUpdate: function(data) {
@@ -1836,7 +1847,7 @@ var ws_functions = {
                 data.tiles[i] = Object.assign({}, blankTile);
             }
             if(!data.tiles[i].properties.color) {
-                data.tiles[i].properties.color = Object.assign({}, blankColor);
+                data.tiles[i].properties.color = Object.assign([], blankColor);
             }
 			if (data.tiles[i].properties.animation) {
 				animateTile(data.tiles[i], i); // if it's already animated it will stop the old animation
@@ -1844,7 +1855,7 @@ var ws_functions = {
 				stopAnimation(i);
 			}
             if(!tiles[i].properties.color) {
-                tiles[i].properties.color = Object.assign({}, blankColor);
+                tiles[i].properties.color = Object.assign([], blankColor);
             }
             var pos = getPos(i);
             var tileX = pos[1];
