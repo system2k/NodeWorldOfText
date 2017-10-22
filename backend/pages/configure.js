@@ -64,17 +64,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         });
     }
 
-    var properties = JSON.parse(world.properties)
-  /*var go_to_coord = false;
-    var coordLink = false;
-    var urlLink = false;
-	var animate = false;
-    if(properties.features) {
-        if(properties.features.go_to_coord) go_to_coord = properties.features.go_to_coord
-        if(properties.features.coordLink) coordLink = properties.features.coordLink
-        if(properties.features.urlLink) urlLink = properties.features.urlLink
-		if(properties.features.animate) animate = properties.features.animate;
-    }*/
+    var properties = JSON.parse(world.properties);
 
     // if empty, make sure server knows it's empty
     // ([] is considered to not be empty through boolean conversion)
@@ -104,7 +94,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         url_link: world.feature_url_link,
         paste: world.feature_paste,
         membertiles_addremove: world.feature_membertiles_addremove,
-		animate: world.feature_animate,
+	  //animate: world.feature_animate,
 
         color,
         cursor_color,

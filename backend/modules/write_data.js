@@ -98,6 +98,7 @@ function fixColors(colors) {
 	return colors;
 }
 
+//let's leave this as just a feature for who knows this secret top top secret
 var NOT_SO_SECRET = "@^&$%!#*%^#*)~@$^*#!)~*%38259`25equfahgrqieavkj4bh8ofweieagrHG*FNV#@#OIFENUOGIVEOSFKNL<CDOLFKEWNSCOIEAFM:COGPEWWRG>BVPZL:MBGOEWSV";
 
 module.exports = async function(data, vars) {

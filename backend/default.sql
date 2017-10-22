@@ -63,7 +63,6 @@ CREATE TABLE "world" (
     "feature_paste" integer NOT NULL,
     "feature_coord_link" integer NOT NULL,
     "feature_url_link" integer NOT NULL,
-	"feature_animate" integer NOT NULL,
     "custom_bg" text NOT NULL,
     "custom_cursor" text NOT NULL,
     "custom_guest_cursor" text NOT NULL,
