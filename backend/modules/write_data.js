@@ -190,21 +190,21 @@ module.exports = async function(data, vars) {
             if(writability == 2 && !is_owner) {
                 rej_edits(changes)
                 free_queue();
-                return;
+                continue; // next tile
             }
         
             // tile is member-only, but user is not member (nor owner)
             if(writability == 1 && !is_owner && !is_member) {
                 rej_edits(changes)
                 free_queue();
-                return;
+                continue;
             }
         
             // this tile has no protection settings, and this user has no write perms
             if(writability == null && !can_write) {
                 rej_edits(changes)
                 free_queue();
-                return;
+                continue;
             }
             for(var e = 0; e < changes.length; e++) {
                 // edit --> [tileY, tileX, charY, charX, timestamp, char, id, colors, animation]

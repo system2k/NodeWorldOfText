@@ -191,8 +191,8 @@ module.exports.POST = async function(req, serve, vars) {
             membertiles_addremove = 0;
         }
 
-        await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link,feature_animate)=(?,?,?,?,?,?) WHERE id=?",
-            [go_to_coord, membertiles_addremove, paste, coord_link, url_link, animate, world.id])
+        await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link)=(?,?,?,?,?) WHERE id=?",
+            [go_to_coord, membertiles_addremove, paste, coord_link, url_link/*, animate*/, world.id])
     } else if(post_data.form == "style") {
         var color = validateCSS(post_data.color);
         var cursor_color = validateCSS(post_data.cursor_color);

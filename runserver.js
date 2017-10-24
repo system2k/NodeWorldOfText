@@ -770,6 +770,8 @@ function plural(int) {
 }
 
 async function world_get_or_create(name) {
+    name += "";
+    if(typeof name != "string") name = "";
     var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
     if(!world) { // world doesn't exist
         if(name.match(/^(\w*)$/g)) {

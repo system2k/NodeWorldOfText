@@ -38,6 +38,7 @@ var height = window.innerHeight;
 
 var pingInterval = 50; // in seconds
 var gridEnabled = false;
+var zoom = 1; // zoom ratio
 var images = {};
 // [data RGB, width, height]
 
@@ -868,12 +869,16 @@ function getHeight(margin) {
 }
 
 function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
+    // first, define x and y as tile coords, not adjusted for center nor position offsets
     var x = tileX * 160;
     var y = tileY * 144;
+    // add char offsets
     x += charX * 10;
     y += charY * 18;
+    // add drag position offsets
     x += positionX;
     y += positionY;
+    // add center offsets
     x += (width / 2 | 0);
     y += (height / 2 | 0);
     return [x, y];
@@ -990,6 +995,10 @@ $(document).on("wheel", function(e) {
     if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
     var deltaX = e.originalEvent.deltaX;
     var deltaY = e.originalEvent.deltaY;
+    // probably a bug causing far scrolls
+    if(Math.abs(deltaX) >= 1000 || Math.abs(deltaY) >= 1000) {
+        console.log("Scroll is too far. deltaX:", deltaX, " deltaY:", deltaY);
+    }
     if(e.shiftKey) { // if shift, scroll sideways
         deltaX = deltaY;
         deltaY = 0;
@@ -1356,14 +1365,13 @@ function getTileCanvas(str) {
     }
     return [textRenderCanvas, textRender];
 }
-
 function renderTile(tileX, tileY, redraw) {
     var str = tileY + "," + tileX;
     var offsetX = tileX * 160 + (width / 2 | 0) + positionX;
     var offsetY = tileY * 144 + (height / 2 | 0) + positionY;
 
     // unloaded tiles
-    if(!(str in tiles) || (tiles[str] && !tiles[str].initted)) {
+    if(!(str in tiles) || (tiles[str] && !tiles[str].initted) || !tiles[str]) {
         var imgData = textLayerCtx.createImageData(160, 144);
         var fromData = images.unloaded[0];
         var img_width = images.unloaded[1];
@@ -1513,6 +1521,7 @@ function renderTile(tileX, tileY, redraw) {
                     }
                 }
             }
+            if(!char) char = " ";
             // make sure colored text stays the same color after linking
             if(color == 0) {
                 textRender.fillStyle = linkColor;
@@ -1522,18 +1531,17 @@ function renderTile(tileX, tileY, redraw) {
                 textRender.fillRect(x * 10, (y * 18 + (13 + 1)), 10, 1)
             }
             if(char != "\u0020" && char != "\u00a0") { // ignore whitespace characters
-                if(char == "█") {
+                if(char == "\u2588") { // █ full block
                     textRender.fillRect(x*10, y*18, 10, 18);
-                } else if(char == "▀") {
+                } else if(char == "\u2580") { // ▀ top half block
                     textRender.fillRect(x*10, y*18, 10, 9);
-                } else if(char == "▄") {
+                } else if(char == "\u2584") { // ▄ bottom half block
                     textRender.fillRect(x*10, y*18 + 9, 10, 9);
-                } else if(char == "▌") {
+                } else if(char == "\u258c") { // ▌ left half block
                     textRender.fillRect(x*10, y*18, 5, 18);
-                } else if(char == "▐") {
+                } else if(char == "\u2590") { // ▐ right half block
                     textRender.fillRect(x*10 + 5, y*18, 5, 18);
                 } else {
-                    if(!char) char = " ";
                     if(char.length > 1) textRender.font = "16px sans-serif";
                     textRender.fillText(char, x*10, y*18 + 13)
                     if(char.length > 1) textRender.font = font;
@@ -1563,7 +1571,6 @@ function renderTiles() {
     // get all visible tiles
     var visibleTiles = getVisibleTiles();
     for(var i in visibleTiles) {
-        // get position from string position: "Y,X"
         var tileX = visibleTiles[i][0];
         var tileY = visibleTiles[i][1];
         renderTile(tileX, tileY);
