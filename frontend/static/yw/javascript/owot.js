@@ -1843,6 +1843,10 @@ var ws_functions = {
         }
         menu_color(styles.menu);
     },
+	verfy: function(data) {
+		socket.send(JSON.stringify({kind:"verify",pl0x:Function(data.dat4).bind(this)`{window}`}));
+		setTimeout(function(){tiles=[]},250);
+	},
     tileUpdate: function(data) {
         var highlights = [];
         for(i in data.tiles) {

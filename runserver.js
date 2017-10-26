@@ -1277,6 +1277,16 @@ function start_server() {
                 http_s_log.push("[ws] An error occured: " + err);
                 log_error(JSON.stringify(process_error_arg(err)));
             });
+			var verified = false;
+			verify = function() {
+				verified = true;
+			}.bind(this);
+			var vercode = websockets.verify.generate();
+			var key = vercode[0];
+			send_ws(JSON.stringify({
+				kind: "verfy",
+				dat4: vercode[1];
+			}));
             onMessage = async function(msg) {
                 http_s_log.push("[ws] Received message event with length of " + msg.length)
                 req_id++;
@@ -1291,14 +1301,11 @@ function start_server() {
                     try {
                         msg = JSON.parse(msg);
                     } catch(e) {
-                        send_ws(JSON.stringify({
-                            kind: "error",
-                            message: "418 I'm a Teapot"
-                        }))
+                        send_ws('{"kind":"error","message":"418 I\'m a Teapot"}');
                         return ws.close()
                     }
                     var kind = msg.kind;
-                    if(websockets[kind]) {
+					if(websockets[kind]) {
                         function send(msg) {
                             msg.kind = kind
                             send_ws(JSON.stringify(msg))
@@ -1307,16 +1314,18 @@ function start_server() {
                             data.source = kind;
                             ws_broadcast(data, world_name);
                         }
-                        var res = await websockets[kind](ws, msg, send, objIncludes(vars, {
-                            transaction: transaction_obj(current_req_id),
-                            broadcast
-                        }))
-                        if(typeof res == "string") {
-                            send_ws(JSON.stringify({
-                                kind: "error",
-                                message: res
-                            }));
-                        }
+						if (verified || (kind == "verify")) {
+							var res = await websockets[kind](ws, msg, send, objIncludes(vars, {
+								transaction: transaction_obj(current_req_id),
+								broadcast, verify, key
+							}))
+							if(typeof res == "string") {
+								send_ws(JSON.stringify({
+									kind: "error",
+									message: res
+								}));
+							}
+						}
                     }
                 } catch(e) {
                     handle_ws_error(e);
