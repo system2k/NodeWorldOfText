@@ -25,7 +25,7 @@ module.exports.GET = async function(req, serve, vars) {
 
     var world_name = get_third(path, "accounts", "download")
 
-    var world = await world_get_or_create(world_name, req, serve)
+    var world = await world_get_or_create(world_name)
     if(!world) {
         return await dispage("404", null, req, serve, vars)
     }

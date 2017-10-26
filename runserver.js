@@ -24,6 +24,7 @@ var static_path_web = "static/"
 var template_data = {}; // data used by the server
 var templates_path = "./frontend/templates/";
 dump_dir(template_data, templates_path, "", true);
+console.log("Compiling HTML templates...");
 for(var i in template_data) {
     template_data[i] = swig.compileFile(template_data[i]);
 }
@@ -40,6 +41,7 @@ if(!fs.existsSync(settings.ZIP_LOG_PATH)) {
 } else {
     zip_file = new zip(settings.ZIP_LOG_PATH);
 }
+console.log("Handling previous error logs (if any)");
 if(fs.existsSync(settings.LOG_PATH)) {
     var file = fs.readFileSync(settings.LOG_PATH)
     if(file.length > 0) {
@@ -61,6 +63,7 @@ function load_modules(default_dir) {
     return obj;
 }
 
+console.log("Loading modules...");
 const pages = load_modules("./backend/pages/");
 const websockets = load_modules("./backend/websockets/");
 const modules = load_modules("./backend/modules/");
@@ -160,19 +163,27 @@ const db = {
     }
 };
 
-var transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: settings.email.username,
-        pass: settings.email.password
-    }
-});
-var email_available = true;
 try {
-    transporter.verify()
+    var transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+            user: settings.email.username,
+            pass: settings.email.password
+        }
+    });
 } catch(e) {
     email_available = false;
-    console.log("Email is disabled because the verification failed (credentials possibly incorrect)")
+    console.log("Email disabled. Error message:", e);
+}
+
+var email_available = true;
+try {
+    if(email_available) {
+        transporter.verify()
+    }
+} catch(e) {
+    email_available = false;
+    console.log("Email is disabled because the verification failed (credentials possibly incorrect)");
 }
 
 async function send_email(destination, subject, text) {
@@ -471,7 +482,6 @@ var Decade = 315360345600;
 var ms = { Second, Minute, Hour, Day, Week, Month, Year, Decade };
 
 var url_regexp = [ // regexp , function/redirect to
-    ["^(\\w*)$", pages.yourworld],
     ["^(beta/(.*))$", pages.yourworld],
     ["^(frontpage/(.*))$", pages.yourworld],
     ["^favicon\.ico$", "/static/favicon.png"],
@@ -483,8 +493,8 @@ var url_regexp = [ // regexp , function/redirect to
     ["^ajax/unprotect/$", pages.unprotect],
     ["^ajax/coordlink/$", pages.coordlink],
     ["^ajax/urllink/$", pages.urllink],
-    ["^accounts/profile/", pages.profile],
-    ["^accounts/private/", pages.private],
+    ["^accounts/profile/$", pages.profile],
+    ["^accounts/private/$", pages.private],
     ["^accounts/configure/$", pages.configure], // for front page configuring
     ["^accounts/configure/(.*)/$", pages.configure],
     ["^accounts/configure/(beta/\\w+)/$", pages.configure],
@@ -501,7 +511,9 @@ var url_regexp = [ // regexp , function/redirect to
     ["^administrator/user/(.*)/$", pages.administrator_user],
     ["^accounts/download/$", pages.accounts_download], // for front page downloading
     ["^accounts/download/(.*)/$", pages.accounts_download],
-    ["^world_style/$", pages.world_style]
+    ["^world_style/$", pages.world_style],
+    ["^other/random_color$", pages.random_color],
+    ["^(\\w*)$", pages.yourworld]
 ]
 
 function get_third(url, first, second) {
@@ -542,9 +554,11 @@ static_file_returner.GET = function(req, serve) {
 }
 
 // push static file urls to regexp array
+var static_regexp = [];
 for (var i in static_data) {
-    url_regexp.push(["^" + i + "$", static_file_returner])
+    static_regexp.push(["^" + i + "$", static_file_returner])
 }
+url_regexp = static_regexp.concat(url_regexp);
 
 // trim whitespaces in all items in array
 function ar_str_trim(ar) {
@@ -769,14 +783,15 @@ function plural(int) {
     return p;
 }
 
-async function world_get_or_create(name) {
+async function world_get_or_create(name, do_not_create) {
     name += "";
     if(typeof name != "string") name = "";
     var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
-    if(!world) { // world doesn't exist
-        if(name.match(/^(\w*)$/g)) {
+    if(!world) { // world doesn't exist, create it
+    //console.log(do_not_create)
+        if(name.match(/^(\w*)$/g) && !do_not_create) {
             var date = Date.now();
-            await db.run("INSERT INTO world VALUES(null, ?, null, ?, 2, 0, 2, 0, 0, '', '', '', '', '', '', 0, 0, '{}')",
+            await db.run("INSERT INTO world VALUES(null, ?, null, ?, 2, 0, 0, 0, 0, '', '', '', '', '', '', 0, 0, '{}')",
                 [name, date])
             world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name)
         } else { // special worlds (like: /beta/test) are not found and must not be created
@@ -1154,6 +1169,7 @@ function announce(text) {
     })();
 }
 
+var wss;
 function start_server() {
     (async function() {
         announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
@@ -1164,7 +1180,7 @@ function start_server() {
         }
     })();
 
-    var wss = new ws.Server({ server });
+    wss = new ws.Server({ server });
     ws_broadcast = function(data, world) {
         data = JSON.stringify(data)
         http_s_log.push("[ws] Begin broadcast client, data size is " + data.length)

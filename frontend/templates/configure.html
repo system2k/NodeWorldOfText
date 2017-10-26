@@ -6,6 +6,36 @@
 
 {% block endhead %}
 <link rel="stylesheet" type="text/css" href="/static/jquery.autocomplete.css">
+<script>
+	var actionMethod = "";
+	onload = function() {
+		unclaim.onclick = function() { actionMethod = "unclaim" };
+		clear_public.onclick = function() { actionMethod = "clear_public" };
+		clear_all.onclick = function() { actionMethod = "clear_all" };
+	}
+	function action_confirm() {
+		var msg = "";
+		if(actionMethod == "unclaim") {
+			msg = "Are you sure you want to unclaim this world? This action cannot be undone if someone else reclaims the world."
+		}
+		if(actionMethod == "clear_public") {
+			msg = "Are you sure you want to clear all public areas? This action cannot be undone."
+		}
+		if(actionMethod == "clear_all") {
+			msg = "Are you sure you want to clear this world entirely? This action cannot be undone."
+		}
+		return confirm(msg);
+	}
+</script>
+<style>
+	.action_btn {
+		width: 150px;
+	}
+	.action_desc {
+		font-size: 10px;
+		color: #2e2e2e;
+	}
+</style>
 {% endblock %}
 
 {% block header %}
@@ -23,7 +53,7 @@
 				Write-permissions can be overridden for particular sections of your world: visit your world, then click the "More" menu for options.
 			</p>
 			<form method="POST" action="">
-				<input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' />
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 				<p>
 					Who can visit this world?
 					<select name="readability">
@@ -53,7 +83,7 @@
 				Who can use what features on this world.
 			</p>
 			<form method="POST" action="">
-				<input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' />
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 				<table class="config_table">
 					<tr>
 						<td class="feature_name">Go to coordinates</td>
@@ -133,7 +163,7 @@
 				Custom colors for your world
 			</p>
 			<form method="POST" action="">
-				<input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' />
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 				<table class="config_table">
 					<tr>
 						<td class="feature_name">Text color</td>
@@ -211,11 +241,32 @@
 	</div>
 
 	<div class="content_set">
+		<div class="content_set_title">Miscellaneous</div>
+		<div class="content_set_content" id="misc">
+			{% if misc_message %}
+				<span style="font-size:80%"><i>{{ misc_message }}</i></span>
+			{% endif %}
+			<p class="set_description">
+				Other features that may not meet the categories.
+			</p>
+			<form method="POST" action="">
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
+				<p>
+					Name of this world:
+					<input name="new_world_name" value="{{ world }}">
+				</p>
+				<input type="hidden" name="form" value="misc">
+				<input type="submit" value="Submit">
+			</form>
+		</div>
+	</div>
+
+	<div class="content_set">
 		<div class="content_set_title">Members</div>
 		<div class="content_set_content">
 			{% if members %}
 				<ul>
-					<form method="POST" action="."><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
+					<form method="POST" action="."><div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" /></div>
 					<input type="hidden" name="form" value="remove_member">
 					{% for member in members %}
 						<li>{{ member.member_name }} <input type="submit" name="remove_{{ member.member_name }}" value="Remove {{ member.member_name }}">
@@ -227,15 +278,47 @@
 			{% endif %}
 			{% if add_member_message %}<div><i>{{ add_member_message }}</i></div>{% endif %}
 			<div style="margin-top:.3em">
-				<form method="POST" action="."><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
-				<label for="choose_member">Add a member: </label>
-				<input id="choose_member" type="text" name="add_member" value="">
-				<input type="hidden" name="form" value="add_member">
-				<input type="submit" value="Submit">
+				<form method="POST" action="."><div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" /></div>
+					<label for="choose_member">Add a member: </label>
+					<input id="choose_member" type="text" name="add_member" value="">
+					<input type="hidden" name="form" value="add_member">
+					<input type="submit" value="Submit">
+				</form>
 			</div>
-			</form>
 		</div>
 	</div>
+
+	<form method="POST" action="." id="action_form" onsubmit="return action_confirm();">
+		<input type="hidden" name="form" value="action">
+		<table>
+			<tbody>
+				<tr>
+					<td>
+						<button name="unclaim" class="action_btn" id="unclaim">Unclaim this world</button>
+					</td>
+					<td class="action_desc">
+						Give up ownership of this world
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<button name="clear_public" class="action_btn" id="clear_public">Clear all public areas</button>
+					</td>
+					<td class="action_desc">
+						Clear all areas that are public (areas anyone can edit, regardless of rank)
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<button name="clear_all" class="action_btn" id="clear_all">Clear everything</button>
+					</td>
+					<td class="action_desc">
+						Clear the entire world. All text will be completely gone
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</form>
 {% endblock %}
 {% block endbody %}
 <script type="text/javascript" src="/static/jquery.autocomplete.min.js"></script>

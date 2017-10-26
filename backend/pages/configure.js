@@ -85,6 +85,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         csrftoken: user.csrftoken,
         members: member_list,
         add_member_message: params.message,
+        misc_message: params.misc_message,
 
         readability: world.readability,
         writability: world.writability,
@@ -137,6 +138,7 @@ module.exports.POST = async function(req, serve, vars) {
     }
 
     var properties = JSON.parse(world.properties);
+    var new_world_name = null;
 
     if(post_data.form == "add_member") {
         var username = post_data.add_member;
@@ -217,9 +219,50 @@ module.exports.POST = async function(req, serve, vars) {
                 menu: menu_color || "#e5e5ff"
             }
         }, world.name)
+    } else if(post_data.form == "misc") {
+        var new_name = post_data.new_world_name + "";
+        var exists = await world_get_or_create(new_name, true);
+        // world name exists (skip if user is just changing casing of the name)
+        if(exists && exists.id != world.id) {
+            return await dispage("configure", {
+                misc_message: "World name is already taken"
+            }, req, serve, vars)
+        }
+        if(new_name == "" && !user.superuser) {
+            return await dispage("configure", {
+                misc_message: "Cannot change world name to this"
+            }, req, serve, vars)
+        }
+        await db.run("UPDATE world SET name=? WHERE id=?", [new_name, world.id]);
+        new_world_name = new_name;
+    } else if(post_data.form == "action") { // the special features (unclaim, clear worlds)
+        var mode = post_data.mode;
+        if(post_data.unclaim == "") {
+            await db.run("UPDATE world SET owner_id=null WHERE id=?", world.id);
+            return serve(null, null, {
+                redirect: "/accounts/profile/"
+            });
+        } else if(post_data.clear_public == "") {
+            await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE world_id=? AND writability=0",
+                [" ".repeat(128), "{}", world.id]);
+            var writability = world.writability;
+            if(writability == 0) {
+                // delete default tiles that are public too (null = default protection)
+                await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE world_id=? AND writability IS NULL", [" ".repeat(128), "{}", world.id]);
+                // apparently, it's not "=null" but "IS NULL"
+            }
+        } else if(post_data.clear_all == "") {
+            await db.run("DELETE FROM tile WHERE world_id=?", world.id);
+        }
     }
 
-    serve(null, null, {
-        redirect: url.parse(req.url).pathname
-    });
+    if(new_world_name == null) {
+        serve(null, null, {
+            redirect: url.parse(req.url).pathname
+        });
+    } else { // world name changed, redirect to new name
+        serve(null, null, {
+            redirect: "/accounts/configure/" + new_world_name + "/"
+        });
+    }
 }

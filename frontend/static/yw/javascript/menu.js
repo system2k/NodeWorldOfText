@@ -12,14 +12,16 @@ var Menu = (function() {
 			s.click(_this.hideNow);
 			_this.addEntry(s[0]);
 		};
-		this.addCheckboxOption = function(text, checkedAction, uncheckedAction) {
+		this.addCheckboxOption = function(text, checkedAction, uncheckedAction, checked) {
 			var i;
 			var s;
 			s = $(document.createElement("div"));
 			s.text(text);
 			i = document.createElement("input");
 			i.type = "checkbox";
+			i.checked = !!checked;
 			s.prepend(i);
+			s[0].checked = !!checked;
 			s.click(function(e) {
 				if (e.target !== i) {
 					i.checked = !i.checked;

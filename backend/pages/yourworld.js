@@ -18,7 +18,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         world_name = params.world;
     }
 
-    var world = await world_get_or_create(world_name, req, serve)
+    var world = await world_get_or_create(world_name)
     if(!world) return;
 
     var world_properties = JSON.parse(world.properties)
@@ -103,7 +103,7 @@ module.exports.POST = async function(req, serve, vars) {
     var world_get_or_create = vars.world_get_or_create;
     var can_view_world = vars.can_view_world;
 
-    var world = await world_get_or_create(path, req, serve, vars)
+    var world = await world_get_or_create(path)
     if(!world) return;
 
     var read_permission = await can_view_world(world, user, db);

@@ -21,6 +21,7 @@ module.exports.POST = async function(req, serve, vars, params) {
     var world_get_or_create = vars.world_get_or_create;
     var can_view_world = vars.can_view_world;
     var tile_signal_update = vars.tile_signal_update;
+    var san_nbr = vars.san_nbr;
 
     var world = await world_get_or_create(post_data.world);
     if(!world) {
@@ -102,6 +103,10 @@ module.exports.POST = async function(req, serve, vars, params) {
     if(!all_numbers(numb_check)) { // one of args isn't number
         return serve(null, 400);
     }
+    tileX = san_nbr(tileX);
+    tileY = san_nbr(tileY);
+    charX = san_nbr(charX);
+    charY = san_nbr(charY);
 
     if(!(charX < 16 && charY < 8 && charX >= 0 && charY >= 0)) { // out of range coords
         return serve(null, 400);
@@ -114,7 +119,7 @@ module.exports.POST = async function(req, serve, vars, params) {
     if(link_type == 0) {
         tile_props.cell_props[charY][charX].link = {
             type: "url",
-            url: post_data.url
+            url: post_data.url.slice(0, 10000) // size limit of urls
         }
     } else if(link_type == 1) {
         tile_props.cell_props[charY][charX].link = {

@@ -1,30 +1,3 @@
-if (typeof Object.assign != "function") { // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign#Polyfill
-	// Must be writable: true, enumerable: false, configurable: true
-	Object.defineProperty(Object, "assign", {
-		value: function assign(target, varArgs) { // .length of function is 2
-			"use strict";
-			if (target == null) { // TypeError if undefined or null
-				throw new TypeError("Cannot convert undefined or null to object");
-			}
-			var to = Object(target);
-			for (var index = 1; index < arguments.length; index++) {
-				var nextSource = arguments[index];
-				if (nextSource != null) { // Skip over if undefined or null
-					for (var nextKey in nextSource) {
-						// Avoid bugs when hasOwnProperty is shadowed
-						if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
-							to[nextKey] = nextSource[nextKey];
-						}
-					}
-				}
-			}
-			return to;
-		},
-		writable: true,
-		configurable: true
-	});
-}
-
 $("#loading").hide();
 var owot = $("#owot")[0];
 var textInput = $("#textInput");
@@ -38,11 +11,12 @@ var height = window.innerHeight;
 
 var pingInterval = 50; // in seconds
 var gridEnabled = false;
-var zoom = 1; // zoom ratio
+var linksEnabled = true;
+var colorsEnabled = true;
+var zoom = 100; // zoom in percentage
+zoom /= 100; // convert zoom to a ratio the client can manage. 100% -> 1, 200% -> 2, 50% -> 0.5
 var images = {};
 // [data RGB, width, height]
-
-var font = "16px 'Courier New', monospace";
 
 var backgroundImageParser = document.createElement("canvas");
 var backImg = backgroundImageParser.getContext("2d");
@@ -56,6 +30,83 @@ unloadedImage.onload = function() {
     // once all the images are loaded
     renderTiles();
     begin();
+}
+
+var defaultSizes = {
+    // in pixels
+    tileW: 160,
+    tileH: 144,
+    cellW: 10,
+    cellH: 18,
+    // in characters
+    tileWidth: 16,
+    tileHeight: 8
+}
+
+var tileW = defaultSizes.tileW * zoom;
+var tileH = defaultSizes.tileH * zoom;
+var cellW = defaultSizes.cellW * zoom;
+var cellH = defaultSizes.cellH * zoom;
+
+var fontBase = "px 'Courier New', monospace";
+var specialCharFontBase = "px sans-serif";
+
+var font = (16 * zoom) + fontBase;
+var specialCharFont = (16 * zoom) + specialCharFontBase;
+
+var tileWidth = defaultSizes.tileWidth;
+var tileHeight = defaultSizes.tileHeight;
+var tileArea = tileWidth * tileHeight;
+
+function doZoom(percentage) {
+    if(percentage < 25 || percentage > 1000) { // zoomed too far in/out?
+        return;
+    }
+    percentage /= 100;
+    zoom = percentage;
+
+    // modify all pixel sizes
+    tileW = defaultSizes.tileW * zoom;
+    tileH = defaultSizes.tileH * zoom;
+    cellW = defaultSizes.cellW * zoom;
+    cellH = defaultSizes.cellH * zoom;
+    font = (16 * zoom) + fontBase;
+    specialCharFont = (16 * zoom) + specialCharFontBase;
+
+    // modify invisible-link size
+    linkDiv.style.width = cellW + "px";
+    linkDiv.style.height = cellH + "px";
+
+    textLayerCtx.clearRect(0, 0, width, height);
+    // change size of tiles
+    for(var i in tilePixelCache) {
+        var canvas = tilePixelCache[i][0];
+        canvas.width = tileW;
+        canvas.height = tileH;
+        var ctx = tilePixelCache[i][1];
+        ctx.font = font;
+        var pos = getPos(i);
+        renderTile(pos[1], pos[0], true);
+    }
+}
+
+// this is for testing purposes. do not use this for regular use
+function DebugRepairBlurry() {
+    var ratio = devicePixelRatio;
+
+    textLayer.style.width = (width|0) + "px"
+    textLayer.style.height = (height|0) + "px"
+    textLayer.width = width*ratio;
+    textLayer.height = height*ratio;
+    
+    owot.style.width = (width|0) + "px"
+    owot.style.height = (height|0) + "px"
+    owot.width = width*ratio;
+    owot.height = height*ratio;
+    
+    width *= ratio;
+    height *= ratio;
+    doZoom(100*ratio)
 }
 
 function removeAlpha(data) {
@@ -300,6 +351,34 @@ $("body").on("keyup.linkAuto", function(e) {
     linkAuto.shiftDown = e.shiftKey;
 })
 
+// polyfill for Object.assign
+if (typeof Object.assign != "function") { // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign#Polyfill
+	// Must be writable: true, enumerable: false, configurable: true
+	Object.defineProperty(Object, "assign", {
+		value: function assign(target, varArgs) { // .length of function is 2
+			"use strict";
+			if (target == null) { // TypeError if undefined or null
+				throw new TypeError("Cannot convert undefined or null to object");
+			}
+			var to = Object(target);
+			for (var index = 1; index < arguments.length; index++) {
+				var nextSource = arguments[index];
+				if (nextSource != null) { // Skip over if undefined or null
+					for (var nextKey in nextSource) {
+						// Avoid bugs when hasOwnProperty is shadowed
+						if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
+							to[nextKey] = nextSource[nextKey];
+						}
+					}
+				}
+			}
+			return to;
+		},
+		writable: true,
+		configurable: true
+	});
+}
+
 $(window).on("resize", function(e) {
     width = window.innerWidth;
     height = window.innerHeight;
@@ -310,6 +389,33 @@ $(window).on("resize", function(e) {
     textLayer.height = height;
 
     renderTiles();
+})
+
+function getChar(tileX, tileY, charX, charY) {
+	var tile = tiles[tileY + "," + tileX];
+	if(!tile) return " ";
+	var content = advancedSplit(tile.content);
+	return content[charY * tileWidth + charX];
+}
+
+// copy individual chars
+$(document).on("keydown", function(e) {
+    // 67 = c, 77 = m
+    if(!e.ctrlKey || (e.keyCode != 67 && e.keyCode != 77)) return;
+    textInput[0].value = "";
+	// ctrl + c to copy characters where the text cursor is,
+	// ctrl + m to copy characters where the mouse cursor is
+	var pos_ref = cursorCoords
+	if(e.keyCode == 77) { // copy where mouse cursor is
+		pos_ref = currentPosition
+	}
+	if(!pos_ref) return;
+	var tileX = pos_ref[0];
+	var tileY = pos_ref[1];
+	var charX = pos_ref[2];
+	var charY = pos_ref[3];
+	var char = getChar(tileX, tileY, charX, charY)
+    prompt("Copy the character below:", char);
 })
 
 owot.width = width;
@@ -516,10 +622,11 @@ function renderCursor(coords) {
     cursorCoordsCurrent = coords;
     renderTile(coords[0], coords[1]);
 
-    var pixelX = (coords[0] * 160) + (coords[2] * 10) + positionX + (width / 2 | 0);
-    var pixelY = (coords[1] * 144) + (coords[3] * 18) + positionY + (height / 2 | 0);
+    var pixelX = (coords[0] * tileW) + (coords[2] * cellW) + positionX + (width / 2 | 0);
+    var pixelY = (coords[1] * tileH) + (coords[3] * cellH) + positionY + (height / 2 | 0);
     
     var diff = null;
+    // keep record of old positions to check if they changed
     var posXCompare = positionX;
     var posYCompare = positionY;
 
@@ -527,17 +634,17 @@ function renderCursor(coords) {
         diff = Math.abs(pixelX);
         positionX += diff;
     }
-    if(pixelX + 10 >= width) { // cursor too far right
+    if(pixelX + cellW >= width) { // cursor too far right
         diff = Math.abs(width - pixelX);
-        positionX -= 10 - diff;
+        positionX -= cellW - diff;
     }
     if(pixelY < 0) { // cursor too far up
         diff = Math.abs(pixelY);
         positionY += diff;
     }
-    if(pixelY + 18 >= height) { // cursor too far down
+    if(pixelY + cellH >= height) { // cursor too far down
         diff = Math.abs(height - pixelY);
-        positionY -= 18 - diff;
+        positionY -= cellH - diff;
     }
 
     if(diff != null && (posXCompare != positionX || posYCompare != positionY)) renderTiles()
@@ -587,7 +694,7 @@ function is_link(tileX, tileY, charX, charY) {
     if(tiles[tileY + "," + tileX]) {
         var tile = tiles[tileY + "," + tileX]
         if(tile) {
-            var pos = charY * 16 + charX;
+            var pos = charY * tileWidth + charX;
             var props = tile.properties.cell_props;
             if(!props) props = {};
             if(props[charY]) {
@@ -623,7 +730,7 @@ function containsNewLine(char) {
 
 var blankColor = (function() {
     var ar = [];
-    for(var i = 0; i < 128; i++) {
+    for(var i = 0; i < tileArea; i++) {
         ar.push(0);
     }
     return ar;
@@ -651,24 +758,24 @@ function moveCursor(direction, do_not_change_enter_x) {
     if(direction == "up") {
         cSCopy[3]--;
         if(cSCopy[3] < 0) {
-            cSCopy[3] = 7;
+            cSCopy[3] = tileHeight - 1;
             cSCopy[1]--
         }
     } else if(direction == "down") {
         cSCopy[3]++;
-        if(cSCopy[3] > 7) {
+        if(cSCopy[3] > tileHeight - 1) {
             cSCopy[3] = 0;
             cSCopy[1]++;
         }
     } else if(direction == "left") {
         cSCopy[2]--;
         if(cSCopy[2] < 0) {
-            cSCopy[2] = 15;
+            cSCopy[2] = tileWidth - 1;
             cSCopy[0]--;
         }
     } else if(direction == "right") {
         cSCopy[2]++;
-        if(cSCopy[2] > 15) {
+        if(cSCopy[2] > tileWidth - 1) {
             cSCopy[2] = 0;
             cSCopy[0]++;
         }
@@ -695,7 +802,7 @@ function writeChar(char, doNotMoveCursor) {
         var newLine = containsNewLine(char);
         if(!newLine) {
             if(!tiles[tileY + "," + tileX]) {
-                tiles[tileY + "," + tileX] = Object.assign({}, blankTile);
+                tiles[tileY + "," + tileX] = blankTile();
             }
             var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
             if(!cell_props) cell_props = {};
@@ -709,15 +816,16 @@ function writeChar(char, doNotMoveCursor) {
                 }
             }
             // change color
-            color[charY * 16 + charX] = YourWorld.Color;
+            color[charY * tileWidth + charX] = YourWorld.Color;
             tiles[tileY + "," + tileX].properties.color = color;
+
             // update cell properties (link positions)
             tiles[tileY + "," + tileX].properties.cell_props = cell_props;
 
             var con = tiles[tileY + "," + tileX].content;
             con = advancedSplit(con);
             // replace character
-            con[charY * 16 + charX] = char;
+            con[charY * tileWidth + charX] = char;
             // join splitted content string
             tiles[tileY + "," + tileX].content = con.join("");
             // re-render
@@ -736,14 +844,14 @@ function writeChar(char, doNotMoveCursor) {
             var cSCopy = cursor.slice();
             // move cursor to right
             cSCopy[2]++;
-            if(cSCopy[2] >= 16) {
+            if(cSCopy[2] >= tileWidth) {
                 cSCopy[2] = 0;
                 cSCopy[0]++;
             }
             if(newLine) {
                 // move cursor down
                 cSCopy[3]++;
-                if(cSCopy[3] >= 8) {
+                if(cSCopy[3] >= tileHeight) {
                     cSCopy[3] = 0;
                     cSCopy[1]++;
                 }
@@ -826,14 +934,14 @@ function getTileCoordsFromMouseCoords(x, y) {
     var mpX = x - positionX - (width / 2 | 0);
     var mpY = y - positionY - (height / 2 | 0);
     // cell position (relative to anywhere)
-    charX = Math.floor(mpX / 10);
-    charY = Math.floor(mpY / 18);
+    charX = Math.floor(mpX / cellW);
+    charY = Math.floor(mpY / cellH);
     // add tile position
-    tileX = Math.floor(charX / 16);
-    tileY = Math.floor(charY / 8);
+    tileX = Math.floor(charX / tileWidth);
+    tileY = Math.floor(charY / tileHeight);
     // in-tile cell position
-    charX = charX - (Math.floor(charX / 16) * 16);
-    charY = charY - (Math.floor(charY / 8) * 8);
+    charX = charX - (Math.floor(charX / tileWidth) * tileWidth);
+    charY = charY - (Math.floor(charY / tileHeight) * tileHeight);
     return [tileX, tileY, charX, charY];
 }
 
@@ -870,11 +978,11 @@ function getHeight(margin) {
 
 function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
     // first, define x and y as tile coords, not adjusted for center nor position offsets
-    var x = tileX * 160;
-    var y = tileY * 144;
+    var x = tileX * tileW;
+    var y = tileY * tileH;
     // add char offsets
-    x += charX * 10;
-    y += charY * 18;
+    x += charX * cellW;
+    y += charY * cellH;
     // add drag position offsets
     x += positionX;
     y += positionY;
@@ -888,8 +996,8 @@ var linkElm = document.createElement("a");
 linkElm.href = "test";
 $("body")[0].appendChild(linkElm);
 var linkDiv = document.createElement("div");
-linkDiv.style.width = "10px";
-linkDiv.style.height = "18px";
+linkDiv.style.width = cellW + "px";
+linkDiv.style.height = cellH + "px";
 linkElm.appendChild(linkDiv);
 linkElm.style.position = "absolute";
 linkElm.title = "Link to url...";
@@ -897,7 +1005,7 @@ linkElm.style.display = "block";
 linkElm.target = "_blank";
 linkElm.style.cursor = "pointer";
 
-var waitTimeout = Math.floor(1000 / 60); // 0: no wait timeout
+var waitTimeout = Math.floor(1000 / 60); // 60 fps max for dragging
 var lastRender = 0;
 $(document).on("mousemove", function(e) {
     var coords = getTileCoordsFromMouseCoords(e.pageX, e.pageY)
@@ -909,7 +1017,7 @@ $(document).on("mousemove", function(e) {
     var charY = coords[3];
 
     var link = is_link(tileX, tileY, charX, charY);
-    if(link) {
+    if(link && linksEnabled) {
         var pos = tileAndCharsToWindowCoords(tileX, tileY, charX, charY);
         linkElm.style.left = pos[0] + "px";
         linkElm.style.top = pos[1] + "px";
@@ -930,8 +1038,8 @@ $(document).on("mousemove", function(e) {
             linkElm.target = "";
         }
     } else {
-        linkElm.style.top = "-100px";
-        linkElm.style.left = "-100px";
+        linkElm.style.top = "-1000px";
+        linkElm.style.left = "-1000px";
         linkElm.hidden = true;
     }
 
@@ -978,6 +1086,7 @@ $(document).on("mousemove", function(e) {
     var posX = e.pageX;
     var posY = e.pageY;
 
+    // if dragging beyond window, stop
     if(posX >= width || posY >= height || posX < 0 || posY < 0) stopDragging();
 
     if(!isDragging) return;
@@ -995,10 +1104,6 @@ $(document).on("wheel", function(e) {
     if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
     var deltaX = e.originalEvent.deltaX;
     var deltaY = e.originalEvent.deltaY;
-    // probably a bug causing far scrolls
-    if(Math.abs(deltaX) >= 1000 || Math.abs(deltaY) >= 1000) {
-        console.log("Scroll is too far. deltaX:", deltaX, " deltaY:", deltaY);
-    }
     if(e.shiftKey) { // if shift, scroll sideways
         deltaX = deltaY;
         deltaY = 0;
@@ -1109,6 +1214,7 @@ function cutRanges(map, width, height) {
 }
 
 var pingTimeout;
+var fetchInterval;
 function createSocket() {
     socket = new ReconnectingWebSocket(ws_path);
     w.socket = socket;
@@ -1123,16 +1229,18 @@ function createSocket() {
 
     socket.onopen = function(msg) {
         getAndFetchTiles();
+        clearInterval(fetchInterval);
         fetchInterval = setInterval(function() {
             getAndFetchTiles();
         }, 300)
         socket.send("2::"); // initial ping
+        // ping is so that the socket won't close after every minute
     }
 }
 
 // fetches only unloaded tiles
 function getAndFetchTiles() {
-    var margin = 200;
+    var margin = 200; // px
     var data = getVisibleTiles(margin);
     
     var startX = data[0][0];
@@ -1225,7 +1333,7 @@ function fixedCharAt(str, idx) {
 
 function newColorArray() {
     var ar = [];
-    for(var i = 0; i < 128; i++) {
+    for(var i = 0; i < tileArea; i++) {
         ar.push(0);
     }
     return ar;
@@ -1285,25 +1393,27 @@ var flashAnimateInterval = setInterval(function() {
         }
     }
     // re-render tiles
-    var tileGroupCount = 0;
     for(var i in tileGroup) {
         var pos = getPos(i);
         renderTile(pos[1], pos[0]);
-        tileGroupCount++;
     }
 }, 1)
 
 var blank = "";
-for(var i = 0; i < 128; i++) blank += " ";
+for(var i = 0; i < tileArea; i++) blank += " ";
 
-var blankTile = {
-	content: blank,
-	properties: {
-		cell_props: {},
-		writability: null,
-		color: Object.assign([], blankColor)
-	},
-	initted: false
+function blankTile() {
+    var newTile = {
+        content: blank,
+        properties: {
+            cell_props: {},
+            writability: null,
+            color: null
+        },
+        initted: false
+    }
+    newTile.properties.color = Object.assign([], blankColor);
+    return newTile;
 }
 
 // format:
@@ -1355,8 +1465,8 @@ function getTileCanvas(str) {
     var textRender;
     if(!textRenderCanvas) {
         textRenderCanvas = document.createElement("canvas");
-        textRenderCanvas.width = 10 * 16;
-        textRenderCanvas.height = 18 * 8;
+        textRenderCanvas.width = cellW * tileWidth;
+        textRenderCanvas.height = cellH * tileHeight;
         textRender = textRenderCanvas.getContext("2d");
         textRender.font = font;
         tilePixelCache[str] = [textRenderCanvas, textRender];
@@ -1365,27 +1475,28 @@ function getTileCanvas(str) {
     }
     return [textRenderCanvas, textRender];
 }
+
 function renderTile(tileX, tileY, redraw) {
     var str = tileY + "," + tileX;
-    var offsetX = tileX * 160 + (width / 2 | 0) + positionX;
-    var offsetY = tileY * 144 + (height / 2 | 0) + positionY;
+    var offsetX = tileX * tileW + (width / 2 | 0) + positionX;
+    var offsetY = tileY * tileH + (height / 2 | 0) + positionY;
 
     // unloaded tiles
     if(!(str in tiles) || (tiles[str] && !tiles[str].initted) || !tiles[str]) {
-        var imgData = textLayerCtx.createImageData(160, 144);
+        var imgData = textLayerCtx.createImageData(tileW, tileH);
         var fromData = images.unloaded[0];
         var img_width = images.unloaded[1];
         var img_height = images.unloaded[2];
-        var startX = tileX * 160;
-        var startY = tileY * 144;
-        for(var y = 0; y < 144; y++) {
-            for(var x = 0; x < 160; x++) {
+        var startX = tileX * tileW;
+        var startY = tileY * tileH;
+        for(var y = 0; y < tileH; y++) {
+            for(var x = 0; x < tileW; x++) {
                 var posX = startX + x;
                 var posY = startY + y;
                 posX = posX - Math.floor(posX / img_width) * img_width;
                 posY = posY - Math.floor(posY / img_height) * img_height;
                 var index = (posY * img_width + posX) * 3;
-                var destIndex = (y * 160 + x) * 4;
+                var destIndex = (y * tileW + x) * 4;
                 imgData.data[destIndex + 0] = fromData[index + 0];
                 imgData.data[destIndex + 1] = fromData[index + 1];
                 imgData.data[destIndex + 2] = fromData[index + 2];
@@ -1396,7 +1507,7 @@ function renderTile(tileX, tileY, redraw) {
         var textRenderCanvas = tileCanv[0];
         var textRender = tileCanv[1];
         textRender.putImageData(imgData, 0, 0);
-        textLayerCtx.clearRect(offsetX, offsetY, 160, 144);
+        textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
         textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
         return;
     }
@@ -1404,7 +1515,7 @@ function renderTile(tileX, tileY, redraw) {
     var tile = tiles[str];
 
     if(tile == null) {
-        tiles[str] = Object.assign({}, blankTile);
+        tiles[str] = blankTile();
         tile = tiles[str];
     }
 
@@ -1426,33 +1537,33 @@ function renderTile(tileX, tileY, redraw) {
     }
 
     // fill tile background color
-    ctx.fillRect(offsetX, offsetY, 160, 144);
+    ctx.fillRect(offsetX, offsetY, tileW, tileH);
 
     // draw cursor
     if(cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
         var charX = cursorCoords[2];
         var charY = cursorCoords[3];
         ctx.fillStyle = styles.cursor;
-        ctx.fillRect(offsetX + charX * 10, offsetY + charY * 18, 10, 18);
+        ctx.fillRect(offsetX + charX * cellW, offsetY + charY * cellH, cellW, cellH);
     }
 
     // draw the grid
     if(gridEnabled) {
         ctx.fillStyle = "#000000";
-        ctx.fillRect(offsetX, offsetY + 143, 160, 1);
-        ctx.fillRect(offsetX + 160 - 1, offsetY, 1, 144);
+        ctx.fillRect(offsetX, offsetY + tileH - zoom, tileW, zoom);
+        ctx.fillRect(offsetX + tileW - zoom, offsetY, zoom, tileH);
     }
 
     var highlight = highlightFlash[str];
     if(!highlight) highlight = {};
 
-    for(var y = 0; y < 8; y++) {
-        for(var x = 0; x < 16; x++) {
+    for(var y = 0; y < tileHeight; y++) {
+        for(var x = 0; x < tileWidth; x++) {
             // highlight flash animation
             if(highlight[y]) {
                 if(highlight[y][x] !== void 0) {
                     ctx.fillStyle = "rgb(255, 255, " + highlight[y][x][1] + ")";
-                    ctx.fillRect(offsetX + x * 10, offsetY + y * 18, 10, 18);
+                    ctx.fillRect(offsetX + x * cellW, offsetY + y * cellH, cellW, cellH);
                 }
             }
         }
@@ -1460,12 +1571,17 @@ function renderTile(tileX, tileY, redraw) {
 
     // tile is null, so don't add text/color data
     if(!tile) return;
+
     // tile is already written
-    if(tilePixelCache[str] && !redraw) {
-        textLayerCtx.clearRect(offsetX, offsetY, 160, 144);
+    if(tilePixelCache[str] && !redraw && !tile.redraw) {
+        textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
         textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
         return;
     }
+    if(tile.redraw) { // tile is being redrawn via boolean, so set it back to false
+        delete tile.redraw;
+    }
+
     var tileCanv = getTileCanvas(str);
     var textRenderCanvas = tileCanv[0];
     var textRender = tileCanv[1];
@@ -1482,27 +1598,27 @@ function renderTile(tileX, tileY, redraw) {
     if(!props) props = {};
 
     content = advancedSplit(content);
-
-    for(var y = 0; y < 8; y++) {
-        for(var x = 0; x < 16; x++) {
+    var textYOffset = cellH - (5 * zoom);
+    for(var y = 0; y < tileHeight; y++) {
+        for(var x = 0; x < tileWidth; x++) {
             // fill background if defined
             if(coloredChars[str]) {
                 if(coloredChars[str][y]) {
                     if(coloredChars[str][y][x]) {
                         var color = coloredChars[str][y][x];
                         textRender.fillStyle = color;
-                        textRender.fillRect(x * 10, y * 18, 10, 18);
+                        textRender.fillRect(x * cellW, y * cellH, cellW, cellH);
                     }
                 }
             }
 
-            var char = content[y * 16 + x];
-            var color = colors[y * 16 + x];
+            var char = content[y * tileWidth + x];
+            var color = colors[y * tileWidth + x];
             // initialize link color to default text color in case there's no link to color
             var linkColor = styles.text;
             var isLink = false;
-            // if text has no color, use defaul text color. otherwise, colorize it
-            if(color == 0) {
+            // if text has no color, use default text color. otherwise, colorize it
+            if(color == 0 || !colorsEnabled) {
                 textRender.fillStyle = styles.text;
             } else {
                 textRender.fillStyle = "#" + ("00000" + color.toString(16)).slice(-6);
@@ -1523,45 +1639,51 @@ function renderTile(tileX, tileY, redraw) {
             }
             if(!char) char = " ";
             // make sure colored text stays the same color after linking
-            if(color == 0) {
+            if(color == 0 || !colorsEnabled) {
                 textRender.fillStyle = linkColor;
             }
             // underline link
             if(isLink) {
-                textRender.fillRect(x * 10, (y * 18 + (13 + 1)), 10, 1)
+                textRender.fillRect(x * cellW, (y * cellH + textYOffset + zoom), cellW, zoom)
             }
             if(char != "\u0020" && char != "\u00a0") { // ignore whitespace characters
                 if(char == "\u2588") { // █ full block
-                    textRender.fillRect(x*10, y*18, 10, 18);
+                    textRender.fillRect(x*cellW, y*cellH, cellW, cellH);
                 } else if(char == "\u2580") { // ▀ top half block
-                    textRender.fillRect(x*10, y*18, 10, 9);
+                    textRender.fillRect(x*cellW, y*cellH, cellW, cellH / 2 | 0);
                 } else if(char == "\u2584") { // ▄ bottom half block
-                    textRender.fillRect(x*10, y*18 + 9, 10, 9);
+                    textRender.fillRect(x*cellW, y*cellH + (cellH/2|0), cellW, cellH / 2 | 0);
                 } else if(char == "\u258c") { // ▌ left half block
-                    textRender.fillRect(x*10, y*18, 5, 18);
+                    textRender.fillRect(x*cellW, y*cellH, cellW/2|0, cellH);
                 } else if(char == "\u2590") { // ▐ right half block
-                    textRender.fillRect(x*10 + 5, y*18, 5, 18);
+                    textRender.fillRect(x*cellW + (cellW/2|0), y*cellH, cellW/2|0, cellH);
                 } else {
-                    if(char.length > 1) textRender.font = "16px sans-serif";
-                    textRender.fillText(char, x*10, y*18 + 13)
+                    if(char.length > 1) textRender.font = specialCharFont;
+                    textRender.fillText(char, x*cellW, y*cellH + textYOffset)
                     if(char.length > 1) textRender.font = font;
                 }
             }
         }
     }
     // add image to main canvas
-    textLayerCtx.clearRect(offsetX, offsetY, 160, 144);
+    textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
     textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
 }
 
-function renderTiles() {
+function renderTiles(redraw) {
     // update coordinate display
-    var tileCoordX = Math.floor(-positionX / 160);
-    var tileCoordY = Math.floor(-positionY / 144);
+    var tileCoordX = Math.floor(-positionX / tileW);
+    var tileCoordY = Math.floor(-positionY / tileH);
     var centerY = -Math.floor(tileCoordY / 4);
     var centerX = Math.floor(tileCoordX / 4);
     $("#coord_Y").text(centerY);
     $("#coord_X").text(centerX);
+
+    if(redraw) {
+        for(var i in tiles) {
+            tiles[i].redraw = true;
+        }
+    }
 
     ctx.fillStyle = "#ddd";
     // clear tile color layer
@@ -1585,13 +1707,6 @@ function buildMenu() {
     }, function() {
         return $("#coords").hide();
     });
-    menu.addCheckboxOption(" Toggle grid", function() {
-        gridEnabled = true;
-        renderTiles();
-    }, function() {
-        gridEnabled = false;
-        renderTiles();
-    });
     menu.addOption("Change color", w.color);
     if (Permissions.can_go_to_coord(state.userModel, state.worldModel)) {
         menu.addOption("Go to coordinates", w.goToCoord);
@@ -1614,8 +1729,27 @@ function buildMenu() {
         menu.addOption("Make an area public", function() {
             return w.doProtect("public");
         });
-        return menu.addOption("Default area protection", w.doUnprotect);
+        menu.addOption("Default area protection", w.doUnprotect);
     }
+    menu.addCheckboxOption(" Toggle grid", function() {
+        gridEnabled = true;
+        renderTiles();
+    }, function() {
+        gridEnabled = false;
+        renderTiles();
+    });
+    menu.addCheckboxOption(" Links enabled", function() {
+        linksEnabled = true;
+    }, function() {
+        linksEnabled = false;
+    }, true);
+    menu.addCheckboxOption(" Colors enabled", function() {
+        colorsEnabled = true;
+        renderTiles(true);
+    }, function() {
+        colorsEnabled = false;
+        renderTiles(true);
+    }, true);
 }
 
 document.onselectstart = function() {
@@ -1659,12 +1793,17 @@ var w = {
         w._ui.coordinateInputModal.open("Go to coordinates:", w.doGoToCoord.bind(w));
     },
     doGoToCoord: function(y, x) {
-        positionX = -x * 160 * 4;
-        positionY = y * 144 * 4;
+        var maxX = 14073748835532; // do not go beyond these coords
+        var maxY = 15637498706147;
+        if(x > maxX || x < -maxX || y > maxY || y < -maxY) {
+            return;
+        }
+        positionX = -x * tileW * 4;
+        positionY = y * tileH * 4;
         renderTiles();
     },
     getCenterCoords: function() {
-        return [-positionY / 144, -positionX / 160]
+        return [-positionY / tileH, -positionX / tileW]
     },
     doUrlLink: function(url) {
         linkAuto.active = true;
@@ -1819,7 +1958,7 @@ var ws_functions = {
 				stopAnimation(i);
 			}
             tiles[i] = tile;
-            if(!tiles[i]) tiles[i] = Object.assign({}, blankTile);
+            if(!tiles[i]) tiles[i] = blankTile();
             tiles[i].initted = true;
             var pos = getPos(i);
             renderTile(pos[1], pos[0], true);
@@ -1848,10 +1987,10 @@ var ws_functions = {
         for(i in data.tiles) {
             // if tile isn't loaded, load it blank
             if(!tiles[i]) {
-                tiles[i] = Object.assign({}, blankTile);
+                tiles[i] = blankTile();
             }
             if(!data.tiles[i]) {
-                data.tiles[i] = Object.assign({}, blankTile);
+                data.tiles[i] = blankTile();
             }
             if(!data.tiles[i].properties.color) {
                 data.tiles[i].properties.color = Object.assign([], blankColor);
@@ -1884,7 +2023,7 @@ var ws_functions = {
             var charX = 0;
             var charY = 0;
             // compare data
-            for(var g = 0; g < 128; g++) {
+            for(var g = 0; g < tileArea; g++) {
                 var oChar = oldContent[g];
                 var nChar = newContent[g];
                 var oCol = oldColors[g];
@@ -1892,7 +2031,6 @@ var ws_functions = {
                 if(oChar != nChar || oCol != nCol) {
                     // make sure it won't overwrite the clients changes before they get sent.
                     // if edits are from client, don't overwrite, but leave the highlight flashes
-
                     if(!searchTellEdit(tileX, tileY, charX, charY) && (data.channel != w.socketChannel || w.acceptOwnEdits)) {
                         oldContent[g] = nChar;
                         oldColors[g] = nCol;
@@ -1901,7 +2039,7 @@ var ws_functions = {
                     highlights.push([tileX, tileY, charX, charY]);
                 }
                 charX++;
-                if(charX >= 16) {
+                if(charX >= tileWidth) {
                     charX = 0;
                     charY++;
                 }
@@ -1910,9 +2048,10 @@ var ws_functions = {
             tiles[i].properties = data.tiles[i].properties; // update tile
             tiles[i].content = oldContent; // update only necessary character updates
             tiles[i].properties.color = oldColors; // update only necessary color updates
-            renderTile(tileX, tileY, true);
+            tiles[i].redraw = true;
         }
         if(highlights.length > 0) highlight(highlights);
+        renderTiles();
     },
     write: function(data) {
         // after user has written text, the client should expect list of all edit ids that passed
