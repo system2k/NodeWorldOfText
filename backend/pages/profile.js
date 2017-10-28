@@ -53,7 +53,8 @@ module.exports.GET = async function(req, serve, vars, params) {
         }
         memberships.push({
             get_absolute_url: "/" + name,
-            url: display_name
+            url: display_name,
+            name
         })
     }
 
@@ -90,17 +91,27 @@ module.exports.POST = async function(req, serve, vars) {
     }
 
     var message = null;
-
-    var worldname = post_data.worldname;
-    if(worldname.match(/^(\w*)$/g) && (worldname.length > 0 || user.superuser)) {
-        var world = await world_get_or_create(worldname);
-        if(world.owner_id == null) {
-            await db.run("UPDATE world SET owner_id=? WHERE name=? COLLATE NOCASE", [user.id, worldname])
+    if(post_data.form == "claim") {
+        var worldname = post_data.worldname;
+        if(worldname.match(/^(\w*)$/g) && (worldname.length > 0 || user.superuser)) {
+            var world = await world_get_or_create(worldname);
+            if(world.owner_id == null) {
+                await db.run("UPDATE world SET owner_id=? WHERE name=? COLLATE NOCASE", [user.id, worldname])
+            } else {
+                message = "World already has an owner";
+            }
         } else {
-            message = "World already has an owner";
+            message = "Invalid world name";
         }
-    } else {
-        message = "Invalid world name";
+    } else if(post_data.form == "leave") { // user is leaving the world (terminating own membership)
+        for(var key in post_data) {
+            if(key.startsWith("leave_")) {
+                var worldName = key.substr("leave_".length);
+                await db.run("DELETE FROM whitelist WHERE world_id=(SELECT id FROM world WHERE name=?) and user_id=?",
+                    [worldName, user.id]);
+                break;
+            }
+        }
     }
     await dispage("profile", {
         message: message

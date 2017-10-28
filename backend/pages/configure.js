@@ -103,7 +103,9 @@ module.exports.GET = async function(req, serve, vars, params) {
         bg,
         owner_color,
         member_color,
-        menu_color
+        menu_color,
+
+        pumpkin_background: properties.background == "/static/misc/images/halloween/pumpkin.png"
     };
 
     serve(template_data["configure.html"](data))
@@ -220,22 +222,38 @@ module.exports.POST = async function(req, serve, vars) {
             }
         }, world.name)
     } else if(post_data.form == "misc") {
+        var properties_updated = false;
+        if(!("pumpkin_background" in post_data)) {
+            properties_updated = true;
+            delete properties.background;
+        }
         var new_name = post_data.new_world_name + "";
-        var exists = await world_get_or_create(new_name, true);
-        // world name exists (skip if user is just changing casing of the name)
-        if(exists && exists.id != world.id) {
-            return await dispage("configure", {
-                misc_message: "World name is already taken"
-            }, req, serve, vars)
+        if(new_name && new_name != world.name) { // changing world name
+            var exists = await world_get_or_create(new_name, true);
+            // world name exists (skip if user is just changing casing of the name)
+            if(exists && exists.id != world.id) {
+                return await dispage("configure", {
+                    misc_message: "World name is already taken"
+                }, req, serve, vars)
+            }
+            if((new_name == "" || !new_name.match(/^(\w*)$/g)) && !user.superuser) {
+                return await dispage("configure", {
+                    misc_message: "Cannot change world name to this"
+                }, req, serve, vars)
+            }
+            await db.run("UPDATE world SET name=? WHERE id=?", [new_name, world.id]);
+            new_world_name = new_name;
+        } else if("pumpkin_background" in post_data) {
+            properties.background = "/static/misc/images/halloween/pumpkin.png";
+            properties_updated = true;
         }
-        if(new_name == "" && !user.superuser) {
-            return await dispage("configure", {
-                misc_message: "Cannot change world name to this"
-            }, req, serve, vars)
+        if(properties_updated) {
+            await db.run("UPDATE world SET properties=? WHERE id=?",
+                [JSON.stringify(properties), world.id])
         }
-        await db.run("UPDATE world SET name=? WHERE id=?", [new_name, world.id]);
-        new_world_name = new_name;
-    } else if(post_data.form == "action") { // the special features (unclaim, clear worlds)
+    } else if(post_data.form == "action") {
+        // the special features (unclaim, clear worlds)
+
         var mode = post_data.mode;
         if(post_data.unclaim == "") {
             await db.run("UPDATE world SET owner_id=null WHERE id=?", world.id);

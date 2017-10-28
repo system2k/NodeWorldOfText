@@ -1,11 +1,23 @@
+var YourWorld = {
+    Color: 0
+}
+
+// edit ID
+var nextObjId = 1;
+
 $("#loading").hide();
 var owot = $("#owot")[0];
 var textInput = $("#textInput");
 var textLayer = $("#text")[0];
+
 owot.hidden = false;
 textLayer.hidden = false;
 textLayer.style.pointerEvents = "none";
 owot.style.cursor = "text";
+
+$("#coord_Y").text(0);
+$("#coord_X").text(0);
+
 var width = window.innerWidth;
 var height = window.innerHeight;
 
@@ -13,24 +25,56 @@ var pingInterval = 50; // in seconds
 var gridEnabled = false;
 var linksEnabled = true;
 var colorsEnabled = true;
+var backgroundEnabled = true; // if any
 var zoom = 100; // zoom in percentage
 zoom /= 100; // convert zoom to a ratio the client can manage. 100% -> 1, 200% -> 2, 50% -> 0.5
-var images = {};
-// [data RGB, width, height]
+var images = {}; // { name: [data RGBA, width, height] }
 
-var backgroundImageParser = document.createElement("canvas");
-var backImg = backgroundImageParser.getContext("2d");
-var unloadedImage = new Image();
-unloadedImage.src = "/static/unloaded.png";
-unloadedImage.onload = function() {
-    backImg.drawImage(unloadedImage, 0, 0);
-    var width = unloadedImage.width;
-    var height = unloadedImage.height;
-    images.unloaded = [removeAlpha(backImg.getImageData(0, 0, width, height).data), width, height];
-    // once all the images are loaded
-    renderTiles();
-    begin();
+var images_to_load = {
+    unloaded: "/static/unloaded.png"
 }
+if(state.background) { // add the background image (if it already exists)
+    images_to_load.background = state.background;
+}
+for(var i in images_to_load) { // add blank image object so that client knows it exists, but not loaded
+    images[i] = null;
+}
+var img_load_keys = Object.keys(images_to_load);
+
+var imgToArrayCanvas = document.createElement("canvas");
+var backImg = imgToArrayCanvas.getContext("2d");
+
+var loadImageElm = new Image();
+var img_load_index = 0;
+function loadLoop() {
+    var img_key = img_load_keys[img_load_index];
+    loadImageElm.src = images_to_load[img_key];
+    var error = false;
+    loadImageElm.onload = function() {
+        if(!error) { // error occured, don't process
+            var width = loadImageElm.width;
+            var height = loadImageElm.height;
+            imgToArrayCanvas.width = width;
+            imgToArrayCanvas.height = height;
+            backImg.drawImage(loadImageElm, 0, 0);
+            images[img_key] = [backImg.getImageData(0, 0, width, height).data, width, height];
+        }
+        img_load_index++;
+        if(img_load_index >= img_load_keys.length) {
+            // once all the images are loaded
+            renderTiles();
+            begin();
+        } else {
+            // keep loading
+            loadLoop();
+        }
+    }
+    loadImageElm.onerror = function() {
+        error = true;
+        loadImageElm.onload();
+    }
+}
+loadLoop();
 
 var defaultSizes = {
     // in pixels
@@ -39,8 +83,8 @@ var defaultSizes = {
     cellW: 10,
     cellH: 18,
     // in characters
-    tileWidth: 16,
-    tileHeight: 8
+    tileC: 16, // columns
+    tileR: 8 // rows
 }
 
 var tileW = defaultSizes.tileW * zoom;
@@ -54,9 +98,15 @@ var specialCharFontBase = "px sans-serif";
 var font = (16 * zoom) + fontBase;
 var specialCharFont = (16 * zoom) + specialCharFontBase;
 
-var tileWidth = defaultSizes.tileWidth;
-var tileHeight = defaultSizes.tileHeight;
-var tileArea = tileWidth * tileHeight;
+var tileC = defaultSizes.tileC;
+var tileR = defaultSizes.tileR;
+var tileArea = tileC * tileR;
+
+// used to stretch background images
+var backgroundImageCanvasRenderer = document.createElement("canvas");
+backgroundImageCanvasRenderer.width = tileW;
+backgroundImageCanvasRenderer.height = tileH;
+var backgroundImageCtx = backgroundImageCanvasRenderer.getContext("2d");
 
 function doZoom(percentage) {
     if(percentage < 25 || percentage > 1000) { // zoomed too far in/out?
@@ -120,16 +170,6 @@ function removeAlpha(data) {
     }
     return res;
 }
-
-var YourWorld = {
-    Color: 0
-}
-
-$("#coord_Y").text(0);
-$("#coord_X").text(0);
-
-// edit ID
-var nextObjId = 1;
 
 var tileProtectAuto = {
 	selected: {},
@@ -395,7 +435,7 @@ function getChar(tileX, tileY, charX, charY) {
 	var tile = tiles[tileY + "," + tileX];
 	if(!tile) return " ";
 	var content = advancedSplit(tile.content);
-	return content[charY * tileWidth + charX];
+	return content[charY * tileC + charX];
 }
 
 // copy individual chars
@@ -694,7 +734,7 @@ function is_link(tileX, tileY, charX, charY) {
     if(tiles[tileY + "," + tileX]) {
         var tile = tiles[tileY + "," + tileX]
         if(tile) {
-            var pos = charY * tileWidth + charX;
+            var pos = charY * tileC + charX;
             var props = tile.properties.cell_props;
             if(!props) props = {};
             if(props[charY]) {
@@ -758,24 +798,24 @@ function moveCursor(direction, do_not_change_enter_x) {
     if(direction == "up") {
         cSCopy[3]--;
         if(cSCopy[3] < 0) {
-            cSCopy[3] = tileHeight - 1;
+            cSCopy[3] = tileR - 1;
             cSCopy[1]--
         }
     } else if(direction == "down") {
         cSCopy[3]++;
-        if(cSCopy[3] > tileHeight - 1) {
+        if(cSCopy[3] > tileR - 1) {
             cSCopy[3] = 0;
             cSCopy[1]++;
         }
     } else if(direction == "left") {
         cSCopy[2]--;
         if(cSCopy[2] < 0) {
-            cSCopy[2] = tileWidth - 1;
+            cSCopy[2] = tileC - 1;
             cSCopy[0]--;
         }
     } else if(direction == "right") {
         cSCopy[2]++;
-        if(cSCopy[2] > tileWidth - 1) {
+        if(cSCopy[2] > tileC - 1) {
             cSCopy[2] = 0;
             cSCopy[0]++;
         }
@@ -816,7 +856,7 @@ function writeChar(char, doNotMoveCursor) {
                 }
             }
             // change color
-            color[charY * tileWidth + charX] = YourWorld.Color;
+            color[charY * tileC + charX] = YourWorld.Color;
             tiles[tileY + "," + tileX].properties.color = color;
 
             // update cell properties (link positions)
@@ -825,7 +865,7 @@ function writeChar(char, doNotMoveCursor) {
             var con = tiles[tileY + "," + tileX].content;
             con = advancedSplit(con);
             // replace character
-            con[charY * tileWidth + charX] = char;
+            con[charY * tileC + charX] = char;
             // join splitted content string
             tiles[tileY + "," + tileX].content = con.join("");
             // re-render
@@ -844,14 +884,14 @@ function writeChar(char, doNotMoveCursor) {
             var cSCopy = cursor.slice();
             // move cursor to right
             cSCopy[2]++;
-            if(cSCopy[2] >= tileWidth) {
+            if(cSCopy[2] >= tileC) {
                 cSCopy[2] = 0;
                 cSCopy[0]++;
             }
             if(newLine) {
                 // move cursor down
                 cSCopy[3]++;
-                if(cSCopy[3] >= tileHeight) {
+                if(cSCopy[3] >= tileR) {
                     cSCopy[3] = 0;
                     cSCopy[1]++;
                 }
@@ -937,11 +977,11 @@ function getTileCoordsFromMouseCoords(x, y) {
     charX = Math.floor(mpX / cellW);
     charY = Math.floor(mpY / cellH);
     // add tile position
-    tileX = Math.floor(charX / tileWidth);
-    tileY = Math.floor(charY / tileHeight);
+    tileX = Math.floor(charX / tileC);
+    tileY = Math.floor(charY / tileR);
     // in-tile cell position
-    charX = charX - (Math.floor(charX / tileWidth) * tileWidth);
-    charY = charY - (Math.floor(charY / tileHeight) * tileHeight);
+    charX = charX - (Math.floor(charX / tileC) * tileC);
+    charY = charY - (Math.floor(charY / tileR) * tileR);
     return [tileX, tileY, charX, charY];
 }
 
@@ -1102,8 +1142,12 @@ $(document).on("mousemove", function(e) {
 })
 $(document).on("wheel", function(e) {
     if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
-    var deltaX = e.originalEvent.deltaX;
-    var deltaY = e.originalEvent.deltaY;
+    var deltaX = e.originalEvent.deltaX | 0;
+    var deltaY = e.originalEvent.deltaY | 0;
+    if(e.deltaMode != 0) {
+        deltaX = 0;
+        deltaY = (deltaY / Math.abs(deltaY)) * 100;
+    }
     if(e.shiftKey) { // if shift, scroll sideways
         deltaX = deltaY;
         deltaY = 0;
@@ -1281,7 +1325,7 @@ function getAndFetchTiles() {
     }
 }
 
-// clears all tiles outside the viewport
+// clears all tiles outside the viewport (to free up memory)
 function clearTiles() {
     var coordinates = getVisibleTiles();
     // reference to tile coordinates (EG: "5,6")
@@ -1465,8 +1509,8 @@ function getTileCanvas(str) {
     var textRender;
     if(!textRenderCanvas) {
         textRenderCanvas = document.createElement("canvas");
-        textRenderCanvas.width = cellW * tileWidth;
-        textRenderCanvas.height = cellH * tileHeight;
+        textRenderCanvas.width = cellW * tileC;
+        textRenderCanvas.height = cellH * tileR;
         textRender = textRenderCanvas.getContext("2d");
         textRender.font = font;
         tilePixelCache[str] = [textRenderCanvas, textRender];
@@ -1476,35 +1520,63 @@ function getTileCanvas(str) {
     return [textRenderCanvas, textRender];
 }
 
+const dTileW = tileW; // permanent tile sizes in pixel (remains same throughout client's session)
+const dTileH = tileH;
+
+function generateBackgroundPixels(tileX, tileY, image, returnCanvas) {
+    var tileWidth = tileW;
+    var tileHeight = tileH;
+    if(returnCanvas) {
+        // returning a canvas (for scaling purposes), so use the constant tile sizes
+        tileWidth = dTileW;
+        tileHeight = dTileH;
+    }
+    var imgData = textLayerCtx.createImageData(tileWidth, tileHeight);
+    if(!image) { // image doesn't exist, return as how it is
+        return imgData;
+    }
+    var fromData = image[0]; // pixel data (RGBA)
+    var img_width = image[1];
+    var img_height = image[2];
+    // [pixels] where the tile starts in the client (offset relative to 0,0)
+    var startX = tileX * tileWidth;
+    var startY = tileY * tileHeight;
+    // start drawing the pixels
+    for(var y = 0; y < tileHeight; y++) {
+        for(var x = 0; x < tileWidth; x++) {
+            var posX = startX + x;
+            var posY = startY + y;
+            // perform calculation to get chunk out of the image tiled
+            posX = posX - Math.floor(posX / img_width) * img_width;
+            posY = posY - Math.floor(posY / img_height) * img_height;
+            var index = (posY * img_width + posX) * 4;
+            var destIndex = (y * tileWidth + x) * 4;
+            imgData.data[destIndex + 0] = fromData[index + 0];
+            imgData.data[destIndex + 1] = fromData[index + 1];
+            imgData.data[destIndex + 2] = fromData[index + 2];
+            imgData.data[destIndex + 3] = fromData[index + 3];
+        }
+    }
+    if(returnCanvas) { // return canvas version of background
+        backgroundImageCtx.putImageData(imgData, 0, 0);
+        return backgroundImageCanvasRenderer;
+    }
+    return imgData;
+}
+
 function renderTile(tileX, tileY, redraw) {
     var str = tileY + "," + tileX;
     var offsetX = tileX * tileW + (width / 2 | 0) + positionX;
     var offsetY = tileY * tileH + (height / 2 | 0) + positionY;
 
     // unloaded tiles
-    if(!(str in tiles) || (tiles[str] && !tiles[str].initted) || !tiles[str]) {
-        var imgData = textLayerCtx.createImageData(tileW, tileH);
-        var fromData = images.unloaded[0];
-        var img_width = images.unloaded[1];
-        var img_height = images.unloaded[2];
-        var startX = tileX * tileW;
-        var startY = tileY * tileH;
-        for(var y = 0; y < tileH; y++) {
-            for(var x = 0; x < tileW; x++) {
-                var posX = startX + x;
-                var posY = startY + y;
-                posX = posX - Math.floor(posX / img_width) * img_width;
-                posY = posY - Math.floor(posY / img_height) * img_height;
-                var index = (posY * img_width + posX) * 3;
-                var destIndex = (y * tileW + x) * 4;
-                imgData.data[destIndex + 0] = fromData[index + 0];
-                imgData.data[destIndex + 1] = fromData[index + 1];
-                imgData.data[destIndex + 2] = fromData[index + 2];
-                imgData.data[destIndex + 3] = 255;
-            }
-        }
+    if(!tiles[str] || (tiles[str] && !tiles[str].initted)) {
+        // generate tile background
+        var imgData = generateBackgroundPixels(tileX, tileY, images.unloaded);
+        // get main canvas of the tile
         var tileCanv = getTileCanvas(str);
         var textRenderCanvas = tileCanv[0];
+        // get the canvas context
         var textRender = tileCanv[1];
         textRender.putImageData(imgData, 0, 0);
         textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
@@ -1550,6 +1622,9 @@ function renderTile(tileX, tileY, redraw) {
     // draw the grid
     if(gridEnabled) {
         ctx.fillStyle = "#000000";
+        if(styles.public == "#000000") { // if black background, make gridlines white
+            ctx.fillStyle = "#FFFFFF";
+        }
         ctx.fillRect(offsetX, offsetY + tileH - zoom, tileW, zoom);
         ctx.fillRect(offsetX + tileW - zoom, offsetY, zoom, tileH);
     }
@@ -1557,8 +1632,8 @@ function renderTile(tileX, tileY, redraw) {
     var highlight = highlightFlash[str];
     if(!highlight) highlight = {};
 
-    for(var y = 0; y < tileHeight; y++) {
-        for(var x = 0; x < tileWidth; x++) {
+    for(var y = 0; y < tileR; y++) {
+        for(var x = 0; x < tileC; x++) {
             // highlight flash animation
             if(highlight[y]) {
                 if(highlight[y][x] !== void 0) {
@@ -1578,7 +1653,8 @@ function renderTile(tileX, tileY, redraw) {
         textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
         return;
     }
-    if(tile.redraw) { // tile is being redrawn via boolean, so set it back to false
+    // tile is being redrawn via boolean (draw next time renderer is called), so set it back to false
+    if(tile.redraw) {
         delete tile.redraw;
     }
 
@@ -1588,6 +1664,10 @@ function renderTile(tileX, tileY, redraw) {
 
     // first, clear text renderer canvas
     textRender.clearRect(0, 0, width, height);
+    if(images.background && backgroundEnabled) {
+        var background_data = generateBackgroundPixels(tileX, tileY, images.background, true);
+        textRender.drawImage(background_data, 0, 0, tileW, tileH)
+    }
 
     var content = tile.content;
     var colors = tile.properties.color;
@@ -1599,8 +1679,8 @@ function renderTile(tileX, tileY, redraw) {
 
     content = advancedSplit(content);
     var textYOffset = cellH - (5 * zoom);
-    for(var y = 0; y < tileHeight; y++) {
-        for(var x = 0; x < tileWidth; x++) {
+    for(var y = 0; y < tileR; y++) {
+        for(var x = 0; x < tileC; x++) {
             // fill background if defined
             if(coloredChars[str]) {
                 if(coloredChars[str][y]) {
@@ -1612,8 +1692,8 @@ function renderTile(tileX, tileY, redraw) {
                 }
             }
 
-            var char = content[y * tileWidth + x];
-            var color = colors[y * tileWidth + x];
+            var char = content[y * tileC + x];
+            var color = colors[y * tileC + x];
             // initialize link color to default text color in case there's no link to color
             var linkColor = styles.text;
             var isLink = false;
@@ -1750,6 +1830,15 @@ function buildMenu() {
         colorsEnabled = false;
         renderTiles(true);
     }, true);
+    if("background" in images) {
+        menu.addCheckboxOption(" Background", function() {
+            backgroundEnabled = true;
+            renderTiles(true);
+        }, function() {
+            backgroundEnabled = false;
+            renderTiles(true);
+        }, true);
+    }
 }
 
 document.onselectstart = function() {
@@ -2039,7 +2128,7 @@ var ws_functions = {
                     highlights.push([tileX, tileY, charX, charY]);
                 }
                 charX++;
-                if(charX >= tileWidth) {
+                if(charX >= tileC) {
                     charX = 0;
                     charY++;
                 }

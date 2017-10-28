@@ -80,6 +80,9 @@ module.exports.GET = async function(req, serve, vars, params) {
         if(params.timemachine) {
             state.worldModel.writability = 0;
         }
+        if(world_properties.background) {
+            state.background = world_properties.background;
+        }
         var page_title = "Our World of Text";
         if(world.name) {
             page_title = "/" + world.name;

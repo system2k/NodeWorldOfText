@@ -255,6 +255,12 @@
 					Name of this world:
 					<input name="new_world_name" value="{{ world }}">
 				</p>
+				{% if user.staff %}
+					<p>
+						Pumpkin background
+						<input name="pumpkin_background" type="checkbox"{%if pumpkin_background%} checked{%endif%} value="{{ world }}">
+					</p>
+				{% endif %}
 				<input type="hidden" name="form" value="misc">
 				<input type="submit" value="Submit">
 			</form>
@@ -297,7 +303,7 @@
 						<button name="unclaim" class="action_btn" id="unclaim">Unclaim this world</button>
 					</td>
 					<td class="action_desc">
-						Give up ownership of this world
+						Give up ownership of this world.
 					</td>
 				</tr>
 				<tr>
@@ -305,7 +311,7 @@
 						<button name="clear_public" class="action_btn" id="clear_public">Clear all public areas</button>
 					</td>
 					<td class="action_desc">
-						Clear all areas that are public (areas anyone can edit, regardless of rank)
+						Clear all areas that are public (areas anyone can edit, regardless of rank). Text in protected areas will remain.
 					</td>
 				</tr>
 				<tr>
@@ -313,7 +319,7 @@
 						<button name="clear_all" class="action_btn" id="clear_all">Clear everything</button>
 					</td>
 					<td class="action_desc">
-						Clear the entire world. All text will be completely gone
+						Clear the entire world. All text will be completely gone (including protected areas).
 					</td>
 				</tr>
 			</tbody>
