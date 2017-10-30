@@ -191,6 +191,7 @@ module.exports = async function(data, vars) {
             await wait_queue(tileX, tileY, world.id); // wait for previous tile to finish
         }
         in_queue.push([tileX, tileY, world.id]);
+        // this tile is done, let other edits edit the same tile
         function free_queue() {
             resolve_queue(tileX, tileY, world.id);
             rem_queue(tileX, tileY, world.id);

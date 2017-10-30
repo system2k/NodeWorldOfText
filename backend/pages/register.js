@@ -1,12 +1,10 @@
 module.exports = {};
 
 module.exports.GET = async function(req, serve, vars, params) {
-    var template_data = vars.template_data;
+    var HTML = vars.HTML;
     var user = vars.user;
 
     var data = {
-        user,
-
         csrftoken: user.csrftoken,
         form_username_errors    : params.form_username_errors  || [],
         form_email_errors       : params.form_email_errors     || [],
@@ -19,7 +17,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         password1: params.password
     };
 
-    serve(template_data["registration/registration_form.html"](data))
+    serve(HTML("registration/registration_form.html", data));
 }
 
 module.exports.POST = async function(req, serve, vars) {

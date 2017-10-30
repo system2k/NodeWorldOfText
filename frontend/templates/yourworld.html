@@ -10,6 +10,11 @@
         {% for script in user.scripts %}
             <script src="/script_manager/view/{{ script.name }}/"></script>
         {% endfor %}
+        <style>
+            .screen {
+                overflow: hidden;
+            }
+        </style>
     </head>
     <body>
         <div id="topbar" class="ui">
@@ -72,8 +77,8 @@
             var state = {{ state|safe }};
         </script>
 
-        <canvas id="owot" hidden></canvas>
-        <canvas id="text" style="position: absolute; left: 0px; top: 0px;" hidden></canvas>
+        <canvas id="owot" class="screen" hidden></canvas>
+        <canvas id="text" class="screen" style="position: absolute; left: 0px; top: 0px;" hidden></canvas>
         <textarea autocapitalize="off" autocorrect="off" autocomplete="off" style="left: -1000px; top: -1000px; position: absolute;" id="textInput"></textarea>
     
         <script type="text/javascript" src="/static/jquery-1.7.min.js"></script>

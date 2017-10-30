@@ -1,21 +1,20 @@
 module.exports = {};
 
 module.exports.GET = async function(req, serve, vars, params) {
-    var template_data = vars.template_data;
+    var HTML = vars.HTML;
     var cookies = vars.cookies;
     var db = vars.db;
     var user = vars.user;
     var new_token = vars.new_token;
 
     var data = {
-        user,
         form_errors: params.errors, // "Your username and password didn't match. Please try again."
         csrftoken: new_token(32),
         message: params.message,
         username: params.username
     };
 
-    serve(template_data["registration/login.html"](data))
+    serve(HTML("registration/login.html", data));
 }
 
 module.exports.POST = async function(req, serve, vars, params) {

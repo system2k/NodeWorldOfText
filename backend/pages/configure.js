@@ -26,7 +26,7 @@ function validatePerms(p) {
 }
 
 module.exports.GET = async function(req, serve, vars, params) {
-    var template_data = vars.template_data;
+    var HTML = vars.HTML;
     var user = vars.user;
     var url = vars.url;
     var path = vars.path;
@@ -108,7 +108,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         pumpkin_background: properties.background == "/static/misc/images/halloween/pumpkin.png"
     };
 
-    serve(template_data["configure.html"](data))
+    serve(HTML("configure.html", data));
 }
 
 module.exports.POST = async function(req, serve, vars) {
@@ -121,6 +121,7 @@ module.exports.POST = async function(req, serve, vars) {
     var url = vars.url;
     var world_get_or_create = vars.world_get_or_create;
     var ws_broadcast = vars.ws_broadcast;
+    var validate_claim_worldname = vars.validate_claim_worldname;
 
     if(!user.authenticated) {
         serve();
@@ -223,26 +224,24 @@ module.exports.POST = async function(req, serve, vars) {
         }, world.name)
     } else if(post_data.form == "misc") {
         var properties_updated = false;
+        // pumpkin background unchecked? remove it
         if(!("pumpkin_background" in post_data)) {
             properties_updated = true;
             delete properties.background;
         }
         var new_name = post_data.new_world_name + "";
         if(new_name && new_name != world.name) { // changing world name
-            var exists = await world_get_or_create(new_name, true);
-            // world name exists (skip if user is just changing casing of the name)
-            if(exists && exists.id != world.id) {
+            var validate = await validate_claim_worldname(new_name, vars, true, world.id);
+            if(typeof validate != "object" && validate != "<RENAME>") { // error with renaming
                 return await dispage("configure", {
-                    misc_message: "World name is already taken"
+                    misc_message: validate
                 }, req, serve, vars)
             }
-            if((new_name == "" || !new_name.match(/^(\w*)$/g)) && !user.superuser) {
-                return await dispage("configure", {
-                    misc_message: "Cannot change world name to this"
-                }, req, serve, vars)
+            if(validate == "<RENAME>") {
+                await db.run("UPDATE world SET name=? WHERE id=?", [new_name, world.id]);
+                new_world_name = new_name;
             }
-            await db.run("UPDATE world SET name=? WHERE id=?", [new_name, world.id]);
-            new_world_name = new_name;
+
         } else if("pumpkin_background" in post_data) {
             properties.background = "/static/misc/images/halloween/pumpkin.png";
             properties_updated = true;

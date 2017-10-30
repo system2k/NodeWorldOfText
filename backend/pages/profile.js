@@ -1,7 +1,7 @@
 module.exports = {};
 
 module.exports.GET = async function(req, serve, vars, params) {
-    var template_data = vars.template_data;
+    var HTML = vars.HTML;
     var cookies = vars.cookies;
     var db = vars.db;
     var user = vars.user;
@@ -68,15 +68,13 @@ module.exports.GET = async function(req, serve, vars, params) {
     if(memberships.length == 0) memberships = null;
 
     var data = {
-        user,
-
         message: message,
         csrftoken: cookies.csrftoken,
         worlds_owned: world_list,
         memberships: memberships
     };
 
-    serve(template_data["profile.html"](data))
+    serve(HTML("profile.html", data));
 }
 
 module.exports.POST = async function(req, serve, vars) {
@@ -85,6 +83,7 @@ module.exports.POST = async function(req, serve, vars) {
     var user = vars.user;
     var dispage = vars.dispage;
     var world_get_or_create = vars.world_get_or_create;
+    var validate_claim_worldname = vars.validate_claim_worldname;
 
     if(!user.authenticated) {
         return serve(null, 403);
@@ -92,17 +91,16 @@ module.exports.POST = async function(req, serve, vars) {
 
     var message = null;
     if(post_data.form == "claim") {
-        var worldname = post_data.worldname;
-        if(worldname.match(/^(\w*)$/g) && (worldname.length > 0 || user.superuser)) {
-            var world = await world_get_or_create(worldname);
-            if(world.owner_id == null) {
-                await db.run("UPDATE world SET owner_id=? WHERE name=? COLLATE NOCASE", [user.id, worldname])
-            } else {
-                message = "World already has an owner";
-            }
-        } else {
-            message = "Invalid world name";
+        var worldname = post_data.worldname + "";
+        var validate = await validate_claim_worldname(worldname, vars);
+        if(typeof validate == "string") { // an error occured while claiming
+            return await dispage("profile", {
+                message: validate
+            }, req, serve, vars)
         }
+        await db.run("UPDATE world SET owner_id=? WHERE id=?", [user.id, validate.world_id]);
+        message = validate.message;
+
     } else if(post_data.form == "leave") { // user is leaving the world (terminating own membership)
         for(var key in post_data) {
             if(key.startsWith("leave_")) {
@@ -114,6 +112,6 @@ module.exports.POST = async function(req, serve, vars) {
         }
     }
     await dispage("profile", {
-        message: message
+        message
     }, req, serve, vars)
 }

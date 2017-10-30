@@ -1,7 +1,6 @@
 module.exports = {};
 
 module.exports.GET = async function(req, serve, vars, params) {
-    var template_data = vars.template_data;
     var user = vars.user;
     var url = vars.url;
     var path = vars.path;

@@ -1,7 +1,7 @@
 module.exports = {};
 
 module.exports.GET = async function(req, serve, vars, params) {
-    var template_data = vars.template_data;
+    var HTML = vars.HTML;
     var user = vars.user;
     var path = vars.path;
     var get_third = vars.get_third;
@@ -20,12 +20,11 @@ module.exports.GET = async function(req, serve, vars, params) {
     }
 
     var data = {
-        user,
         user_edit,
         message: params.message
     };
 
-    serve(template_data["administrator_user.html"](data))
+    serve(HTML("administrator_user.html", data));
 }
 
 module.exports.POST = async function(req, serve, vars) {

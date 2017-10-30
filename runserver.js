@@ -481,26 +481,25 @@ var Decade = 315360345600;
 
 var ms = { Second, Minute, Hour, Day, Week, Month, Year, Decade };
 
-var url_regexp = [ // regexp , function/redirect to
-    ["^(beta/(.*))$", pages.yourworld],
-    ["^(frontpage/(.*))$", pages.yourworld],
-    ["^favicon\.ico$", "/static/favicon.png"],
-    ["^home/$", pages.home],
-    ["^accounts/login", pages.login],
-    ["^accounts/logout", pages.logout],
-    ["^accounts/register/$", pages.register],
-    ["^ajax/protect/$", pages.protect],
-    ["^ajax/unprotect/$", pages.unprotect],
-    ["^ajax/coordlink/$", pages.coordlink],
-    ["^ajax/urllink/$", pages.urllink],
-    ["^accounts/profile/$", pages.profile],
-    ["^accounts/private/$", pages.private],
-    ["^accounts/configure/$", pages.configure], // for front page configuring
+var url_regexp = [ // regexp , function/redirect to , options
+    ["^favicon\.ico[\\/]?$", "/static/favicon.png"],
+    ["^robots.txt[\\/]?$", "/static/robots.txt"],
+    ["^home[\\/]?$", pages.home],
+    ["^accounts/login[\\/]?", pages.login],
+    ["^accounts/logout[\\/]?", pages.logout],
+    ["^accounts/register[\\/]?$", pages.register],
+    ["^ajax/protect[\\/]?$", pages.protect],
+    ["^ajax/unprotect[\\/]?$", pages.unprotect],
+    ["^ajax/coordlink[\\/]?$", pages.coordlink],
+    ["^ajax/urllink[\\/]?$", pages.urllink],
+    ["^accounts/profile[\\/]?$", pages.profile],
+    ["^accounts/private[\\/]?$", pages.private],
+    ["^accounts/configure[\\/]?$", pages.configure], // for front page configuring
     ["^accounts/configure/(.*)/$", pages.configure],
     ["^accounts/configure/(beta/\\w+)/$", pages.configure],
-    ["^accounts/member_autocomplete/$", pages.member_autocomplete],
+    ["^accounts/member_autocomplete[\\/]?$", pages.member_autocomplete],
     ["^accounts/timemachine/(.*)/$", pages.timemachine],
-    ["^accounts/register/complete/$", pages.register_complete],
+    ["^accounts/register/complete[\\/]?$", pages.register_complete],
     ["^accounts/activate/(.*)/$", pages.activate],
     ["^administrator/$", pages.administrator],
     ["^administrator/edits/$", pages.administrator_edits], // for front page downloading
@@ -511,9 +510,11 @@ var url_regexp = [ // regexp , function/redirect to
     ["^administrator/user/(.*)/$", pages.administrator_user],
     ["^accounts/download/$", pages.accounts_download], // for front page downloading
     ["^accounts/download/(.*)/$", pages.accounts_download],
-    ["^world_style/$", pages.world_style],
-    ["^other/random_color$", pages.random_color],
-    ["^(\\w*)$", pages.yourworld]
+    ["^world_style[\\/]?$", pages.world_style],
+    ["^other/random_color[\\/]?$", pages.random_color],
+    ["^accounts/password_change[\\/]?$", pages.password_change],
+    ["^accounts/password_change/done[\\/]?$", pages.password_change_done],
+    ["^([\\w\\/\\.\\-\\~]*)$", pages.yourworld, { remove_end_slash: true }]
 ]
 
 function get_third(url, first, second) {
@@ -546,17 +547,29 @@ async function dispage(page, params, req, serve, vars, method) {
     await pages[page][method](req, serve, vars, params);
 }
 
+function removeLastSlash(text) {
+    if(text.charAt(text.length - 1) == "/") {
+        text = text.slice(0, text.length - 1);
+    }
+    return text;
+}
+
 var static_file_returner = {}
 static_file_returner.GET = function(req, serve) {
     var parse = url.parse(req.url).pathname.substr(1)
+    parse = removeLastSlash(parse);
     var mime_type = mime(parse.replace(/.*[\.\/\\]/, "").toLowerCase());
-    serve(static_data[parse], 200, { mime: mime_type })
+    if(parse in static_data) {
+        serve(static_data[parse], 200, { mime: mime_type })
+    } else {
+        serve("<html><h1>404</h1>Static item not found</html>", 404);
+    }
 }
 
 // push static file urls to regexp array
 var static_regexp = [];
 for (var i in static_data) {
-    static_regexp.push(["^" + i + "$", static_file_returner])
+    static_regexp.push(["^" + i + "[\\/]?$", static_file_returner])
 }
 url_regexp = static_regexp.concat(url_regexp);
 
@@ -783,18 +796,17 @@ function plural(int) {
     return p;
 }
 
-async function world_get_or_create(name, do_not_create) {
+async function world_get_or_create(name, do_not_create, force_create) {
     name += "";
     if(typeof name != "string") name = "";
     var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
     if(!world) { // world doesn't exist, create it
-    //console.log(do_not_create)
-        if(name.match(/^(\w*)$/g) && !do_not_create) {
+        if((name.match(/^([\w\.\-]*)$/g) && !do_not_create) || force_create) {
             var date = Date.now();
             await db.run("INSERT INTO world VALUES(null, ?, null, ?, 2, 0, 0, 0, 0, '', '', '', '', '', '', 0, 0, '{}')",
                 [name, date])
             world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name)
-        } else { // special worlds (like: /beta/test) are not found and must not be created
+        } else { // special world names that must not be created
             return false;
         }
     }
@@ -998,6 +1010,8 @@ var server = https_reference.createServer(options, async function(req, res) {
     }
 })
 
+var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
+
 async function process_request(req, res, current_req_id) {
     var URL = url.parse(req.url).pathname;
     if(URL.charAt(0) == "/") {
@@ -1069,6 +1083,8 @@ async function process_request(req, res, current_req_id) {
     var found_url = false;
     for(var i in url_regexp) {
         var row = url_regexp[i];
+        var options = row[2];
+        if(!options) options = {};
         if(URL.match(row[0])) {
             found_url = true;
             if(typeof row[1] == "object") {
@@ -1105,16 +1121,36 @@ async function process_request(req, res, current_req_id) {
                     }
                     post_data = dat;
                 }
+                var URL_mod = URL; // modified url
+                // remove end slash if enabled
+                if(options.remove_end_slash) {
+                    URL_mod = removeLastSlash(URL_mod);
+                }
+                // return compiled HTML pages
+                function HTML(path, data) {
+                    if(!template_data[path]) { // template not found
+                        return "An unexpected error occured while generating this page"
+                    }
+                    if(!data) {
+                        data = {};
+                    }
+                    data.user = user;
+                    if(data.csrftoken) {
+                        csrf_tokens[data.csrftoken] = 1;
+                    }
+                    return template_data[path](data);
+                }
                 vars = objIncludes(global_data, { // extra information
                     cookies,
                     post_data,
                     query_data,
-                    path: URL,
+                    path: URL_mod,
                     user,
                     redirect,
                     referer: req.headers.referer,
                     transaction,
-                    broadcast: global_data.ws_broadcast
+                    broadcast: global_data.ws_broadcast,
+                    HTML
                 })
                 vars_joined = true;
                 if(row[1][method]) {
@@ -1167,6 +1203,80 @@ function announce(text) {
         await MODIFY_ANNOUNCEMENT(text);
         console.log("Updated announcement");
     })();
+}
+
+// ignore_already_owned: if user already owns world, do not complain that the user
+// owns that world
+async function validate_claim_worldname(worldname, vars, rename_casing, world_id) {
+    var user = vars.user;
+    var db = vars.db;
+    var world_get_or_create = vars.world_get_or_create;
+
+    // ignore first /
+    if(worldname[0] == "/") worldname = worldname.substr(1);
+    if(worldname == "" && !user.superuser) {
+        return "Worldname cannot be blank";
+    }
+    worldname = worldname.split("/");
+    for(var i in worldname) {
+        // make sure there is no blank segment (superusers bypass this)
+        if(worldname[i] == "" && !user.superuser) {
+            return "Segments cannot be blank (make sure name does not end in /)";
+        }
+        // make sure segment is valid
+        if(!(worldname[i].match(/^([\w\.\-]*)$/g) && (worldname[i].length > 0 || user.superuser))) {
+            return "Invalid world name. Contains invalid characters. Must contain either letters, numbers, or _. It can be seperated by /";
+        }
+    }
+    if(worldname.length == 1) { // regular world names
+        worldname = worldname[0];
+        var world = await world_get_or_create(worldname, rename_casing);
+        if(world.owner_id == null || (rename_casing && world.id == world_id)) {
+            if(rename_casing) {
+                if(world.id == world_id || !world) {
+                    return "<RENAME>"
+                } else {
+                    return "World already exists, cannot rename to it";
+                }
+            }
+            return {
+                world_id: world.id,
+                message: "Successfully claimed the world"
+            };
+        } else {
+            return "World already has an owner";
+        }
+    } else { // world with /'s
+        // make sure first segment is a world owned by the user
+        var base_worldname = worldname[0];
+        var base_world = await world_get_or_create(base_worldname, true);
+        // world does not exist nor is owned by the user
+        if(!base_world || (base_world && base_world.owner_id != user.id)) {
+            return "You do not own the base world in the path";
+        }
+        worldname = worldname.join("/");
+        // create world, except if user is trying to rename
+        var claimedSubworld = await world_get_or_create(worldname, rename_casing, (true && !rename_casing));
+        // only renaming the casing
+        if(rename_casing && claimedSubworld) {
+            if(claimedSubworld.id == world_id) {
+                return "<RENAME>"
+            }
+        }
+        // does not exist
+        if(!claimedSubworld) {
+            return "<RENAME>"
+        }
+        // already owned (Unless owner renames it)
+        if(claimedSubworld.owner_id != null && !(rename_casing && claimedSubworld.id == world_id)) {
+            return "You already own this subdirectory world";
+        }
+        // subworld is created, now claim it
+        return {
+            world_id: claimedSubworld.id,
+            message: "Successfully claimed the subdirectory world"
+        };
+    }
 }
 
 var wss;
@@ -1382,7 +1492,8 @@ var global_data = {
     plural,
     announcement: function() { return announcement_cache },
     announce: MODIFY_ANNOUNCEMENT,
-    uptime
+    uptime,
+    validate_claim_worldname
 }
 
 function stopServer() {

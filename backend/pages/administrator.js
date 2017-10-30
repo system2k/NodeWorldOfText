@@ -1,7 +1,7 @@
 module.exports = {};
 
 module.exports.GET = async function(req, serve, vars, params) {
-    var template_data = vars.template_data;
+    var HTML = vars.HTML;
     var user = vars.user;
     var dispage = vars.dispage;
     var db = vars.db;
@@ -14,14 +14,13 @@ module.exports.GET = async function(req, serve, vars, params) {
     }
 
     var data = {
-        user,
         user_ranks: await db.all("SELECT * FROM auth_user WHERE level > 0"),
         announcement: announcement(),
         announcement_update_msg: params.announcement_update_msg,
         uptime: uptime()
     }
 
-    serve(template_data["administrator.html"](data))
+    serve(HTML("administrator.html", data));
 }
 
 module.exports.POST = async function(req, serve, vars) {

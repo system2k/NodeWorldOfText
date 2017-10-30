@@ -27,7 +27,7 @@
 				<input type="hidden" name="form" value="claim">
 				World name: 
 				<input type="text" name="worldname" value="">
-				<input type="submit" value="Submit">
+				<input type="submit" value="Claim">
 			</form>
 		</div>
 	</div>
@@ -61,7 +61,7 @@
 	<form method="POST" action="." onsubmit="return leave_confirm();" id="leave">
 		<input type="hidden" name="form" value="leave">
 		<div class="content_set">
-			<div class="content_set_title">Worlds you belong to</div>
+			<div class="content_set_title">Worlds you're a member of</div>
 			<div class="content_set_content">
 				<ul>
 				{% for world in memberships %}
@@ -75,5 +75,12 @@
 		</div>
 	</form>
 	{% endif %}
+
+	<div class="content_set">
+		<div class="content_set_title">Account</div>
+		<div class="content_set_content">
+			<a href="/accounts/password_change/">Change Password</a>
+		</div>
+	</div>
 
 {% endblock %}

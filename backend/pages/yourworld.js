@@ -1,7 +1,6 @@
 module.exports = {};
 
 module.exports.GET = async function(req, serve, vars, params) {
-    var template_data = vars.template_data;
     var cookies = vars.cookies;
     var query_data = vars.query_data;
     var path = vars.path;
@@ -12,6 +11,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var can_view_world = vars.can_view_world;
     var modules = vars.modules;
     var announcement = vars.announcement();
+    var HTML = vars.HTML;
 
     var world_name = path;
     if(params.timemachine) {
@@ -49,7 +49,10 @@ module.exports.GET = async function(req, serve, vars, params) {
             await db.run("UPDATE world SET properties=? WHERE id=?",
                 [JSON.stringify(world_properties), world.id])
         }
-
+        var pathname = world.name;
+        if(pathname != "") {
+            pathname = "/" + pathname;
+        }
         var state = {
             userModel: {
                 username: user.username,
@@ -68,7 +71,8 @@ module.exports.GET = async function(req, serve, vars, params) {
                 feature_paste: world.feature_paste,
                 namespace: world.name,
                 readability: world.readability,
-                feature_coord_link: world.feature_coord_link
+                feature_coord_link: world.feature_coord_link,
+                pathname
             }
         }
         if(announcement) {
@@ -89,11 +93,10 @@ module.exports.GET = async function(req, serve, vars, params) {
         }
         var data = {
             state: JSON.stringify(state),
-            user,
             world,
             page_title
         }
-        serve(template_data["yourworld.html"](data))
+        serve(HTML("yourworld.html", data));
     }
 }
 
