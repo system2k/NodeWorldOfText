@@ -66,6 +66,7 @@ var Menu = (function() {
 		};
 		this.menuEl.css("top", this.titleEl.offset().top + this.titleEl.outerHeight());
 		this.titleEl.hover(this.show, this.hide);
+		this.titleEl.click(this.show, this.hide);
 		this.menuEl.hover(this.show, this.hide);
 		this.titleEl.show();
 	}

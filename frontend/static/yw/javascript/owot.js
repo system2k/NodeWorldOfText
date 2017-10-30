@@ -21,6 +21,10 @@ $("#coord_X").text(0);
 var width = window.innerWidth;
 var height = window.innerHeight;
 
+// position in client in pixels
+var positionX = 0;
+var positionY = 0;
+
 var pingInterval = 50; // in seconds
 var gridEnabled = false;
 var linksEnabled = true;
@@ -28,7 +32,8 @@ var colorsEnabled = true;
 var backgroundEnabled = true; // if any
 var zoom = 100; // zoom in percentage
 zoom /= 100; // convert zoom to a ratio the client can manage. 100% -> 1, 200% -> 2, 50% -> 0.5
-var zoomRatio = 1; // browser's zoom ratio
+var zoomRatio = window.devicePixelRatio; // browser's zoom ratio
+if(!zoomRatio) zoomRatio = 1;
 var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
 var images = {}; // { name: [data RGBA, width, height] }
 
@@ -104,6 +109,9 @@ var tileC = defaultSizes.tileC;
 var tileR = defaultSizes.tileR;
 var tileArea = tileC * tileR;
 
+const dTileW = tileW; // permanent tile sizes in pixel (remains same throughout client's session)
+const dTileH = tileH;
+
 // used to stretch background images
 var backgroundImageCanvasRenderer = document.createElement("canvas");
 backgroundImageCanvasRenderer.width = tileW;
@@ -111,7 +119,7 @@ backgroundImageCanvasRenderer.height = tileH;
 var backgroundImageCtx = backgroundImageCanvasRenderer.getContext("2d");
 
 function doZoom(percentage) {
-    if(percentage < 25 || percentage > 1000) { // zoomed too far in/out?
+    if(percentage < 20 || percentage > 1000) { // zoomed too far in/out?
         return;
     }
     percentage /= 100;
@@ -125,64 +133,40 @@ function doZoom(percentage) {
     font = (16 * zoom) + fontBase;
     specialCharFont = (16 * zoom) + specialCharFontBase;
 
-    // modify invisible-link size
-    linkDiv.style.width = (cellW + (linkMargin * 2)) + "px";
-    linkDiv.style.height = (cellH + (linkMargin * 2)) + "px";
+    // if the tile system has loaded yet. otherwise, update it
+    if(window.tilePixelCache) {
+        // modify invisible-link size
+        linkDiv.style.width = (cellW + (linkMargin * 2)) + "px";
+        linkDiv.style.height = (cellH + (linkMargin * 2)) + "px";
 
-    textLayerCtx.clearRect(0, 0, width, height);
-    // change size of tiles
-    for(var i in tilePixelCache) {
-        var canvas = tilePixelCache[i][0];
-        canvas.width = tileW;
-        canvas.height = tileH;
-        var ctx = tilePixelCache[i][1];
-        ctx.font = font;
+        textLayerCtx.clearRect(0, 0, width, height);
+        // change size of tiles
+        for(var i in tilePixelCache) {
+            var canvas = tilePixelCache[i][0];
+            canvas.width = tileW;
+            canvas.height = tileH;
+            var ctx = tilePixelCache[i][1];
+            ctx.font = font;
+        }
+        renderTiles(true);
     }
-    renderTiles(true);
 }
 
-function browserZoomAdjust() {
+function browserZoomAdjust(initial) {
+    // make the canvas as if it were at 100% zoom,
+    // except it uses the proper zoom function
     var ratio = window.devicePixelRatio;
     if(!ratio) ratio = 1;
+    if(zoomRatio == ratio && !initial) return; // ratio is still the same, do nothing
+    positionX /= zoomRatio;
+    positionY /= zoomRatio;
     zoomRatio = ratio;
-    //if(lastZoomRatio == zoomRatio) return;
+    positionX *= zoomRatio;
+    positionY *= zoomRatio;
+    positionX |= 0; // remove decimals
+    positionY |= 0;
 
-    /*if(ratio < 1) { // zoomed out?
-        ratio = 1;
-    }*/
-
-    /*width = window.innerWidth * ratio | 0;
-    height = window.innerHeight * ratio | 0;
-
-    textLayer.style.width = width + "px"
-    textLayer.style.height = height + "px"
-    textLayer.width = width*ratio | 0;
-    textLayer.height = height*ratio | 0;
-    
-    owot.style.width = width + "px"
-    owot.style.height = height + "px"
-    owot.width = width*ratio | 0;
-    owot.height = height*ratio | 0;
-    
-    doZoom(100 * ratio)*/
-
-    var window_width = window.innerWidth;
-    var window_height = window.innerHeight;
-
-    width = Math.round(window_width * ratio);
-    height = Math.round(window_height * ratio);
-
-    // the normal size of the actual browser window
-    textLayer.width = Math.round(window_width * ratio);
-    textLayer.height = Math.round(window_height * ratio);
-    owot.width = Math.round(window_width * ratio);
-    owot.height = Math.round(window_height * ratio);
-    // the size of the viewport (varies by zoom)
-    textLayer.style.width = window_width + "px";
-    textLayer.style.height = window_height + "px";
-    owot.style.width = window_width + "px";
-    owot.style.height = window_height + "px";
-
+    adjust_scaling_DOM(ratio);
     doZoom(ratio * 100)
 }
 
@@ -445,37 +429,44 @@ if (typeof Object.assign != "function") { // https://developer.mozilla.org/en-US
 		configurable: true
 	});
 }
-var lastZoomRatio = zoomRatio;
+
+// adjust canvas width, canvas display width, and variable width to
+// disobey the browser zoom so that the custom zoom can be used
+function adjust_scaling_DOM(ratio) {
+    // the size of the viewport
+    var window_width = window.innerWidth;
+    var window_height = window.innerHeight;
+
+    // change variable sizes to the screen-width of the inner browser (same, regardless of zoom)
+    width = Math.round(window_width * ratio);
+    height = Math.round(window_height * ratio);
+
+    // make size of canvas the size of the inner browser screen-size
+    owot.width = Math.round(window_width * ratio);
+    owot.height = Math.round(window_height * ratio);
+    // make the display size the suze of the viewport
+    owot.style.width = window_width + "px";
+    owot.style.height = window_height + "px";
+
+    // comments above apply below
+    textLayer.width = Math.round(window_width * ratio);
+    textLayer.height = Math.round(window_height * ratio);
+    textLayer.style.width = window_width + "px";
+    textLayer.style.height = window_height + "px";
+}
+
 $(window).on("resize", function(e) {
-    width = window.innerWidth;
-    height = window.innerHeight;
+    var ratio = window.devicePixelRatio;
+    if(!ratio) ratio = 1;
 
-    //zoomRatio = window.devicePixelRatio;
-    //if(!zoomRatio) zoomRatio = 1;
+    adjust_scaling_DOM(ratio);
 
-    owot.width = width * zoomRatio | 0;
-    owot.height = height * zoomRatio | 0;
-    owot.style.width = width + "px";
-    owot.style.height = height + "px";
-
-    textLayer.width = width * zoomRatio | 0;
-    textLayer.height = height * zoomRatio | 0;
-    textLayer.style.width = width + "px";
-    textLayer.style.height = height + "px";
-
-    /*width *= zoomRatio;
-    height *= zoomRatio;
-
-    width |= 0;
-    height |= 0;*/
-
-    //if(lastZoomRatio != zoomRatio) {
-    //    browserZoomAdjust();
-    //    lastZoomRatio = zoomRatio;
-    //} else {
-        renderTiles();
-    //}
+    browserZoomAdjust();
+    renderTiles();
 })
+
+// fix zooming blurriness issue
+browserZoomAdjust(true);
 
 function getChar(tileX, tileY, charX, charY) {
 	var tile = tiles[tileY + "," + tileX];
@@ -535,8 +526,6 @@ var cursorCoordsCurrent = [0, 0, 0, 0, "NOT_INITTED"]; // cursorCoords that don'
 var currentPosition = [0, 0, 0, 0];
 var currentPositionInitted = false;
 
-var positionX = 0;
-var positionY = 0;
 var tiles = {};
 
 var ctx = owot.getContext("2d");
@@ -675,13 +664,13 @@ var dragPosX = 0;
 var dragPosY = 0;
 var isDragging = false;
 function event_mousedown(e, arg_pageX, arg_pageY) {
-    var pageX = e.pageX;
-    var pageY = e.pageY;
+    var pageX = e.pageX*zoomRatio|0;
+    var pageY = e.pageY*zoomRatio|0;
     if(arg_pageX != void 0) pageX = arg_pageX;
     if(arg_pageY != void 0) pageY = arg_pageY;
     if(e.target != owot && e.target != linkDiv) return;
-    dragStartX = pageX*zoomRatio|0;
-    dragStartY = pageY*zoomRatio|0;
+    dragStartX = pageX;
+    dragStartY = pageY;
     dragPosX = positionX;
     dragPosY = positionY;
     isDragging = true;
@@ -787,15 +776,15 @@ function stopDragging() {
 // tileX, charX
 var lastX = [0, 0];
 function event_mouseup(e, arg_pageX, arg_pageY) {
-    var pageX = e.pageX;
-    var pageY = e.pageY;
+    var pageX = e.pageX * zoomRatio | 0;
+    var pageY = e.pageY * zoomRatio | 0;
     if(arg_pageX != void 0) pageX = arg_pageX;
     if(arg_pageY != void 0) pageY = arg_pageY;
     stopDragging();
     if(e.target != owot && e.target != linkDiv) return;
 
     // set cursor
-    var pos = getTileCoordsFromMouseCoords(pageX, pageY);
+    var pos = getTileCoordsFromMouseCoords(pageX, pageY, true);
     if(tiles[pos[1] + "," + pos[0]] !== void 0) {
         lastX = [pos[0], pos[2]];
         // render the cursor and get results
@@ -1069,9 +1058,12 @@ $(document).on("keydown", function(e) {
     }
 })
 
-function getTileCoordsFromMouseCoords(x, y) {
-    x *= zoomRatio;
-    y *= zoomRatio;
+function getTileCoordsFromMouseCoords(x, y, ignoreZoomRatio) {
+    if(!ignoreZoomRatio) {
+        x *= zoomRatio;
+        y *= zoomRatio;
+    }
+    
     var tileX = 0;
     var tileY = 0;
     var charX = 0;
@@ -1103,22 +1095,22 @@ function getRange(x1, y1, x2, y2) {
 
 function getVisibleTiles(margin) {
     if(!margin) margin = 0;
-    var A = getTileCoordsFromMouseCoords(0 - margin, 0 - margin);
-    var B = getTileCoordsFromMouseCoords(width - 1 + margin, height - 1 + margin);
+    var A = getTileCoordsFromMouseCoords(0 - margin, 0 - margin, true);
+    var B = getTileCoordsFromMouseCoords(width - 1 + margin, height - 1 + margin, true);
     return getRange(A[0], A[1], B[0], B[1]);
 }
 
 function getWidth(margin) {
     if(!margin) margin = 0;
-    var A = getTileCoordsFromMouseCoords(0 - margin, 0);
-    var B = getTileCoordsFromMouseCoords(width - 1 + margin, 0);
+    var A = getTileCoordsFromMouseCoords(0 - margin, 0, true);
+    var B = getTileCoordsFromMouseCoords(width - 1 + margin, 0, true);
     return B[0] - A[0] + 1;
 }
 
 function getHeight(margin) {
     if(!margin) margin = 0;
-    var A = getTileCoordsFromMouseCoords(0, 0 - margin);
-    var B = getTileCoordsFromMouseCoords(0, height - 1 + margin);
+    var A = getTileCoordsFromMouseCoords(0, 0 - margin, true);
+    var B = getTileCoordsFromMouseCoords(0, height - 1 + margin, true);
     return B[1] - A[1] + 1;
 }
 
@@ -1157,11 +1149,11 @@ var lastRender = 0;
 var touchPosX = 0;
 var touchPosY = 0;
 function event_mousemove(e, arg_pageX, arg_pageY) {
-    var pageX = e.pageX;
-    var pageY = e.pageY;
+    var pageX = e.pageX * zoomRatio;
+    var pageY = e.pageY * zoomRatio;
     if(arg_pageX != void 0) pageX = arg_pageX;
     if(arg_pageY != void 0) pageY = arg_pageY;
-    var coords = getTileCoordsFromMouseCoords(pageX, pageY)
+    var coords = getTileCoordsFromMouseCoords(pageX, pageY, true)
     currentPosition = coords;
     currentPositionInitted = true;
     var tileX = coords[0];
@@ -1254,9 +1246,10 @@ $(document).on("mousemove", function(e) {
     event_mousemove(e);
 })
 $(document).on("touchmove", function(e) {
+    e.preventDefault();
     var pos = touch_pagePos(e);
-    touchPosX = pos[0] * zoomRatio | 0;
-    touchPosY = pos[1] * zoomRatio | 0;
+    touchPosX = pos[0];
+    touchPosY = pos[1];
     event_mousemove(e, pos[0], pos[1]);
 })
 
@@ -1646,9 +1639,6 @@ function getTileCanvas(str) {
     return [textRenderCanvas, textRender];
 }
 
-const dTileW = tileW; // permanent tile sizes in pixel (remains same throughout client's session)
-const dTileH = tileH;
-
 function generateBackgroundPixels(tileX, tileY, image, returnCanvas) {
     var tileWidth = tileW | 0;
     var tileHeight = tileH | 0;
@@ -1714,6 +1704,12 @@ function renderTile(tileX, tileY, redraw) {
 
     // unloaded tiles
     if(!tiles[str] || (tiles[str] && !tiles[str].initted)) {
+        // unloaded tile background is already drawn
+        if(tilePixelCache[str]) {
+            textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
+            textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
+            return;
+        }
         // generate tile background
         var imgData = generateBackgroundPixels(tileX, tileY, images.unloaded);
         // get main canvas of the tile
@@ -1909,7 +1905,9 @@ function renderTiles(redraw) {
 
     if(redraw) {
         for(var i in tiles) {
-            tiles[i].redraw = true;
+            if(tiles[i]) {
+                tiles[i].redraw = true;
+            }
         }
     }
 
@@ -2221,7 +2219,11 @@ var ws_functions = {
             renderTile(pos[1], pos[0], true);
         }
         // too many tiles, remove tiles outside of the viewport
-        if(Object.keys(tiles).length >= 1000) {
+        var tileLim = 1000;
+        if(zoomRatio < 0.5) { // zoomed out too far? make sure tiles don't constantly unload
+            tileLim = 4000;
+        }
+        if(Object.keys(tiles).length >= tileLim) {
             clearTiles()
         }
     },
@@ -2339,6 +2341,3 @@ var ws_functions = {
 		}, pingInterval * 1000)
     }
 };
-
-//browserZoomAdjust();
-//lastZoomRatio = zoomRatio;
