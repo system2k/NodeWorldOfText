@@ -893,7 +893,6 @@ function transaction_obj(id) {
             if(!transaction_active && !is_switching_mode) {
                 transaction_active = true;
                 is_switching_mode = true;
-                http_s_log.push("[transaction] Started")
                 transaction_req_id = req_id;
                 await db.run("BEGIN TRANSACTION")
                 is_switching_mode = false;
@@ -909,7 +908,6 @@ function transaction_obj(id) {
             if(transaction_active && !is_switching_mode) {
                 transaction_active = false;
                 is_switching_mode = true;
-                http_s_log.push("[transaction] Ended")
                 await db.run("COMMIT")
                 is_switching_mode = false;
                 if(on_switched) on_switched();
@@ -926,7 +924,6 @@ function transaction_obj(id) {
 
 process.on("uncaughtException", function(e) {
     fs.writeFileSync(settings.UNCAUGHT_PATH, JSON.stringify(process_error_arg(e)))
-    fs.writeFileSync(settings.REQ_LOG, JSON.stringify(http_s_log, null, 4))
     console.log("Uncaught error:", e);
     process.exit();
 });
@@ -987,11 +984,7 @@ function uptime() {
 	return seconds_ago + " " + _data + extra;
 }
 
-var http_s_log = [];
-
 var server = https_reference.createServer(options, async function(req, res) {
-    http_s_log.push("HTTP(S): " + req.url +
-        " METHOD: " + req.method + ", TIME: " + Date.now() + " [" + new Date() + "]")
     req_id++;
     var current_req_id = req_id;
     try {
@@ -1170,6 +1163,18 @@ async function process_request(req, res, current_req_id) {
     if(!vars.user) vars.user = await get_user_info(parseCookie(req.headers.cookie))
     if(!vars.cookies) vars.cookie = parseCookie(req.headers.cookie);
     if(!vars.path) vars.path = URL;
+	if(!vars.HTML) {
+		vars.HTML = function (path, data) {
+			if(!template_data[path]) { // template not found
+				return "An unexpected error occured while generating this page"
+			}
+			if(!data) {
+				data = {};
+			}
+			data.user = vars.user;
+			return template_data[path](data);
+		}
+	}
 
     if(!vars_joined) {
         vars = objIncludes(global_data, vars)
@@ -1293,18 +1298,14 @@ function start_server() {
     wss = new ws.Server({ server });
     ws_broadcast = function(data, world) {
         data = JSON.stringify(data)
-        http_s_log.push("[ws] Begin broadcast client, data size is " + data.length)
         wss.clients.forEach(function each(client) {
             try {
                 if(client.readyState == ws.OPEN &&
                 world == void 0 || toUpper(client.world_name) == toUpper(world)) {
                     client.send(data);
                 }
-            } catch(e) {
-                http_s_log.push("[ws] BROADCAST ERROR: " + JSON.stringify(process_error_arg(e)))
-            }
+            } catch(e) {}
         });
-        http_s_log.push("[ws] Finish broadcast client")
     };
 
     tile_signal_update = function(world, x, y, content, properties, writability) {
@@ -1347,7 +1348,6 @@ function start_server() {
     });
     
     wss.on("connection", async function (ws, req) {
-        http_s_log.push("[ws] Creating a websocket connection...")
         try {
             var pre_queue = [];
             // code isn't ready yet, so push data to array and then send after it's ready
@@ -1361,9 +1361,7 @@ function start_server() {
             var world_name;
             function send_ws(data) {
                 if(ws.readyState === ws.OPEN) {
-                    http_s_log.push("[ws] Sending data with length of " + data.length)
                     ws.send(data);
-                    http_s_log.push("[ws] Data sending complete")
                 }
             }
             if(location.match(/(\/ws\/$)/)) {
@@ -1400,11 +1398,9 @@ function start_server() {
                 sender: channel
             }))
             ws.on("error", function(err) {
-                http_s_log.push("[ws] An error occured: " + err);
                 log_error(JSON.stringify(process_error_arg(err)));
             });
             onMessage = async function(msg) {
-                http_s_log.push("[ws] Received message event with length of " + msg.length)
                 req_id++;
                 var current_req_id = req_id;
                 try {

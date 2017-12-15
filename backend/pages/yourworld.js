@@ -53,6 +53,9 @@ module.exports.GET = async function(req, serve, vars, params) {
         if(pathname != "") {
             pathname = "/" + pathname;
         }
+		if(params.timemachine) {
+			pathname = "/" + path;
+		}
         var state = {
             userModel: {
                 username: user.username,
