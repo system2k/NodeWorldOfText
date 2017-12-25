@@ -105,7 +105,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         member_color,
         menu_color,
 
-        pumpkin_background: properties.background == "/static/misc/images/halloween/pumpkin.png"
+        admin_background: properties.background == "/static/misc/images/christmas/blank_tree.png"
     };
 
     serve(HTML("configure.html", data));
@@ -225,7 +225,7 @@ module.exports.POST = async function(req, serve, vars) {
     } else if(post_data.form == "misc") {
         var properties_updated = false;
         // pumpkin background unchecked? remove it
-        if(!("pumpkin_background" in post_data)) {
+        if(!("admin_background" in post_data)) {
             properties_updated = true;
             delete properties.background;
         }
@@ -242,8 +242,8 @@ module.exports.POST = async function(req, serve, vars) {
                 new_world_name = new_name;
             }
 
-        } else if("pumpkin_background" in post_data) {
-            properties.background = "/static/misc/images/halloween/pumpkin.png";
+        } else if("admin_background" in post_data) {
+            properties.background = "/static/misc/images/christmas/blank_tree.png";
             properties_updated = true;
         }
         if(properties_updated) {
