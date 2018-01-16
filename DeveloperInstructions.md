@@ -19,7 +19,8 @@ You'll need Git : https://git-scm.com/ ->
  - Download based on your platform ( In my case 'Windows' )
  - A download popup should appear, otherwise use the link "If your download hasn't started, click here to download manually."
  - Run it
- - Installing windows version gives me these options:
+
+   Installing windows version gives me these options:
     'Windows Explorer integration: Bash, GUI'
     both of which I HIGHLY recommend, because they're both awesome!
  - Git LFS (large file support) is always a plus, and file associations are great also!
@@ -84,6 +85,7 @@ Now use 'node' command to start the server using the main script:
     node runserver.js
     
 You should now see
+    
     Compiling HTML templates...
     Handling previous error logs (if any)
     Loading modules...
