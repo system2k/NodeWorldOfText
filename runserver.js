@@ -1376,6 +1376,12 @@ function start_server() {
             ws.world_name = world_name;
             var cookies = parseCookie(req.headers.cookie);
             var user = await get_user_info(cookies, true)
+            /*REPCOMM - MOD - 1/17/18
+             * If users authenticated, send non-modified (scriptable) page data
+             * otherwise, send non-scriptable page.
+            */
+            //console.log(user);
+            //Sending of the client code happens before this! We need to parse user login before sending!
             var channel = new_token(16);
             var vars = objIncludes(global_data, {
                 user,
@@ -1422,8 +1428,9 @@ function start_server() {
                     var kind = msg.kind;
                     if(websockets[kind]) {
                         function send(msg) {
-                            msg.kind = kind
-                            send_ws(JSON.stringify(msg))
+                            //console.log(msg); //Logs the message sent from ws server to client
+                            msg.kind = kind;
+                            send_ws(JSON.stringify(msg));
                         }
                         function broadcast(data) {
                             data.source = kind;
