@@ -35,6 +35,8 @@ dump_dir(static_data, static_path, static_path_web);
 var sql_table_init = "./backend/default.sql";
 var sql_indexes_init = "./backend/indexes.sql";
 
+var globaluser = undefined;//DEBUGGING ONLY
+
 var zip_file;
 if(!fs.existsSync(settings.ZIP_LOG_PATH)) {
     zip_file = new zip();
@@ -1021,6 +1023,8 @@ async function process_request(req, res, current_req_id) {
 
     var transaction = transaction_obj(current_req_id)
 
+    //DEBUGGING - Need to pass user cookie where dispatch can detect it! Right now, we're using global var (not stable!)
+
     function dispatch(data, status_code, params) {
         if(request_resolved) return; // if request is already sent
         request_resolved = true;
@@ -1066,7 +1070,18 @@ async function process_request(req, res, current_req_id) {
         if(!data) {
             data = "";
         }
-        res.write(data, "utf8")
+        
+        if (typeof(data) == "string") {
+            
+            if (globaluser && globaluser.authenticated) {
+                res.write(data, "utf8");
+            } else {
+                var lame = data.replace("src=\"/static/yw/javascript/owot.js\"", "src=\"/static/yw/javascript/owot_lame.js\"");
+                res.write(lame, "utf8");
+            }
+        } else {
+            res.write(data, "utf8");
+        }
         res.end()
     }
 
@@ -1086,6 +1101,7 @@ async function process_request(req, res, current_req_id) {
                 var query_data = querystring.parse(url.parse(req.url).query)
                 var cookies = parseCookie(req.headers.cookie);
                 var user = await get_user_info(cookies);
+                globaluser = user; //DEBUGGING ONLY
                 // check if user is logged in
                 if(!cookies.csrftoken) {
                     var token = new_token(32)
@@ -1099,7 +1115,8 @@ async function process_request(req, res, current_req_id) {
                 function redirect(path) {
                     dispatch(null, null, {
                         redirect: path
-                    })
+                    }
+                    )
                     redirected = true;
                 }
                 if(redirected) {
@@ -1153,7 +1170,7 @@ async function process_request(req, res, current_req_id) {
                     dispatch("Method " + method + " not allowed.", 405)
                 }
             } else if(typeof row[1] == "string") { // it's a path and must be redirected to
-                dispatch(null, null, { redirect: row[1] })
+                dispatch(null, null, { redirect: row[1] }, user)
             } else {
                 found_url = false; // nevermind, it's not found because the type is invalid
             }
