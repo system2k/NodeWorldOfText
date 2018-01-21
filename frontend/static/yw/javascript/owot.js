@@ -2193,13 +2193,14 @@ function animateTile(tile, posStr) {
 			newTile.properties.color = frame[1];
 			tiles[posStr] = newTile;
 			renderTile(tileX, tileY, true);
-			if (atFrame++ > framenum) {
+			atFrame++;
+			if (atFrame >= framenum) {
 				if (repeat)
 					atFrame = 0;
 				else
 					stopAnimation(posStr);
 			}
-		}.bind(this), animationInterval);
+		}.bind(this), changeInterval);
 	}.bind(this), 200);
 }
 
