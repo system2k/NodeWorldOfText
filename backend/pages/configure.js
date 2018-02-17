@@ -143,6 +143,14 @@ module.exports.POST = async function(req, serve, vars) {
     var properties = JSON.parse(world.properties);
     var new_world_name = null;
 
+    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+        [user.id, world.id, 0, 0, Date.now(), "@" + JSON.stringify({
+            kind: "configure",
+            new_world_name,
+            properties: world.properties,
+            data: post_data
+        })]);
+
     if(post_data.form == "add_member") {
         var username = post_data.add_member;
         var date = Date.now();

@@ -17,7 +17,12 @@ module.exports = async function(ws, data, send, vars) {
 
     var tile_data = " ".repeat(128);
     await db.run("UPDATE tile SET (content, properties)=(?, ?) WHERE world_id=? AND tileY=? AND tileX=?",
-                    [tile_data, "{}", world.id, tileY, tileX]);
+        [tile_data, "{}", world.id, tileY, tileX]);
+    
+    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+        [user.id, world.id, tileY, tileX, Date.now(), "@" + JSON.stringify({
+            kind: "tile_clear"
+        })]);
 
     broadcast({
         kind: "tile_clear",

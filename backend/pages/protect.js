@@ -71,6 +71,13 @@ module.exports.POST = async function(req, serve, vars, params) {
     if(protect_type == null && can_member) {
         writability = null;
     }
+
+    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+        [user.id, world.id, post_data.tileY, post_data.tileX, Date.now(), "@" + JSON.stringify({
+            kind: "protect",
+            protect_type
+        })]);
+
     var content = " ".repeat(128);
     var properties = "{}";
     if(tile) { // tile exists, update

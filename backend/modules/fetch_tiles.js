@@ -89,6 +89,7 @@ module.exports = async function(data, vars) {
 
             await db.each("SELECT * FROM edit WHERE world_id=? AND time <= ? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?",
                 [world.id, time, minY, minX, maxY, maxX], function(data) {
+                if(data.content.charAt(0) == "@") return;
                 var con = JSON.parse(data.content);
                 for(var q in con) {
                     var z = con[q]

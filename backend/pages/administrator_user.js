@@ -52,6 +52,13 @@ module.exports.POST = async function(req, serve, vars) {
         }, req, serve, vars)
     }
 
+    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+        [user.id, 0, 0, 0, Date.now(), "@" + JSON.stringify({
+            kind: "administrator_user",
+            user_edit,
+            post_data
+        })]);
+
     if(post_data.form == "rank") {
         var rank = -1;
         if(post_data.rank == "operator") rank = 3;

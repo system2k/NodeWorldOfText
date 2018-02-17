@@ -28,6 +28,7 @@ module.exports.POST = async function(req, serve, vars) {
     var dispage = vars.dispage;
     var post_data = vars.post_data;
     var announce = vars.announce;
+    var db = vars.db;
 
     if(!user.superuser) {
         return await dispage("404", null, req, serve, vars)
@@ -35,6 +36,13 @@ module.exports.POST = async function(req, serve, vars) {
 
     var new_announcement = post_data.announcement;
     await announce(new_announcement);
+
+    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+        [user.id, 0, 0, 0, Date.now(), "@" + JSON.stringify({
+            kind: "administrator_announce",
+            post_data,
+            user
+        })]);
 
     await dispage("administrator", {
         announcement_update_msg: "Announcement updated"
