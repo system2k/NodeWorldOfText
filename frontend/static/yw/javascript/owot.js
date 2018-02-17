@@ -1925,8 +1925,8 @@ function renderTiles(redraw) {
     }
 }
 
+var menu;
 function buildMenu() {
-    var menu;
     menu = new Menu($("#menu"), $("#nav"));
     menu.addCheckboxOption(" Show coordinates", function() {
         return $("#coords").show();
@@ -2340,5 +2340,15 @@ var ws_functions = {
 		pingTimeout = setTimeout(function() {
 			socket.send("2::");
 		}, pingInterval * 1000)
+    },
+    tile_clear: function(data) {
+        var pos = data.tileY + "," + data.tileX;
+        if(tiles[pos]) {
+            var writability = tiles[pos].properties.writability;
+            tiles[pos] = blankTile();
+            tiles[pos].initted = true;
+            tiles[pos].properties.writability = writability;
+            renderTile(data.tileX, data.tileY);
+        }
     }
 };

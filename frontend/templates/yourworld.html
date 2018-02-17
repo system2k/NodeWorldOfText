@@ -98,5 +98,8 @@
         <script type="text/javascript" src="/static/yw/javascript/permissions.js"></script>
         <script type="text/javascript" src="/static/yw/javascript/owot.js"></script>
         <script type="text/javascript" src="/static/jscolor.min.js"></script>
+        {% if user.superuser %}
+            <script type="text/javascript" src="/static/yw/javascript/adminWorldUI.js"></script>
+        {% endif %}
     </body>
 </html>

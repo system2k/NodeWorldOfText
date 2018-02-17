@@ -1,22 +1,46 @@
-const https         = require("https");
-const http          = require("http"); // just in case the keys don't exist
-const url           = require("url");
-const sql           = require("sqlite3").verbose();
-const fs            = require("fs");
-const swig          = require("swig");
-const querystring   = require("querystring");
 const crypto        = require("crypto");
-const mime          = require("./backend/mime.js");
-const prompt        = require("prompt");
 const dump_dir      = require("./backend/dump_dir");
-const zip           = require("adm-zip")
+const fs            = require("fs");
+const html_minify   = require("html-minifier").minify;
+const http          = require("http");
+const https         = require("https");
+const isIP          = require("net").isIP;
+const mime          = require("./backend/mime.js");
 const nodemailer    = require("nodemailer");
+const prompt        = require("prompt");
+const querystring   = require("querystring");
+const sql           = require("sqlite3").verbose();
+const swig          = require("swig");
+const url           = require("url");
 const ws            = require("ws");
+const zip           = require("adm-zip")
 
 const settings = require("./settings.json");
 const database = new sql.Database(settings.DATABASE_PATH);
 
 Error.stackTraceLimit = Infinity;
+
+async function minify_js(file_in, file_out) {
+	return new Promise(function(res) {
+		compressor.minify({
+			compressor: "uglifyjs",
+			input: file_in,
+			output: file_out,
+			callback: function() {
+				res(fs.readFileSync(file_out));
+			}
+		});
+	})
+}
+
+function minify_html(data) {
+	return html_minify(data, {
+		collapseWhitespace: true,
+		minifyCSS: true,
+		minifyJS: true,
+		removeComments: true
+	});
+}
 
 var static_path = "./frontend/static/";
 var static_path_web = "static/"
@@ -30,7 +54,7 @@ for(var i in template_data) {
 }
 
 var static_data = {}; // html data to be returned (text data for values)
-dump_dir(static_data, static_path, static_path_web);
+dump_dir(static_data, static_path, static_path_web, null);
 
 var sql_table_init = "./backend/default.sql";
 var sql_indexes_init = "./backend/indexes.sql";
@@ -1003,9 +1027,27 @@ var server = https_reference.createServer(options, async function(req, res) {
     }
 })
 
+function compareNoCase(str1, str2) {
+	str1 += "";
+	str2 += "";
+	var res = str1.localeCompare(str2, "en", {
+		sensitivity: "base"
+	});
+	return !res;
+}
+
 var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
 
 async function process_request(req, res, current_req_id) {
+    var hostname = req.headers.host;
+	var offset = 2;
+    var subdomains = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
+    var sub = subdomains.slice(offset);
+    if(sub.length == 1 && compareNoCase(sub[0], "test")) {
+        res.write("OWOT subdomain testing <test.hostname.tld>");
+        return res.end();
+    }
+
     var URL = url.parse(req.url).pathname;
     if(URL.charAt(0) == "/") {
         URL = URL.substr(1);

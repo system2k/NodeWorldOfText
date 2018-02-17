@@ -1,14 +1,16 @@
 {
     "name": "nodeworldoftext",
-    "version": "1.6.0",
-    "description": "YourWorldOfText written in Node",
+    "version": "1.0.0",
+    "description": "OurWorldOfText server",
     "dependencies": {
         "sqlite3": "*",
         "swig": "*",
         "prompt": "*",
         "adm-zip": "*",
         "nodemailer": "*",
-        "ws": "*"
+        "ws": "*",
+        "node-minify": "*",
+        "html-minifier": "*"
     },
     "scripts": {
         "start": "node runserver.js",
