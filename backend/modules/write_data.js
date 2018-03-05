@@ -133,13 +133,14 @@ module.exports = async function(data, vars) {
     var tile_coord = vars.tile_coord;
     var broadcast = vars.broadcast;
     var channel = vars.channel;
+    var decodeCharProt = vars.decodeCharProt;
 
     var edits_limit = 1280;
 
     var is_owner = user.id == world.owner_id;
     var is_member = user.stats.member;
 
-     // can write on default tiles (with no protection) AKA writability==null?
+     // can write on public tiles?
     var can_write = user.stats.can_write;
 
     var edits = data.edits;
@@ -166,6 +167,7 @@ module.exports = async function(data, vars) {
     var rejected = {};
     var upd_tiles = {};
 
+    // accepts only an ARRAY of edits
     function rej_edits(edits) {
         for(var i = 0; i < edits.length; i++) {
             rejected[edits[i][6]] = "NO_TILE_PERM"
@@ -180,7 +182,6 @@ module.exports = async function(data, vars) {
         var properties = {
             color: Array(128).fill(0)
         };
-        var writability = null;
         var date = Date.now();
 
         var pos = tile_coord(i)
@@ -200,36 +201,20 @@ module.exports = async function(data, vars) {
         try {
             var tile = await db.get("SELECT * FROM tile WHERE world_id=? AND tileY=? AND tileX=?",
                 [world.id, tileY, tileX])
+            var charProt = new Array(128).fill(tile.writability);
+            if(tile) {
+                properties = JSON.parse(tile.properties);
+                if(properties.char) {
+                    charProt = decodeCharProt(properties.char);
+                }
+            }
     
             var changes = tiles[i];
             if(tile) {
                 var content = tile.content;
                 tile_data = content;
-                properties = JSON.parse(tile.properties)
-                writability = tile.writability;
-            } else {
-                writability = world.writability;
             }
-            // tile is owner-only, but user is not owner
-            if(writability == 2 && !is_owner) {
-                rej_edits(changes)
-                free_queue();
-                continue; // next tile
-            }
-        
-            // tile is member-only, but user is not member (nor owner)
-            if(writability == 1 && !is_owner && !is_member) {
-                rej_edits(changes)
-                free_queue();
-                continue;
-            }
-        
-            // this tile has no protection settings, and this user has no write perms
-            if(writability == null && !can_write) {
-                rej_edits(changes)
-                free_queue();
-                continue;
-            }
+
             for(var e = 0; e < changes.length; e++) {
                 // edit --> [tileY, tileX, charY, charX, timestamp, char, id, colors, animation]
 				var change = changes[e];
@@ -239,6 +224,27 @@ module.exports = async function(data, vars) {
                 var charX = san_nbr(change[3]);
                 if(charX < 0) charX = 0;
                 if(charX >= 16) charX = 16;
+
+                var char_writability = charProt[charY * 16 + charX];
+                if(char_writability == null) char_writability = tile.writability;
+                if(char_writability == null) char_writability = world.writability;
+
+                // tile is owner-only, but user is not owner
+                if(char_writability == 2 && !is_owner) {
+                    rej_edits([changes[e]]);
+                    continue;
+                }
+                // tile is member-only, but user is not member (nor owner)
+                if(char_writability == 1 && !is_owner && !is_member) {
+                    rej_edits([changes[e]]);
+                    continue;
+                }
+                // tile is public, but user cannot write
+                if(char_writability == 0 && !can_write) {
+                    rej_edits([changes[e]]);
+                    continue;
+                }
+
                 var char = change[5];
                 accepted.push(change[6]);
                 var color = fixColors(change[7]);
@@ -248,7 +254,7 @@ module.exports = async function(data, vars) {
                 // frame --> [TEXT, COLORS] where TEXT is a 128 character string, and COLORS is an array of 128 colors
                 var animation = change[8];
                 if(Array.isArray(animation) && (animation.length === 4)) {
-                    //ANIMATION CODE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    // Animation code.
 					var notSoSecret = animation[0]
 					if ((typeof notSoSecret == "string") && (notSoSecret === NOT_SO_SECRET)) {
 						var changeInterval = san_nbr(animation[1]);
@@ -322,7 +328,7 @@ module.exports = async function(data, vars) {
             upd_tiles[tileY + "," + tileX] = {
                 content: tile_data,
                 properties: Object.assign(properties, {
-                    writability
+                    writability: tile.writability
                 })
             }
             free_queue();

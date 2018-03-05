@@ -514,6 +514,8 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^accounts/register[\\/]?$", pages.register],
     ["^ajax/protect[\\/]?$", pages.protect],
     ["^ajax/unprotect[\\/]?$", pages.unprotect],
+    ["^ajax/protect/char[\\/]?$", pages.protect_char],
+    ["^ajax/unprotect/char[\\/]?$", pages.unprotect_char],
     ["^ajax/coordlink[\\/]?$", pages.coordlink],
     ["^ajax/urllink[\\/]?$", pages.urllink],
     ["^accounts/profile[\\/]?$", pages.profile],
@@ -1498,6 +1500,65 @@ function start_server() {
     })
 }
 
+var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function encodeCharProt(array) {
+	// convert array from writability-format to base64-format
+	for(var c = 0; c < array.length; c++) {
+		switch(array[c]) {
+			case null: array[c] = 0; continue;
+			case 0: array[c] = 1; continue;
+			case 1: array[c] = 2; continue;
+			case 2: array[c] = 3; continue;
+		}
+	}
+	var str = "@";
+	var bytes = Math.ceil(128 / 3)
+	for(var i = 0; i < bytes; i++) {
+		var idx = i * 3;
+		var char1 = ((4*4)*array[idx + 0]);
+		var char2 = ((4)*array[idx + 1])
+		var char3 = ((1)*array[idx + 2])
+		if(idx + 1 > 127) char2 = 0;
+		if(idx + 2 > 127) char3 = 0;
+		var code = char1 + char2 + char3;
+		str += base64table.charAt(code)
+	}
+	return str;
+}
+
+function decodeCharProt(str) {
+	var res = new Array(128).fill(0);
+	str = str.substr(1);
+	for(var i = 0; i < str.length; i++) {
+		var code = base64table.indexOf(str.charAt(i));
+		var char1 = Math.trunc(code / (4*4) % 4);
+		var char2 = Math.trunc(code / (4) % 4);
+		var char3 = Math.trunc(code / (1) % 4);
+		res[i*3 + 0] = char1;
+		if(i*3 + 1 > 127) break;
+		res[i*3 + 1] = char2;
+		if(i*3 + 2 > 127) break;
+		res[i*3 + 2] = char3;
+	}
+	// convert from base64-format to writability-format
+	for(var c = 0; c < res.length; c++) {
+		switch(res[c]) {
+			case 0: res[c] = null; continue;
+			case 1: res[c] = 0; continue;
+			case 2: res[c] = 1; continue;
+			case 3: res[c] = 2; continue;
+		}
+	}
+	return res;
+}
+/*
+	Writability format (tiles and chars):
+		null: The parent's writability
+		0: public
+		1: members
+		2: owners
+*/
+
 function handle_ws_error(e) {
     log_error(JSON.stringify(process_error_arg(e)));
 }
@@ -1531,7 +1592,9 @@ var global_data = {
     announcement: function() { return announcement_cache },
     announce: MODIFY_ANNOUNCEMENT,
     uptime,
-    validate_claim_worldname
+    validate_claim_worldname,
+    encodeCharProt,
+    decodeCharProt
 }
 
 function stopServer() {

@@ -31,17 +31,25 @@ Permissions = {
 		action = Permissions.user_matches_perm(user, world, world.feature_coord_link);
 		return write && action;
 	},
-	can_edit_tile: function(user, world, tile) {
+	can_edit_tile: function(user, world, tile, charX, charY) {
 		if (!tile.initted()) {
 			throw new Error("Can't check perms on un-initted tile");
 		}
 		if (!Permissions.can_read(user, world)) {
 			return false;
 		}
-		if (tile.writability === null) {
+		var targetWritability;
+		if(tile.char) {
+			targetWritability = tile.char[charY * 16 + charX];
+			if(targetWritability == null) targetWritability = tile.writability; // inherit from tile
+			if(targetWritability == null) targetWritability = world.writability; // inherit from world
+		} else {
+			targetWritability = tile.writability;
+		}
+		if (targetWritability === null) {
 			return Permissions.can_write(user, world);
 		}
-		return Permissions.user_matches_perm(user, world, tile.writability);
+		return Permissions.user_matches_perm(user, world, targetWritability);
 	},
 	can_go_to_coord: function(user, world) {
 		return Permissions.can_read(user, world) && Permissions.user_matches_perm(user, world, world.feature_go_to_coord);

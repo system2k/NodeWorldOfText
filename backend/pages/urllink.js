@@ -22,6 +22,7 @@ module.exports.POST = async function(req, serve, vars, params) {
     var can_view_world = vars.can_view_world;
     var tile_signal_update = vars.tile_signal_update;
     var san_nbr = vars.san_nbr;
+    var decodeCharProt = vars.decodeCharProt;
 
     var world = await world_get_or_create(post_data.world);
     if(!world) {
@@ -53,7 +54,7 @@ module.exports.POST = async function(req, serve, vars, params) {
     if(feature_mode == 1 && can_read.member && can_read.can_write) {
         can_link = true;
     }
-    if(feature_mode == 0 && can_read.can_write) { // if everybody has link permission
+    if(feature_mode == 0) { // if everybody has link permission
         can_link = true;
     }
 
@@ -61,30 +62,8 @@ module.exports.POST = async function(req, serve, vars, params) {
         [world.id, post_data.tileY, post_data.tileX])
 
     var tile_props = {};
-    var writability = null;
     if(tile) {
         tile_props = JSON.parse(tile.properties);
-        writability = tile.writability;
-    } else {
-        writability = world.writability;
-    }
-
-    // only owner can link on owner-only tiles
-    if(writability == 2 && !can_read.owner) {
-        can_link = false;
-    }
-
-    // only members/owners can link on member-only tiles
-    if(writability == 1 && !can_read.member) {
-        can_link = false;
-    }
-
-    if(writability == null && !can_read.can_write) {
-        can_link = false;
-    }
-
-    if(!can_link) {
-        return serve(null, 403)
     }
     
     var tileX = parseInt(post_data.tileX);
@@ -110,6 +89,30 @@ module.exports.POST = async function(req, serve, vars, params) {
 
     if(!(charX < 16 && charY < 8 && charX >= 0 && charY >= 0)) { // out of range coords
         return serve(null, 400);
+    }
+
+    var charProt = new Array(128).fill(tile.writability);
+    properties = JSON.parse(tile.properties);
+    if(tile_props.char) {
+        charProt = decodeCharProt(tile_props.char);
+    }
+
+    var char_writability = charProt[charY * 16 + charX];
+    if(char_writability == null) char_writability = tile.writability; // inherit from tile
+    if(char_writability == null) char_writability = world.writability; // inherit from world
+
+    if(char_writability == 2 && !can_read.owner) {
+        can_link = false;
+    }
+    if(char_writability == 1 && !can_read.member && !can_read.owner) {
+        can_link = false;
+    }
+    if(char_writability == 0 && feature_mode != 0 && !(can_read.member || can_read.owner)) {
+        can_link = false;
+    }
+
+    if(!can_link) {
+        return serve(null, 403)
     }
 
     if(!tile_props.cell_props) tile_props.cell_props = {};

@@ -93,6 +93,7 @@ $("body").on("mousemove.admclr", function(e) {
 
 // a key is released
 $("body").on("keyup.admclr", function(e) {
+    if(!admclr.activated) return;
     admclr.ctrlDown = false;
     admclrActivated.style.display = "none";
     admclr.color = "#00FF00";

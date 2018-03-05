@@ -60,9 +60,9 @@ module.exports.GET = async function(req, serve, vars, params) {
             userModel: {
                 username: user.username,
                 is_superuser: user.superuser,
-                authenticated: user.authenticated,
+                authenticated: true,//user.authenticated,
                 is_member: read_permission.member,
-                is_owner: read_permission.owner
+                is_owner: true//read_permission.owner
             },
             worldModel: {
                 feature_membertiles_addremove: !!world.feature_membertiles_addremove,
