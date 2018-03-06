@@ -1559,6 +1559,69 @@ function decodeCharProt(str) {
 		2: owners
 */
 
+// split a string properly with characters containing surrogates and combining characters
+function advancedSplit(str) {
+    str += "";
+    var data = str.match(/([\uD800-\uDBFF][\uDC00-\uDFFF])|(([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+))|.|\n|\r/g)
+    if(data == null) return [];
+    for(var i = 0; i < data.length; i++) {
+        // contains surrogates without second character?
+        if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
+            data.splice(i, 1)
+        }
+    }
+    for(var i = 0; i < data.length; i++) {
+        data[i] = data[i].slice(0, 16); // limit of 16 combining characters
+    }
+    return data;
+}
+
+function insert_char_at_index(string, char, index) {
+    if(!string) string = "";
+    if(!char) char = "";
+    string = advancedSplit(string);
+    var oldStr = string.slice(0);
+    char = advancedSplit(char);
+    for(var i = 0; i < char.length; i++) {
+        if(index + i >= 128) break;
+        // if nul, don't change
+        if(char[i] != "\0") string[index + i] = char[i];
+    }
+    string = string.join("");
+    // check to see if combining char did not mess up other chars
+    string = advancedSplit(string);
+
+    var charRange1 = index;
+    var charRange2 = index + char.length - 1;
+    if(charRange2 >= 128) charRange2 = 127;
+
+    // check if characters are modified when they are not supposed to
+    for(var x = 0; x < 128; x++) {
+        // if in range of edited characters, skip
+        if(x >= charRange1 && x <= charRange2) {
+            // do not skip over if nul, because nul means "do not change" in this system
+            if(char[x - index] != "\0") {
+                continue;
+            }
+        }
+        if(oldStr[x] != string[x]) { // unecessary characters are affected. reverse changes
+            string = oldStr.slice(0);
+            for(var i = 0; i < char.length; i++) {
+                if(index + i >= 128) break;
+                if(char[i] != "\0") string[index + i] = "!";
+            }
+            break;
+        }
+    }
+
+    // make sure content is exactly 128
+    if(string.length > 128) string = string.slice(0, 128);
+    if(string.length < 128) string = string.concat(Array(128).fill(" ")).slice(0, 128);
+
+    string = string.join("");
+    return string;
+}
+
 function handle_ws_error(e) {
     log_error(JSON.stringify(process_error_arg(e)));
 }
@@ -1594,7 +1657,9 @@ var global_data = {
     uptime,
     validate_claim_worldname,
     encodeCharProt,
-    decodeCharProt
+    decodeCharProt,
+    advancedSplit,
+    insert_char_at_index
 }
 
 function stopServer() {

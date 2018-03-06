@@ -122,6 +122,10 @@ module.exports.POST = async function(req, serve, vars) {
     var world_get_or_create = vars.world_get_or_create;
     var ws_broadcast = vars.ws_broadcast;
     var validate_claim_worldname = vars.validate_claim_worldname;
+    var transaction = vars.transaction;
+    var advancedSplit = vars.advancedSplit;
+    var decodeCharProt = vars.decodeCharProt;
+    var encodeCharProt = vars.encodeCharProt;
 
     if(!user.authenticated) {
         serve();
@@ -268,14 +272,63 @@ module.exports.POST = async function(req, serve, vars) {
                 redirect: "/accounts/profile/"
             });
         } else if(post_data.clear_public == "") {
-            await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE world_id=? AND writability=0",
-                [" ".repeat(128), "{}", world.id]);
-            var writability = world.writability;
-            if(writability == 0) {
-                // delete default tiles that are public too (null = default protection)
-                await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE world_id=? AND writability IS NULL", [" ".repeat(128), "{}", world.id]);
-                // apparently, it's not "=null" but "IS NULL"
+            var chunkSize = 4;
+            var idx = 0;
+            await transaction.begin();
+            while(true) {
+                var data = await db.all("SELECT * FROM tile WHERE world_id=? LIMIT ?,?",
+                    [world.id, idx * chunkSize, chunkSize]);
+                if(data.length == 0) {
+                    break;
+                }
+                for(var d = 0; d < data.length; d++) {
+                    var tile = data[d];
+                    var properties = JSON.parse(tile.properties);
+                    if(properties.char) {
+                        var charData = decodeCharProt(properties.char);
+                        var content = advancedSplit(tile.content);
+                        var hasUpdated = false;
+                        for(var r = 0; r < charData.length; r++) {
+                            var char = charData[r];
+                            var charX = r % 16;
+                            var charY = Math.floor(r / 16);
+                            var charWritability = char;
+                            if(charWritability == null) charWritability = tile.writability;
+                            if(charWritability == null) charWritability = world.writability;
+                            if(char == 0 || charWritability == 0) {
+                                hasUpdated = true;
+                                content[r] = " ";
+                                if(properties.cell_props) {
+                                    if(properties.cell_props[charY]) {
+                                        if(properties.cell_props[charY][charX]) {
+                                            properties.cell_props[charY][charX] = {};
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // update tile if a char has been updated
+                        if(hasUpdated) {
+                            content = content.join("");
+                            properties.char = encodeCharProt(charData);
+                            properties = JSON.stringify(properties);
+                            await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE id=?",
+                                [content, properties, tile.id]);
+                        }
+                    } else {
+                        if(tile.writability == 0) {
+                            await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE id=?",
+                                [" ".repeat(128), "{}", tile.id]);
+                        } else if(tile.writability == null && world.writability == 0) {
+                            // delete default tiles that are public too (null = default protection)
+                            await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE id=?",
+                                [" ".repeat(128), "{}", tile.id]);
+                        }
+                    }
+                }
+                idx++;
             }
+            await transaction.end();
         } else if(post_data.clear_all == "") {
             await db.run("DELETE FROM tile WHERE world_id=?", world.id);
         }
