@@ -201,7 +201,7 @@ module.exports = async function(data, vars) {
         try {
             var tile = await db.get("SELECT * FROM tile WHERE world_id=? AND tileY=? AND tileX=?",
                 [world.id, tileY, tileX])
-            var charProt = new Array(128).fill(tile.writability);
+            var charProt = new Array(128).fill(null);
             if(tile) {
                 properties = JSON.parse(tile.properties);
                 if(properties.char) {
@@ -226,7 +226,7 @@ module.exports = async function(data, vars) {
                 if(charX >= 16) charX = 16;
 
                 var char_writability = charProt[charY * 16 + charX];
-                if(char_writability == null) char_writability = tile.writability;
+                if(char_writability == null) char_writability = tile ? tile.writability : null;
                 if(char_writability == null) char_writability = world.writability;
 
                 // tile is owner-only, but user is not owner
@@ -236,11 +236,6 @@ module.exports = async function(data, vars) {
                 }
                 // tile is member-only, but user is not member (nor owner)
                 if(char_writability == 1 && !is_owner && !is_member) {
-                    rej_edits([changes[e]]);
-                    continue;
-                }
-                // tile is public, but user cannot write
-                if(char_writability == 0 && !can_write) {
                     rej_edits([changes[e]]);
                     continue;
                 }
