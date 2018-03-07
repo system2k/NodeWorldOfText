@@ -1040,8 +1040,10 @@ function compareNoCase(str1, str2) {
 
 var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
 
+var previousHostname = "";
 async function process_request(req, res, current_req_id) {
     var hostname = req.headers.host;
+    previousHostname = hostname;
 	var offset = 2;
     var subdomains = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
     var sub = subdomains.slice(offset);
