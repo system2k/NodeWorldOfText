@@ -167,15 +167,6 @@ module.exports.POST = async function(req, serve, vars, params) {
         properties.char = encodeCharProt(charProt);
     }
 
-    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
-        [user.id, world.id, tileY, tileX, Date.now(), "@" + JSON.stringify({
-            kind: "protect",
-            protect_type,
-            char_pre,
-            charX,
-            charY
-        })]);
-
     var content = " ".repeat(128);
 
     properties = JSON.stringify(properties);

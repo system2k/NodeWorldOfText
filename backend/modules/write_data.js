@@ -73,6 +73,7 @@ module.exports = async function(data, vars) {
     var channel = vars.channel;
     var decodeCharProt = vars.decodeCharProt;
     var insert_char_at_index = vars.insert_char_at_index;
+    var advancedSplit = vars.advancedSplit;
 
     var edits_limit = 1280;
 
@@ -148,23 +149,61 @@ module.exports = async function(data, vars) {
                 }
             }
     
-            var changes = tiles[i];
+            var incomingEdits = tiles[i];
             if(tile) {
                 var content = tile.content;
                 tile_data = content;
+            }
+
+            var changes = [];
+            for(var k = 0; k < incomingEdits.length; k++) {
+                var editIncome = incomingEdits[k];
+
+                var charX = san_nbr(editIncome[3]);
+                var charY = san_nbr(editIncome[2]);
+                var charInsIdx = charY * 16 + charX;
+                if(charInsIdx < 0) charInsIdx = 0;
+                if(charInsIdx > 127) charInsIdx = 127;
+                var char = editIncome[5];
+                if(typeof char != "string") {
+                    char = "?";
+                }
+                char = advancedSplit(char);
+                if(char.length <= 1) {
+                    changes.push(editIncome);
+                    continue;
+                };
+                for(var i = 0; i < char.length; i++) {
+                    var newIdx = charInsIdx + i;
+                    if(newIdx > 127) newIdx = 127;
+                    var newX = newIdx % 16;
+                    var newY = Math.floor(newIdx / 16);
+                    var newChar = char[i];
+                    var newColor = editIncome[7];
+                    if(Array.isArray(newColor)) {
+                        newColor = san_nbr(newColor[i]);
+                    }
+                    if(!newColor) newColor = 0;
+
+                    var newAr = [editIncome[0], editIncome[1],
+                                newY, newX,
+                                editIncome[4], newChar, editIncome[6], newColor];
+                    if(editIncome[8]) {
+                        newAr.push(editIncome[8]);
+                    }
+                    changes.push(newAr);
+                }
             }
 
             for(var e = 0; e < changes.length; e++) {
                 // edit --> [tileY, tileX, charY, charX, timestamp, char, id, colors, animation]
 				var change = changes[e];
                 var charY = san_nbr(change[2]);
-				if(charY < 0) charY = 0;
-				if(charY >= 8) charY = 8;
                 var charX = san_nbr(change[3]);
-                if(charX < 0) charX = 0;
-                if(charX >= 16) charX = 16;
+                var charInsIdx = charY * 16 + charX;
 
-                var char_writability = charProt[charY * 16 + charX];
+                var char_writability = charProt[charInsIdx];
+
                 if(char_writability == null) char_writability = tile ? tile.writability : null;
                 if(char_writability == null) char_writability = world.writability;
 
@@ -217,9 +256,6 @@ module.exports = async function(data, vars) {
 							}
 						}
 					}
-                }
-                if(typeof char !== "string") {
-                    char = "?";
                 }
                 var offset = charY * 16 + charX;
                 tile_data = insert_char_at_index(tile_data, char, offset);

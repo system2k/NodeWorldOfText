@@ -1584,6 +1584,7 @@ function insert_char_at_index(string, char, index) {
     string = advancedSplit(string);
     var oldStr = string.slice(0);
     char = advancedSplit(char);
+    char = char.slice(0, 1);
     for(var i = 0; i < char.length; i++) {
         if(index + i >= 128) break;
         // if nul, don't change

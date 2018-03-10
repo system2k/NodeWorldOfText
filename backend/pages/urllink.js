@@ -132,17 +132,6 @@ module.exports.POST = async function(req, serve, vars, params) {
         }
     }
 
-    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
-        [user.id, world.id, tileY, tileX, Date.now(), "@" + JSON.stringify({
-            kind: "link",
-            charX,
-            charY,
-            link_type,
-            link_tileX: post_data.link_tileX,
-            link_tileY: post_data.link_tileX,
-            url: post_data.url
-        })]);
-
     var content = " ".repeat(128);
     var actual_writability = null;
     if(tile) {
