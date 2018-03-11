@@ -1901,6 +1901,10 @@ function renderTile(tileX, tileY, redraw) {
         ctx.fillStyle = tile.backgroundColor;
     }
 
+    // put this right below the changes to fillStyle for tiles' background color
+    var tileColor = ctx.fillStyle;
+    var tileColorInverted = "#" + ("00000" + (16777215 - parseInt(tileColor.substr(1), 16)).toString(16).toUpperCase()).slice(-6);
+
     // fill tile background color
     ctx.fillRect(offsetX, offsetY, tileW, tileH);
 
@@ -1929,16 +1933,6 @@ function renderTile(tileX, tileY, redraw) {
         ctx.fillRect(offsetX + charX * cellW, offsetY + charY * cellH, cellW, cellH);
     }
 
-    // draw the grid
-    if(gridEnabled) {
-        ctx.fillStyle = "#000000";
-        if(styles.public == "#000000") { // if black background, make gridlines white
-            ctx.fillStyle = "#FFFFFF";
-        }
-        ctx.fillRect(offsetX, offsetY + tileH - zoom, tileW, zoom);
-        ctx.fillRect(offsetX + tileW - zoom, offsetY, zoom, tileH);
-    }
-
     var highlight = highlightFlash[str];
     if(!highlight) highlight = {};
 
@@ -1954,8 +1948,36 @@ function renderTile(tileX, tileY, redraw) {
         }
     }
 
+    function drawGrid(canv, isTileCanvas) {
+        // draw the grid
+        if(gridEnabled) {
+            var thisOffsetX = offsetX;
+            var thisOffsetY = offsetY;
+
+            if(isTileCanvas) {
+                thisOffsetX = 0;
+                thisOffsetY = 0;
+            }
+
+            canv.fillStyle = "#B9B9B9";
+            for(var x = 1; x < tileC; x++) {
+                for(var y = 1; y < tileR; y++) {
+                    canv.fillRect(thisOffsetX, thisOffsetY + tileH - zoom - (y*cellH), tileW, zoom);
+                    canv.fillRect(thisOffsetX + tileW - zoom - (x*cellW), thisOffsetY, zoom, tileH);
+                }
+            }
+
+            canv.fillStyle = tileColorInverted;
+            canv.fillRect(thisOffsetX, thisOffsetY + tileH - zoom, tileW, zoom);
+            canv.fillRect(thisOffsetX + tileW - zoom, thisOffsetY, zoom, tileH);
+        }
+    }
+
     // tile is null, so don't add text/color data
-    if(!tile) return;
+    if(!tile) {
+        drawGrid(ctx);
+        return;
+    };
 
     // tile is already written
     // (force redraw if tile hasn't been drawn before and it's initted)
@@ -2060,6 +2082,9 @@ function renderTile(tileX, tileY, redraw) {
             }
         }
     }
+
+    drawGrid(textRender, true);
+
     // add image to main canvas
     textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
     textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
@@ -2147,10 +2172,10 @@ function buildMenu() {
     }
     menu.addCheckboxOption(" Toggle grid", function() {
         gridEnabled = true;
-        renderTiles();
+        renderTiles(true);
     }, function() {
         gridEnabled = false;
-        renderTiles();
+        renderTiles(true);
     });
     menu.addCheckboxOption(" Links enabled", function() {
         linksEnabled = true;
