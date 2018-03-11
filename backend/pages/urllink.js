@@ -91,14 +91,17 @@ module.exports.POST = async function(req, serve, vars, params) {
         return serve(null, 400);
     }
 
-    var charProt = new Array(128).fill(tile.writability);
-    properties = JSON.parse(tile.properties);
+    var charProt = new Array(128).fill(tile ? tile.writability : null);
+    var properties = {};
+    if(tile) {
+        properties = JSON.parse(tile.properties);
+    }
     if(tile_props.char) {
         charProt = decodeCharProt(tile_props.char);
     }
 
     var char_writability = charProt[charY * 16 + charX];
-    if(char_writability == null) char_writability = tile.writability; // inherit from tile
+    if(char_writability == null) char_writability = tile ? tile.writability : null; // inherit from tile
     if(char_writability == null) char_writability = world.writability; // inherit from world
 
     if(char_writability == 2 && !can_read.owner) {

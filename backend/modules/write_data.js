@@ -298,7 +298,7 @@ module.exports = async function(data, vars) {
             upd_tiles[tileY + "," + tileX] = {
                 content: tile_data,
                 properties: Object.assign(properties, {
-                    writability: tile.writability
+                    writability: tile ? tile.writability : null
                 })
             }
             free_queue();
