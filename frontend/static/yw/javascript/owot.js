@@ -1159,7 +1159,7 @@ function assignColor(username) {
 	return colors[(Math.abs(avg | 0)) % colLen]
 }
 
-$("#chatsend").on("click", function() {
+function sendChat() {
     var chatText = $("#chatbar")[0].value;
     $("#chatbar")[0].value = "";
     
@@ -1194,6 +1194,17 @@ $("#chatsend").on("click", function() {
     if(!registered && nickname) type = "anon_nick";
 
     addChat(location, id, type, nickname, chatText, username);
+}
+
+$("#chatsend").on("click", function() {
+    sendChat();
+})
+
+$("#chatbar").on("keypress", function(e) {
+    var keyCode = e.keyCode;
+    if(keyCode == 13) { // Enter
+        sendChat();
+    }
 })
 
 $("#chat_close").on("click", function() {
