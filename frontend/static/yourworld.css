@@ -237,3 +237,54 @@ a:visited {
     text-align: center;
     color: white;
 }
+
+#chat_open {
+    position: absolute;
+    bottom: 0px;
+    left: 0px;
+    width: 70px;
+    text-align: center;
+    background-color: #003399;
+    color: white;
+    height: 20px;
+    border-style: solid;
+    border-width: 1px;
+    border-color: #000033;
+    cursor: default;
+}
+
+#chat_open:hover {
+    background-color: #2763dc;
+}
+
+#chat_open:active {
+    background-color: #0e2961;
+}
+
+.chat_tab_button {
+    position: absolute;
+    top: 4px;
+    border-style: solid;
+    border-color: black;
+    border-width: 1px;
+    width: 75px;
+    text-align: center;
+    font-family: verdana;
+    font-size: 13px;
+    width: 80px;
+    cursor: default;
+}
+
+.chatfield {
+    position: absolute;
+    top: 27px;
+    left: 3px;
+    width: 45px;
+    height: 43px;
+    border-style: solid;
+    border-width: 1px;
+    background-color: white;
+    width: 392px;
+    height: 243px;
+    overflow: scroll;
+}

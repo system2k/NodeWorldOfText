@@ -1,46 +1,57 @@
 var YourWorld = {
-    Color: 0
+    Color: 0,
+    Nickname: state.userModel.username
 }
 
 // edit ID
 var nextObjId = 1;
 
-$("#loading").hide();
-var owot = $("#owot")[0];
-var textInput = $("#textInput");
-var textLayer = $("#text")[0];
+var owot, textInput, textLater;
+function init_dom() {
+    $("#loading").hide();
+    owot = $("#owot")[0];
+    owot.hidden = false;
+    owot.style.cursor = "text";
+    textInput = $("#textInput");
+    textLayer = $("#text")[0];
+    textLayer.hidden = false;
+    textLayer.style.pointerEvents = "none";
 
-owot.hidden = false;
-textLayer.hidden = false;
-textLayer.style.pointerEvents = "none";
-owot.style.cursor = "text";
+    $("#coord_Y").text(0);
+    $("#coord_X").text(0);
+}
 
-$("#coord_Y").text(0);
-$("#coord_X").text(0);
+function decimal(percentage) {
+    return percentage / 100;
+}
 
-var width = window.innerWidth;
-var height = window.innerHeight;
+function deviceRatio() {
+    var ratio = window.devicePixelRatio;
+    if(!ratio) ratio = 1;
+    return ratio;
+}
 
-// position in client in pixels
-var positionX = 0;
-var positionY = 0;
+init_dom();
 
-var pingInterval = 50; // in seconds
-var gridEnabled = false;
-var linksEnabled = true;
-var colorsEnabled = true;
-var backgroundEnabled = true; // if any
-var zoom = 100; // zoom in percentage
-zoom /= 100; // convert zoom to a ratio the client can manage. 100% -> 1, 200% -> 2, 50% -> 0.5
-var zoomRatio = window.devicePixelRatio; // browser's zoom ratio
-if(!zoomRatio) zoomRatio = 1;
-var protectPrecision = 0; // 0 being tile and 1 being char
+var width                  = window.innerWidth;
+var height                 = window.innerHeight;
+var positionX              = 0; // position in client in pixels
+var positionY              = 0;
+var pingInterval           = 50; // in seconds
+var gridEnabled            = false;
+var linksEnabled           = true;
+var colorsEnabled          = true;
+var backgroundEnabled      = true; // if any
+var zoomRatio              = window.devicePixelRatio; // browser's zoom ratio
+var protectPrecision       = 0; // 0 being tile and 1 being char
 var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
-var images = {}; // { name: [data RGBA, width, height] }
-
-var images_to_load = {
+var zoom                   = decimal(100); // zoom value
+var images                 = {}; // { name: [data RGBA, width, height] }
+var images_to_load         = {
     unloaded: "/static/unloaded.png"
 }
+var selectedChatTab        = 0; // 0 is the page chat, 1 is the global chat
+
 if(state.background) { // add the background image (if it already exists)
     images_to_load.background = state.background;
 }
@@ -123,7 +134,7 @@ function doZoom(percentage) {
     if(percentage < 20 || percentage > 1000) { // zoomed too far in/out?
         return;
     }
-    percentage /= 100;
+    percentage = decimal(percentage);
     zoom = percentage;
 
     // modify all pixel sizes
@@ -274,7 +285,7 @@ $(document).on("mousemove.tileProtectAuto", function() {
 
 $("body").on("keydown.tileProtectAuto", function(e) {
     if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to protect tiles
-        if(e.ctrlKey) { // is Ctrl+S
+        if(e.ctrlKey) { // prevent browser's ctrl+s from executing
             e.preventDefault();
         }
         var selected = tileProtectAuto.selected;
@@ -1108,6 +1119,7 @@ setInterval(function() {
 $(document).on("keydown", function(e) {
     var key = e.keyCode;
     if(w._state.uiModal) return;
+    if(document.activeElement == $("#chatbar")[0]) return;
     textInput.focus();
     textInput[0].value = "";
     // stop paste
@@ -1133,6 +1145,145 @@ $(document).on("keydown", function(e) {
         linkAuto.active = false;
     }
 })
+
+var colors = ["#660066", "#003366", "#ff9900", "#ff0066", "#003300", "#ff0000", "#3a3a3a", "#006666", "#3399ff", "#3333ff", "#000000"]
+function assignColor(username) {
+	username = username.toUpperCase();
+	var colLen = colors.length
+	var usrLen = username.length
+	var avg = 0;
+	for(var i = 0; i < usrLen; i++) {
+		var chr = username.charCodeAt(i);
+		avg += (chr * chr | (i * chr) % 628) * (i << chr) + (chr*(i + 19 + (chr % 56))*chr)
+	}
+	return colors[(Math.abs(avg | 0)) % colLen]
+}
+
+$("#chatsend").on("click", function() {
+    var chatText = $("#chatbar")[0].value;
+    $("#chatbar")[0].value = "";
+    
+    var nickCommand = "/nick ";
+    if(chatText.startsWith(nickCommand)) {
+        chatText = chatText.substr(nickCommand.length);
+        YourWorld.Nickname = chatText.slice(0, 20);
+        addChat(null, "user", "[ Server ]", "Set nickname to `" + chatText + "`", "Server");
+        return;
+    }
+
+    var location = selectedChatTab == 0 ? "page" : "global";
+
+    chatText = chatText.slice(0, 600);
+
+    socket.send(JSON.stringify({
+        kind: "chat",
+        nickname: YourWorld.Nickname,
+        message: chatText,
+        location: location
+    }));
+
+    var registered = state.userModel.authenticated;
+    var username = state.userModel.username;
+    var id = w.clientId;
+    var nickname = YourWorld.Nickname;
+
+    var type = "";
+    if(registered && nickname == username) type = "user";
+    if(registered && nickname != username) type = "user_nick";
+    if(!registered && !nickname) type = "anon";
+    if(!registered && nickname) type = "anon_nick";
+
+    addChat(location, id, type, nickname, chatText, username);
+})
+
+$("#chat_close").on("click", function() {
+    $("#chat_window").hide();
+    $("#chat_open").show();
+})
+
+$("#chat_open").on("click", function() {
+    $("#chat_window").show();
+    $("#chat_open").hide();
+})
+
+$("#chat_page_tab").on("click", function() {
+    $("#chat_global_tab")[0].style.backgroundColor = "";
+    $("#chat_global_tab")[0].style.color = "";
+    $("#chat_page_tab")[0].style.backgroundColor = "#8c8c8c";
+    $("#chat_page_tab")[0].style.color = "white";
+
+    $("#global_chatfield").hide();
+    $("#page_chatfield").show();
+    selectedChatTab = 0;
+})
+
+$("#chat_global_tab").on("click", function() {
+    $("#chat_global_tab")[0].style.backgroundColor = "#8c8c8c";
+    $("#chat_global_tab")[0].style.color = "white";
+    $("#chat_page_tab")[0].style.backgroundColor = "";
+    $("#chat_page_tab")[0].style.color = "";
+
+    $("#global_chatfield").show();
+    $("#page_chatfield").hide();
+    selectedChatTab = 1;
+})
+
+/*
+    [type]:
+    * "user"      :: registered non-renamed nick
+    * "anon_nick" :: unregistered nick
+    * "anon"      :: unregistered
+    * "user_nick" :: registered renamed nick
+*/
+function addChat(chatfield, id, type, nickname, message, realUsername) {
+    var field;
+    if(chatfield == "page") {
+        field = $("#page_chatfield");
+    } else if(chatfield == "global") {
+        field = $("#global_chatfield");
+    } else {
+        field = getChatfield();
+    }
+
+    var nickDom = document.createElement("a");
+    nickDom.style.textDecoration = "underline";
+
+    if(type == "user") {
+        nickDom.style.color = assignColor(nickname);
+        nickDom.href = "/" + realUsername;
+        nickDom.style.fontWeight = "bold";
+    }
+    if(type == "anon_nick") {
+        nickname = "[Anon; " + id + "] " + nickname;
+    }
+    if(type == "anon") {
+        nickname = "[" + id + "]";
+    }
+    if(type == "user_nick") {
+        nickDom.style.color = assignColor(nickname);
+        nickDom.href = "/" + realUsername;
+        nickname = "[" + id + "] " + nickname;
+    }
+    nickDom.innerText = nickname + ":";
+
+    var msgDom = document.createElement("span");
+    msgDom.innerText = " " + message;
+
+    var chatGroup = document.createElement("div");
+    chatGroup.appendChild(nickDom);
+    chatGroup.appendChild(msgDom);
+
+    chatGroup.style.wordWrap = "break-word";
+    chatGroup.style.wordBreak = "break-all";
+
+    field.append(chatGroup);
+
+    var maxScroll = field[0].scrollHeight - field[0].clientHeight;
+    var scroll = field[0].scrollTop;
+    if(maxScroll - scroll < 20) {
+        field[0].scrollTop = maxScroll;
+    }
+}
 
 function getTileCoordsFromMouseCoords(x, y, ignoreZoomRatio) {
     if(!ignoreZoomRatio) {
@@ -1353,7 +1504,17 @@ function touch_pagePos(e) {
     return [first_touch.pageX * zoomRatio | 0, first_touch.pageY * zoomRatio | 0];
 }
 
+function getChatfield(elm) {
+    if(selectedChatTab == 0) {
+        return $("#page_chatfield");
+    } else if(selectedChatTab == 1) {
+        return $("#global_chatfield");
+    }
+}
+
 $(document).on("wheel", function(e) {
+    // if focused on chat, don't scroll world
+    if($(e.target).closest(getChatfield())[0] == getChatfield()[0]) return;
     if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
     var deltaX = Math.floor(e.originalEvent.deltaX);
     var deltaY = Math.floor(e.originalEvent.deltaY);
@@ -2200,7 +2361,11 @@ function buildMenu() {
     }
 }
 
-document.onselectstart = function() {
+document.onselectstart = function(e) {
+    var target = e.target;
+    if($(target).closest(getChatfield())[0] == getChatfield()[0] || target == $("#chatbar")[0]) {
+        return true;
+    }
     return w._state.uiModal;
 }
 // [tileX, tileY, charX, charY]
@@ -2209,6 +2374,8 @@ var lastLinkHover = null;
 var lastTileHover = null;
 
 var w = {
+    userCount: -1,
+    clientId: -1,
     isLinking: false,
     isProtecting: false,
     url_input: "",
@@ -2419,6 +2586,10 @@ function animateTile(tile, posStr) {
 	}.bind(this), 200);
 }
 
+function updateUsrCount() {
+    $("#usr_online").text(w.userCount + " Users Online");
+}
+
 var ws_functions = {
     fetch: function(data) {
         for(var i in data.tiles) {
@@ -2547,6 +2718,9 @@ var ws_functions = {
     },
     channel: function(data) {
         w.socketChannel = data.sender;
+        w.clientId = data.id;
+        w.userCount = data.initial_user_count;
+        updateUsrCount();
     },
     announcement: function(data) {
         if(data.text) {
@@ -2571,5 +2745,20 @@ var ws_functions = {
             tiles[pos].properties.writability = writability;
             renderTile(data.tileX, data.tileY);
         }
+    },
+    chat: function(data) {
+        if(data.channel == w.socketChannel) return;
+        var type = "";
+        if(data.registered && data.nickname == data.realUsername) type = "user";
+        if(data.registered && data.nickname != data.realUsername) type = "user_nick";
+        if(!data.registered && !data.nickname) type = "anon";
+        if(!data.registered && data.nickname) type = "anon_nick";
+
+        addChat(data.location, data.id, type, data.nickname, data.message, data.realUsername);
+    },
+    user_count: function(data) {
+        var count = data.count;
+        w.userCount = count;
+        updateUsrCount();
     }
 };

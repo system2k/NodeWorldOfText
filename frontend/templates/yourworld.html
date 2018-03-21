@@ -6,7 +6,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description" content="An infinite grid of text editable by any visitor. This is a forked version of www.yourworldoftext.com, but with more features.">
         <link type="text/css" rel="stylesheet" href="/static/yourworld.css">
-        <link rel="shortcut icon" href="/static/favicon.png">
+        <link rel="shortcut icon" type="image/png" href="/static/favicon.png">
         {% for script in user.scripts %}
             <script src="/script_manager/view/{{ script.name }}/"></script>
         {% endfor %}
@@ -96,7 +96,28 @@
             </div>
         </div>
         <div id="auto_prog" class="auto_prog_panel" style="display: none"></div>
-    
+
+        <div id="chat_open">
+            Chat
+        </div>
+        <div style="position: absolute; bottom: 0px; left: 0px; background-color: #e0e0e0; width: 400px; height: 300px; border-style: solid; border-width: 1px; display: none;" id="chat_window">
+            <span style="position: absolute; top: 5px; left: 200px;" id="usr_online">-- Users Online</span>
+            <div class="chat_tab_button" style="background-color: #8c8c8c; color: white; left: 5px;" id="chat_page_tab">
+                This page
+            </div>
+            <div class="chat_tab_button" style="left: 92px;" id="chat_global_tab">
+                Global
+            </div>
+            <div style="background-color: red; width: 20px; height: 20px; position: absolute; right: 3px; top: 2px; text-align: center; color: white; font-family: monospace; font-size: 16px; border-style: solid; border-width: 1px; border-color: black; cursor: default;" id="chat_close">
+                X
+            </div>
+            <div class="chatfield" id="page_chatfield"></div>
+            <div class="chatfield" id="global_chatfield" style="display: none;"></div>
+            <div style="position: absolute; left: 3px; bottom: 4px;">
+                <input style="width: 350px;" id="chatbar" maxlength="600"> <button id="chatsend">Send</button>
+            </div>
+        </div>
+
         <script type="text/javascript" src="/static/jquery-1.7.min.js"></script>
         <script type="text/javascript" src="/static/jquery-ui-1.7.2.custom.min.js"></script>
         <script type="text/javascript" src="/static/jquery.simplemodal-1.3.3.mod.js"></script>

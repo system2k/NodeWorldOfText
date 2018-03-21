@@ -384,6 +384,15 @@ function toUpper(x) {
     return x.toString().toUpperCase();
 }
 
+function NCaseCompare(str1, str2) {
+	str1 += "";
+	str2 += "";
+	var res = str1.localeCompare(str2, "en", {
+		sensitivity: "base"
+	});
+	return !res;
+}
+
 function add(username, level) {
     level = parseInt(level);
     if(!level) level = 0;
@@ -1330,6 +1339,56 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
     }
 }
 
+// client id manager
+var worldData = {};
+function getWorldData(world) {
+    var reference = null;
+    for(var i in worldData) {
+        var com = NCaseCompare(i, world);
+        if(com) {
+            return worldData[i];
+        }
+    }
+    worldData[world] = {
+        client_id: 1, // latest client id
+        user_count: 0 // current broadcasted user count
+    };
+    return worldData[world];
+}
+function generateClientId(world) {
+    var worldObj = getWorldData(world);
+    worldObj.client_id++;
+    return worldObj.client_id - 1;
+}
+
+function getUserCountFromWorld(world) {
+    var counter = 0;
+    wss.clients.forEach(function(ws) {
+        var user_world = ws.world_name;
+        if(NCaseCompare(user_world, world)) {
+            counter++;
+        }
+    })
+    return counter;
+}
+
+function broadcastUserCount() {
+    if(!global_data.ws_broadcast) return;
+    for(var user_world in worldData) {
+        var worldObj = getWorldData(user_world);
+        var current_count = worldObj.user_count;
+        var new_count = getUserCountFromWorld(user_world);
+        if(current_count != new_count) {
+            worldObj.user_count = new_count;
+            global_data.ws_broadcast({
+                source: "signal",
+                kind: "user_count",
+                count: new_count
+            }, user_world);
+        }
+    }
+}
+
 var wss;
 function start_server() {
     (async function() {
@@ -1342,12 +1401,15 @@ function start_server() {
     })();
 
     wss = new ws.Server({ server });
+    setInterval(function() {
+        broadcastUserCount();
+    }, 2000);
     ws_broadcast = function(data, world) {
         data = JSON.stringify(data)
         wss.clients.forEach(function each(client) {
             try {
                 if(client.readyState == ws.OPEN &&
-                world == void 0 || toUpper(client.world_name) == toUpper(world)) {
+                world == void 0 || NCaseCompare(client.world_name, world)) {
                     client.send(data);
                 }
             } catch(e) {}
@@ -1420,6 +1482,9 @@ function start_server() {
                 return ws.close();
             }
             ws.world_name = world_name;
+
+            var initial_user_count = getUserCountFromWorld(world_name);
+
             var cookies = parseCookie(req.headers.cookie);
             var user = await get_user_info(cookies, true)
             var channel = new_token(16);
@@ -1439,9 +1504,12 @@ function start_server() {
             vars.timemachine = status.timemachine
 
             user.stats = status.permission;
+            var clientId = generateClientId(world_name);
             send_ws(JSON.stringify({
                 kind: "channel",
-                sender: channel
+                sender: channel,
+                id: clientId,
+                initial_user_count
             }))
             ws.on("error", function(err) {
                 log_error(JSON.stringify(process_error_arg(err)));
@@ -1477,7 +1545,8 @@ function start_server() {
                         }
                         var res = await websockets[kind](ws, msg, send, objIncludes(vars, {
                             transaction: transaction_obj(current_req_id),
-                            broadcast
+                            broadcast,
+                            clientId
                         }))
                         if(typeof res == "string") {
                             send_ws(JSON.stringify({
