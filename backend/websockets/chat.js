@@ -9,6 +9,18 @@ module.exports = async function(ws, data, send, vars) {
     var broadcast = vars.broadcast; // broadcast to current world
     var clientId = vars.clientId;
     var ws_broadcast = vars.ws_broadcast; // site-wide broadcast
+    var add_global_chatlog = vars.add_global_chatlog;
+    var add_page_chatlog = vars.add_page_chatlog;
+
+    var chatsPerSecond = Math.trunc(1000 / 20);
+    var msNow = Date.now();
+    
+    var lastSent = ws.lastSent;
+    if(!lastSent) lastSent = 0;
+
+    if(msNow - lastSent < chatsPerSecond) return;
+
+    ws.lastSent = msNow;
 
     var nick = "";
     if(data.nickname) {
@@ -32,14 +44,23 @@ module.exports = async function(ws, data, send, vars) {
         temporary_broadcast_function = ws_broadcast;
     }
 
-    temporary_broadcast_function({
-        kind: "chat",
+    var chatData = {
         nickname: nick,
         realUsername: user.username,
         id: clientId,
         message: msg,
         registered: user.authenticated,
-        channel: vars.channel,
         location: data.location
-    })
+    };
+
+    if(data.location == "page") {
+        add_page_chatlog(chatData, world.name);
+    } else if(data.location == "global") {
+        add_global_chatlog(chatData);
+    }
+
+    temporary_broadcast_function(Object.assign({
+        kind: "chat",
+        channel: vars.channel
+    }, chatData))
 }

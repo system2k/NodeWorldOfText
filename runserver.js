@@ -1339,6 +1339,22 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
     }
 }
 
+var page_chatlog_limit = 32;
+var global_chatlog_limit = 32;
+var global_chatlog = [];
+
+function add_global_chatlog(data) {
+    global_chatlog.push(data)
+    global_chatlog = global_chatlog.slice(-global_chatlog_limit)
+}
+
+function add_page_chatlog(data, world) {
+    var wDat = getWorldData(world);
+    var page_chatlog = wDat.chatlog;
+    page_chatlog.push(data)
+    wDat.chatlog = page_chatlog.slice(-page_chatlog_limit)
+}
+
 // client id manager
 var worldData = {};
 function getWorldData(world) {
@@ -1351,7 +1367,8 @@ function getWorldData(world) {
     }
     worldData[world] = {
         client_id: 1, // latest client id
-        user_count: 0 // current broadcasted user count
+        user_count: 0, // current broadcasted user count
+        chatlog: []
     };
     return worldData[world];
 }
@@ -1484,6 +1501,7 @@ function start_server() {
             ws.world_name = world_name;
 
             var initial_user_count = getUserCountFromWorld(world_name);
+            var worldData = getWorldData(world_name);
 
             var cookies = parseCookie(req.headers.cookie);
             var user = await get_user_info(cookies, true)
@@ -1509,7 +1527,9 @@ function start_server() {
                 kind: "channel",
                 sender: channel,
                 id: clientId,
-                initial_user_count
+                initial_user_count,
+                global_chat_prev: JSON.stringify(global_chatlog),
+                page_chat_prev: JSON.stringify(worldData.chatlog)
             }))
             ws.on("error", function(err) {
                 log_error(JSON.stringify(process_error_arg(err)));
@@ -1731,7 +1751,9 @@ var global_data = {
     encodeCharProt,
     decodeCharProt,
     advancedSplit,
-    insert_char_at_index
+    insert_char_at_index,
+    add_global_chatlog,
+    add_page_chatlog
 }
 
 function stopServer() {

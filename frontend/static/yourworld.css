@@ -288,3 +288,8 @@ a:visited {
     height: 243px;
     overflow: scroll;
 }
+
+.unread {
+    color: red;
+    font-size: 11px;
+}

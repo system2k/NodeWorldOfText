@@ -51,6 +51,9 @@ var images_to_load         = {
     unloaded: "/static/unloaded.png"
 }
 var selectedChatTab        = 0; // 0 is the page chat, 1 is the global chat
+var chatOpen               = 0;
+var chatPageUnread         = 0;
+var chatGlobalUnread       = 0;
 
 if(state.background) { // add the background image (if it already exists)
     images_to_load.background = state.background;
@@ -1159,26 +1162,39 @@ function assignColor(username) {
 	return colors[(Math.abs(avg | 0)) % colLen]
 }
 
-function sendChat() {
-    var chatText = $("#chatbar")[0].value;
-    $("#chatbar")[0].value = "";
-    
-    var nickCommand = "/nick ";
-    if(chatText.startsWith(nickCommand)) {
-        chatText = chatText.substr(nickCommand.length);
-        YourWorld.Nickname = chatText.slice(0, 20);
-        addChat(null, 0, "user", "[ Server ]", "Set nickname to `" + chatText + "`", "Server");
-        return;
+var OWOT = {
+    events: {},
+    chat: {},
+    on: function(type, call) {
+        if(!OWOT.events[type]) {
+            OWOT.events[type] = [];
+        }
+        OWOT.events[type].push(call);
     }
+};
 
-    var location = selectedChatTab == 0 ? "page" : "global";
+OWOT.chat.send = function(message, opts) {
+    if(!message) return;
+    if(!opts) opts = {};
+    var exclude_commands = opts.exclude_commands;
+    var nick = opts.nick || YourWorld.Nickname;
+    var location = opts.location ? opts.location : (selectedChatTab == 0 ? "page" : "global");
+    message = message.slice(0, 600);
 
-    chatText = chatText.slice(0, 600);
+    if(!exclude_commands) {
+        var nickCommand = "/nick ";
+        if(message.startsWith(nickCommand)) {
+            message = message.substr(nickCommand.length);
+            YourWorld.Nickname = message.slice(0, 20);
+            addChat(null, 0, "user", "[ Server ]", "Set nickname to `" + message + "`", "Server");
+            return;
+        }
+    }
 
     socket.send(JSON.stringify({
         kind: "chat",
-        nickname: YourWorld.Nickname,
-        message: chatText,
+        nickname: nick,
+        message: message,
         location: location
     }));
 
@@ -1193,8 +1209,49 @@ function sendChat() {
     if(!registered && !nickname) type = "anon";
     if(!registered && nickname) type = "anon_nick";
 
-    addChat(location, id, type, nickname, chatText, username);
+    addChat(location, id, type, nickname, message, username);
+};
+
+// Performs send-chat-operation on chatbox
+function sendChat() {
+    var chatText = $("#chatbar")[0].value;
+    $("#chatbar")[0].value = "";
+    OWOT.chat.send(chatText);
 }
+
+function updateUnread() {
+    var total = $("#total_unread");
+    var page = $("#page_unread");
+    var global = $("#global_unread");
+    var totalCount = chatPageUnread + chatGlobalUnread;
+    total.hide();
+    global.hide();
+    page.hide();
+    if(totalCount) {
+        total.show();
+        total.text(totalCount > 99 ? "99+" : "(" + totalCount + ")");
+    }
+    if(chatPageUnread) {
+        page.show();
+        page.text(chatPageUnread > 99 ? "99+" : "(" + chatPageUnread + ")");
+    }
+    if(chatGlobalUnread) {
+        global.show();
+        global.text(chatGlobalUnread > 99 ? "99+" : "(" + chatGlobalUnread + ")");
+    }
+}
+
+// Chat event
+OWOT.on("chat", function(data) {
+    if((!chatOpen || selectedChatTab == 1) && data.location == "page") {
+        chatPageUnread++;
+    }
+    if((!chatOpen || selectedChatTab == 0) && data.location == "global") {
+        chatGlobalUnread++;
+    }
+    updateUnread()
+    addChat(data.location, data.id, data.type, data.nickname, data.message, data.realUsername);
+});
 
 $("#chatsend").on("click", function() {
     sendChat();
@@ -1210,11 +1267,20 @@ $("#chatbar").on("keypress", function(e) {
 $("#chat_close").on("click", function() {
     $("#chat_window").hide();
     $("#chat_open").show();
+    chatOpen = false;
 })
 
 $("#chat_open").on("click", function() {
     $("#chat_window").show();
     $("#chat_open").hide();
+    chatOpen = true;
+    if(selectedChatTab == 0) {
+        chatPageUnread = 0;
+        updateUnread();
+    } else {
+        chatGlobalUnread = 0;
+        updateUnread();
+    }
 })
 
 $("#chat_page_tab").on("click", function() {
@@ -1226,6 +1292,8 @@ $("#chat_page_tab").on("click", function() {
     $("#global_chatfield").hide();
     $("#page_chatfield").show();
     selectedChatTab = 0;
+    chatPageUnread = 0;
+    updateUnread();
 })
 
 $("#chat_global_tab").on("click", function() {
@@ -1237,6 +1305,8 @@ $("#chat_global_tab").on("click", function() {
     $("#global_chatfield").show();
     $("#page_chatfield").hide();
     selectedChatTab = 1;
+    chatGlobalUnread = 0;
+    updateUnread();
 })
 
 /*
@@ -1261,18 +1331,18 @@ function addChat(chatfield, id, type, nickname, message, realUsername) {
 
     if(type == "user") {
         nickDom.style.color = assignColor(nickname);
-        nickDom.href = "/" + realUsername;
+        nickDom.href = "javascript:alert(\"Registered; " + realUsername + "\")"
         nickDom.style.fontWeight = "bold";
     }
     if(type == "anon_nick") {
-        nickname = "[Anon; " + id + "] " + nickname;
+        nickname = "[*" + id + "] " + nickname;
     }
     if(type == "anon") {
         nickname = "[" + id + "]";
     }
     if(type == "user_nick") {
         nickDom.style.color = assignColor(nickname);
-        nickDom.href = "/" + realUsername;
+        nickDom.href = "javascript:alert(\"Registered; " + realUsername + "\")"
         nickname = "[" + id + "] " + nickname;
     }
     nickDom.innerText = nickname + ":";
@@ -2598,7 +2668,19 @@ function animateTile(tile, posStr) {
 }
 
 function updateUsrCount() {
-    $("#usr_online").text(w.userCount + " Users Online");
+    var count = w.userCount;
+    var plural = "s";
+    if(count == 1) plural = "";
+    $("#usr_online").text(count + " user" + plural + " online");
+}
+
+function chatType(registered, nickname, realUsername) {
+    var type = "";
+    if(registered && nickname == realUsername) type = "user";
+    if(registered && nickname != realUsername) type = "user_nick";
+    if(!registered && !nickname) type = "anon";
+    if(!registered && nickname) type = "anon_nick";
+    return type;
 }
 
 var ws_functions = {
@@ -2731,6 +2813,18 @@ var ws_functions = {
         w.socketChannel = data.sender;
         w.clientId = data.id;
         w.userCount = data.initial_user_count;
+        var global_prev = JSON.parse(data.global_chat_prev);
+        var page_prev = JSON.parse(data.page_chat_prev);
+        for(var g = 0; g < global_prev.length; g++) {
+            var chat = global_prev[g];
+            var type = chatType(chat.registered, chat.nickname, chat.realUsername);
+            addChat(chat.location, chat.id, type, chat.nickname, chat.message, chat.realUsername);
+        }
+        for(var p = 0; p < page_prev.length; p++) {
+            var chat = page_prev[p];
+            var type = chatType(chat.registered, chat.nickname, chat.realUsername);
+            addChat(chat.location, chat.id, type, chat.nickname, chat.message, chat.realUsername);
+        }
         updateUsrCount();
     },
     announcement: function(data) {
@@ -2759,13 +2853,20 @@ var ws_functions = {
     },
     chat: function(data) {
         if(data.channel == w.socketChannel) return;
-        var type = "";
-        if(data.registered && data.nickname == data.realUsername) type = "user";
-        if(data.registered && data.nickname != data.realUsername) type = "user_nick";
-        if(!data.registered && !data.nickname) type = "anon";
-        if(!data.registered && data.nickname) type = "anon_nick";
-
-        addChat(data.location, data.id, type, data.nickname, data.message, data.realUsername);
+        var evt = OWOT.events["chat"];
+        if(!evt) return;
+        for(var e = 0; e < evt.length; e++) {
+            var func = evt[e];
+            var type = chatType(data.registered, data.nickname, data.realUsername);
+            func({
+                location: data.location,
+                id: data.id,
+                type: type,
+                nickname: data.nickname,
+                message: data.message,
+                realUsername: data.realUsername
+            });
+        }
     },
     user_count: function(data) {
         var count = data.count;
