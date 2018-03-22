@@ -1167,7 +1167,7 @@ function sendChat() {
     if(chatText.startsWith(nickCommand)) {
         chatText = chatText.substr(nickCommand.length);
         YourWorld.Nickname = chatText.slice(0, 20);
-        addChat(null, "user", "[ Server ]", "Set nickname to `" + chatText + "`", "Server");
+        addChat(null, 0, "user", "[ Server ]", "Set nickname to `" + chatText + "`", "Server");
         return;
     }
 
