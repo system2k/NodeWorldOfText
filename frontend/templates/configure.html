@@ -149,6 +149,19 @@
 							Allows members to create and remove members-only protected areas.
 						</td>
 					</tr>
+					<tr>
+						<td class="feature_name">Chat in this page</td>
+						<td>
+							<select name="chat">
+								<option value="0"{%if chat_permission==0%} selected{%endif%}>anyone</option>
+								<option value="1"{%if chat_permission==1%} selected{%endif%}>me and members</option>
+								<option value="2"{%if chat_permission==2%} selected{%endif%}>only me</option>
+							</select>
+						</td>
+						<td class="feature_description">
+							Allows users to chat in this page or not
+						</td>
+					</tr>
 				</table>
 				<input type="hidden" name="form" value="features">
 				<input type="submit" value="Submit">

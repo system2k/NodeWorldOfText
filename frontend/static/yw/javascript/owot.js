@@ -39,6 +39,7 @@ var positionX              = 0; // position in client in pixels
 var positionY              = 0;
 var pingInterval           = 50; // in seconds
 var gridEnabled            = false;
+var subgridEnabled         = true; // character-level grid
 var linksEnabled           = true;
 var colorsEnabled          = true;
 var backgroundEnabled      = true; // if any
@@ -54,6 +55,8 @@ var selectedChatTab        = 0; // 0 is the page chat, 1 is the global chat
 var chatOpen               = 0;
 var chatPageUnread         = 0;
 var chatGlobalUnread       = 0;
+var initPageTabOpen        = false;
+var initGlobalTabOpen      = false;
 
 if(state.background) { // add the background image (if it already exists)
     images_to_load.background = state.background;
@@ -1277,9 +1280,17 @@ $("#chat_open").on("click", function() {
     if(selectedChatTab == 0) {
         chatPageUnread = 0;
         updateUnread();
+        if(!initPageTabOpen) {
+            initPageTabOpen = true;
+            $("#page_chatfield")[0].scrollTop = $("#page_chatfield")[0].scrollHeight;
+        }
     } else {
         chatGlobalUnread = 0;
         updateUnread();
+        if(!initGlobalTabOpen) {
+            initGlobalTabOpen = true;
+            $("#global_chatfield")[0].scrollTop = $("#global_chatfield")[0].scrollHeight;
+        }
     }
 })
 
@@ -1294,6 +1305,10 @@ $("#chat_page_tab").on("click", function() {
     selectedChatTab = 0;
     chatPageUnread = 0;
     updateUnread();
+    if(!initPageTabOpen) {
+        initPageTabOpen = true;
+        $("#page_chatfield")[0].scrollTop = $("#page_chatfield")[0].scrollHeight;
+    }
 })
 
 $("#chat_global_tab").on("click", function() {
@@ -1307,6 +1322,10 @@ $("#chat_global_tab").on("click", function() {
     selectedChatTab = 1;
     chatGlobalUnread = 0;
     updateUnread();
+    if(!initGlobalTabOpen) {
+        initGlobalTabOpen = true;
+        $("#global_chatfield")[0].scrollTop = $("#global_chatfield")[0].scrollHeight;
+    }
 })
 
 /*
@@ -1714,9 +1733,11 @@ function cutRanges(map, width, height) {
 
 var pingTimeout;
 var fetchInterval;
+var timesConnected = 0;
 function createSocket() {
     socket = new ReconnectingWebSocket(ws_path);
     w.socket = socket;
+    timesConnected++;
 
     socket.onmessage = function(msg) {
         var data = JSON.parse(msg.data);
@@ -1734,6 +1755,11 @@ function createSocket() {
         }, checkTileFetchInterval)
         socket.send("2::"); // initial ping
         // ping is so that the socket won't close after every minute
+        if(timesConnected == 1) {
+            socket.send(JSON.stringify({
+                kind: "chathistory"
+            }));
+        }
     }
 }
 
@@ -2201,11 +2227,13 @@ function renderTile(tileX, tileY, redraw) {
                 thisOffsetY = 0;
             }
 
-            canv.fillStyle = "#B9B9B9";
-            for(var x = 1; x < tileC; x++) {
-                for(var y = 1; y < tileR; y++) {
-                    canv.fillRect(thisOffsetX, thisOffsetY + tileH - zoom - (y*cellH), tileW, zoom);
-                    canv.fillRect(thisOffsetX + tileW - zoom - (x*cellW), thisOffsetY, zoom, tileH);
+            if(subgridEnabled) {
+                canv.fillStyle = "#B9B9B9";
+                for(var x = 1; x < tileC; x++) {
+                    for(var y = 1; y < tileR; y++) {
+                        canv.fillRect(thisOffsetX, thisOffsetY + tileH - zoom - (y*cellH), tileW, zoom);
+                        canv.fillRect(thisOffsetX + tileW - zoom - (x*cellW), thisOffsetY, zoom, tileH);
+                    }
                 }
             }
 
@@ -2419,6 +2447,13 @@ function buildMenu() {
         gridEnabled = false;
         renderTiles(true);
     });
+    menu.addCheckboxOption(" Toggle subgrid", function() {
+        subgridEnabled = true;
+        renderTiles(true);
+    }, function() {
+        subgridEnabled = false;
+        renderTiles(true);
+    }, true);
     menu.addCheckboxOption(" Links enabled", function() {
         linksEnabled = true;
     }, function() {
@@ -2675,6 +2710,7 @@ function updateUsrCount() {
 }
 
 function chatType(registered, nickname, realUsername) {
+    if(realUsername == "server") return "user"
     var type = "";
     if(registered && nickname == realUsername) type = "user";
     if(registered && nickname != realUsername) type = "user_nick";
@@ -2813,18 +2849,6 @@ var ws_functions = {
         w.socketChannel = data.sender;
         w.clientId = data.id;
         w.userCount = data.initial_user_count;
-        var global_prev = JSON.parse(data.global_chat_prev);
-        var page_prev = JSON.parse(data.page_chat_prev);
-        for(var g = 0; g < global_prev.length; g++) {
-            var chat = global_prev[g];
-            var type = chatType(chat.registered, chat.nickname, chat.realUsername);
-            addChat(chat.location, chat.id, type, chat.nickname, chat.message, chat.realUsername);
-        }
-        for(var p = 0; p < page_prev.length; p++) {
-            var chat = page_prev[p];
-            var type = chatType(chat.registered, chat.nickname, chat.realUsername);
-            addChat(chat.location, chat.id, type, chat.nickname, chat.message, chat.realUsername);
-        }
         updateUsrCount();
     },
     announcement: function(data) {
@@ -2872,5 +2896,19 @@ var ws_functions = {
         var count = data.count;
         w.userCount = count;
         updateUsrCount();
+    },
+    chathistory: function(data) {
+        var global_prev = data.global_chat_prev;
+        var page_prev = data.page_chat_prev;
+        for(var g = 0; g < global_prev.length; g++) {
+            var chat = global_prev[g];
+            var type = chatType(chat.registered, chat.nickname, chat.realUsername);
+            addChat(chat.location, chat.id, type, chat.nickname, chat.message, chat.realUsername);
+        }
+        for(var p = 0; p < page_prev.length; p++) {
+            var chat = page_prev[p];
+            var type = chatType(chat.registered, chat.nickname, chat.realUsername);
+            addChat(chat.location, chat.id, type, chat.nickname, chat.message, chat.realUsername);
+        }
     }
 };

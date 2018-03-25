@@ -1049,10 +1049,8 @@ function compareNoCase(str1, str2) {
 
 var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
 
-var previousHostname = "";
 async function process_request(req, res, current_req_id) {
     var hostname = req.headers.host;
-    previousHostname = hostname;
 	var offset = 2;
     var subdomains = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
     var sub = subdomains.slice(offset);
@@ -1339,24 +1337,61 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
     }
 }
 
-var page_chatlog_limit = 32;
-var global_chatlog_limit = 32;
-var global_chatlog = [];
+var clFile = "";
+if(fs.existsSync(settings.CHAT_LOG)) {
+    clFile = fs.readFileSync(settings.CHAT_LOG, "utf8");
+}
+var clData = {
+    global_chatlog: [],
+    world_chatlog: {}
+};
+if(clFile) {
+    clData = JSON.parse(clFile);
+}
+
+var page_chatlog_limit = 100;
+var global_chatlog_limit = 100;
+var global_chatlog = clData.global_chatlog;
+var worldData = {};
+var chatlog_has_update = false;
+for(var i in clData.world_chatlog) {
+    var data = clData.world_chatlog[i];
+    var wdat = getWorldData(i);
+    wdat.chatlog = clData.world_chatlog[i];
+}
 
 function add_global_chatlog(data) {
+    chatlog_has_update = true;
     global_chatlog.push(data)
     global_chatlog = global_chatlog.slice(-global_chatlog_limit)
 }
 
 function add_page_chatlog(data, world) {
+    chatlog_has_update = true;
     var wDat = getWorldData(world);
     var page_chatlog = wDat.chatlog;
     page_chatlog.push(data)
     wDat.chatlog = page_chatlog.slice(-page_chatlog_limit)
 }
 
-// client id manager
-var worldData = {};
+function updateChatLogData() {
+    if(chatlog_has_update) {
+        chatlog_has_update = false;
+        var dat = {};
+        dat.global_chatlog = global_chatlog;
+        dat.world_chatlog = {};
+        for(var i in worldData) {
+            dat.world_chatlog[i] = worldData[i].chatlog;
+        }
+        fs.writeFile(settings.CHAT_LOG, JSON.stringify(dat), "utf8", function() {
+            setTimeout(updateChatLogData, 5000);
+        });
+    } else {
+        setTimeout(updateChatLogData, 1000);
+    }
+}
+updateChatLogData();
+
 function getWorldData(world) {
     var reference = null;
     for(var i in worldData) {
@@ -1527,9 +1562,7 @@ function start_server() {
                 kind: "channel",
                 sender: channel,
                 id: clientId,
-                initial_user_count,
-                global_chat_prev: JSON.stringify(global_chatlog),
-                page_chat_prev: JSON.stringify(worldData.chatlog)
+                initial_user_count
             }))
             ws.on("error", function(err) {
                 log_error(JSON.stringify(process_error_arg(err)));
@@ -1581,7 +1614,7 @@ function start_server() {
             }
             if(pre_queue.length > 0) {
                 for(var p = 0; p < pre_queue.length; p++) {
-                    onMessage(pre_queue[0]);
+                    onMessage(pre_queue[p]);
                     pre_queue.splice(p, 1)
                 }
             }
@@ -1753,7 +1786,9 @@ var global_data = {
     advancedSplit,
     insert_char_at_index,
     add_global_chatlog,
-    add_page_chatlog
+    add_page_chatlog,
+    getWorldData,
+    getGlobalChatlog: function() { return global_chatlog }
 }
 
 function stopServer() {

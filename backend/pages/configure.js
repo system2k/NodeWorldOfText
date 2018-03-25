@@ -19,6 +19,7 @@ function validateCSS(c) {
 }
 
 function validatePerms(p) {
+    // == so that 1 and '1' are both the same. 0 and undefined should return 0 also.
     if(p == 0) return 0;
     if(p == 1) return 1;
     if(p == 2) return 2;
@@ -95,7 +96,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         url_link: world.feature_url_link,
         paste: world.feature_paste,
         membertiles_addremove: world.feature_membertiles_addremove,
-	  //animate: world.feature_animate,
+        chat_permission: properties.chat_permission || 0,
 
         color,
         cursor_color,
@@ -191,6 +192,7 @@ module.exports.POST = async function(req, serve, vars) {
         var url_link = validatePerms(post_data.url_link);
 		var animate = validatePerms(post_data.animate);
         var paste = validatePerms(post_data.paste);
+        var chat = validatePerms(post_data.chat);
         var membertiles_addremove = post_data.membertiles_addremove;
         if(membertiles_addremove == "false") {
             membertiles_addremove = 0;
@@ -199,9 +201,10 @@ module.exports.POST = async function(req, serve, vars) {
         } else {
             membertiles_addremove = 0;
         }
+        properties.chat_permission = chat;
 
-        await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link)=(?,?,?,?,?) WHERE id=?",
-            [go_to_coord, membertiles_addremove, paste, coord_link, url_link/*, animate*/, world.id])
+        await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link,properties)=(?,?,?,?,?,?) WHERE id=?",
+            [go_to_coord, membertiles_addremove, paste, coord_link, url_link, JSON.stringify(properties), world.id])
     } else if(post_data.form == "style") {
         var color = validateCSS(post_data.color);
         var cursor_color = validateCSS(post_data.cursor_color);

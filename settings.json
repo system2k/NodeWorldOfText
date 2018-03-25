@@ -7,6 +7,7 @@
     "ZIP_LOG_PATH": "../nwot_error_logs.zip",
     "UNCAUGHT_PATH": "../exc.err",
     "REQ_LOG": "../reqs.err",
+    "CHAT_LOG": "../chat_log.json",
     "email": {
         "username": "ourworldoftext@gmail.com",
         "password": "9J$U#([478]99*Sn9AMBUa985sen5sSETN4m5eOBUABPO%NYA58ombSA%Y*(P",

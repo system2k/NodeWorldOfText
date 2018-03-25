@@ -12,15 +12,35 @@ module.exports = async function(ws, data, send, vars) {
     var add_global_chatlog = vars.add_global_chatlog;
     var add_page_chatlog = vars.add_page_chatlog;
 
-    var chatsPerSecond = Math.trunc(1000 / 20);
-    var msNow = Date.now();
+    var props = JSON.parse(world.properties);
+    var chat_perm = props.chat_permission;
+    var is_member = user.stats.member;
+    var is_owner = user.stats.owner;
+
+    // sends `[ Server ]: <message>` in chat.
+    function serverChatResponse(message, location) {
+        send({
+            kind: "chat",
+            nickname: "[ Server ]",
+            realUsername: "server",
+            id: 0,
+            message: message,
+            registered: true,
+            location: location
+        })
+    }
     
-    var lastSent = ws.lastSent;
-    if(!lastSent) lastSent = 0;
+    var can_chat = false;
+    if(chat_perm == 0 || chat_perm == undefined) can_chat = true;
+    if(chat_perm === 1 && (is_member || is_owner)) can_chat = true;
+    if(chat_perm === 2 && is_owner) can_chat = true;
 
-    if(msNow - lastSent < chatsPerSecond) return;
+    if(!(data.location == "global" || data.location == "page")) data.location = "page";
 
-    ws.lastSent = msNow;
+    if(data.location == "page" && !can_chat) {
+        serverChatResponse("You do not have permission to chat here", "page")
+        return;
+    }
 
     var nick = "";
     if(data.nickname) {
@@ -35,9 +55,24 @@ module.exports = async function(ws, data, send, vars) {
 
     if(!msg) return;
 
-    msg = msg.slice(0, 600);
+    var msNow = Date.now();
 
-    if(!(data.location == "global" || data.location == "page")) data.location = "page";
+    var second = Math.floor(msNow / 1000);
+    var chatsEverySecond = 3
+
+    if(ws.lastChatSecond != second) {
+        ws.lastChatSecond = second;
+        ws.chatsSentInSecond = 0;
+    } else {
+        if(ws.chatsSentInSecond >= chatsEverySecond) {
+            serverChatResponse("You are chatting too fast.", data.location);
+            return;
+        } else {
+            ws.chatsSentInSecond++;
+        }
+    }
+
+    msg = msg.slice(0, 600);
 
     var temporary_broadcast_function = broadcast;
     if(data.location == "global") {
