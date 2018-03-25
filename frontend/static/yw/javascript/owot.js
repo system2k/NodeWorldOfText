@@ -1748,18 +1748,23 @@ function createSocket() {
     }
 
     socket.onopen = function(msg) {
+        console.log("Connected socket");
         getAndFetchTiles();
         clearInterval(fetchInterval);
         fetchInterval = setInterval(function() {
             getAndFetchTiles();
         }, checkTileFetchInterval)
-        socket.send("2::"); // initial ping
+        if(socket.readyState == WebSocket.OPEN) socket.send("2::"); // initial ping
         // ping is so that the socket won't close after every minute
         if(timesConnected == 1) {
             socket.send(JSON.stringify({
                 kind: "chathistory"
             }));
         }
+    }
+
+    socket.onclose = function() {
+        console.log("Socket has closed. Reconnecting...");
     }
 }
 
