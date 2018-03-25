@@ -287,6 +287,7 @@ a:visited {
     width: 392px;
     height: 243px;
     overflow: scroll;
+    overflow-x: hidden;
 }
 
 .unread {
