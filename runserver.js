@@ -1758,10 +1758,10 @@ function handle_ws_error(e) {
 }
 
 function html_tag_esc(str) {
+    str = str.replace(/\&/g, "&amp;")
     str = str.replace(/\"/g, "&quot;")
     str = str.replace(/\'/g, "&#39;")
     str = str.replace(/\u0020/g, "&nbsp;")
-    str = str.replace(/\&/g, "&amp;")
     str = str.replace(/\</g, "&lt;")
     str = str.replace(/\>/g, "&gt;")
     return str;
