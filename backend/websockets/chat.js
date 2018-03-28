@@ -11,6 +11,7 @@ module.exports = async function(ws, data, send, vars) {
     var ws_broadcast = vars.ws_broadcast; // site-wide broadcast
     var add_global_chatlog = vars.add_global_chatlog;
     var add_page_chatlog = vars.add_page_chatlog;
+    var html_tag_esc = vars.html_tag_esc;
 
     var props = JSON.parse(world.properties);
     var chat_perm = props.chat_permission;
@@ -46,7 +47,7 @@ module.exports = async function(ws, data, send, vars) {
     if(data.nickname) {
         nick = data.nickname + "";
     }
-    nick = nick.slice(0, 20);
+    if(!user.staff) nick = nick.slice(0, 20);
 
     var msg = "";
     if(data.message) {
@@ -65,14 +66,16 @@ module.exports = async function(ws, data, send, vars) {
         ws.chatsSentInSecond = 0;
     } else {
         if(ws.chatsSentInSecond >= chatsEverySecond) {
-            serverChatResponse("You are chatting too fast.", data.location);
-            return;
+            if(!user.staff) {
+                serverChatResponse("You are chatting too fast.", data.location);
+                return;
+            }
         } else {
             ws.chatsSentInSecond++;
         }
     }
 
-    msg = msg.slice(0, 600);
+    if(!user.staff) msg = msg.slice(0, 600);
 
     var temporary_broadcast_function = broadcast;
     if(data.location == "global") {
@@ -80,12 +83,15 @@ module.exports = async function(ws, data, send, vars) {
     }
 
     var chatData = {
-        nickname: nick,
+        nickname: user.operator ? nick : html_tag_esc(nick),
         realUsername: user.username,
         id: clientId,
-        message: msg,
+        message: user.operator ? msg : html_tag_esc(msg),
         registered: user.authenticated,
-        location: data.location
+        location: data.location,
+        op: user.operator,
+        admin: user.superuser,
+        staff: user.staff
     };
 
     if(data.location == "page") {

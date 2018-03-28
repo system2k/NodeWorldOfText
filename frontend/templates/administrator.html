@@ -121,11 +121,18 @@
     </div>
 
     <div class="content_set">
-            <div class="content_set_title">Server Uptime</div>
-            <div class="content_set_content">
-                <span>{{ uptime }}</span>
-            </div>
-        </div> 
+        <div class="content_set_title">Server Uptime</div>
+        <div class="content_set_content">
+            <span>{{ uptime }}</span>
+        </div>
+    </div>
+
+    <div class="content_set">
+        <div class="content_set_title">Connected Clients</div>
+        <div class="content_set_content">
+            <span>{{ client_num }} client(s)</span>
+        </div>
+    </div>
 {% endblock %}
 
 {% block endbody %}

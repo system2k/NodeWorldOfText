@@ -13,7 +13,7 @@ module.exports = async function(ws, data, send, vars) {
     var getGlobalChatlog = vars.getGlobalChatlog;
 
     send({
-        global_chat_prev: getGlobalChatlog(),
-        page_chat_prev: getWorldData(world.name).chatlog
+        global_chat_prev: getGlobalChatlog().slice(-100),
+        page_chat_prev: getWorldData(world.name).chatlog.slice(-100)
     })
 }

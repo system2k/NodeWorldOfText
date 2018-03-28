@@ -853,7 +853,7 @@ async function can_view_world(world, user) {
         member: false,
         owner: false,
         can_write: false,
-        access_denied: false // superusers can access private worlds (but not write)
+        access_denied: false
     };
 
     var is_owner = world.owner_id == user.id;
@@ -861,7 +861,7 @@ async function can_view_world(world, user) {
 
     if(world.readability == 2 && !is_owner) { // owner only
         permissions.access_denied = true;
-        if(!superuser) return false;
+        if(!user.operator) return false;
     }
 
     var is_member = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
@@ -870,7 +870,7 @@ async function can_view_world(world, user) {
     // members (and owners) only
     if(world.readability == 1 && !is_member && !is_owner) {
         permissions.access_denied = true;
-        if(!superuser) return false;
+        if(!user.operator) return false;
     }
 
     permissions.member = !!is_member; // !! because is_member is not a boolean
@@ -1349,8 +1349,8 @@ if(clFile) {
     clData = JSON.parse(clFile);
 }
 
-var page_chatlog_limit = 100;
-var global_chatlog_limit = 100;
+var page_chatlog_limit = Infinity;
+var global_chatlog_limit = Infinity;
 var global_chatlog = clData.global_chatlog;
 var worldData = {};
 var chatlog_has_update = false;
@@ -1374,6 +1374,11 @@ function add_page_chatlog(data, world) {
     wDat.chatlog = page_chatlog.slice(-page_chatlog_limit)
 }
 
+function clearChatlog(world) {
+    getWorldData(world).chatlog = [];
+    chatlog_has_update = true;
+}
+
 function updateChatLogData() {
     if(chatlog_has_update) {
         chatlog_has_update = false;
@@ -1381,6 +1386,7 @@ function updateChatLogData() {
         dat.global_chatlog = global_chatlog;
         dat.world_chatlog = {};
         for(var i in worldData) {
+            if(worldData[i].chatlog == 0) continue;
             dat.world_chatlog[i] = worldData[i].chatlog;
         }
         fs.writeFile(settings.CHAT_LOG, JSON.stringify(dat), "utf8", function() {
@@ -1751,6 +1757,16 @@ function handle_ws_error(e) {
     log_error(JSON.stringify(process_error_arg(e)));
 }
 
+function html_tag_esc(str) {
+    str = str.replace(/\"/g, "&quot;")
+    str = str.replace(/\'/g, "&#39;")
+    str = str.replace(/\u0020/g, "&nbsp;")
+    str = str.replace(/\&/g, "&amp;")
+    str = str.replace(/\</g, "&lt;")
+    str = str.replace(/\>/g, "&gt;")
+    return str;
+}
+
 var global_data = {
     template_data,
     db,
@@ -1788,7 +1804,10 @@ var global_data = {
     add_global_chatlog,
     add_page_chatlog,
     getWorldData,
-    getGlobalChatlog: function() { return global_chatlog }
+    getGlobalChatlog: function() { return global_chatlog },
+    clearChatlog,
+    html_tag_esc,
+    getWss: function() { return wss }
 }
 
 function stopServer() {

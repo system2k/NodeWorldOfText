@@ -33,6 +33,20 @@ function deviceRatio() {
 
 init_dom();
 
+function getStoredNickname() {
+    var nick = YourWorld.Nickname;
+    if(localStorage && localStorage.getItem) {
+        nick = localStorage.getItem("nickname");
+    }
+    if(!nick) nick = YourWorld.Nickname;
+    YourWorld.Nickname = nick;
+}
+function storeNickname() {
+    if(localStorage && localStorage.setItem) {
+        localStorage.setItem("nickname", YourWorld.Nickname)
+    }
+}
+
 var width                  = window.innerWidth;
 var height                 = window.innerHeight;
 var positionX              = 0; // position in client in pixels
@@ -57,6 +71,8 @@ var chatPageUnread         = 0;
 var chatGlobalUnread       = 0;
 var initPageTabOpen        = false;
 var initGlobalTabOpen      = false;
+var worldFocused           = false;
+getStoredNickname();
 
 if(state.background) { // add the background image (if it already exists)
     images_to_load.background = state.background;
@@ -100,6 +116,10 @@ function loadLoop() {
     }
 }
 loadLoop();
+
+if(state.userModel.is_staff) {
+    $("#chatsend")[0].max = "";
+}
 
 var defaultSizes = {
     // in pixels
@@ -290,6 +310,7 @@ $(document).on("mousemove.tileProtectAuto", function() {
 })
 
 $("body").on("keydown.tileProtectAuto", function(e) {
+    if(!worldFocused) return;
     if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to protect tiles
         if(e.ctrlKey) { // prevent browser's ctrl+s from executing
             e.preventDefault();
@@ -405,6 +426,7 @@ $(document).on("mousemove.linkAuto", function() {
 })
 
 $("body").on("keydown.linkAuto", function(e) {
+    if(!worldFocused) return;
     if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to add links
         if(e.ctrlKey) { // is Ctrl+S
             e.preventDefault();
@@ -555,6 +577,7 @@ function getCharColor(tileX, tileY, charX, charY) {
 
 // copy individual chars
 $(document).on("keydown", function(e) {
+    if(!worldFocused) return;
     // 67 = c, 77 = m
     if(!e.ctrlKey || (e.keyCode != 67 && e.keyCode != 77)) return;
     textInput[0].value = "";
@@ -575,6 +598,7 @@ $(document).on("keydown", function(e) {
 
 // color picker
 $(document).on("keydown", function(e) {
+    if(!worldFocused) return;
     if(!(e.altKey && e.keyCode == 67)) return // if not alt + c, return
     textInput[0].value = "";
     // alt + c to use color of text cell (where mouse cursor is) as main color
@@ -757,12 +781,18 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
     var pageY = e.pageY*zoomRatio|0;
     if(arg_pageX != void 0) pageX = arg_pageX;
     if(arg_pageY != void 0) pageY = arg_pageY;
-    if(e.target != owot && e.target != linkDiv) return;
+    if(e.target != owot && e.target != linkDiv) {
+        worldFocused = false;
+        return;
+    };
     dragStartX = pageX;
     dragStartY = pageY;
     dragPosX = positionX;
     dragPosY = positionY;
     isDragging = true;
+    textInput.focus(); // for mobile typing
+    worldFocused = true;
+
     // stop paste
     clearInterval(pasteInterval);
     write_busy = false;
@@ -781,6 +811,8 @@ $(document).on("mousedown", function(e) {
 })
 $(document).on("touchstart", function(e) {
     var pos = touch_pagePos(e);
+    touchPosX = pos[0];
+    touchPosY = pos[1];
     event_mousedown(e, pos[0], pos[1]);
 })
 
@@ -1123,6 +1155,7 @@ setInterval(function() {
 }, 10);
 
 $(document).on("keydown", function(e) {
+    if(!worldFocused) return;
     var key = e.keyCode;
     if(w._state.uiModal) return;
     if(document.activeElement == $("#chatbar")[0]) return;
@@ -1176,19 +1209,36 @@ var OWOT = {
     }
 };
 
+function trimSpacePolyfill(txt) {
+    return txt.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, "");
+}
+
+function trimSpace(txt) {
+    return txt.trim ? txt.trim() : trimSpacePolyfill(txt);
+}
+
 OWOT.chat.send = function(message, opts) {
     if(!message) return;
     if(!opts) opts = {};
     var exclude_commands = opts.exclude_commands;
     var nick = opts.nick || YourWorld.Nickname;
     var location = opts.location ? opts.location : (selectedChatTab == 0 ? "page" : "global");
-    message = message.slice(0, 600);
+
+    var msgLim = state.userModel.staff ? Infinity : 600;
+    var nickLim = state.userModel.staff ? Infinity : 20;
+
+    message = message.slice(0, msgLim);
 
     if(!exclude_commands) {
-        var nickCommand = "/nick ";
+        var nickCommand = "/nick";
         if(message.startsWith(nickCommand)) {
-            message = message.substr(nickCommand.length);
-            YourWorld.Nickname = message.slice(0, 20);
+            message = trimSpace(message.substr(nickCommand.length));
+            var newNick = message.slice(0, nickLim);
+            if(!newNick) {
+                newNick = state.userModel.username;
+            }
+            YourWorld.Nickname = newNick;
+            storeNickname();
             addChat(null, 0, "user", "[ Server ]", "Set nickname to `" + message + "`", "Server");
             return;
         }
@@ -1212,7 +1262,11 @@ OWOT.chat.send = function(message, opts) {
     if(!registered && !nickname) type = "anon";
     if(!registered && nickname) type = "anon_nick";
 
-    addChat(location, id, type, nickname, message, username);
+    var op = opts.op || state.userModel.is_operator;
+    var admin = opts.admin || state.userModel.is_superuser;
+    var staff = opts.staff || state.userModel.is_staff;
+
+    addChat(location, id, type, nickname, message, username, op, admin, staff);
 };
 
 // Performs send-chat-operation on chatbox
@@ -1253,7 +1307,8 @@ OWOT.on("chat", function(data) {
         chatGlobalUnread++;
     }
     updateUnread()
-    addChat(data.location, data.id, data.type, data.nickname, data.message, data.realUsername);
+    addChat(data.location, data.id, data.type,
+        data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff);
 });
 
 $("#chatsend").on("click", function() {
@@ -1335,7 +1390,7 @@ $("#chat_global_tab").on("click", function() {
     * "anon"      :: unregistered
     * "user_nick" :: registered renamed nick
 */
-function addChat(chatfield, id, type, nickname, message, realUsername) {
+function addChat(chatfield, id, type, nickname, message, realUsername, op, admin, staff) {
     var field;
     if(chatfield == "page") {
         field = $("#page_chatfield");
@@ -1343,6 +1398,26 @@ function addChat(chatfield, id, type, nickname, message, realUsername) {
         field = $("#global_chatfield");
     } else {
         field = getChatfield();
+    }
+
+    var hasTagDom = op || admin || staff;
+
+    var tagDom;
+    if(hasTagDom) {
+        tagDom = document.createElement("span");
+        if(op) {
+            tagDom.innerText = "(OP) ";
+            tagDom.style.color = "#0033cc";
+            tagDom.style.fontWeight = "bold";
+        } else if(admin) {
+            tagDom.innerText = "(Admin) ";
+            tagDom.style.color = "#FF0000";
+            tagDom.style.fontWeight = "bold";
+        } else if(staff) {
+            tagDom.innerText = "(Staff) ";
+            tagDom.style.color = "#009933";
+            tagDom.style.fontWeight = "bold";
+        }
     }
 
     var nickDom = document.createElement("a");
@@ -1364,12 +1439,22 @@ function addChat(chatfield, id, type, nickname, message, realUsername) {
         nickDom.href = "javascript:alert(\"Registered; " + realUsername + "\")"
         nickname = "[" + id + "] " + nickname;
     }
-    nickDom.innerText = nickname + ":";
+    nickDom.innerHTML = nickname + ":";
 
     var msgDom = document.createElement("span");
-    msgDom.innerText = " " + message;
+    msgDom.innerHTML = "&nbsp;" + message;
+
+    var maxScroll = field[0].scrollHeight - field[0].clientHeight;
+    var scroll = field[0].scrollTop;
+    var doScrollBottom = false;
+    if(maxScroll - scroll < 20) { // if scrolled at least 20 pixels above bottom
+        doScrollBottom = true;
+    }
 
     var chatGroup = document.createElement("div");
+    if(hasTagDom) {
+        chatGroup.appendChild(tagDom);
+    }
     chatGroup.appendChild(nickDom);
     chatGroup.appendChild(msgDom);
 
@@ -1378,9 +1463,8 @@ function addChat(chatfield, id, type, nickname, message, realUsername) {
 
     field.append(chatGroup);
 
-    var maxScroll = field[0].scrollHeight - field[0].clientHeight;
-    var scroll = field[0].scrollTop;
-    if(maxScroll - scroll < 20) {
+    maxScroll = field[0].scrollHeight - field[0].clientHeight;
+    if(doScrollBottom) {
         field[0].scrollTop = maxScroll;
     }
 }
@@ -2893,7 +2977,10 @@ var ws_functions = {
                 type: type,
                 nickname: data.nickname,
                 message: data.message,
-                realUsername: data.realUsername
+                realUsername: data.realUsername,
+                op: data.op,
+                admin: data.admin,
+                staff: data.staff
             });
         }
     },
@@ -2908,12 +2995,14 @@ var ws_functions = {
         for(var g = 0; g < global_prev.length; g++) {
             var chat = global_prev[g];
             var type = chatType(chat.registered, chat.nickname, chat.realUsername);
-            addChat(chat.location, chat.id, type, chat.nickname, chat.message, chat.realUsername);
+            addChat(chat.location, chat.id, type, chat.nickname,
+                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff);
         }
         for(var p = 0; p < page_prev.length; p++) {
             var chat = page_prev[p];
             var type = chatType(chat.registered, chat.nickname, chat.realUsername);
-            addChat(chat.location, chat.id, type, chat.nickname, chat.message, chat.realUsername);
+            addChat(chat.location, chat.id, type, chat.nickname,
+                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff);
         }
     }
 };

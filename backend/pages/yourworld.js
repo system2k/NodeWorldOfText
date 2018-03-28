@@ -61,8 +61,10 @@ module.exports.GET = async function(req, serve, vars, params) {
                 username: user.username,
                 is_superuser: user.superuser,
                 authenticated: user.authenticated,
-                is_member: read_permission.member,
-                is_owner: read_permission.owner
+                is_member: read_permission.member, // Member of world?
+                is_owner: read_permission.owner, // Owner of world?
+                is_staff: user.staff,
+                is_operator: user.operator
             },
             worldModel: {
                 feature_membertiles_addremove: !!world.feature_membertiles_addremove,
@@ -81,7 +83,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         if(announcement) {
             state.announce = announcement;
         }
-        if(read_permission.access_denied) {
+        if(read_permission.access_denied) { // unused
             state.announce = "You are viewing a private world as an administrator";
         }
         if(params.timemachine) {

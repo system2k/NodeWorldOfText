@@ -294,3 +294,32 @@ a:visited {
     color: red;
     font-size: 11px;
 }
+
+#chat_window {
+    position: absolute;
+    bottom: 0px;
+    left: 0px;
+    background-color: #e0e0e0;
+    width: 400px;
+    height: 300px;
+    border-style: solid;
+    border-width: 1px;
+    display: none;
+}
+
+#chat_close {
+    background-color: red;
+    width: 20px;
+    height: 20px;
+    position: absolute;
+    right: 3px;
+    top: 2px;
+    text-align: center;
+    color: white;
+    font-family: monospace;
+    font-size: 16px;
+    border-style: solid;
+    border-width: 1px;
+    border-color: black;
+    cursor: default;
+}

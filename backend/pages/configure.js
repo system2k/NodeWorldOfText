@@ -127,6 +127,7 @@ module.exports.POST = async function(req, serve, vars) {
     var advancedSplit = vars.advancedSplit;
     var decodeCharProt = vars.decodeCharProt;
     var encodeCharProt = vars.encodeCharProt;
+    var clearChatlog = vars.clearChatlog;
 
     if(!user.authenticated) {
         serve();
@@ -326,6 +327,8 @@ module.exports.POST = async function(req, serve, vars) {
             await transaction.end();
         } else if(post_data.clear_all == "") {
             await db.run("DELETE FROM tile WHERE world_id=?", world.id);
+        } else if(post_data.clear_chat_hist == "") {
+            clearChatlog(world.name);
         }
     }
 

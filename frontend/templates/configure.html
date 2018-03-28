@@ -12,6 +12,7 @@
 		unclaim.onclick = function() { actionMethod = "unclaim" };
 		clear_public.onclick = function() { actionMethod = "clear_public" };
 		clear_all.onclick = function() { actionMethod = "clear_all" };
+		clear_chat_hist.onclick = function() { actionMethod = "clear_chat_hist" };
 	}
 	function action_confirm() {
 		var msg = "";
@@ -23,6 +24,9 @@
 		}
 		if(actionMethod == "clear_all") {
 			msg = "Are you sure you want to clear this world entirely? This action cannot be undone."
+		}
+		if(actionMethod == "clear_chat_hist") {
+			msg = "Are you sure you want to clear the chat history? This action cannot be undone."
 		}
 		return confirm(msg);
 	}
@@ -333,6 +337,11 @@
 					</td>
 					<td class="action_desc">
 						Clear the entire world. All text will be completely gone (including protected areas).
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<button name="clear_chat_hist" class="action_btn" id="clear_chat_hist">Clear chat history</button>
 					</td>
 				</tr>
 			</tbody>

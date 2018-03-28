@@ -7,17 +7,24 @@ module.exports.GET = async function(req, serve, vars, params) {
     var db = vars.db;
     var announcement = vars.announcement;
     var uptime = vars.uptime;
+    var getWss = vars.getWss;
 
     // not a superuser...
     if(!user.superuser) {
         return await dispage("404", null, req, serve, vars)
     }
 
+    var client_num = 0;
+    getWss().clients.forEach(function() {
+        client_num++;
+    })
+
     var data = {
         user_ranks: await db.all("SELECT * FROM auth_user WHERE level > 0"),
         announcement: announcement(),
         announcement_update_msg: params.announcement_update_msg,
-        uptime: uptime()
+        uptime: uptime(),
+        client_num
     }
 
     serve(HTML("administrator.html", data));
