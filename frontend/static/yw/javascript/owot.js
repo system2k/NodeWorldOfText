@@ -1567,7 +1567,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
     var tileY = coords[1];
     var charX = coords[2];
     var charY = coords[3];
-
+    if(e.target != owot && e.target != linkDiv) return;
     var link = is_link(tileX, tileY, charX, charY);
     if(link && linksEnabled) {
         var pos = tileAndCharsToWindowCoords(tileX, tileY, charX, charY);
