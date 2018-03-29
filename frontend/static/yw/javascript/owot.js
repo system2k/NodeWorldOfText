@@ -310,7 +310,6 @@ $(document).on("mousemove.tileProtectAuto", function() {
 })
 
 $("body").on("keydown.tileProtectAuto", function(e) {
-    if(!worldFocused) return;
     if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to protect tiles
         if(e.ctrlKey) { // prevent browser's ctrl+s from executing
             e.preventDefault();
@@ -426,7 +425,6 @@ $(document).on("mousemove.linkAuto", function() {
 })
 
 $("body").on("keydown.linkAuto", function(e) {
-    if(!worldFocused) return;
     if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to add links
         if(e.ctrlKey) { // is Ctrl+S
             e.preventDefault();
@@ -577,7 +575,6 @@ function getCharColor(tileX, tileY, charX, charY) {
 
 // copy individual chars
 $(document).on("keydown", function(e) {
-    if(!worldFocused) return;
     // 67 = c, 77 = m
     if(!e.ctrlKey || (e.keyCode != 67 && e.keyCode != 77)) return;
     textInput[0].value = "";
@@ -1155,7 +1152,6 @@ setInterval(function() {
 }, 10);
 
 $(document).on("keydown", function(e) {
-    if(!worldFocused) return;
     var key = e.keyCode;
     if(w._state.uiModal) return;
     if(document.activeElement == $("#chatbar")[0]) return;
@@ -2626,6 +2622,7 @@ var w = {
         return [-positionY / tileH, -positionX / tileW]
     },
     doUrlLink: function(url) {
+        worldFocused = true;
         linkAuto.active = true;
         linkAuto.mode = 0;
         linkAuto.url = url;
@@ -2640,6 +2637,7 @@ var w = {
         w._ui.urlInputModal.open(w.doUrlLink.bind(w));
     },
     doCoordLink: function(y, x) {
+        worldFocused = true;
         linkAuto.active = true;
         linkAuto.mode = 1;
         linkAuto.coordTileY = y;
@@ -2656,6 +2654,7 @@ var w = {
         w._ui.coordinateInputModal.open("Enter the coordinates to create a link to. You can then click on a letter to create the link.", w.doCoordLink.bind(w));
     },
     doProtect: function(protectType, unprotect) {
+        worldFocused = true;
         // show the protection precision menu
         $("#protect_precision").css("display", "");
         tileProtectAuto.active = true;
