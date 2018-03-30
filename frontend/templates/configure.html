@@ -293,11 +293,11 @@
 						Christmas tree background
 						<input name="admin_background" type="checkbox"{%if admin_background%} checked{%endif%}>
 					</p>
-					<p>
-						This page is NSFW
-						<input name="nsfw_page" type="checkbox"{%if page_is_nsfw%} checked{%endif%}>
-					</p>
 				{% endif %}
+				<p>
+					This page is NSFW
+					<input name="nsfw_page" type="checkbox"{%if page_is_nsfw%} checked{%endif%}>
+				</p>
 				<input type="hidden" name="form" value="misc">
 				<input type="submit" value="Submit">
 			</form>
