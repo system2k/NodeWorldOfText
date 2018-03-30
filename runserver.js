@@ -488,7 +488,7 @@ function command_prompt() {
         if(err) return console.log(err);
         if(account_to_create == void 0) return;
         var pass = input.password;
-        db.run("UPDATE auth_user SET password=? WHERE username=?",
+        db.run("UPDATE auth_user SET password=? WHERE username=? COLLATE NOCASE",
             [encryptHash(pass), account_to_create])
         account_to_create = void 0;
         command_prompt();
@@ -549,11 +549,21 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^other/random_color[\\/]?$", pages.random_color],
     ["^accounts/password_change[\\/]?$", pages.password_change],
     ["^accounts/password_change/done[\\/]?$", pages.password_change_done],
+    ["^administrator/users/by_username/(.*)[\\/]?$", pages.administrator_users_by_username],
+    ["^administrator/users/by_id/(.*)[\\/]?$", pages.administrator_users_by_id],
     ["^([\\w\\/\\.\\-\\~]*)$", pages.yourworld, { remove_end_slash: true }]
 ]
 
 function get_third(url, first, second) {
     var value = split_limit(url, first + "/" + second + "/", 1)[1]
+    if(value.charAt(value.length - 1) === "/") {
+        value = value.substring(0, value.length - 1);
+    }
+    return value;
+}
+
+function get_fourth(url, first, second, third) {
+    var value = split_limit(url, first + "/" + second + "/" + third + "/", 1)[1]
     if(value.charAt(value.length - 1) === "/") {
         value = value.substring(0, value.length - 1);
     }
@@ -1430,6 +1440,19 @@ function getUserCountFromWorld(world) {
     return counter;
 }
 
+function topActiveWorlds(number) {
+    var clientNumbers = [];
+    for(var i in worldData) {
+        var cnt = getUserCountFromWorld(i);
+        if(cnt == 0) continue;
+        clientNumbers.push([cnt, i])
+    }
+    clientNumbers.sort(function(int1, int2) {
+        return int2[0] - int1[0];
+    })
+    return clientNumbers;
+}
+
 function broadcastUserCount() {
     if(!global_data.ws_broadcast) return;
     for(var user_world in worldData) {
@@ -1784,6 +1807,7 @@ var global_data = {
     crypto,
     filename_sanitize,
     get_third,
+    get_fourth,
     create_date,
     get_user_info,
     world_get_or_create,
@@ -1807,7 +1831,8 @@ var global_data = {
     getGlobalChatlog: function() { return global_chatlog },
     clearChatlog,
     html_tag_esc,
-    getWss: function() { return wss }
+    getWss: function() { return wss },
+    topActiveWorlds
 }
 
 function stopServer() {

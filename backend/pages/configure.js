@@ -59,7 +59,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var members = await db.all("SELECT * FROM whitelist WHERE world_id=?", world.id)
     var member_list = []; // processed list of members
     for(var i = 0; i < members.length; i++) {
-        var username = await db.get("SELECT username from auth_user where id=?", members[i].user_id)
+        var username = await db.get("SELECT username FROM auth_user WHERE id=?", members[i].user_id)
         member_list.push({
             member_name: username.username
         });
@@ -70,6 +70,12 @@ module.exports.GET = async function(req, serve, vars, params) {
     // if empty, make sure server knows it's empty
     // ([] is considered to not be empty through boolean conversion)
     if(member_list.length === 0) member_list = null;
+
+    var owner_name = ""
+
+    if(world.owner_id) {
+        owner_name = (await db.get("SELECT username FROM auth_user WHERE id=?", [world.owner_id])).username
+    }
 
     var color = world.custom_color || "default";
     var cursor_color = world.custom_cursor || "default";
@@ -105,6 +111,8 @@ module.exports.GET = async function(req, serve, vars, params) {
         owner_color,
         member_color,
         menu_color,
+
+        owner_name,
 
         admin_background: properties.background == "/static/misc/images/christmas/blank_tree.png"
     };

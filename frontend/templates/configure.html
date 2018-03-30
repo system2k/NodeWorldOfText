@@ -43,11 +43,27 @@
 {% endblock %}
 
 {% block header %}
-	<h1>Options for "{{ world }}"</h1>
+	<h1>Options for "<a href="/{{ world }}">{{ world }}</a>"</h1>
 	<span><a href="/accounts/profile/">« Back to profile</a></span>
 {% endblock %}
 
 {% block content %}
+	{% if user.superuser %}
+		<div class="content_set">
+			<div class="content_set_title">This world is owned by:</div>
+			<div class="content_set_content" id="owned_by">
+				&nbsp;&nbsp;&nbsp;&nbsp;
+				{% if owner_name %}
+					<a href="/administrator/users/by_username/{{owner_name}}" style="background-color: aqua; min-width: 70px;">
+						{{ owner_name }}
+					</a>
+				{% else %}
+					<b>[ No Owner ]</b>
+				{% endif %}
+			</div>
+		</div>
+	{% endif %}
+
 	<div class="content_set">
 		<div class="content_set_title">Access</div>
 		<div class="content_set_content" id="world_access">

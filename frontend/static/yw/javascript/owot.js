@@ -1407,11 +1407,11 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
             tagDom.style.color = "#0033cc";
             tagDom.style.fontWeight = "bold";
         } else if(admin) {
-            tagDom.innerText = "(Admin) ";
+            tagDom.innerText = "(A) ";
             tagDom.style.color = "#FF0000";
             tagDom.style.fontWeight = "bold";
         } else if(staff) {
-            tagDom.innerText = "(Staff) ";
+            tagDom.innerText = "(M) ";
             tagDom.style.color = "#009933";
             tagDom.style.fontWeight = "bold";
         }

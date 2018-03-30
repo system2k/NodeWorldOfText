@@ -22,6 +22,14 @@
             window.location.pathname = "/accounts/download/" + worldname_download.value + "/";
             return false;
         }
+        function goto_user_by_username() {
+            window.location.pathname = "/administrator/users/by_username/" + user_info_by_username.value + "/";
+            return false;
+        }
+        function goto_user_by_id() {
+            window.location.pathname = "/administrator/users/by_id/" + user_info_by_id.value + "/";
+            return false;
+        }
         onload = function() {
             $('#username_config').autocomplete('/accounts/member_autocomplete/', {delay: 50})
         }
@@ -117,6 +125,22 @@
 				<input type="text" name="announcement" id="announcement" value="{{ announcement }}" style="width: 100%;">
 				<input type="submit" value="Set">
 			</form>
+        </div>
+    </div>
+
+    <div class="content_set">
+        <div class="content_set_title">View user info</div>
+        <div class="content_set_content">
+            <form onsubmit="return goto_user_by_username();">
+                User name: 
+                <input type="text" name="username" id="user_info_by_username" value="">
+                <input type="submit" value="Enter">
+            </form>
+            <form onsubmit="return goto_user_by_id();">
+                User id: 
+                <input type="text" name="username" id="user_info_by_id" value="">
+                <input type="submit" value="Enter">
+            </form>
         </div>
     </div>
 

@@ -12,6 +12,7 @@ module.exports = async function(ws, data, send, vars) {
     var add_global_chatlog = vars.add_global_chatlog;
     var add_page_chatlog = vars.add_page_chatlog;
     var html_tag_esc = vars.html_tag_esc;
+    var topActiveWorlds = vars.topActiveWorlds;
 
     var props = JSON.parse(world.properties);
     var chat_perm = props.chat_permission;
@@ -80,6 +81,28 @@ module.exports = async function(ws, data, send, vars) {
     var temporary_broadcast_function = broadcast;
     if(data.location == "global") {
         temporary_broadcast_function = ws_broadcast;
+    }
+
+    if(msg == "/worlds" && user.operator) {
+        var lst = topActiveWorlds(10);
+        var worldList = "";
+        for(var i = 0; i < lst.length; i++) {
+            var row = lst[i];
+            if(row[1] == "") {
+                row[1] = "(main)"
+            } else {
+                row[1] = `<a href="/${row[1]}" style="color: blue; text-decoration: underline;">${row[1]}</a>`;
+            }
+            worldList += "-> " + row[1] + " [" + row[0] + "]";
+            if(i != lst.length - 1) worldList += "<br>"
+        }
+        var listWrapper = `
+            <div style="background-color: #dadada; font-family: monospace;">
+                ${worldList}
+            </div>
+        `;
+        serverChatResponse("Currently loaded worlds (top 10): " + listWrapper, data.location)
+        return;
     }
 
     var chatData = {
