@@ -551,6 +551,7 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^accounts/password_change/done[\\/]?$", pages.password_change_done],
     ["^administrator/users/by_username/(.*)[\\/]?$", pages.administrator_users_by_username],
     ["^administrator/users/by_id/(.*)[\\/]?$", pages.administrator_users_by_id],
+    ["^accounts/nsfw/(.*)[\\/]?$", pages.accounts_nsfw],
     ["^([\\w\\/\\.\\-\\~]*)$", pages.yourworld, { remove_end_slash: true }]
 ]
 

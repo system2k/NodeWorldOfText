@@ -80,10 +80,13 @@ module.exports.GET = async function(req, serve, vars, params) {
                 pathname
             }
         }
+        if(world_properties.page_is_nsfw) {
+            state.worldModel.nsfw = world_properties.page_is_nsfw;
+        }
         if(announcement) {
             state.announce = announcement;
         }
-        if(read_permission.access_denied) { // unused
+        if(read_permission.access_denied) {
             state.announce = "You are viewing a private world as an administrator";
         }
         if(params.timemachine) {
@@ -99,7 +102,8 @@ module.exports.GET = async function(req, serve, vars, params) {
         var data = {
             state: JSON.stringify(state),
             world,
-            page_title
+            page_title,
+            nsfw: world_properties.page_is_nsfw
         }
         serve(HTML("yourworld.html", data));
     }

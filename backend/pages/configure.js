@@ -113,6 +113,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         menu_color,
 
         owner_name,
+        page_is_nsfw: !!properties.page_is_nsfw,
 
         admin_background: properties.background == "/static/misc/images/christmas/blank_tree.png"
     };
@@ -245,6 +246,10 @@ module.exports.POST = async function(req, serve, vars) {
             properties_updated = true;
             delete properties.background;
         }
+        if(!("nsfw_page" in post_data)) {
+            properties_updated = true;
+            delete properties.page_is_nsfw;
+        }
         var new_name = post_data.new_world_name + "";
         if(new_name && new_name != world.name) { // changing world name
             var validate = await validate_claim_worldname(new_name, vars, true, world.id);
@@ -260,6 +265,9 @@ module.exports.POST = async function(req, serve, vars) {
 
         } else if("admin_background" in post_data) {
             properties.background = "/static/misc/images/christmas/blank_tree.png";
+            properties_updated = true;
+        } else if("nsfw_page" in post_data) {
+            properties.page_is_nsfw = true;
             properties_updated = true;
         }
         if(properties_updated) {

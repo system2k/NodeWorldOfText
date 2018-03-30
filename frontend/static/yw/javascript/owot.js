@@ -310,6 +310,7 @@ $(document).on("mousemove.tileProtectAuto", function() {
 })
 
 $("body").on("keydown.tileProtectAuto", function(e) {
+    if(!worldFocused) return;
     if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to protect tiles
         if(e.ctrlKey) { // prevent browser's ctrl+s from executing
             e.preventDefault();
@@ -425,6 +426,7 @@ $(document).on("mousemove.linkAuto", function() {
 })
 
 $("body").on("keydown.linkAuto", function(e) {
+    if(!worldFocused) return;
     if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to add links
         if(e.ctrlKey) { // is Ctrl+S
             e.preventDefault();
@@ -575,6 +577,7 @@ function getCharColor(tileX, tileY, charX, charY) {
 
 // copy individual chars
 $(document).on("keydown", function(e) {
+    if(!worldFocused) return;
     // 67 = c, 77 = m
     if(!e.ctrlKey || (e.keyCode != 67 && e.keyCode != 77)) return;
     textInput[0].value = "";
@@ -775,12 +778,18 @@ var dragPosX = 0;
 var dragPosY = 0;
 var isDragging = false;
 function event_mousedown(e, arg_pageX, arg_pageY) {
+    var target = e.target;
+    if($(target).closest(getChatfield())[0] == getChatfield()[0] || target == $("#chatbar")[0]) {
+        worldFocused = false;
+    } else {
+        worldFocused = true;
+    }
+
     var pageX = e.pageX*zoomRatio|0;
     var pageY = e.pageY*zoomRatio|0;
     if(arg_pageX != void 0) pageX = arg_pageX;
     if(arg_pageY != void 0) pageY = arg_pageY;
-    if(e.target != owot && e.target != linkDiv) {
-        worldFocused = false;
+    if(target != owot && target != linkDiv) {
         return;
     };
     dragStartX = pageX;
@@ -789,7 +798,6 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
     dragPosY = positionY;
     isDragging = true;
     textInput.focus(); // for mobile typing
-    worldFocused = true;
 
     // stop paste
     clearInterval(pasteInterval);
@@ -1153,6 +1161,7 @@ setInterval(function() {
 }, 10);
 
 $(document).on("keydown", function(e) {
+    if(!worldFocused) return;
     var key = e.keyCode;
     if(w._state.uiModal) return;
     if(document.activeElement == $("#chatbar")[0]) return;
@@ -2624,7 +2633,6 @@ var w = {
         return [-positionY / tileH, -positionX / tileW]
     },
     doUrlLink: function(url) {
-        worldFocused = true;
         linkAuto.active = true;
         linkAuto.mode = 0;
         linkAuto.url = url;
@@ -2639,7 +2647,6 @@ var w = {
         w._ui.urlInputModal.open(w.doUrlLink.bind(w));
     },
     doCoordLink: function(y, x) {
-        worldFocused = true;
         linkAuto.active = true;
         linkAuto.mode = 1;
         linkAuto.coordTileY = y;
@@ -2656,7 +2663,6 @@ var w = {
         w._ui.coordinateInputModal.open("Enter the coordinates to create a link to. You can then click on a letter to create the link.", w.doCoordLink.bind(w));
     },
     doProtect: function(protectType, unprotect) {
-        worldFocused = true;
         // show the protection precision menu
         $("#protect_precision").css("display", "");
         tileProtectAuto.active = true;

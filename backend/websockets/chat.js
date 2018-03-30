@@ -54,6 +54,7 @@ module.exports = async function(ws, data, send, vars) {
     if(data.message) {
         msg = data.message + "";
     }
+    msg = msg.trim();
 
     if(!msg) return;
 
@@ -83,8 +84,12 @@ module.exports = async function(ws, data, send, vars) {
         temporary_broadcast_function = ws_broadcast;
     }
 
-    if(msg == "/worlds" && user.operator) {
-        var lst = topActiveWorlds(10);
+    if(msg == "/worlds") {
+        if(!user.operator) {
+            return;
+        }
+        var topCount = 10;
+        var lst = topActiveWorlds(topCount);
         var worldList = "";
         for(var i = 0; i < lst.length; i++) {
             var row = lst[i];
@@ -101,7 +106,7 @@ module.exports = async function(ws, data, send, vars) {
                 ${worldList}
             </div>
         `;
-        serverChatResponse("Currently loaded worlds (top 10): " + listWrapper, data.location)
+        serverChatResponse("Currently loaded worlds (top " + topCount + "): " + listWrapper, data.location)
         return;
     }
 
