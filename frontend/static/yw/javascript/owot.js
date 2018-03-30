@@ -1,5 +1,5 @@
 var YourWorld = {
-    Color: 0,
+    Color: +localStorage.getItem("color") || 0,
     Nickname: state.userModel.username
 }
 
@@ -607,6 +607,7 @@ $(document).on("keydown", function(e) {
     var charY = pos[3];
     var color = getCharColor(tileX, tileY, charX, charY)
     YourWorld.Color = color;
+    localStorage.setItem('color', color);
     // update color textbox in "change color" menu
     $(".jscolor")[0].value = ("00000" + color.toString(16)).slice(-6);
 })
@@ -2603,6 +2604,7 @@ var w = {
                 this_color = 0;
             }
             YourWorld.Color = this_color;
+            localStorage.setItem('color', this_color);
         });
     },
     goToCoord: function() {
