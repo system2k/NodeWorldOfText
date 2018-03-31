@@ -1210,7 +1210,10 @@ var OWOT = {
         OWOT.events[type].push(call);
     }
 };
-OWOT.on("chat", event_on_chat); // Chat event
+
+if(Permissions.can_chat(state.userModel, state.worldModel)) {
+    OWOT.on("chat", event_on_chat); // Chat event
+}
 
 function trimSpacePolyfill(txt) {
     return txt.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, "");
@@ -1584,9 +1587,11 @@ function createSocket() {
         if(socket.readyState == WebSocket.OPEN) socket.send("2::"); // initial ping
         // ping is so that the socket won't close after every minute
         if(timesConnected == 1) {
-            socket.send(JSON.stringify({
-                kind: "chathistory"
-            }));
+            if(Permissions.can_chat(state.userModel, state.worldModel)) {
+                socket.send(JSON.stringify({
+                    kind: "chathistory"
+                }));
+            }
         }
     }
 

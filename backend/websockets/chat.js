@@ -142,11 +142,8 @@ module.exports = async function(ws, data, send, vars) {
     }, chatData)
 
     var chatOpts = {
+        // Global and Page updates should not appear in worlds with chat disabled
         chat_perm
-    }
-    // if this is a global message, allow everyone to see it
-    if(data.location == "global") {
-        chatOpts.chat_perm = 0;
     }
 
     if(!isCommand) {

@@ -8,11 +8,8 @@ var initGlobalTabOpen = false;
 var canChat = Permissions.can_chat(state.userModel, state.worldModel);
 if(!canChat) { // can't chat, adjust the chat window for it
     selectedChatTab = 1;
-    $("#chat_page_tab").remove();
-    $("#page_chatfield").remove();
-    $("#chat_global_tab")[0].style.left = "3px";
-    $("#usr_online")[0].style.left = "96px";
-    $("#global_chatfield")[0].style.display = "";
+    $("#chat_window").remove();
+    $("#chat_open").remove();
 }
 
 function api_chat_send(message, opts) {
