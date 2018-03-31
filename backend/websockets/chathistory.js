@@ -12,8 +12,24 @@ module.exports = async function(ws, data, send, vars) {
     var getWorldData = vars.getWorldData;
     var getGlobalChatlog = vars.getGlobalChatlog;
 
+    var props = JSON.parse(world.properties);
+    var chat_perm = props.chat_permission;
+    var is_member = user.stats.member;
+    var is_owner = user.stats.owner;
+
+    var can_chat = false;
+    if(chat_perm == 0 || chat_perm == undefined) can_chat = true;
+    if(chat_perm === 1 && (is_member || is_owner)) can_chat = true;
+    if(chat_perm === 2 && is_owner) can_chat = true;
+
+    var page_chat_prev = [];
+
+    if(can_chat) {
+        page_chat_prev = getWorldData(world.name).chatlog.slice(-100);
+    }
+
     send({
         global_chat_prev: getGlobalChatlog().slice(-100),
-        page_chat_prev: getWorldData(world.name).chatlog.slice(-100)
+        page_chat_prev
     })
 }

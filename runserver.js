@@ -1486,12 +1486,15 @@ function start_server() {
     setInterval(function() {
         broadcastUserCount();
     }, 2000);
-    ws_broadcast = function(data, world) {
+    ws_broadcast = function(data, world, opts) {
+        if(!opts) opts = {};
         data = JSON.stringify(data)
         wss.clients.forEach(function each(client) {
             try {
                 if(client.readyState == ws.OPEN &&
                 world == void 0 || NCaseCompare(client.world_name, world)) {
+                    if(opts.chat_perm == 1) if(!(client.is_member || client.is_owner)) return;
+                    if(opts.chat_perm == 2) if(!client.is_owner) return;
                     client.send(data);
                 }
             } catch(e) {}
@@ -1575,6 +1578,7 @@ function start_server() {
                 user,
                 channel
             })
+
             var status = await websockets.Main(ws, world_name, vars);
             if(typeof status == "string") {
                 send_ws(JSON.stringify({
@@ -1587,6 +1591,10 @@ function start_server() {
             vars.timemachine = status.timemachine
 
             user.stats = status.permission;
+
+            ws.is_member = user.stats.member;
+            ws.is_owner = user.stats.owner;
+
             var clientId = generateClientId(world_name);
             send_ws(JSON.stringify({
                 kind: "channel",
@@ -1601,12 +1609,14 @@ function start_server() {
                 req_id++;
                 var current_req_id = req_id;
                 try {
+                    // This is a ping
                     if(msg == "2::") {
                         return send_ws(JSON.stringify({
                             kind: "ping",
                             result: "pong"
                         }));
                     }
+                    // Parse request. If failed, return a "418" message
                     try {
                         msg = JSON.parse(msg);
                     } catch(e) {
@@ -1617,14 +1627,15 @@ function start_server() {
                         return ws.close()
                     }
                     var kind = msg.kind;
+                    // Begin calling a websocket function for the necessary request
                     if(websockets[kind]) {
                         function send(msg) {
                             msg.kind = kind
                             send_ws(JSON.stringify(msg))
                         }
-                        function broadcast(data) {
+                        function broadcast(data, opts) {
                             data.source = kind;
-                            ws_broadcast(data, world_name);
+                            ws_broadcast(data, world_name, opts);
                         }
                         var res = await websockets[kind](ws, msg, send, objIncludes(vars, {
                             transaction: transaction_obj(current_req_id),
@@ -1642,6 +1653,7 @@ function start_server() {
                     handle_ws_error(e);
                 }
             }
+            // Some messages might have been received before the socket finished opening
             if(pre_queue.length > 0) {
                 for(var p = 0; p < pre_queue.length; p++) {
                     onMessage(pre_queue[p]);

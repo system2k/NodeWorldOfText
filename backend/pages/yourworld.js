@@ -55,16 +55,18 @@ module.exports.GET = async function(req, serve, vars, params) {
         }
 		if(params.timemachine) {
 			pathname = "/" + path;
-		}
+        }
+        var chat_permission = world_properties.chat_permission;
+        if(!chat_permission) chat_permission = 0;
         var state = {
             userModel: {
                 username: user.username,
-                is_superuser: user.superuser,
+                is_superuser: user.superuser, // Admin of OWOT?
                 authenticated: user.authenticated,
                 is_member: read_permission.member, // Member of world?
                 is_owner: read_permission.owner, // Owner of world?
-                is_staff: user.staff,
-                is_operator: user.operator
+                is_staff: user.staff, // Staff of OWOT?
+                is_operator: user.operator // Operator of OWOT?
             },
             worldModel: {
                 feature_membertiles_addremove: !!world.feature_membertiles_addremove,
@@ -77,7 +79,8 @@ module.exports.GET = async function(req, serve, vars, params) {
                 namespace: world.name,
                 readability: world.readability,
                 feature_coord_link: world.feature_coord_link,
-                pathname
+                pathname,
+                chat_permission
             }
         }
         if(world_properties.page_is_nsfw) {

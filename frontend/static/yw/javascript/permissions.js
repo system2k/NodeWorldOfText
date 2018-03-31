@@ -107,5 +107,8 @@ Permissions = {
 		}
 		assert(perm === PERM.MEMBERS);
 		return _ref = world.id, user.is_member;
+	},
+	can_chat: function(user, world) {
+		return Permissions.user_matches_perm(user, world, world.chat_permission);
 	}
 };

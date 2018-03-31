@@ -5,6 +5,16 @@ var chatGlobalUnread  = 0;
 var initPageTabOpen   = false;
 var initGlobalTabOpen = false;
 
+var canChat = Permissions.can_chat(state.userModel, state.worldModel);
+if(!canChat) { // can't chat, adjust the chat window for it
+    selectedChatTab = 1;
+    $("#chat_page_tab").remove();
+    $("#page_chatfield").remove();
+    $("#chat_global_tab")[0].style.left = "3px";
+    $("#usr_online")[0].style.left = "96px";
+    $("#global_chatfield")[0].style.display = "";
+}
+
 function api_chat_send(message, opts) {
     if(!message) return;
     if(!opts) opts = {};
@@ -12,10 +22,21 @@ function api_chat_send(message, opts) {
     var nick = opts.nick || YourWorld.Nickname;
     var location = opts.location ? opts.location : (selectedChatTab == 0 ? "page" : "global");
 
-    var msgLim = state.userModel.staff ? Infinity : 600;
-    var nickLim = state.userModel.staff ? Infinity : 20;
+    var msgLim = state.userModel.is_staff ? Infinity : 400;
+    var nickLim = state.userModel.is_staff ? Infinity : 20;
 
-    message = message.slice(0, msgLim);
+    message = trimSpace(message.slice(0, msgLim));
+
+    var chatColor;
+    if(!opts.color) {
+        if(!YourWorld.Color) {
+            chatColor = assignColor(YourWorld.Nickname)
+        } else {
+            chatColor = "#" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase();
+        };
+    } else {
+        chatColor = opts.color;
+    }
 
     if(!exclude_commands) {
         var nickCommand = "/nick";
@@ -35,12 +56,17 @@ function api_chat_send(message, opts) {
             return;
         }
     }
+    var isCommand = false;
+    if(!exclude_commands && (message.startsWith("/") || message.startsWith("\\"))) {
+        isCommand = true;
+    }
 
     socket.send(JSON.stringify({
         kind: "chat",
         nickname: nick,
         message: message,
-        location: location
+        location: location,
+        color: chatColor
     }));
 
     var registered = state.userModel.authenticated;
@@ -58,7 +84,8 @@ function api_chat_send(message, opts) {
     var admin = opts.admin || state.userModel.is_superuser;
     var staff = opts.staff || state.userModel.is_staff;
 
-    addChat(location, id, type, nickname, message, username, op, admin, staff);
+    if(!isCommand) addChat(location, id, type, nickname,
+                            message, username, op, admin, staff, chatColor);
 };
 
 // Performs send-chat-operation on chatbox
@@ -99,7 +126,7 @@ function event_on_chat(data) {
     }
     updateUnread()
     addChat(data.location, data.id, data.type,
-        data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff);
+        data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color);
 }
 
 $("#chatsend").on("click", function() {
@@ -181,7 +208,8 @@ $("#chat_global_tab").on("click", function() {
     * "anon"      :: unregistered
     * "user_nick" :: registered renamed nick
 */
-function addChat(chatfield, id, type, nickname, message, realUsername, op, admin, staff) {
+function addChat(chatfield, id, type, nickname, message, realUsername, op, admin, staff, color) {
+    if(!color) color = assignColor(nickname);
     var field;
     if(chatfield == "page") {
         field = $("#page_chatfield");
@@ -215,7 +243,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     nickDom.style.textDecoration = "underline";
 
     if(type == "user") {
-        nickDom.style.color = assignColor(nickname);
+        nickDom.style.color = color;
         nickDom.href = "javascript:alert(\"Registered; " + realUsername + "\")"
         nickDom.style.fontWeight = "bold";
     }
@@ -226,9 +254,8 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
         nickname = "[" + id + "]";
     }
     if(type == "user_nick") {
-        nickDom.style.color = assignColor(nickname);
+        nickDom.style.color = color;
         nickDom.href = "javascript:alert(\"Registered; " + realUsername + "\")"
-        nickname = "[" + id + "] " + nickname;
     }
     nickDom.innerHTML = nickname + ":";
 

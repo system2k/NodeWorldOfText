@@ -2707,7 +2707,8 @@ var ws_functions = {
                 realUsername: data.realUsername,
                 op: data.op,
                 admin: data.admin,
-                staff: data.staff
+                staff: data.staff,
+                color: data.color
             });
         }
     },
@@ -2717,19 +2718,22 @@ var ws_functions = {
         updateUsrCount();
     },
     chathistory: function(data) {
+        if(data.error) {
+            return;
+        }
         var global_prev = data.global_chat_prev;
         var page_prev = data.page_chat_prev;
         for(var g = 0; g < global_prev.length; g++) {
             var chat = global_prev[g];
             var type = chatType(chat.registered, chat.nickname, chat.realUsername);
             addChat(chat.location, chat.id, type, chat.nickname,
-                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff);
+                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color);
         }
         for(var p = 0; p < page_prev.length; p++) {
             var chat = page_prev[p];
             var type = chatType(chat.registered, chat.nickname, chat.realUsername);
             addChat(chat.location, chat.id, type, chat.nickname,
-                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff);
+                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color);
         }
     }
 };

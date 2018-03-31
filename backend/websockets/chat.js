@@ -58,6 +58,11 @@ module.exports = async function(ws, data, send, vars) {
 
     if(!msg) return;
 
+    data.color += "";
+    if(!data.color) data.color = "#000000";
+    if(!user.staff) data.color = data.color.slice(0, 20);
+    data.color = data.color.trim();
+
     var msNow = Date.now();
 
     var second = Math.floor(msNow / 1000);
@@ -77,12 +82,7 @@ module.exports = async function(ws, data, send, vars) {
         }
     }
 
-    if(!user.staff) msg = msg.slice(0, 600);
-
-    var temporary_broadcast_function = broadcast;
-    if(data.location == "global") {
-        temporary_broadcast_function = ws_broadcast;
-    }
+    if(!user.staff) msg = msg.slice(0, 400);
 
     if(msg == "/worlds") {
         if(!user.operator) {
@@ -119,17 +119,41 @@ module.exports = async function(ws, data, send, vars) {
         location: data.location,
         op: user.operator,
         admin: user.superuser,
-        staff: user.staff
+        staff: user.staff,
+        color: data.color
     };
 
-    if(data.location == "page") {
-        add_page_chatlog(chatData, world.name);
-    } else if(data.location == "global") {
-        add_global_chatlog(chatData);
+    var isCommand = false;
+    if(msg.startsWith("/") || msg.startsWith("\\")) {
+        isCommand = true;
     }
 
-    temporary_broadcast_function(Object.assign({
+    if(!isCommand) {
+        if(data.location == "page") {
+            add_page_chatlog(chatData, world.name);
+        } else if(data.location == "global") {
+            add_global_chatlog(chatData);
+        }
+    }
+
+    var websocketChatData = Object.assign({
         kind: "chat",
         channel: vars.channel
-    }, chatData))
+    }, chatData)
+
+    var chatOpts = {
+        chat_perm
+    }
+    // if this is a global message, allow everyone to see it
+    if(data.location == "global") {
+        chatOpts.chat_perm = 0;
+    }
+
+    if(!isCommand) {
+        if(data.location == "page") {
+            broadcast(websocketChatData, chatOpts)
+        } else if(data.location == "global") {
+            ws_broadcast(websocketChatData, void 0, chatOpts)
+        }
+    }
 }
