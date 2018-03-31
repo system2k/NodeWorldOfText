@@ -27,7 +27,7 @@ module.exports = async function(ws, data, send, vars) {
     if(can_chat) {
         page_chat_prev = getWorldData(world.name).chatlog.slice(-100);
     }
-
+    
     send({
         global_chat_prev: getGlobalChatlog().slice(-100),
         page_chat_prev

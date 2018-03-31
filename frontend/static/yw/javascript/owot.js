@@ -112,7 +112,7 @@ function loadLoop() {
 loadLoop();
 
 if(state.userModel.is_staff) {
-    $("#chatsend")[0].max = "";
+    $("#chatbar")[0].removeAttribute("maxLength");
 }
 
 var defaultSizes = {
