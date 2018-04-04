@@ -1676,6 +1676,7 @@ function start_server() {
             ws.on("message", function(msg) {
                 onMessage(msg);
             });
+            ws.on("close", function(data) {})
             var location = url.parse(req.url).pathname;
             var world_name;
             function send_ws(data) {

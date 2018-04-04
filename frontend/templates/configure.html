@@ -193,7 +193,7 @@
 		<div class="content_set_title">Style</div>
 		<div class="content_set_content" id="world_style">
 			<p class="set_description">
-				Custom colors for your world
+				Custom colors for your world.
 			</p>
 			<form method="POST" action="">
 				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
@@ -294,6 +294,10 @@
 						<input name="admin_background" type="checkbox"{%if admin_background%} checked{%endif%}>
 					</p>
 				{% endif %}
+				<p>
+					Use square characters
+					<input name="square_chars" type="checkbox"{%if square_chars%} checked{%endif%}>
+				</p>
 				<p>
 					This page is NSFW
 					<input name="nsfw_page" type="checkbox"{%if page_is_nsfw%} checked{%endif%}>

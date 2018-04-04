@@ -117,14 +117,21 @@ if(state.userModel.is_staff) {
 
 var defaultSizes = {
     // in pixels
-    tileW: 160,
-    tileH: 144,
     cellW: 10,
     cellH: 18,
+    // assigned later
+    tileW: null,
+    tileH: null,
     // in characters
     tileC: 16, // columns
     tileR: 8 // rows
 }
+if(state.worldModel.square_chars) {
+    defaultSizes.cellW = 18;
+}
+defaultSizes.tileW = defaultSizes.cellW * defaultSizes.tileC;
+defaultSizes.tileH = defaultSizes.cellH * defaultSizes.tileR;
+var cellWidthPad = Math.floor((defaultSizes.cellW - 10) / 2); // X text offset if the cell is wider
 
 var tileW = defaultSizes.tileW * zoom | 0;
 var tileH = defaultSizes.tileH * zoom | 0;
@@ -2166,6 +2173,10 @@ function renderTile(tileX, tileY, redraw) {
             if(color == 0 || !colorsEnabled) {
                 textRender.fillStyle = linkColor;
             }
+
+            // x padding of text if the char width is > 10
+            var XPadding = cellWidthPad * zoom;
+
             // underline link
             if(isLink) {
                 textRender.fillRect(x * cellW, (y * cellH + textYOffset + zoom), cellW, zoom)
@@ -2183,7 +2194,7 @@ function renderTile(tileX, tileY, redraw) {
                     textRender.fillRect(x*cellW + (cellW/2|0), y*cellH, cellW/2|0, cellH);
                 } else {
                     if(char.length > 1) textRender.font = specialCharFont;
-                    textRender.fillText(char, x*cellW, y*cellH + textYOffset)
+                    textRender.fillText(char, x*cellW + XPadding, y*cellH + textYOffset)
                     if(char.length > 1) textRender.font = font;
                 }
             }

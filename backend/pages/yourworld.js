@@ -86,6 +86,9 @@ module.exports.GET = async function(req, serve, vars, params) {
         if(world_properties.page_is_nsfw) {
             state.worldModel.nsfw = world_properties.page_is_nsfw;
         }
+        if(world_properties.square_chars) {
+            state.worldModel.square_chars = true;
+        }
         if(announcement) {
             state.announce = announcement;
         }
