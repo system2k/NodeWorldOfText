@@ -17,6 +17,7 @@ const zip           = require("adm-zip")
 
 const settings = require("./settings.json");
 const database = new sql.Database(settings.DATABASE_PATH);
+const chat_history = new sql.Database(settings.CHAT_HISTORY);
 
 Error.stackTraceLimit = Infinity;
 
@@ -92,100 +93,106 @@ const pages = load_modules("./backend/pages/");
 const websockets = load_modules("./backend/websockets/");
 const modules = load_modules("./backend/modules/");
 
-const db = {
-    // gets data from the database (only 1 row at a time)
-    get: async function(command, params) {
-        if(params == void 0 || params == null) params = []
-        return new Promise(function(r, rej) {
-            database.get(command, params, function(err, res) {
-                if(err) {
-                    return rej({
-                        sqlite_error: process_error_arg(err),
-                        input: { command, params }
-                    })
-                }
-                r(res)
-            })
-        })
-    },
-    // runs a command (insert, update, etc...) and might return "lastID" if needed
-    run: async function(command, params) {
-        if(params == void 0 || params == null) params = []
-        var err = false
-        return new Promise(function(r, rej) {
-            database.run(command, params, function(err, res) {
-                if(err) {
-                    return rej({
-                        sqlite_error: process_error_arg(err),
-                        input: { command, params }
-                    })
-                }
-                var info = {
-                    lastID: this.lastID
-                }
-                r(info)
-            })
-        })
-    },
-    // gets multiple rows in one command
-    all: async function(command, params) {
-        if(params == void 0 || params == null) params = []
-        return new Promise(function(r, rej) {
-            database.all(command, params, function(err, res) {
-                if(err) {
-                    return rej({
-                        sqlite_error: process_error_arg(err),
-                        input: { command, params }
-                    })
-                }
-                r(res)
-            })
-        })
-    },
-    // get multiple rows but execute a function for every row
-    each: async function(command, params, callbacks) {
-        if(typeof params == "function") {
-            callbacks = params
-            params = []
-        }
-        var def = callbacks
-        var callback_error = false
-        var cb_err_desc = "callback_error...";
-        callbacks = function(e, data) {
-            try {
-                def(data)
-            } catch(e) {
-                callback_error = true
-                cb_err_desc = e;
-            }
-        }
-        return new Promise(function(r, rej) {
-            database.each(command, params, callbacks, function(err, res) {
-                if(err) return rej({
-                    sqlite_error: process_error_arg(err),
-                    input: { command, params }
+function asyncDbSystem(database) {
+    const db = {
+        // gets data from the database (only 1 row at a time)
+        get: async function(command, params) {
+            if(params == void 0 || params == null) params = []
+            return new Promise(function(r, rej) {
+                database.get(command, params, function(err, res) {
+                    if(err) {
+                        return rej({
+                            sqlite_error: process_error_arg(err),
+                            input: { command, params }
+                        })
+                    }
+                    r(res)
                 })
-                if(callback_error) return rej(cb_err_desc)
-                r(res)
             })
-        })
-    },
-    // like run, but executes the command as a SQL file
-    // (no comments allowed, and must be semicolon seperated)
-    exec: async function(command) {
-        return new Promise(function(r, rej) {
-            database.exec(command, function(err) {
-                if(err) {
-                    return rej({
-                        sqlite_error: process_error_arg(err),
-                        input: { command }
-                    })
+        },
+        // runs a command (insert, update, etc...) and might return "lastID" if needed
+        run: async function(command, params) {
+            if(params == void 0 || params == null) params = []
+            var err = false
+            return new Promise(function(r, rej) {
+                database.run(command, params, function(err, res) {
+                    if(err) {
+                        return rej({
+                            sqlite_error: process_error_arg(err),
+                            input: { command, params }
+                        })
+                    }
+                    var info = {
+                        lastID: this.lastID
+                    }
+                    r(info)
+                })
+            })
+        },
+        // gets multiple rows in one command
+        all: async function(command, params) {
+            if(params == void 0 || params == null) params = []
+            return new Promise(function(r, rej) {
+                database.all(command, params, function(err, res) {
+                    if(err) {
+                        return rej({
+                            sqlite_error: process_error_arg(err),
+                            input: { command, params }
+                        })
+                    }
+                    r(res)
+                })
+            })
+        },
+        // get multiple rows but execute a function for every row
+        each: async function(command, params, callbacks) {
+            if(typeof params == "function") {
+                callbacks = params
+                params = []
+            }
+            var def = callbacks
+            var callback_error = false
+            var cb_err_desc = "callback_error...";
+            callbacks = function(e, data) {
+                try {
+                    def(data)
+                } catch(e) {
+                    callback_error = true
+                    cb_err_desc = e;
                 }
-                r(true)
+            }
+            return new Promise(function(r, rej) {
+                database.each(command, params, callbacks, function(err, res) {
+                    if(err) return rej({
+                        sqlite_error: process_error_arg(err),
+                        input: { command, params }
+                    })
+                    if(callback_error) return rej(cb_err_desc)
+                    r(res)
+                })
             })
-        })
-    }
-};
+        },
+        // like run, but executes the command as a SQL file
+        // (no comments allowed, and must be semicolon seperated)
+        exec: async function(command) {
+            return new Promise(function(r, rej) {
+                database.exec(command, function(err) {
+                    if(err) {
+                        return rej({
+                            sqlite_error: process_error_arg(err),
+                            input: { command }
+                        })
+                    }
+                    r(true)
+                })
+            })
+        }
+    };
+    return db;
+}
+
+const db = asyncDbSystem(database);
+const db_ch = asyncDbSystem(chat_history);
 
 try {
     var transporter = nodemailer.createTransport({
@@ -286,6 +293,7 @@ var announcement_cache = "";
 
 async function initialize_server() {
     console.log("Starting server...");
+    await init_chat_history();
     if(!await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='server_info'")) {
         // table to inform that the server is initialized
         await db.run("CREATE TABLE 'server_info' (name TEXT, value TEXT)");
@@ -1348,33 +1356,104 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
     }
 }
 
-var clFile = "";
-if(fs.existsSync(settings.CHAT_LOG)) {
-    clFile = fs.readFileSync(settings.CHAT_LOG, "utf8");
+async function init_chat_history() {
+    if(!await db_ch.get("SELECT name FROM sqlite_master WHERE type='table' AND name='ch_info'")) {
+        await db_ch.run("CREATE TABLE 'ch_info' (name TEXT, value TEXT)");
+    }
+    if(!await db_ch.get("SELECT value FROM ch_info WHERE name='initialized'")) {
+        await db_ch.run("INSERT INTO ch_info VALUES('initialized', 'true')");
+        await db_ch.run("CREATE TABLE channels (id integer NOT NULL PRIMARY KEY, name integer, properties text, description text, date_created integer, world_id integer)")
+        await db_ch.run("CREATE TABLE entries (id integer NOT NULL PRIMARY KEY, date integer, channel integer, data text)")
+        await db_ch.run("CREATE TABLE default_channels (channel_id integer, world_id integer)")
+        var rowid = await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
+            ["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0])
+        var global_id = rowid.lastID;
+        // if the chat log exists
+        if(fs.existsSync(settings.CHAT_LOG)) {
+            var chatlogFile = fs.readFileSync(settings.CHAT_LOG, "utf8");
+            chatlogFile = JSON.parse(chatlogFile);
+            var global = chatlogFile.global_chatlog;
+            var world = chatlogFile.world_chatlog;
+            
+            await db_ch.run("BEGIN TRANSACTION")
+            // begin copying global chats
+            for(var i = 0; i < global.length; i++) {
+                var rowStr = JSON.stringify(global[i]);
+                await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
+                    [Date.now(), global_id, rowStr])
+            }
+            // begin copying world chats
+            for(var i in world) {
+                var worldId = (await db.get("SELECT id FROM world WHERE name=? COLLATE NOCASE", i))
+                if(!worldId) continue;
+                worldId = worldId.id;
+                var channelDesc = "Channel - \"" + i + "\"";
+                if(!i) { // No name? It's the front page
+                    channelDesc = "Front page channel"
+                }
+                // channel names start with _ (underscore)
+                var world_channel = await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
+                    ["_" + i, "{}", channelDesc, Date.now(), worldId])
+                var chats = world[i];
+                // copy each chat into the channel for the world
+                for(var c = 0; c < chats.length; c++) {
+                    var rowStr = JSON.stringify(chats[c]);
+                    await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
+                        [Date.now(), world_channel.lastID, rowStr])
+                }
+                // mark this channel as the default for the world
+                await db_ch.run("INSERT INTO default_channels VALUES(?, ?)",
+                    [world_channel.lastID, worldId])
+            }
+            await db_ch.run("COMMIT")
+        }
+    }
+    var globalChannelId = (await db_ch.get("SELECT id FROM channels WHERE name='global'")).id;
+    var globals = await db_ch.all("SELECT * FROM entries WHERE channel=? ORDER BY id", globalChannelId);
+    // pull global chats
+    for(var i = 0; i < globals.length; i++) {
+        var row = JSON.parse(globals[i].data);
+        global_chatlog.push(row);
+    }
+    // pull world chats
+    var default_channels = await db_ch.all("SELECT * FROM default_channels");
+    for(var i = 0; i < default_channels.length; i++) {
+        var channel = default_channels[i].channel_id;
+        var world = default_channels[i].world_id;
+        var world_chats = await db_ch.all("SELECT * FROM entries WHERE channel=? ORDER BY id", channel);
+        var world_name = (await db.get("SELECT name FROM world WHERE id=?", world)).name
+        world_chatlog[world_name] = [];
+        for(var a = 0; a < world_chats.length; a++) {
+            var row = JSON.parse(world_chats[a].data);
+            world_chatlog[world_name].push(row)
+        }
+    }
+
+    // apply world chats to the world data object
+    for(var i in world_chatlog) {
+        var data = world_chatlog[i];
+        var wdat = getWorldData(i);
+        wdat.chatlog = world_chatlog[i];
+    }
+
+    updateChatLogData(); // begin the chatlog update checker
 }
-var clData = {
-    global_chatlog: [],
-    world_chatlog: {}
-};
-if(clFile) {
-    clData = JSON.parse(clFile);
-}
+
+var world_chatlog = {}; // Temporary
 
 var page_chatlog_limit = Infinity;
 var global_chatlog_limit = Infinity;
-var global_chatlog = clData.global_chatlog;
+var global_chatlog = [];
 var worldData = {};
-var chatlog_has_update = false;
-for(var i in clData.world_chatlog) {
-    var data = clData.world_chatlog[i];
-    var wdat = getWorldData(i);
-    wdat.chatlog = clData.world_chatlog[i];
-}
+var chatIsCleared = {};
+
+var global_chat_additions = [];
+var world_chat_additions = [];
 
 function add_global_chatlog(data) {
-    chatlog_has_update = true;
     global_chatlog.push(data)
     global_chatlog = global_chatlog.slice(-global_chatlog_limit)
+    global_chat_additions.push(data);
 }
 
 function add_page_chatlog(data, world) {
@@ -1383,31 +1462,78 @@ function add_page_chatlog(data, world) {
     var page_chatlog = wDat.chatlog;
     page_chatlog.push(data)
     wDat.chatlog = page_chatlog.slice(-page_chatlog_limit)
+    world_chat_additions.push([data, world])
 }
 
 function clearChatlog(world) {
     getWorldData(world).chatlog = [];
-    chatlog_has_update = true;
+    chatIsCleared[world] = true;
 }
 
-function updateChatLogData() {
-    if(chatlog_has_update) {
-        chatlog_has_update = false;
-        var dat = {};
-        dat.global_chatlog = global_chatlog;
-        dat.world_chatlog = {};
-        for(var i in worldData) {
-            if(worldData[i].chatlog == 0) continue;
-            dat.world_chatlog[i] = worldData[i].chatlog;
-        }
-        fs.writeFile(settings.CHAT_LOG, JSON.stringify(dat), "utf8", function() {
-            setTimeout(updateChatLogData, 5000);
-        });
-    } else {
+async function updateChatLogData() {
+    if(!(global_chat_additions.length > 0 ||
+          world_chat_additions.length > 0 ||
+          Object.keys(chatIsCleared).length > 0)) {
         setTimeout(updateChatLogData, 1000);
+        return;
     }
+
+    var copy_global_chat_additions = global_chat_additions.slice(0);
+    var copy_world_chat_additions = world_chat_additions.slice(0);
+    var copy_chatIsCleared = Object.assign(chatIsCleared, {})
+
+    global_chat_additions = [];
+    world_chat_additions = [];
+    chatIsCleared = {};
+
+    await db_ch.run("BEGIN TRANSACTION")
+
+    for(var i in copy_chatIsCleared) {
+        var worldId = await db.get("SELECT id FROM world WHERE name=? COLLATE NOCASE", i);
+        if(!worldId) continue;
+        worldId = worldId.id;
+        var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId)
+        if(!def_channel) continue;
+        def_channel = def_channel.channel_id
+        await db_ch.run("DELETE FROM entries WHERE channel=?", def_channel)
+    }
+
+    for(var i = 0; i < copy_world_chat_additions.length; i++) {
+        var row = copy_world_chat_additions[i];
+        var chatData = row[0];
+        var worldName = row[1];
+        var worldId = await db.get("SELECT id FROM world WHERE name=? COLLATE NOCASE", worldName);
+        if(!worldId) continue;
+        worldId = worldId.id;
+        var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId)
+        if(!def_channel) {
+            var channelDesc = "Channel - \"" + worldName + "\"";
+            if(!worldName) { // "" = front page
+                channelDesc = "Front page channel"
+            }
+            var world_channel = await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
+                ["_" + worldName, "{}", channelDesc, Date.now(), worldId])
+            var new_def_channel = await db_ch.run("INSERT INTO default_channels VALUES(?, ?)",
+                [world_channel.lastID, worldId])
+            def_channel = world_channel.lastID;
+        } else {
+            def_channel = def_channel.channel_id;
+        }
+        await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
+            [Date.now(), def_channel, JSON.stringify(chatData)])
+    }
+
+    for(var i = 0; i < copy_global_chat_additions.length; i++) {
+        var row = copy_global_chat_additions[i];
+        var global_channel = (await db_ch.get("SELECT id FROM channels WHERE name='global'")).id;
+        await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
+            [Date.now(), global_channel, JSON.stringify(row)])
+    }
+
+    await db_ch.run("COMMIT")
+
+    setTimeout(updateChatLogData, 5000);
 }
-updateChatLogData();
 
 function getWorldData(world) {
     var reference = null;
@@ -1554,7 +1680,7 @@ function start_server() {
             var world_name;
             function send_ws(data) {
                 if(ws.readyState === ws.OPEN) {
-                    ws.send(data);
+                    try {ws.send(data)} catch(e){}; // not protected by callbacks
                 }
             }
             if(location.match(/(\/ws\/$)/)) {
