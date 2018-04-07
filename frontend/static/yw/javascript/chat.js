@@ -206,6 +206,9 @@ $("#chat_global_tab").on("click", function() {
     * "user_nick" :: registered renamed nick
 */
 function addChat(chatfield, id, type, nickname, message, realUsername, op, admin, staff, color) {
+    if(!nickname) nickname = "";
+    if(!message) message = ""; // Should this even happen?
+    if(!realUsername) realUsername = "";
     if(!color) color = assignColor(nickname);
     var field;
     if(chatfield == "page") {

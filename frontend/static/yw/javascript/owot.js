@@ -79,9 +79,34 @@ var img_load_keys = Object.keys(images_to_load);
 var imgToArrayCanvas = document.createElement("canvas");
 var backImg = imgToArrayCanvas.getContext("2d");
 
-var loadImageElm = new Image();
+var imgElmRes = { /*"myimage": <img>*/ };
+var imgElmPath = [["favicon", "/static/favicon.png"]/*, ["name", "path"]*/];
+function loadImgResources(callback) {
+    var index = 0;
+    var total = imgElmPath.length;
+    var imgInfo = imgElmPath
+    function loop() {
+        var imgName = imgInfo[index][0];
+        var imgPath = imgInfo[index][1];
+        var imgElm = new Image();
+        imgElm.src = imgPath;
+        imgElm.onload = function() {
+            imgElmRes[imgName] = imgElm;
+            index++;
+            if(index >= total) {
+                callback();
+            } else {
+                loop();
+            }
+        }
+    }
+    loop();
+}
+
+var loadImageElm;
 var img_load_index = 0;
-function loadLoop() {
+function loadImgPixelData(callback) {
+    if(!loadImageElm) loadImageElm = new Image();
     var img_key = img_load_keys[img_load_index];
     loadImageElm.src = images_to_load[img_key];
     var error = false;
@@ -98,10 +123,10 @@ function loadLoop() {
         if(img_load_index >= img_load_keys.length) {
             // once all the images are loaded
             renderTiles();
-            begin();
+            callback();
         } else {
             // keep loading
-            loadLoop();
+            loadImgPixelData(callback);
         }
     }
     loadImageElm.onerror = function() {
@@ -109,7 +134,15 @@ function loadLoop() {
         loadImageElm.onload();
     }
 }
-loadLoop();
+
+function beginLoadingOWOT() {
+    loadImgPixelData(function() {
+        loadImgResources(function() {
+            begin();
+        })
+    });
+}
+beginLoadingOWOT();
 
 if(state.userModel.is_staff) {
     $("#chatbar")[0].removeAttribute("maxLength");
@@ -189,6 +222,31 @@ function doZoom(percentage) {
         }
         renderTiles(true);
     }
+}
+
+function generateAlertFavicon() {
+    var mainFavIcon = document.getElementById("mainFavIcon");
+    var img = imgElmRes.favicon;
+    var microCanvas = document.createElement("canvas");
+
+    microCanvas.width = 32;
+    microCanvas.height = 32;
+    var fico = microCanvas.getContext("2d");
+    fico.drawImage(img, 0, 0);
+    
+    fico.beginPath();
+    fico.arc(21, 21, 9, 0, 2 * Math.PI);
+	fico.strokeStyle = "#FF2222"
+    fico.stroke();
+
+	fico.fillStyle = "#DD0000"
+	fico.fill();
+	
+	fico.fillStyle = "#FFFFFF"
+	fico.font = "bold 20px Arial"
+	fico.fillText("8", 15, 28)
+
+    mainFavIcon.href = microCanvas.toDataURL();
 }
 
 function browserZoomAdjust(initial) {
