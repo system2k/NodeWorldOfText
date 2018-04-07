@@ -79,30 +79,6 @@ var img_load_keys = Object.keys(images_to_load);
 var imgToArrayCanvas = document.createElement("canvas");
 var backImg = imgToArrayCanvas.getContext("2d");
 
-var imgElmRes = { /*"myimage": <img>*/ };
-var imgElmPath = [["favicon", "/static/favicon.png"]/*, ["name", "path"]*/];
-function loadImgResources(callback) {
-    var index = 0;
-    var total = imgElmPath.length;
-    var imgInfo = imgElmPath
-    function loop() {
-        var imgName = imgInfo[index][0];
-        var imgPath = imgInfo[index][1];
-        var imgElm = new Image();
-        imgElm.src = imgPath;
-        imgElm.onload = function() {
-            imgElmRes[imgName] = imgElm;
-            index++;
-            if(index >= total) {
-                callback();
-            } else {
-                loop();
-            }
-        }
-    }
-    loop();
-}
-
 var loadImageElm;
 var img_load_index = 0;
 function loadImgPixelData(callback) {
@@ -137,7 +113,8 @@ function loadImgPixelData(callback) {
 
 function beginLoadingOWOT() {
     loadImgPixelData(function() {
-        loadImgResources(function() {
+        imageLoader.start(function() { // Load image resources
+            ui.execute(); // Create the UI
             begin();
         })
     });
@@ -226,7 +203,7 @@ function doZoom(percentage) {
 
 function generateAlertFavicon() {
     var mainFavIcon = document.getElementById("mainFavIcon");
-    var img = imgElmRes.favicon;
+    var img = imageLoader.res.favicon;
     var microCanvas = document.createElement("canvas");
 
     microCanvas.width = 32;
@@ -671,6 +648,7 @@ $(document).on("keydown", function(e) {
     YourWorld.Color = color;
     localStorage.setItem('color', color);
     // update color textbox in "change color" menu
+    if(!color) color = 0;
     $(".jscolor")[0].value = ("00000" + color.toString(16)).slice(-6);
 })
 
@@ -712,6 +690,7 @@ function menu_color(color) {
     menuStyle.innerHTML = "#menu.hover, #nav { background: " + color + "; }"
 }
 
+// begin OWOT's client
 function begin() {
     // get world style
     jQuery.ajax({
@@ -2210,6 +2189,7 @@ function renderTile(tileX, tileY, redraw) {
             if(color == 0 || !colorsEnabled) {
                 textRender.fillStyle = styles.text;
             } else {
+                if(!color) color = 0;
                 textRender.fillStyle = "#" + ("00000" + color.toString(16)).slice(-6);
             }
             // check if this char is a link

@@ -170,6 +170,10 @@ module.exports = async function(data, vars) {
                 }
                 char = advancedSplit(char);
                 if(char.length <= 1) {
+                    if(!editIncome[7]) editIncome[7] = 0;
+                    if(Array.isArray(editIncome[7])) {
+                        editIncome[7] = fixColors(editIncome[7][0])
+                    }
                     changes.push(editIncome);
                     continue;
                 };

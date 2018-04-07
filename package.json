@@ -14,7 +14,7 @@
     },
     "scripts": {
         "start": "node runserver.js",
-        "dbg": "node --trace-warnings --stack-trace-limit=1024 runserver.js"
+        "dbg": "node --trace-warnings --stack-trace-limit=1024 runserver.js --test-server"
     },
     "private": true
 }

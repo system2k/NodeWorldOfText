@@ -16,10 +16,32 @@ const ws            = require("ws");
 const zip           = require("adm-zip")
 
 const settings = require("./settings.json");
-const database = new sql.Database(settings.DATABASE_PATH);
-const chat_history = new sql.Database(settings.CHAT_HISTORY);
+
+var serverPort = settings.port;
+var serverDB = settings.DATABASE_PATH;
+var chatDB = settings.CHAT_HISTORY
 
 Error.stackTraceLimit = Infinity;
+var isTestServer = false;
+
+var args = process.argv;
+args.forEach(function(a) {
+	if(a == "--test-server") {
+		isTestServer = true;
+		serverPort = settings.test_port;
+		serverDB = settings.TEST_DATABASE_PATH;
+        chatDB = settings.TEST_CHAT_HISTORY;
+        settings.LOG_PATH = settings.TEST_LOG_PATH;
+        settings.ZIP_LOG_PATH = settings.TEST_ZIP_LOG_PATH;
+        settings.UNCAUGHT_PATH = settings.TEST_UNCAUGHT_PATH;
+        settings.REQ_LOG = settings.TEST_REQ_LOG;
+        settings.CHAT_LOG = settings.TEST_CHAT_LOG;
+		return;
+	}
+});
+
+const database = new sql.Database(serverDB);
+const chat_history = new sql.Database(chatDB);
 
 async function minify_js(file_in, file_out) {
 	return new Promise(function(res) {
@@ -1658,7 +1680,7 @@ function start_server() {
         setTimeout(clear_expired_sessions, Minute);
     })();
 
-    server.listen(settings.port, function() {
+    server.listen(serverPort, function() {
         var addr = server.address();
         console.log("Server is running.\nAddress: " + addr.address + "\nPort: " + addr.port);
 
