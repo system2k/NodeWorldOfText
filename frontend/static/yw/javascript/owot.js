@@ -114,7 +114,7 @@ function loadImgPixelData(callback) {
 function beginLoadingOWOT() {
     loadImgPixelData(function() {
         imageLoader.start(function() { // Load image resources
-            ui.execute(); // Create the UI
+            // ui.execute(); // Create the UI
             begin();
         })
     });

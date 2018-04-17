@@ -7,7 +7,7 @@ imageLoader.path = [ // Modifiable
     ["chatIcon", "/static/chatIcon.png"]
 ];
 
-function __loadImgResources(callback) {
+imageLoader.start = function(callback) {
     var index = 0;
     var total = imageLoader.path.length;
     var imgInfo = imageLoader.path
@@ -27,8 +27,4 @@ function __loadImgResources(callback) {
         }
     }
     loop();
-}
-
-imageLoader.start = function(callback) {
-    __loadImgResources(callback)
 }

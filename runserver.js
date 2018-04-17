@@ -1881,6 +1881,7 @@ function advancedSplit(str) {
     if(data == null) return [];
     for(var i = 0; i < data.length; i++) {
         // contains surrogates without second character?
+		// This invalid character would not have been added to the string anyway
         if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
             data.splice(i, 1)
         }
@@ -1888,54 +1889,64 @@ function advancedSplit(str) {
     for(var i = 0; i < data.length; i++) {
         data[i] = data[i].slice(0, 16); // limit of 16 combining characters
     }
+    // if a part contains a single nul character, make the entire part nul
+	for(var i = 0; i < data.length; i++) {
+        var chr = data[i];
+		for(var x = 0; x < chr.length; x++) {
+			if(chr[x] == "\0") {
+				data[i] = "\0";
+				break;
+			}
+		}
+    }
     return data;
 }
 
 function insert_char_at_index(string, char, index) {
-    if(!string) string = "";
-    if(!char) char = "";
-    string = advancedSplit(string);
-    var oldStr = string.slice(0);
-    char = advancedSplit(char);
-    char = char.slice(0, 1);
-    for(var i = 0; i < char.length; i++) {
-        if(index + i >= 128) break;
-        // if nul, don't change
-        if(char[i] != "\0") string[index + i] = char[i];
-    }
-    string = string.join("");
-    // check to see if combining char did not mess up other chars
-    string = advancedSplit(string);
+	string += "";
+	char += "";
+	string = advancedSplit(string);
+	var stringPrev = string.slice(0);
+	char = advancedSplit(char);
+	if(char.length == 0) return string.join("");
+	if(char.length > 1) char = char.slice(0, 1);
+	char = char[0];
+	
+	if(char == "\0") return string.join("");
+	
+	var c1 = /([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])/g
 
-    var charRange1 = index;
-    var charRange2 = index + char.length - 1;
-    if(charRange2 >= 128) charRange2 = 127;
+	var c2 = /([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+)/g
 
-    // check if characters are modified when they are not supposed to
-    for(var x = 0; x < 128; x++) {
-        // if in range of edited characters, skip
-        if(x >= charRange1 && x <= charRange2) {
-            // do not skip over if nul, because nul means "do not change" in this system
-            if(char[x - index] != "\0") {
-                continue;
-            }
-        }
-        if(oldStr[x] != string[x]) { // unecessary characters are affected. reverse changes
-            string = oldStr.slice(0);
-            for(var i = 0; i < char.length; i++) {
-                if(index + i >= 128) break;
-                if(char[i] != "\0") string[index + i] = "!";
-            }
-            break;
-        }
-    }
+	var ex1 = char.match(c1)
+	var ex2 = char.match(c2)
 
-    // make sure content is exactly 128
+	if(ex2 && !ex1) { // combining char without the first char?
+		char = "@"
+	}
+	
+	string[index] = char;
+	
+	string = string.join("");
+	
+	string = advancedSplit(string);
+	
+	for(var i = 0; i < 128; i++) {
+		var char1 = stringPrev[i];
+		var char2 = string[i];
+		
+		if(i == index) continue;
+		if(char1 != char2) {
+			stringPrev[index] = "!";
+			string = stringPrev;
+		}
+	}
+	
+	// make sure content is exactly 128
     if(string.length > 128) string = string.slice(0, 128);
     if(string.length < 128) string = string.concat(Array(128).fill(" ")).slice(0, 128);
-
-    string = string.join("");
-    return string;
+	
+	return string.join("");
 }
 
 function handle_ws_error(e) {

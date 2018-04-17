@@ -1,3 +1,15 @@
+function sanitizeColor(col) {
+    var key = "#0123456789ABCDEF(RGB,)(HSV,)%."
+    var res = "";
+    for(var i = 0; i < col.length; i++) {
+        var char = col[i];
+        if(key.indexOf(char) > -1) {
+            res += char;
+        }
+    }
+    return res;
+}
+
 module.exports = async function(ws, data, send, vars) {
     var db = vars.db;
     var user = vars.user;
@@ -59,6 +71,7 @@ module.exports = async function(ws, data, send, vars) {
     if(!msg) return;
 
     data.color += "";
+    if(!user.staff) data.color = sanitizeColor(data.color);
     if(!data.color) data.color = "#000000";
     if(!user.staff) data.color = data.color.slice(0, 20);
     data.color = data.color.trim();
