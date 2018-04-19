@@ -115,6 +115,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         owner_name,
         page_is_nsfw: !!properties.page_is_nsfw,
         square_chars: !!properties.square_chars,
+        no_log_edits: !!properties.no_log_edits,
 
         admin_background: properties.background == "/static/misc/images/christmas/blank_tree.png"
     };
@@ -255,6 +256,10 @@ module.exports.POST = async function(req, serve, vars) {
             properties_updated = true;
             delete properties.square_chars;
         }
+        if(!("no_log_edits" in post_data)) {
+            properties_updated = true;
+            delete properties.no_log_edits;
+        }
         var new_name = post_data.new_world_name + "";
         if(new_name && new_name != world.name) { // changing world name
             var validate = await validate_claim_worldname(new_name, vars, true, world.id);
@@ -276,6 +281,9 @@ module.exports.POST = async function(req, serve, vars) {
             properties_updated = true;
         } else if("square_chars" in post_data) {
             properties.square_chars = true;
+            properties_updated = true;
+        } else if("no_log_edits" in post_data) {
+            properties.no_log_edits = true;
             properties_updated = true;
         }
         if(properties_updated) {

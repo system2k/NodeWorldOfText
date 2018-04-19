@@ -1252,6 +1252,12 @@ var OWOT = {
             OWOT.events[type] = [];
         }
         OWOT.events[type].push(call);
+    },
+    broadcastCommand: function(data) {
+        socket.send(JSON.stringify({
+            kind: "cmd",
+            data: data // max len of 1024
+        }))
     }
 };
 

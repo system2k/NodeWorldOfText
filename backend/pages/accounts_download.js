@@ -43,6 +43,11 @@ module.exports.GET = async function(req, serve, vars) {
         }
     }
 
+    var count = (await db.get("SELECT count(*) AS cnt FROM tile WHERE world_id=?", world.id)).cnt;
+    if(count >= 2000) {
+        return serve("World is too large to download, email OWOT");
+    }
+
     var tiles = [];
     await db.each("SELECT * FROM tile WHERE world_id=?", world.id, function(data) {
         tiles.push({

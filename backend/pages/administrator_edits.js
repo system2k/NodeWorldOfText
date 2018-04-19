@@ -21,6 +21,11 @@ module.exports.GET = async function(req, serve, vars) {
         return await dispage("404", null, req, serve, vars)
     }
 
+    var len = (await db.get("SELECT count(*) AS cnt FROM edit WHERE world_id=?", world.id)).cnt;
+    if(len > 20000) {
+        return serve("Warning: Edit array is larger than 20000");
+    }
+
     var edits = [];
     await db.each("SELECT * FROM edit WHERE world_id=?", world.id, function(data) {
         edits.push(data);

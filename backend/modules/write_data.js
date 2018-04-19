@@ -77,6 +77,10 @@ module.exports = async function(data, vars) {
 
     var edits_limit = 1280;
 
+    var worldProps = JSON.parse(world.properties);
+
+    var no_log_edits = !!worldProps.no_log_edits;
+
     var is_owner = user.id == world.owner_id;
     var is_member = user.stats.member;
 
@@ -295,8 +299,10 @@ module.exports = async function(data, vars) {
                 await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, null, ?)",
                     [world.id, tile_data, tileY, tileX, JSON.stringify(properties), date])
             }
-            await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)", // log the edit
-                [user.id, world.id, tileY, tileX, date, JSON.stringify(changes)])
+            if(!no_log_edits) {
+                await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)", // log the edit
+                    [user.id, world.id, tileY, tileX, date, JSON.stringify(changes)])
+            }
         
             // return updated tiles to client
             upd_tiles[tileY + "," + tileX] = {

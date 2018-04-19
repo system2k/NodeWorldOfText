@@ -30,6 +30,17 @@
 		}
 		return confirm(msg);
 	}
+	var advancedMiscVisible = false;
+	function showAdvancedMisc() {
+		var advElm = document.getElementById("advanced");
+		if(!advancedMiscVisible) {
+			advElm.style.display = "";
+			advancedMiscVisible = true;
+		} else {
+			advElm.style.display = "none";
+			advancedMiscVisible = false;
+		}
+	}
 </script>
 <style>
 	.action_btn {
@@ -294,14 +305,22 @@
 						<input name="admin_background" type="checkbox"{%if admin_background%} checked{%endif%}>
 					</p>
 				{% endif %}
-				<p>
-					Use square characters
-					<input name="square_chars" type="checkbox"{%if square_chars%} checked{%endif%}>
-				</p>
-				<p>
-					This page is NSFW
-					<input name="nsfw_page" type="checkbox"{%if page_is_nsfw%} checked{%endif%}>
-				</p>
+				<a href="javascript: showAdvancedMisc();">Advanced...</a>
+				<div id="advanced" style="display: none;">
+					<p>
+						Use square characters
+						<input name="square_chars" type="checkbox"{%if square_chars%} checked{%endif%}>
+					</p>
+					<p>
+						This page is NSFW
+						<input name="nsfw_page" type="checkbox"{%if page_is_nsfw%} checked{%endif%}>
+					</p>
+					<p>
+						Do not log edits
+						<input name="no_log_edits" type="checkbox"{%if no_log_edits%} checked{%endif%}>
+					</p>
+				</div>
+				<br>
 				<input type="hidden" name="form" value="misc">
 				<input type="submit" value="Submit">
 			</form>
