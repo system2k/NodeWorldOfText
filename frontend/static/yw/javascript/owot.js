@@ -1,4 +1,4 @@
-var YourWorld = {
+﻿var YourWorld = {
     Color: +localStorage.getItem("color") || 0,
     Nickname: state.userModel.username
 }
@@ -1345,9 +1345,29 @@ function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
     return [x/zoomRatio|0, y/zoomRatio|0];
 }
 
+function runJsLink(data) {
+    var doRun = confirm("Are you sure you want to run this javascript link?\nPress cancel to NOT run it.\n\"" + escapeQuote(data.slice(0, 128)) + "\"");
+    if(!doRun) return;
+    var link = document.createElement("a");
+    link.href = data;
+    link.click();
+}
+
+function escapeQuote(text) { // escapes " and '
+    return text.replace(/\"/g, "\\\"").replace(/\'/g, "\\'");
+}
+
+function checkMiscURLProtocol(protocol) {
+    if(protocol == "http:" || protocol == "https:" || protocol == "localhost:") {
+        return false
+    } else {
+        return true;
+    }
+}
+
 var linkMargin = 100; // px
 var linkElm = document.createElement("a");
-linkElm.href = "test";
+linkElm.href = "";
 $("body")[0].appendChild(linkElm);
 var linkDiv = document.createElement("div");
 linkDiv.style.width = (cellW + (linkMargin * 2)) + "px";
@@ -1386,8 +1406,14 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
         linkElm.target = "_blank";
         linkElm.href = "";
         if(link[0].type == "url") {
-            linkElm.title = "Link to URL " + link[0].url;
-            linkElm.href = link[0].url;
+            var URL_Link = link[0].url;
+            linkElm.title = "Link to URL " + URL_Link;
+            linkElm.href = URL_Link;
+            var linkProtocol = linkElm.protocol;
+            if(checkMiscURLProtocol(linkProtocol)) {
+                URL_Link = "javascript:runJsLink(\"" + escapeQuote(URL_Link) + "\");"
+                linkElm.href = URL_Link;
+            }
         } else if(link[0].type == "coord") {
             var pos = link[0].link_tileX + "," + link[0].link_tileY;
             linkElm.title = "Link to coordinates " + pos;
