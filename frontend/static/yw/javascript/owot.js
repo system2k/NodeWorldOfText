@@ -1354,15 +1354,14 @@ function runJsLink(data) {
 }
 
 function escapeQuote(text) { // escapes " and '
-    return text.replace(/\"/g, "\\\"").replace(/\'/g, "\\'");
+    return text.replace(/\\/g, "\\\\").replace(/\"/g, "\\\"").replace(/\'/g, "\\'");
 }
 
-function checkMiscURLProtocol(protocol) {
-    if(protocol == "http:" || protocol == "https:" || protocol == "localhost:") {
-        return false
-    } else {
-        return true;
-    }
+function checkMiscURLProtocol(protocol) { // determine if url protocol is at least unsafe (E.G. javascript:)
+    return !(protocol == "http:" ||
+             protocol == "https:" ||
+             protocol == "localhost:" ||
+             protocol == "ftp:")
 }
 
 var linkMargin = 100; // px

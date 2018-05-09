@@ -769,13 +769,15 @@ function cookie_expire(timeStamp) {
     var dayWeekList = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     var monthList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-    var _DayOfWeek = dayWeekList[new Date(timeStamp).getDay()];
-    var _Day = new Date(timeStamp).getDate();
-    var _Month = monthList[new Date(timeStamp).getMonth()];
-    var _Year = new Date(timeStamp).getFullYear();
-    var _Hour = new Date(timeStamp).getHours();
-    var _Minute = new Date(timeStamp).getMinutes();
-    var _Second = new Date(timeStamp).getSeconds();
+	var _date = new Date(timeStamp);
+	
+    var _DayOfWeek = dayWeekList[_date.getUTCDay()];
+    var _Day = _date.getUTCDate();
+    var _Month = monthList[_date.getUTCMonth()];
+    var _Year = _date.getUTCFullYear();
+    var _Hour = _date.getUTCHours();
+    var _Minute = _date.getUTCMinutes();
+    var _Second = _date.getUTCSeconds();
 
     var compile = _DayOfWeek + ", " + _Day + " " + _Month + " " + _Year + " " + _Hour + ":" + _Minute + ":" + _Second + " UTC";
     return compile
