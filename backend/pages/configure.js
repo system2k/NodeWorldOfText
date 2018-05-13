@@ -263,14 +263,14 @@ module.exports.POST = async function(req, serve, vars) {
         var new_name = post_data.new_world_name + "";
         if(new_name && new_name != world.name) { // changing world name
             var validate = await validate_claim_worldname(new_name, vars, true, world.id);
-            if(typeof validate != "object" && validate != "<RENAME>") { // error with renaming
+            if(validate.error) { // error with renaming
                 return await dispage("configure", {
-                    misc_message: validate
+                    misc_message: validate.message
                 }, req, serve, vars)
             }
-            if(validate == "<RENAME>") {
-                await db.run("UPDATE world SET name=? WHERE id=?", [new_name, world.id]);
-                new_world_name = new_name;
+            if(validate.rename) {
+                await db.run("UPDATE world SET name=? WHERE id=?", [validate.new_name, world.id]);
+                new_world_name = validate.new_name;
             }
 
         } else if("admin_background" in post_data) {

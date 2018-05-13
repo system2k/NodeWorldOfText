@@ -93,9 +93,9 @@ module.exports.POST = async function(req, serve, vars) {
     if(post_data.form == "claim") {
         var worldname = post_data.worldname + "";
         var validate = await validate_claim_worldname(worldname, vars);
-        if(typeof validate == "string") { // an error occured while claiming
+        if(validate.error) { // an error occured while claiming
             return await dispage("profile", {
-                message: validate
+                message: validate.message
             }, req, serve, vars)
         }
         await db.run("UPDATE world SET owner_id=? WHERE id=?", [user.id, validate.world_id]);

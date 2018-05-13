@@ -772,12 +772,12 @@ function cookie_expire(timeStamp) {
 	var _date = new Date(timeStamp);
 	
     var _DayOfWeek = dayWeekList[_date.getUTCDay()];
-    var _Day = _date.getUTCDate();
+    var _Day = _date.getUTCDate().toString().padStart(2, 0);
     var _Month = monthList[_date.getUTCMonth()];
     var _Year = _date.getUTCFullYear();
-    var _Hour = _date.getUTCHours();
-    var _Minute = _date.getUTCMinutes();
-    var _Second = _date.getUTCSeconds();
+    var _Hour = _date.getUTCHours().toString().padStart(2, 0);
+    var _Minute = _date.getUTCMinutes().toString().padStart(2, 0);
+    var _Second = _date.getUTCSeconds().toString().padStart(2, 0);
 
     var compile = _DayOfWeek + ", " + _Day + " " + _Month + " " + _Year + " " + _Hour + ":" + _Minute + ":" + _Second + " UTC";
     return compile
@@ -795,13 +795,13 @@ var prev_cS = http.createServer;
 
 var options = {};
 
-try { // so that ~FP can run it on his own (since he does not have the keys)
+try { // detect ssl keys
     var options = {
         key: fs.readFileSync("../le/etc/live/nwot.sytes.net/privkey.pem"),
         cert: fs.readFileSync("../le/etc/live/nwot.sytes.net/cert.pem"),
         ca: fs.readFileSync("../le/etc/live/nwot.sytes.net/chain.pem")
     };
-} catch(e) { // incase the keys are not available (if running on FPs machine)
+} catch(e) { // not detected, run without ssl
     console.log("Running server in HTTP mode")
 	http.createServer = function(opt, func) {
         return prev_cS(func);
@@ -866,10 +866,11 @@ async function get_user_info(cookies, is_websocket) {
     return user;
 }
 
-function plural(int) {
+// return "s" or not depending on the quantity
+function plural(int, plEnding) {
     var p = "";
     if(int != 1) {
-        p = "s";
+        p = !plEnding ? "s" : plEnding;
     }
     return p;
 }
@@ -967,6 +968,7 @@ var req_id = 0;
 function transaction_obj(id) {
     var req_id = id;
     var fc = {
+        // start or end transactions safely
         begin: async function(id) {
             if(!transaction_active && !is_switching_mode) {
                 transaction_active = true;
@@ -1316,28 +1318,46 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
     // ignore first /
     if(worldname[0] == "/") worldname = worldname.substr(1);
     if(worldname == "" && !user.superuser) {
-        return "Worldname cannot be blank";
+        return {
+            error: true,
+            message: "Worldname cannot be blank"
+        }
     }
     worldname = worldname.split("/");
     for(var i in worldname) {
         // make sure there is no blank segment (superusers bypass this)
         if(worldname[i] == "" && !user.superuser) {
-            return "Segments cannot be blank (make sure name does not end in /)";
+            return {
+                error: true,
+                message: "Segments cannot be blank (make sure name does not end in /)"
+            }
         }
         // make sure segment is valid
         if(!(worldname[i].match(/^([\w\.\-]*)$/g) && (worldname[i].length > 0 || user.superuser))) {
-            return "Invalid world name. Contains invalid characters. Must contain either letters, numbers, or _. It can be seperated by /";
+            return {
+                error: true,
+                message: "Invalid world name. Contains invalid characters. Must contain either letters, numbers, or _. It can be seperated by /"
+            }
         }
     }
+
+    var valid_world_name = worldname.join("/");
+
     if(worldname.length == 1) { // regular world names
         worldname = worldname[0];
         var world = await world_get_or_create(worldname, rename_casing);
         if(world.owner_id == null || (rename_casing && world.id == world_id)) {
             if(rename_casing) {
                 if(world.id == world_id || !world) {
-                    return "<RENAME>"
+                    return {
+                        rename: true,
+                        new_name: valid_world_name
+                    }
                 } else {
-                    return "World already exists, cannot rename to it";
+                    return {
+                        error: true,
+                        message: "World already exists, cannot rename to it"
+                    }
                 }
             }
             return {
@@ -1345,7 +1365,10 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
                 message: "Successfully claimed the world"
             };
         } else {
-            return "World already has an owner";
+            return {
+                error: true,
+                message: "World already has an owner"
+            }
         }
     } else { // world with /'s
         // make sure first segment is a world owned by the user
@@ -1353,7 +1376,10 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
         var base_world = await world_get_or_create(base_worldname, true);
         // world does not exist nor is owned by the user
         if(!base_world || (base_world && base_world.owner_id != user.id)) {
-            return "You do not own the base world in the path";
+            return {
+                error: true,
+                message: "You do not own the base world in the path"
+            }
         }
         worldname = worldname.join("/");
         // create world, except if user is trying to rename
@@ -1361,16 +1387,25 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
         // only renaming the casing
         if(rename_casing && claimedSubworld) {
             if(claimedSubworld.id == world_id) {
-                return "<RENAME>"
+                return {
+                    rename: true,
+                    new_name: valid_world_name
+                }
             }
         }
         // does not exist
         if(!claimedSubworld) {
-            return "<RENAME>"
+            return {
+                rename: true,
+                new_name: valid_world_name
+            }
         }
         // already owned (Unless owner renames it)
         if(claimedSubworld.owner_id != null && !(rename_casing && claimedSubworld.id == world_id)) {
-            return "You already own this subdirectory world";
+            return {
+                error: true,
+                message: "You already own this subdirectory world"
+            }
         }
         // subworld is created, now claim it
         return {
