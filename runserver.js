@@ -1727,6 +1727,10 @@ function start_server() {
     
     wss.on("connection", async function (ws, req) {
         try {
+            // must be at the top before any async calls (errors would occur before this event declaration)
+            ws.on("error", function(err) {
+                log_error(JSON.stringify(process_error_arg(err)));
+            });
             var pre_queue = [];
             // code isn't ready yet, so push data to array and then send after it's ready
             function onMessage(msg) {
@@ -1788,9 +1792,6 @@ function start_server() {
                 id: clientId,
                 initial_user_count
             }))
-            ws.on("error", function(err) {
-                log_error(JSON.stringify(process_error_arg(err)));
-            });
             onMessage = async function(msg) {
                 req_id++;
                 var current_req_id = req_id;
