@@ -20,7 +20,7 @@ const querystring   = require("querystring");
 const sql           = require("sqlite3").verbose();
 const swig          = require("swig");
 const url           = require("url");
-const ws            = require("ws");
+const WebSocket     = require("ws");
 const zip           = require("adm-zip")
 
 console.log("Loaded modules");
@@ -1707,7 +1707,7 @@ function start_server() {
         }
     })();
 
-    wss = new ws.Server({ server });
+    wss = new WebSocket.Server({ server });
     intv.userCount = setInterval(function() {
         broadcastUserCount();
     }, 2000);
@@ -1716,7 +1716,7 @@ function start_server() {
         data = JSON.stringify(data)
         wss.clients.forEach(function each(client) {
             try {
-                if(client.readyState == ws.OPEN &&
+                if(client.readyState == WebSocket.OPEN &&
                 world == void 0 || NCaseCompare(client.world_name, world)) {
                     if(opts.chat_perm == 1) if(!(client.is_member || client.is_owner)) return;
                     if(opts.chat_perm == 2) if(!client.is_owner) return;
@@ -1766,6 +1766,9 @@ function start_server() {
     });
     
     wss.on("connection", async function (ws, req) {
+        var ipHeaderAddr = req.headers["x-forwarded-for"];
+        ws.ipHeaderAddr = ipHeaderAddr;
+
         var req_per_second = 133;
         var reqs_second = 0; // requests received at currect second
         var current_second = Math.floor(Date.now() / 1000);

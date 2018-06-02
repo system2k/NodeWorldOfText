@@ -75,7 +75,7 @@ module.exports = async function(data, vars) {
     var insert_char_at_index = vars.insert_char_at_index;
     var advancedSplit = vars.advancedSplit;
 
-    var edits_limit = 200;
+    var edits_limit = 500;
     if(user.superuser) {
         edits_limit = 1280;
     }

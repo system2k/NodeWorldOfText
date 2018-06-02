@@ -99,7 +99,7 @@ module.exports = async function(ws, data, send, vars) {
     if(!user.staff) {
         msg = msg.slice(0, 400);
     } else {
-        msg = msg.slice(0, 2048);
+        msg = msg.slice(0, 3030);
     }
 
     // TODO: Refactor
@@ -153,7 +153,7 @@ module.exports = async function(ws, data, send, vars) {
                 var ipData = "Client not found"
                 wss.clients.forEach(function(e) {
                     if(e.clientId != id) return;
-                    ipData = JSON.stringify([e._socket.remoteAddress, e._socket.address()])
+                    ipData = JSON.stringify([e._socket.remoteAddress, e._socket.address(), ws.ipHeaderAddr])
                 })
                 serverChatResponse(ipData, data.location);
                 return;
