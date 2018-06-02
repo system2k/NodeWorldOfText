@@ -1353,6 +1353,7 @@ function alertJS(data) {
     confirm_js_code.innerText = data;
     run_js_confirm.href = "javascript:confirmRunJsLink(\"" + escapeQuote(data) + "\");"
     confirm_js_cancel.onclick = closeJSAlert;
+    confirm_js_cancel_x.onclick = closeJSAlert;
 }
 
 function closeJSAlert() {
