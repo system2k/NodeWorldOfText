@@ -1766,8 +1766,13 @@ function start_server() {
     });
     
     wss.on("connection", async function (ws, req) {
-        var ipHeaderAddr = req.headers["x-forwarded-for"];
-        ws.ipHeaderAddr = ipHeaderAddr;
+        var ipHeaderAddr = "Unknown"
+        try {
+            ipHeaderAddr = req.headers["x-forwarded-for"];
+            ws.ipHeaderAddr = ipHeaderAddr;
+        } catch(e) {
+            log_error(e);
+        }
 
         var req_per_second = 133;
         var reqs_second = 0; // requests received at currect second

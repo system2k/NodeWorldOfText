@@ -26,6 +26,7 @@ module.exports = async function(ws, data, send, vars) {
     var html_tag_esc = vars.html_tag_esc;
     var topActiveWorlds = vars.topActiveWorlds;
     var getWss = vars.getWss;
+    var NCaseCompare = vars.NCaseCompare;
 
     var props = JSON.parse(world.properties);
     var chat_perm = props.chat_permission;
@@ -153,8 +154,10 @@ module.exports = async function(ws, data, send, vars) {
                 var ipData = "Client not found"
                 wss.clients.forEach(function(e) {
                     if(e.clientId != id) return;
+                    if(!NCaseCompare(e.world_name, world.name)) return;
                     ipData = JSON.stringify([e._socket.remoteAddress, e._socket.address(), ws.ipHeaderAddr])
                 })
+                ipData = id + "; " + ipData;
                 serverChatResponse(ipData, data.location);
                 return;
             case "help":
