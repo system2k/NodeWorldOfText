@@ -4,7 +4,7 @@
         <title>{{ page_title }}</title>
         <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="description" content="An infinite grid of text editable by anyone. This is similar to www.yourworldoftext.com, but with more features.">
+        <meta name="description" content="An infinite grid of text editable by anyone. This is like YourWorldOfText, but with more features.">
         <link type="text/css" rel="stylesheet" href="/static/yourworld.css">
         <link rel="shortcut icon" type="image/png" href="/static/favicon.png" id="mainFavIcon">
         {% for script in user.scripts %}
@@ -74,7 +74,6 @@
             </form>
         </div>
         <h1 id="loading">Loading...</h1>
-        <div id="yourworld"></div>
         <div style="display:none"><input type='hidden' name='csrfmiddlewaretoken' value='{{ user.csrftoken }}' /></div>
         <script type="text/javascript">
             var state = {{ state|safe }};
@@ -113,8 +112,36 @@
             </div>
             <div class="chatfield" id="page_chatfield"></div>
             <div class="chatfield" id="global_chatfield" style="display: none;"></div>
-            <div style="position: absolute; left: 3px; bottom: 4px;">
-                <input style="width: 350px;" id="chatbar" maxlength="600"> <button id="chatsend">Send</button>
+            <div style="position: absolute; left: -1px; bottom: 0px;">
+                <table style="border-collapse: collapse; width: 394px; margin: 4px;">
+                    <tbody>
+                        <tr>
+                            <td style="padding-right: 8px;">
+                                <input style="width: 100%;" id="chatbar">
+                            </td>
+                            <td style="width: 1px;">
+                                <button id="chatsend">Send</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div id="confirm_js" style="display: none;">
+            <a href="javascript:void 0;" style="position: absolute; color: blue; text-decoration: underline; top: 220px; left: 20px;" id="run_js_confirm">run</a>
+            <span id="confirm_js_msg">
+                Are you sure you want to run this javascript link?
+                <br>
+                Press Close to NOT run it.
+            </span>
+            <span id="confirm_js_code">
+                --
+            </span>
+            <div id="confirm_js_cancel">
+                Close
+            </div>
+            <div id="confirm_js_cancel_x">
+                X
             </div>
         </div>
 

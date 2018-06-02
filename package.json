@@ -3,14 +3,14 @@
     "version": "1.0.0",
     "description": "OurWorldOfText server",
     "dependencies": {
-        "sqlite3": "*",
-        "swig": "*",
-        "prompt": "*",
-        "adm-zip": "*",
-        "nodemailer": "*",
-        "ws": "*",
-        "node-minify": "*",
-        "html-minifier": "*"
+        "sqlite3": "4.0.0",
+        "swig": "1.4.2",
+        "prompt": "1.0.0",
+        "adm-zip": "0.4.11",
+        "nodemailer": "4.6.5",
+        "ws": "5.2.0",
+        "node-minify": "2.4.2",
+        "html-minifier": "3.5.16"
     },
     "scripts": {
         "start": "node runserver.js",

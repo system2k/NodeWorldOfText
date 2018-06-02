@@ -306,7 +306,7 @@ module.exports.POST = async function(req, serve, vars) {
             while(true) {
                 var data = await db.all("SELECT * FROM tile WHERE world_id=? LIMIT ?,?",
                     [world.id, idx * chunkSize, chunkSize]);
-                if(data.length == 0) {
+                if(!data || data.length == 0) {
                     break;
                 }
                 for(var d = 0; d < data.length; d++) {

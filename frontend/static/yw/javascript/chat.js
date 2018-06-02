@@ -134,6 +134,18 @@ $("#chatbar").on("keypress", function(e) {
     var keyCode = e.keyCode;
     if(keyCode == 13) { // Enter
         sendChat();
+        chatbar.blur();
+    }
+})
+
+$("#chatbar").on("keydown", function(e) {
+    var keyCode = e.keyCode;
+
+    // scroll through chat history that the client sent
+    if(keyCode == 38) { // up
+        
+    } else if(keyCode == 40) { // down
+
     }
 })
 
@@ -239,6 +251,8 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
         }
     }
 
+    var idTag = "";
+
     var nickDom = document.createElement("a");
     nickDom.style.textDecoration = "underline";
 
@@ -246,17 +260,33 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
         nickDom.style.color = color;
         nickDom.href = "javascript:alert(\"Registered; " + realUsername + "\")"
         nickDom.style.fontWeight = "bold";
+        if(state.userModel.is_operator) idTag = "[" + id + "]";
     }
     if(type == "anon_nick") {
-        nickname = "[*" + id + "] " + nickname;
+        idTag = "[*" + id + "]"
     }
     if(type == "anon") {
-        nickname = "[" + id + "]";
+        idTag = "[" + id + "]"
     }
     if(type == "user_nick") {
         nickDom.style.color = color;
         nickDom.href = "javascript:alert(\"Registered; " + realUsername + "\")"
+        if(state.userModel.is_operator) idTag = "[*" + id + "]";
     }
+
+    if(state.userModel.is_operator) {
+        idTag = "<span style=\"color: black; font-weight: normal;\">" + idTag + "</span>"
+    }
+
+    if(idTag) idTag += " "; // space between id and name
+
+    if(id == 0) {
+        idTag = "";
+        nickname = "<span style=\"background-color: #e2e2e2;\">" + nickname + "</span>";
+    };
+
+    nickname = idTag + nickname;
+
     nickDom.innerHTML = nickname + ":";
 
     var msgDom = document.createElement("span");

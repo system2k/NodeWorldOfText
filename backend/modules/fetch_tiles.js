@@ -1,3 +1,5 @@
+var url = require("url");
+
 function generateDiag(text, tileX, tileY) {
     var str = "";
     for(var y = 0; y < 8; y++) {
@@ -16,6 +18,25 @@ function generateDiag(text, tileX, tileY) {
             writability: 2
         }
     };
+}
+
+function checkJSLinks(prop_reference) {
+    if(!prop_reference.cell_props) return;
+    var cell_props = prop_reference.cell_props;
+    for(var y in cell_props) {
+        var row = cell_props[y];
+        for(var x in row) {
+            var cell = row[x];
+            if(!cell.link) continue;
+            var link = cell.link;
+            if(link.type != "url") continue;
+            if(!link.url) continue;
+            var protocol = url.parse(link.url).protocol;
+            if(protocol == "javascript:") {
+                link.js = true;
+            }
+        }
+    }
 }
 
 module.exports = async function(data, vars) {
@@ -113,9 +134,11 @@ module.exports = async function(data, vars) {
         } else {
             await db.each("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?", 
                 [world.id, minY, minX, maxY, maxX], function(data) {
+                var properties = JSON.parse(data.properties);
+                checkJSLinks(properties);
                 tiles[data.tileY + "," + data.tileX] = {
                     content: data.content,
-                    properties: Object.assign(JSON.parse(data.properties), {
+                    properties: Object.assign(properties, {
                         writability: data.writability
                     })
                 }

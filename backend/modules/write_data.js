@@ -75,7 +75,10 @@ module.exports = async function(data, vars) {
     var insert_char_at_index = vars.insert_char_at_index;
     var advancedSplit = vars.advancedSplit;
 
-    var edits_limit = 1280;
+    var edits_limit = 200;
+    if(user.superuser) {
+        edits_limit = 1280;
+    }
 
     var worldProps = JSON.parse(world.properties);
 
@@ -160,6 +163,7 @@ module.exports = async function(data, vars) {
             }
 
             var changes = [];
+            var accepted_changes = [];
             for(var k = 0; k < incomingEdits.length; k++) {
                 var editIncome = incomingEdits[k];
 
@@ -180,6 +184,10 @@ module.exports = async function(data, vars) {
                     }
                     changes.push(editIncome);
                     continue;
+                } else {
+                    if(!user.superuser) {
+                        char = char.slice(0, 1);
+                    }
                 };
                 for(var i = 0; i < char.length; i++) {
                     var newIdx = charInsIdx + i;
@@ -217,12 +225,12 @@ module.exports = async function(data, vars) {
 
                 // tile is owner-only, but user is not owner
                 if(char_writability == 2 && !is_owner) {
-                    rej_edits([changes[e]]);
+                    rej_edits([change]);
                     continue;
                 }
                 // tile is member-only, but user is not member (nor owner)
                 if(char_writability == 1 && !is_owner && !is_member) {
-                    rej_edits([changes[e]]);
+                    rej_edits([change]);
                     continue;
                 }
 
@@ -234,10 +242,12 @@ module.exports = async function(data, vars) {
                 // frames --> [frame0, frame1, ..., frameN], maximum 999 frames
                 // frame --> [TEXT, COLORS] where TEXT is a 128 character string, and COLORS is an array of 128 colors
                 var animation = change[8];
+                var incAnimationEditLog = false;
                 if(Array.isArray(animation) && (animation.length === 4)) {
                     // Animation code.
 					var notSoSecret = animation[0]
 					if ((typeof notSoSecret == "string") && (notSoSecret === NOT_SO_SECRET)) {
+                        incAnimationEditLog = true;
 						var changeInterval = san_nbr(animation[1]);
 						if (changeInterval < 500) changeInterval = 500; // so it won't be very very fast
 						var repeat = animation[2];
@@ -291,6 +301,13 @@ module.exports = async function(data, vars) {
                         }
                     }
                 }
+
+                var eLog = [tileY, tileX, charY, charX,
+                    san_nbr(change[4]), char, san_nbr(change[6]), color];
+                if(incAnimationEditLog) {
+                    eLog.push(animation)
+                }
+                accepted_changes.push(eLog)
             }
             if(tile) { // tile exists, update
                 await db.run("UPDATE tile SET (content, properties)=(?, ?) WHERE world_id=? AND tileY=? AND tileX=?",
@@ -299,9 +316,9 @@ module.exports = async function(data, vars) {
                 await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, null, ?)",
                     [world.id, tile_data, tileY, tileX, JSON.stringify(properties), date])
             }
-            if(!no_log_edits) {
+            if(!no_log_edits && accepted_changes.length) {
                 await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)", // log the edit
-                    [user.id, world.id, tileY, tileX, date, JSON.stringify(changes)])
+                    [user.id, world.id, tileY, tileX, date, JSON.stringify(accepted_changes)])
             }
         
             // return updated tiles to client

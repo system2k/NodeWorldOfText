@@ -1,3 +1,11 @@
+/*
+**  Our World of Text
+**  Est. September 17, 2017
+**  This is the main file
+*/
+
+console.log("Starting up...")
+
 const crypto        = require("crypto");
 const dump_dir      = require("./backend/dump_dir");
 const fs            = require("fs");
@@ -15,7 +23,10 @@ const url           = require("url");
 const ws            = require("ws");
 const zip           = require("adm-zip")
 
+console.log("Loaded modules");
+
 const settings = require("./settings.json");
+var SERVER_STOP = false;
 
 var serverPort = settings.port;
 var serverDB = settings.DATABASE_PATH;
@@ -23,6 +34,9 @@ var chatDB = settings.CHAT_HISTORY
 
 Error.stackTraceLimit = Infinity;
 var isTestServer = false;
+
+var intv = {}; // intervals
+var timt = {}; // timeouts
 
 var args = process.argv;
 args.forEach(function(a) {
@@ -70,14 +84,29 @@ var static_path_web = "static/"
 
 var template_data = {}; // data used by the server
 var templates_path = "./frontend/templates/";
-dump_dir(template_data, templates_path, "", true);
-console.log("Compiling HTML templates...");
-for(var i in template_data) {
-    template_data[i] = swig.compileFile(template_data[i]);
-}
 
-var static_data = {}; // html data to be returned (text data for values)
-dump_dir(static_data, static_path, static_path_web, null);
+var static_data = {}; // return static server files
+
+function load_static() {
+    for(var i in template_data) {
+        delete template_data[i];
+    }
+    for(var i in static_data) {
+        delete static_data[i];
+    }
+    
+    console.log("Loading static files...");
+    dump_dir(static_data, static_path, static_path_web, null);
+
+    console.log("Loading HTML templates...");
+    dump_dir(template_data, templates_path, "", true);
+
+    console.log("Compiling HTML templates...");
+    for(var i in template_data) {
+        template_data[i] = swig.compileFile(template_data[i]);
+    }
+}
+load_static();
 
 var sql_table_init = "./backend/default.sql";
 var sql_indexes_init = "./backend/indexes.sql";
@@ -110,10 +139,21 @@ function load_modules(default_dir) {
     return obj;
 }
 
-console.log("Loading modules...");
+console.log("Loading page files");
 const pages = load_modules("./backend/pages/");
 const websockets = load_modules("./backend/websockets/");
 const modules = load_modules("./backend/modules/");
+
+// if page modules contain a startup function, run it
+for(var i in pages) {
+    var mod = pages[i];
+    if(mod.startup_internal) {
+        mod.startup_internal({
+            intv,
+            timt
+        });
+    }
+}
 
 function asyncDbSystem(database) {
     const db = {
@@ -1533,7 +1573,7 @@ async function updateChatLogData() {
     if(!(global_chat_additions.length > 0 ||
           world_chat_additions.length > 0 ||
           Object.keys(chatIsCleared).length > 0)) {
-        setTimeout(updateChatLogData, 1000);
+        timt.updateChatLogData = setTimeout(updateChatLogData, 1000);
         return;
     }
 
@@ -1591,7 +1631,7 @@ async function updateChatLogData() {
 
     await db_ch.run("COMMIT")
 
-    setTimeout(updateChatLogData, 5000);
+    timt.updateChatLogData = setTimeout(updateChatLogData, 5000);
 }
 
 function getWorldData(world) {
@@ -1636,7 +1676,7 @@ function topActiveWorlds(number) {
     clientNumbers.sort(function(int1, int2) {
         return int2[0] - int1[0];
     })
-    return clientNumbers;
+    return clientNumbers.slice(0, number);
 }
 
 function broadcastUserCount() {
@@ -1668,7 +1708,7 @@ function start_server() {
     })();
 
     wss = new ws.Server({ server });
-    setInterval(function() {
+    intv.userCount = setInterval(function() {
         broadcastUserCount();
     }, 2000);
     ws_broadcast = function(data, world, opts) {
@@ -1714,7 +1754,7 @@ function start_server() {
             await db.run("DELETE FROM auth_user WHERE id=?", id)
         })
 
-        setTimeout(clear_expired_sessions, Minute);
+        timt.clearExpiredSessions = setTimeout(clear_expired_sessions, Minute);
     })();
 
     server.listen(serverPort, function() {
@@ -1726,6 +1766,25 @@ function start_server() {
     });
     
     wss.on("connection", async function (ws, req) {
+        var req_per_second = 133;
+        var reqs_second = 0; // requests received at currect second
+        var current_second = Math.floor(Date.now() / 1000);
+        function can_process_req() { // limit requests per second
+            var compare_second = Math.floor(Date.now() / 1000);
+            reqs_second++;
+            if(compare_second == current_second) {
+                if(reqs_second >= req_per_second) {
+                    return false;
+                } else {
+                    return true;
+                }
+            } else {
+                reqs_second = 0;
+                current_second = compare_second;
+                return true;
+            }
+            return false;
+        }
         try {
             // must be at the top before any async calls (errors would occur before this event declaration)
             ws.on("error", function(err) {
@@ -1733,10 +1792,12 @@ function start_server() {
             });
             var pre_queue = [];
             // code isn't ready yet, so push data to array and then send after it's ready
+            // Data will be deleted if the socket closes (error or invalid permissions) before the real message event
             function onMessage(msg) {
                 pre_queue.push(msg);
             }
             ws.on("message", function(msg) {
+                if(!can_process_req()) return;
                 onMessage(msg);
             });
             ws.on("close", function(data) {})
@@ -1786,6 +1847,9 @@ function start_server() {
             ws.is_owner = user.stats.owner;
 
             var clientId = generateClientId(world_name);
+
+            ws.clientId = clientId;
+
             send_ws(JSON.stringify({
                 kind: "channel",
                 sender: channel,
@@ -1793,6 +1857,24 @@ function start_server() {
                 initial_user_count
             }))
             onMessage = async function(msg) {
+                if(!can_process_req()) return;
+                try {
+                    if(!(typeof msg == "string" || typeof msg == "object")) {
+                        return;
+                    }
+                    if(!(msg.constructor == Buffer || msg.constructor == String)) {
+                        return send_ws(JSON.stringify({
+                            kind: "error",
+                            message: "Invalid socket type"
+                        }))
+                    }
+                    if(msg.constructor == Buffer) { // buffers not supported at the moment
+                        return;
+                    }
+                } catch(e) {
+                    handle_ws_error(e);
+                    return;
+                }
                 req_id++;
                 var current_req_id = req_id;
                 try {
@@ -1991,13 +2073,15 @@ function handle_ws_error(e) {
     log_error(JSON.stringify(process_error_arg(e)));
 }
 
-function html_tag_esc(str) {
-    str = str.replace(/\&/g, "&amp;")
-    str = str.replace(/\"/g, "&quot;")
-    str = str.replace(/\'/g, "&#39;")
-    //str = str.replace(/\u0020/g, "&nbsp;")
-    str = str.replace(/\</g, "&lt;")
-    str = str.replace(/\>/g, "&gt;")
+function html_tag_esc(str, non_breaking_space) {
+    str = str.replace(/\&/g, "&amp;");
+    str = str.replace(/\"/g, "&quot;");
+    str = str.replace(/\'/g, "&#39;");
+    if(non_breaking_space) { // replace spaces with non-breaking space html tags
+        str = str.replace(/\u0020/g, "&nbsp;");
+    }
+    str = str.replace(/\</g, "&lt;");
+    str = str.replace(/\>/g, "&gt;");
     return str;
 }
 
@@ -2043,9 +2127,31 @@ var global_data = {
     clearChatlog,
     html_tag_esc,
     getWss: function() { return wss },
-    topActiveWorlds
+    topActiveWorlds,
+    NCaseCompare
+}
+
+function stopPrompt() {
+    if (prompt.stopped || !prompt.started) {
+        return;
+    }
+    prompt.stopped = true;
+    prompt.started = false;
+    prompt.paused = false;
 }
 
 function stopServer() {
-	process.exit(0);
+    server.close();
+    wss.close();
+
+    for(var i in intv) {
+        clearInterval(intv[i]);
+    }
+    for(var i in timt) {
+        clearTimeout(timt[i]);
+    }
+    stopPrompt();
+
+    var count = process._getActiveHandles().length;
+    console.log("Stopped server with " + count + " handles remaining.");
 }

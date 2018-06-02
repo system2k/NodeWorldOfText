@@ -323,3 +323,76 @@ a:visited {
     border-color: black;
     cursor: default;
 }
+
+#confirm_js {
+    width: 441px;
+    height: 256px;
+    position: absolute;
+    background-color: #dbdbdb;
+    border-width: 2px;
+    border-style: solid;
+    border-color: black;
+    top: 50px;
+    left: 100px;
+}
+
+#confirm_js_code {
+    background-color: #e6e6e6;
+    position: absolute;
+    width: 365px;
+    height: 90px;
+    top: 100px;
+    left: 35px;
+    padding: 3px;
+    font-family: "Courier New", monospace;
+    word-wrap: break-word;
+    word-break: break-all;
+    overflow: scroll;
+    overflow-x: hidden;
+}
+
+#confirm_js_cancel {
+    position: absolute;
+    font-family: Helvetica;
+    background-color: green;
+    border-style: solid;
+    width: 100px;
+    height: 30px;
+    top: 200px;
+    left: 300px;
+    border-width: 1px;
+    padding: 7px;
+    text-align: center;
+    font-size: 25px;
+    color: white;
+    border-color: black;
+}
+
+#confirm_js_cancel_x {
+    background-color: red;
+    width: 20px;
+    height: 20px;
+    position: absolute;
+    right: 3px;
+    top: 2px;
+    text-align: center;
+    color: white;
+    font-family: monospace;
+    font-size: 16px;
+    border-style: solid;
+    border-width: 1px;
+    border-color: black;
+    cursor: default;
+}
+
+#confirm_js_msg {
+    text-align: center;
+    position: absolute;
+    left: 20px;
+    font-family: verdana;
+    top: 40px;
+}
+
+#confirm_js_cancel:hover {
+    background-color: #00AE00;
+}

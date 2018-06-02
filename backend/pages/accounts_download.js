@@ -1,17 +1,22 @@
 module.exports = {};
 
+var intv;
+module.exports.startup_internal = function(vars) {
+    intv = vars.intv;
+
+    // wait at least 5 minutes and then allow user to download again
+    intv.accountTimeCheck = setInterval(function() {
+        var date = Date.now();
+        for(var i in time_limits) {
+            if(time_limits[i] + wait_ms >= date) {
+                delete time_limits[i];
+            }
+        }
+    }, 1000 * 30) // check every 30 seconds if the time is up
+}
+
 var wait_ms = 1000 * 60 * 5;
 var time_limits = {};
-
-// wait 5 minutes and then allow user to download again
-setInterval(function() {
-    var date = Date.now();
-    for(var i in time_limits) {
-        if(time_limits[i] + wait_ms >= date) {
-            delete time_limits[i];
-        }
-    }
-}, 1000 * 30)
 
 module.exports.GET = async function(req, serve, vars) {
     var user = vars.user;

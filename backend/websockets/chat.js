@@ -25,6 +25,7 @@ module.exports = async function(ws, data, send, vars) {
     var add_page_chatlog = vars.add_page_chatlog;
     var html_tag_esc = vars.html_tag_esc;
     var topActiveWorlds = vars.topActiveWorlds;
+    var getWss = vars.getWss;
 
     var props = JSON.parse(world.properties);
     var chat_perm = props.chat_permission;
@@ -95,32 +96,106 @@ module.exports = async function(ws, data, send, vars) {
         }
     }
 
-    if(!user.staff) msg = msg.slice(0, 400);
+    if(!user.staff) {
+        msg = msg.slice(0, 400);
+    } else {
+        msg = msg.slice(0, 2048);
+    }
 
-    if(msg == "/worlds") {
-        if(!user.operator) {
+    // TODO: Refactor
+
+    // WARNING: Don't look ahead. Graphic content
+
+    // chat commands
+    if(user.operator && msg.charAt(0) == "/") {
+        var args = msg.toLowerCase().substr(1).split(" ")
+        switch(args[0]) {
+            case "worlds":
+                var topCount = 5;
+                var lst = topActiveWorlds(topCount);
+                var worldList = "";
+                for(var i = 0; i < lst.length; i++) {
+                    var row = lst[i];
+                    if(row[1] == "") {
+                        row[1] = "(main)"
+                    } else {
+                        row[1] = `<a href="/${row[1]}" style="color: blue; text-decoration: underline;">${row[1]}</a>`;
+                    }
+                    worldList += "-> " + row[1] + " [" + row[0] + "]";
+                    if(i != lst.length - 1) worldList += "<br>"
+                }
+                var listWrapper = `
+                    <div style="background-color: #dadada; font-family: monospace;">
+                        ${worldList}
+                    </div>
+                `;
+                serverChatResponse("Currently loaded worlds (top " + topCount + "): " + listWrapper, data.location)
+                return;
+            case "ban":
+                var id = args[1];
+                serverChatResponse(JSON.stringify(args), data.location);
+                return;
+            case "kick":
+                var id = args[1];
+                serverChatResponse(JSON.stringify(args), data.location);
+                return;
+            case "banip":
+                var ip = args[1];
+                serverChatResponse(JSON.stringify(args), data.location);
+                return;
+            case "kickip":
+                var ip = args[1];
+                serverChatResponse(JSON.stringify(args), data.location);
+                return;
+            case "whois":
+                var id = args[1];
+                var wss = getWss();
+                var ipData = "Client not found"
+                wss.clients.forEach(function(e) {
+                    if(e.clientId != id) return;
+                    ipData = JSON.stringify([e._socket.remoteAddress, e._socket.address()])
+                })
+                serverChatResponse(ipData, data.location);
+                return;
+            case "help":
+                serverChatResponse(
+                    `
+                        Command list:<br>
+                        <div style="background-color: #dadada; font-family: monospace;">
+                        -&gt; /nick &lt;nickname&gt; :: changes your nickname
+                        <br>
+                        -&gt; /help :: lists all commands
+                        <br>
+                        -&gt; /worlds :: list all worlds
+                        <br>
+                        -&gt; /ban &lt;id&gt; :: ban user from chat by id (referenced by IP)
+                        <br>
+                        -&gt; /kick &lt;id&gt; :: kick user's client from chat by id
+                        <br>
+                        -&gt; /banip &lt;ip&gt; :: ban user from chat by ip
+                        <br>
+                        -&gt; /kickip &lt;ip&gt; :: kick all user's clients from chat by ip
+                        <br>
+                        -&gt; /whois &lt;id&gt; :: get user ip address from id
+                        </div>
+                    `, data.location);
+                return;
+        }
+    } else if(msg.charAt(0) == "/") {
+        var args = msg.toLowerCase().substr(1).split(" ")
+        switch(args[0]) {
+            case "help":
+                serverChatResponse(
+                    `
+                        Command list:<br>
+                        <div style="background-color: #dadada; font-family: monospace;">
+                        -&gt; /nick &lt;nickname&gt; :: changes your nickname
+                        <br>
+                        <div style="background-color: #d3d3d3">-&gt; /help :: lists all commands</div>
+                        </div>
+                    `, data.location);
             return;
         }
-        var topCount = 10;
-        var lst = topActiveWorlds(topCount);
-        var worldList = "";
-        for(var i = 0; i < lst.length; i++) {
-            var row = lst[i];
-            if(row[1] == "") {
-                row[1] = "(main)"
-            } else {
-                row[1] = `<a href="/${row[1]}" style="color: blue; text-decoration: underline;">${row[1]}</a>`;
-            }
-            worldList += "-> " + row[1] + " [" + row[0] + "]";
-            if(i != lst.length - 1) worldList += "<br>"
-        }
-        var listWrapper = `
-            <div style="background-color: #dadada; font-family: monospace;">
-                ${worldList}
-            </div>
-        `;
-        serverChatResponse("Currently loaded worlds (top " + topCount + "): " + listWrapper, data.location)
-        return;
     }
 
     var chatData = {

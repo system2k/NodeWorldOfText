@@ -62,6 +62,7 @@ var protectPrecision       = 0; // 0 being tile and 1 being char
 var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
 var zoom                   = decimal(100); // zoom value
 var images                 = {}; // { name: [data RGBA, width, height] }
+var js_alert_active        = false; // js alert window open
 var images_to_load         = {
     unloaded: "/static/unloaded.png"
 }
@@ -1345,23 +1346,37 @@ function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
     return [x/zoomRatio|0, y/zoomRatio|0];
 }
 
-function runJsLink(data) {
-    var doRun = confirm("Are you sure you want to run this javascript link?\nPress cancel to NOT run it.\n\"" + escapeQuote(data.slice(0, 128)) + "\"");
-    if(!doRun) return;
+function alertJS(data) {
+    if(js_alert_active) return;
+    js_alert_active = true;
+    confirm_js.style.display = "";
+    confirm_js_code.innerText = data;
+    run_js_confirm.href = "javascript:confirmRunJsLink(\"" + escapeQuote(data) + "\");"
+    confirm_js_cancel.onclick = closeJSAlert;
+}
+
+function closeJSAlert() {
+    if(!js_alert_active) return;
+    js_alert_active = false;
+    confirm_js.style.display = "none";
+    run_js_confirm.href = "javascript:void 0;"
+}
+
+function confirmRunJsLink(data) {
+    var doRun = confirm("Are you sure you want to run this javascript link?\nPress cancel to NOT run it.\n\"" + escapeQuote(data.slice(0, 256)) + "\"");
+    if(!doRun) return closeJSAlert();
     var link = document.createElement("a");
     link.href = data;
-    link.click();
+    link.click()
+    closeJSAlert();
 }
 
-function escapeQuote(text) { // escapes " and '
+function runJsLink(data) {
+    alertJS(data);
+}
+
+function escapeQuote(text) { // escapes " and ' and \
     return text.replace(/\\/g, "\\\\").replace(/\"/g, "\\\"").replace(/\'/g, "\\'");
-}
-
-function checkMiscURLProtocol(protocol) { // determine if url protocol is at least unsafe (E.G. javascript:)
-    return !(protocol == "http:" ||
-             protocol == "https:" ||
-             protocol == "localhost:" ||
-             protocol == "ftp:")
 }
 
 var linkMargin = 100; // px
@@ -1409,7 +1424,8 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             linkElm.title = "Link to URL " + URL_Link;
             linkElm.href = URL_Link;
             var linkProtocol = linkElm.protocol;
-            if(checkMiscURLProtocol(linkProtocol)) {
+            var isJSLink = link[0].js; // server's checking of js links
+            if(linkProtocol == "javascript:" || isJSLink) {
                 URL_Link = "javascript:runJsLink(\"" + escapeQuote(URL_Link) + "\");"
                 linkElm.href = URL_Link;
             }
@@ -1667,6 +1683,7 @@ function createSocket() {
                     kind: "chathistory"
                 }));
             }
+            timesConnected++;
         }
     }
 
@@ -1936,7 +1953,7 @@ function generateBackgroundPixels(tileX, tileY, image, returnCanvas) {
         for(var x = 0; x < tileWidth; x++) {
             var posX = startX + x;
             var posY = startY + y;
-            // perform calculation to get chunk out of the image tiled
+            // perform calculation to get chunk out of the image tiles
             posX = posX - Math.floor(posX / img_width) * img_width;
             posY = posY - Math.floor(posY / img_height) * img_height;
             var index = (posY * img_width + posX) * 4;
