@@ -155,7 +155,7 @@ module.exports = async function(ws, data, send, vars) {
                 wss.clients.forEach(function(e) {
                     if(e.clientId != id) return;
                     if(!NCaseCompare(e.world_name, world.name)) return;
-                    ipData = JSON.stringify([e._socket.remoteAddress, e._socket.address(), ws.ipHeaderAddr])
+                    ipData = JSON.stringify([e._socket.remoteAddress, e._socket.address(), e.ipHeaderAddr])
                 })
                 ipData = id + "; " + ipData;
                 serverChatResponse(ipData, data.location);
