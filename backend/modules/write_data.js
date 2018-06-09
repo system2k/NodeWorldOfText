@@ -104,6 +104,7 @@ module.exports = async function(data, vars) {
         }
         edits[i][5] = edits[i][5].replace(/\n/g, " ")
         edits[i][5] = edits[i][5].replace(/\r/g, " ")
+        edits[i][5] = edits[i][5].replace(/\ufeff/g, " ");
         tiles[edits[i][0] + "," + edits[i][1]].push(edits[i])
         if(total_edits >= edits_limit) { // edit limit reached
             break;

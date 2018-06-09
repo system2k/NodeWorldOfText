@@ -17,7 +17,7 @@ const mime          = require("./backend/mime.js");
 const nodemailer    = require("nodemailer");
 const prompt        = require("prompt");
 const querystring   = require("querystring");
-const sql           = require("sqlite3").verbose();
+const sql           = require("sqlite3");
 const swig          = require("swig");
 const url           = require("url");
 const WebSocket     = require("ws");
@@ -1143,6 +1143,10 @@ async function process_request(req, res, current_req_id) {
         res.write("OWOT subdomain testing <test.hostname.tld>");
         return res.end();
     }
+    if(sub.length == 1 && compareNoCase(sub[0], "forums")) {
+        res.write("<html><h1>Test page</h1></html>");
+        return res.end();
+    }
 
     var URL = url.parse(req.url).pathname;
     if(URL.charAt(0) == "/") {
@@ -1635,19 +1639,17 @@ async function updateChatLogData() {
 }
 
 function getWorldData(world) {
-    var reference = null;
-    for(var i in worldData) {
-        var com = NCaseCompare(i, world);
-        if(com) {
-            return worldData[i];
-        }
-    }
-    worldData[world] = {
-        client_id: 1, // latest client id
-        user_count: 0, // current broadcasted user count
+    var ref = world.toLowerCase();
+
+    if(worldData[ref]) return worldData[ref];
+
+    worldData[ref] = {
+        client_id: 1,
+        user_count: 0,
         chatlog: []
-    };
-    return worldData[world];
+    }
+
+    return worldData[ref];
 }
 function generateClientId(world) {
     var worldObj = getWorldData(world);
@@ -1775,7 +1777,7 @@ function start_server() {
         }
 
         var req_per_second = 133;
-        var reqs_second = 0; // requests received at currect second
+        var reqs_second = 0; // requests received at current second
         var current_second = Math.floor(Date.now() / 1000);
         function can_process_req() { // limit requests per second
             var compare_second = Math.floor(Date.now() / 1000);
@@ -1812,7 +1814,7 @@ function start_server() {
             var location = url.parse(req.url).pathname;
             var world_name;
             function send_ws(data) {
-                if(ws.readyState === ws.OPEN) {
+                if(ws.readyState === WebSocket.OPEN) {
                     try {ws.send(data)} catch(e){}; // not protected by callbacks
                 }
             }

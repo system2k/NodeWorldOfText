@@ -122,7 +122,18 @@ module.exports = async function(data, vars) {
                             }
                         };
                     };
-                    tiles[z[0] + "," + z[1]].content[z[2]*16+z[3]] = z[5]
+                    var tile_r = tiles[z[0] + "," + z[1]];
+                    var index_r = z[2]*16+z[3];
+                    tile_r.content[index_r] = z[5]
+                    var color = z[7];
+                    if(!color) color = 0;
+                    if(typeof color != "number") color = 0;
+                    if(color) {
+                        if(!tile_r.properties.color) {
+                            tile_r.properties.color = new Array(128).fill(0);
+                        }
+                        tile_r.properties.color[index_r] = color;
+                    }
                 }
             })
 

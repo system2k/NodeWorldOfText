@@ -3,8 +3,7 @@ var imageLoader = {};
 imageLoader.res = { /*"myimage": <img>*/ };
 
 imageLoader.path = [ // Modifiable
-    ["favicon", "/static/favicon.png"],
-    ["chatIcon", "/static/chatIcon.png"]
+    ["favicon", "/static/favicon.png"]
 ];
 
 imageLoader.start = function(callback) {
