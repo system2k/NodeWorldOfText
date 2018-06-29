@@ -15,7 +15,7 @@ const https         = require("https");
 const isIP          = require("net").isIP;
 const mime          = require("./backend/mime.js");
 const nodemailer    = require("nodemailer");
-const prompt        = require("prompt");
+const prompt        = require(/*"prompt"*/"./lib/prompt/prompt");
 const querystring   = require("querystring");
 const sql           = require("sqlite3");
 const swig          = require("swig");
@@ -35,8 +35,7 @@ var chatDB = settings.CHAT_HISTORY
 Error.stackTraceLimit = Infinity;
 var isTestServer = false;
 
-var intv = {}; // intervals
-var timt = {}; // timeouts
+var intv = {}; // intervals and timeouts
 
 var args = process.argv;
 args.forEach(function(a) {
@@ -150,8 +149,7 @@ for(var i in pages) {
     var mod = pages[i];
     if(mod.startup_internal) {
         mod.startup_internal({
-            intv,
-            timt
+            intv
         });
     }
 }
@@ -552,6 +550,7 @@ var prompt_password_new_account = {
 
 var ask_password = false;
 var account_to_create = "";
+var prompt_stopped = false;
 
 function command_prompt() {
     function on_input(err, input) {
@@ -572,6 +571,7 @@ function command_prompt() {
         account_to_create = void 0;
         command_prompt();
     }
+    if(prompt_stopped) return;
     prompt.start();
     if(!ask_password) {
         prompt.get(prompt_command_input, on_input);
@@ -1729,11 +1729,11 @@ function clearChatlog(world_id) {
     chatIsCleared[world_id] = true;
 }
 
-async function updateChatLogData() {
+async function updateChatLogData(no_timeout) {
     if(!(global_chat_additions.length > 0 ||
           world_chat_additions.length > 0 ||
           Object.keys(chatIsCleared).length > 0)) {
-        timt.updateChatLogData = setTimeout(updateChatLogData, 1000);
+        if(!no_timeout) intv.updateChatLogData = setTimeout(updateChatLogData, 1000);
         return;
     }
 
@@ -1789,7 +1789,7 @@ async function updateChatLogData() {
 
     await db_ch.run("COMMIT")
 
-    timt.updateChatLogData = setTimeout(updateChatLogData, 5000);
+    if(!no_timeout) intv.updateChatLogData = setTimeout(updateChatLogData, 5000);
 }
 
 function getWorldData(world) {
@@ -1851,6 +1851,21 @@ function broadcastUserCount() {
     }
 }
 
+async function clear_expired_sessions(no_timeout) {
+    // clear expires sessions
+    await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
+
+    // clear expired registration keys (and accounts that aren't activated yet)
+    await db.each("SELECT id FROM auth_user WHERE is_active=0 AND ? - date_joined >= ?",
+        [Date.now(), Day * settings.activation_key_days_expire], async function(data) {
+        var id = data.id;
+        await db.run("DELETE FROM registration_registrationprofile WHERE user_id=?", id);
+        await db.run("DELETE FROM auth_user WHERE id=?", id)
+    })
+
+    if(!no_timeout) intv.clearExpiredSessions = setTimeout(clear_expired_sessions, Minute);
+}
+
 async function initialize_server_components() {
     await (async function() {
         announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
@@ -1865,20 +1880,7 @@ async function initialize_server_components() {
         broadcastUserCount();
     }, 2000);
 
-    await (async function clear_expired_sessions() {
-        // clear expires sessions
-        await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
-
-        // clear expired registration keys (and accounts that aren't activated yet)
-        await db.each("SELECT id FROM auth_user WHERE is_active=0 AND ? - date_joined >= ?",
-            [Date.now(), Day * settings.activation_key_days_expire], async function(data) {
-            var id = data.id;
-            await db.run("DELETE FROM registration_registrationprofile WHERE user_id=?", id);
-            await db.run("DELETE FROM auth_user WHERE id=?", id)
-        })
-
-        timt.clearExpiredSessions = setTimeout(clear_expired_sessions, Minute);
-    })();
+    await clear_expired_sessions();
 
     server.listen(serverPort, function() {
         var addr = server.address();
@@ -2320,26 +2322,29 @@ var global_data = {
 }
 
 function stopPrompt() {
-    if (prompt.stopped || !prompt.started) {
-        return;
-    }
-    prompt.stopped = true;
-    prompt.started = false;
-    prompt.paused = false;
+    prompt_stopped = true; // do not execute any more prompts
+    prompt.stop();
 }
 
+// stops server (for upgrades/maintenance) without crashing everything
+// this lets node terminate the program when all handles are complete
 function stopServer() {
-    server.close();
-    wss.close();
+    console.log("\x1b[32mStopping server...\x1b[0m");
+    (async function() {
+        stopPrompt();
+        for(var i in intv) {
+            clearInterval(intv[i]);
+            clearTimeout(intv[i]);
+            delete intv[i];
+        }
 
-    for(var i in intv) {
-        clearInterval(intv[i]);
-    }
-    for(var i in timt) {
-        clearTimeout(timt[i]);
-    }
-    stopPrompt();
+        await updateChatLogData(true);
+        await clear_expired_sessions(true);
 
-    var count = process._getActiveHandles().length;
-    console.log("Stopped server with " + count + " handles remaining.");
+        server.close();
+        wss.close();
+
+        var count = process._getActiveHandles().length;
+        console.log("Stopped server with " + count + " handles remaining.");
+    })();
 }

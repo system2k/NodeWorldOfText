@@ -7,7 +7,6 @@
         "html-minifier": "^3.5.16",
         "node-minify": "^2.4.2",
         "nodemailer": "^4.6.5",
-        "prompt": "^1.0.0",
         "sqlite3": "^4.0.0",
         "swig": "^1.4.2",
         "ws": "^5.2.0"
