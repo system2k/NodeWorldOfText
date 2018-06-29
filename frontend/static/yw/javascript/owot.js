@@ -140,6 +140,9 @@ var defaultSizes = {
 if(state.worldModel.square_chars) {
     defaultSizes.cellW = 18;
 }
+if(state.worldModel.half_chars) {
+    defaultSizes.cellH = 20;
+}
 defaultSizes.tileW = defaultSizes.cellW * defaultSizes.tileC;
 defaultSizes.tileH = defaultSizes.cellH * defaultSizes.tileR;
 var cellWidthPad = Math.floor((defaultSizes.cellW - 10) / 2); // X text offset if the cell is wider
@@ -199,6 +202,17 @@ function doZoom(percentage) {
             ctx.font = font;
         }
         renderTiles(true);
+    }
+}
+
+if(!Math.trunc) {
+    console.log("Math.trunc is not supported. Using polyfill.");
+    Math.trunc = function(x) {
+        if(x < 0) {
+            return Math.ceil(x)
+        } else {
+            return Math.floor(x);
+        }
     }
 }
 
@@ -1210,23 +1224,30 @@ $(document).on("keydown", function(e) {
     clearInterval(pasteInterval);
     write_busy = false;
 
-    if(key == 38) {
-        moveCursor("up");
-    } else if(key == 40) {
-        moveCursor("down");
-    } else if(key == 37) {
-        moveCursor("left");
-    } else if(key == 39) {
-        moveCursor("right");
-    } else if(key == 8) { // backspace
-        moveCursor("left", true);
-        writeChar(" ", true);
-    } else if(key == 27) { // esc
-        stopLinkUI();
-        stopTileUI();
-        removeCursor();
-        tileProtectAuto.active = false;
-        linkAuto.active = false;
+    switch(key) {
+        case 38:
+            moveCursor("up");
+            break;
+        case 40:
+            moveCursor("down");
+            break;
+        case 37:
+            moveCursor("left");
+            break;
+        case 39:
+            moveCursor("right");
+            break;
+        case 8: // backspace
+            moveCursor("left", true);
+            writeChar(" ", true);
+            break;
+        case 27: // esc
+            stopLinkUI();
+            stopTileUI();
+            removeCursor();
+            tileProtectAuto.active = false;
+            linkAuto.active = false;
+            break;
     }
 })
 
@@ -2018,6 +2039,17 @@ function encodeCharProt(array) {
 		str += base64table.charAt(code)
 	}
 	return str;
+}
+
+if(!Array.prototype.fill) {
+    console.log("Array.prototype.fill is not supported. Using basic polyfill")
+    Array.prototype.fill = function(val) {
+        var ar = this;
+        for(var i = 0; i < ar.length; i++) {
+            ar[i] = val;
+        }
+        return ar;
+    }
 }
 
 function decodeCharProt(str) {

@@ -9,7 +9,7 @@ function sanitize_color(col) {
     return col;
 }
 
-in_queue = [];
+var in_queue = [];
 function is_queueing(tileX, tileY, worldID) {
     for(var i = 0; i < in_queue.length; i++) {
         if(in_queue[i][0] == tileX && in_queue[i][1] == tileY && in_queue[i][2] == worldID) {
@@ -18,7 +18,7 @@ function is_queueing(tileX, tileY, worldID) {
     }
     return false;
 }
-is_waiting = []; // functions
+var is_waiting = []; // functions
 function wait_queue(tileX, tileY, worldID) {
     return new Promise(function(resolve) {
         is_waiting.push([tileX, tileY, worldID, function() {
@@ -145,7 +145,8 @@ module.exports = async function(data, vars) {
             resolve_queue(tileX, tileY, world.id);
             rem_queue(tileX, tileY, world.id);
         }
-        // write the edits with caution
+        // begin writing the edits with a try/catch.
+        // if an internal error occurs, it won't block the entire system by not reaching the function to free the queue
         try {
             var tile = await db.get("SELECT * FROM tile WHERE world_id=? AND tileY=? AND tileX=?",
                 [world.id, tileY, tileX])
@@ -165,6 +166,7 @@ module.exports = async function(data, vars) {
 
             var changes = [];
             var accepted_changes = [];
+            // processes edits, including splitting multi-char edits into multiple edits
             for(var k = 0; k < incomingEdits.length; k++) {
                 var editIncome = incomingEdits[k];
 
@@ -185,11 +187,7 @@ module.exports = async function(data, vars) {
                     }
                     changes.push(editIncome);
                     continue;
-                } else {
-                    if(!user.superuser) {
-                        char = char.slice(0, 1);
-                    }
-                };
+                }
                 for(var i = 0; i < char.length; i++) {
                     var newIdx = charInsIdx + i;
                     if(newIdx > 127) newIdx = 127;

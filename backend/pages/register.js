@@ -30,6 +30,7 @@ module.exports.POST = async function(req, serve, vars) {
     var crypto = vars.crypto;
     var website = vars.website;
     var template_data = vars.template_data;
+    var handle_error = vars.handle_error;
 
     if(post_data.csrfmiddlewaretoken != user.csrftoken) { // csrftokens not matching?
         serve();
@@ -107,10 +108,17 @@ module.exports.POST = async function(req, serve, vars) {
             [user_id, token])
 
         var subject = template_data["registration/activation_email_subject.txt"]();
-        var email_send = await send_email(email, subject, template_data["registration/activation_email.txt"]({
-            website,
-            reg_key: "accounts/activate/" + token + "/"
-        }))
+        try {
+            var email_send = await send_email(email, subject, template_data["registration/activation_email.txt"]({
+                website,
+                reg_key: "accounts/activate/" + token + "/"
+            }))
+        } catch(e) {
+            handle_error(e);
+            return await dispage("register", {
+                form_email_errors: ["An internal error occured while sending the verification email"]
+            }, req, serve, vars);
+        }
 
         if(email_send === false) {
             form_email_errors.push("The email system appears to be down. Try not using an email or wait until it's fixed")

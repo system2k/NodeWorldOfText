@@ -21,11 +21,10 @@ module.exports = async function(ws, data, send, vars) {
     var broadcast = vars.broadcast; // broadcast to current world
     var clientId = vars.clientId;
     var ws_broadcast = vars.ws_broadcast; // site-wide broadcast
-    var add_global_chatlog = vars.add_global_chatlog;
-    var add_page_chatlog = vars.add_page_chatlog;
+    var add_to_chatlog = vars.add_to_chatlog;
     var html_tag_esc = vars.html_tag_esc;
     var topActiveWorlds = vars.topActiveWorlds;
-    var getWss = vars.getWss;
+    var wss = vars.wss;
     var NCaseCompare = vars.NCaseCompare;
 
     var props = JSON.parse(world.properties);
@@ -38,7 +37,7 @@ module.exports = async function(ws, data, send, vars) {
         send({
             kind: "chat",
             nickname: "[ Server ]",
-            realUsername: "server",
+            realUsername: "[ Server ]",
             id: 0,
             message: message,
             registered: true,
@@ -108,7 +107,7 @@ module.exports = async function(ws, data, send, vars) {
     // WARNING: Don't look ahead. Graphic content
 
     // chat commands
-    if(user.operator && msg.charAt(0) == "/") {
+    if(user.superuser && msg[0] == "/") {
         var args = msg.toLowerCase().substr(1).split(" ")
         switch(args[0]) {
             case "worlds":
@@ -150,7 +149,6 @@ module.exports = async function(ws, data, send, vars) {
                 return;
             case "whois":
                 var id = args[1];
-                var wss = getWss();
                 var ipData = "Client not found"
                 wss.clients.forEach(function(e) {
                     if(e.clientId != id) return;
@@ -183,6 +181,8 @@ module.exports = async function(ws, data, send, vars) {
                         </div>
                     `, data.location);
                 return;
+            default:
+                serverChatResponse("Invalid command: " + html_tag_esc(msg));
         }
     } else if(msg.charAt(0) == "/") {
         var args = msg.toLowerCase().substr(1).split(" ")
@@ -197,7 +197,9 @@ module.exports = async function(ws, data, send, vars) {
                         <div style="background-color: #d3d3d3">-&gt; /help :: lists all commands</div>
                         </div>
                     `, data.location);
-            return;
+                return;
+            default:
+                serverChatResponse("Invalid command: " + html_tag_esc(msg));
         }
     }
 
@@ -221,9 +223,9 @@ module.exports = async function(ws, data, send, vars) {
 
     if(!isCommand) {
         if(data.location == "page") {
-            add_page_chatlog(chatData, world.name);
+            await add_to_chatlog(chatData, world.id);
         } else if(data.location == "global") {
-            add_global_chatlog(chatData);
+            await add_to_chatlog(chatData, 0);
         }
     }
 

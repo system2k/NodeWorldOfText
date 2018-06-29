@@ -1,7 +1,7 @@
 module.exports = async function(ws, data, send, vars) {
     var broadcast = vars.broadcast; // broadcast to current world
     var data_rec = data.data;
-    var getWss = vars.getWss;
+    var wss = vars.wss;
     var NCaseCompare = vars.NCaseCompare;
     var world = vars.world;
 
@@ -23,8 +23,6 @@ module.exports = async function(ws, data, send, vars) {
             ws.cmdsSentInSecond++;
         }
     }
-
-    var wss = getWss();
 
     data = JSON.stringify({
         kind: "cmd",

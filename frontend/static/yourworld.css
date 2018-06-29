@@ -10,43 +10,6 @@ img {
     border: 0;
     text-decoration: none;
 }
-.tilecont {
-    position: absolute;
-    background-color: #fff;
-    transform: translateZ(0);
-}
-div.world-container.writability-ADMIN .tilecont {
-    background-color: #ddd;
-}
-div.world-container.writability-MEMBERS .tilecont {
-    background-color: #eee;
-}
-div.world-container.writability-PUBLIC .tilecont {
-    background-color: #fff;
-}
-div.world-container .tilecont.protected-admin {
-    background-color: #ddd;
-}
-div.world-container .tilecont.protected-members {
-    background-color: #eee;
-}
-div.world-container .tilecont.protected-public {
-    background-color: #fff;
-}
-#yourworld table,
-span.cell-content {
-    line-height: 18px;
-}
-#yourworld table {
-    table-layout: fixed;
-    line-height: 18px;
-}
-span.cell-content {
-    display: inline-block;
-}
-#yourworld table tr {
-    height: 18px;
-}
 a,
 a:link,
 a:hover,

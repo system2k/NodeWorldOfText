@@ -7,7 +7,9 @@ module.exports.GET = async function(req, serve, vars, params) {
     var db = vars.db;
     var announcement = vars.announcement;
     var uptime = vars.uptime;
-    var getWss = vars.getWss;
+    var wss = vars.wss;
+
+    console.log(wss)
 
     // not a superuser...
     if(!user.superuser) {
@@ -15,7 +17,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     }
 
     var client_num = 0;
-    getWss().clients.forEach(function() {
+    wss.clients.forEach(function() {
         client_num++;
     })
 

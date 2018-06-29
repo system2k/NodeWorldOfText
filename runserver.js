@@ -4,7 +4,7 @@
 **  This is the main file
 */
 
-console.log("Starting up...")
+console.log("\x1b[36;1mStarting up...\x1b[0m")
 
 const crypto        = require("crypto");
 const dump_dir      = require("./backend/dump_dir");
@@ -23,7 +23,7 @@ const url           = require("url");
 const WebSocket     = require("ws");
 const zip           = require("adm-zip")
 
-console.log("Loaded modules");
+console.log("Loaded libs");
 
 const settings = require("./settings.json");
 var SERVER_STOP = false;
@@ -41,6 +41,7 @@ var timt = {}; // timeouts
 var args = process.argv;
 args.forEach(function(a) {
 	if(a == "--test-server") {
+        console.log("\x1b[32;1mThis is a test server\x1b[0m")
 		isTestServer = true;
 		serverPort = settings.test_port;
 		serverDB = settings.TEST_DATABASE_PATH;
@@ -256,28 +257,36 @@ function asyncDbSystem(database) {
 const db = asyncDbSystem(database);
 const db_ch = asyncDbSystem(chat_history);
 
-try {
-    var transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-            user: settings.email.username,
-            pass: settings.email.password
-        }
-    });
-} catch(e) {
-    email_available = false;
-    console.log("Email disabled. Error message:", e);
-}
-
+var transporter;
 var email_available = true;
-try {
-    if(email_available) {
-        transporter.verify()
+
+function loadEmail() {
+    try {
+        if(isTestServer) throw "This is a test server";
+        transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+                user: settings.email.username,
+                pass: settings.email.password
+            }
+        });
+    } catch(e) {
+        email_available = false;
+        console.log("\x1b[31;1mEmail disabled. Error message: " + JSON.stringify(process_error_arg(e)) + "\x1b[0m");
     }
-} catch(e) {
-    email_available = false;
-    console.log("Email is disabled because the verification failed (credentials possibly incorrect)");
+    try {
+        if(email_available) {
+            transporter.verify()
+        }
+    } catch(e) {
+        email_available = false;
+        console.log("\x1b[31;1mEmail is disabled because the verification failed (credentials possibly incorrect)" + JSON.stringify(process_error_arg(e)) + "\x1b[0m");
+    }
+    if(email_available) {
+        console.log("Logged into email")
+    }
 }
+loadEmail();
 
 async function send_email(destination, subject, text) {
     if(!email_available) return false;
@@ -342,7 +351,7 @@ function san_nbr(x) {
     if(x >= 9007199254740991) x = 9007199254740991;
     if(x <= -9007199254740991) x = -9007199254740991;
     x = parseInt(x);
-    if(!x || isNaN(x) || !isFinite) {
+    if(!x || isNaN(x) || !isFinite(x)) {
         x = 0;
     }
     x = Math.floor(x);
@@ -716,32 +725,77 @@ function split_limit(str, char, limit) {
     return result;
 }
 
-function parseCookie(cookie) {
-    try {
-        if(typeof cookie !== "string") {
-            return {};
-        }
-        cookie = cookie.split(";");
-        var result = {};
-        for(var i = 0; i < cookie.length; i++) {
-            var seg = cookie[i];
-            seg = split_limit(seg, "=", 1);
-            seg = ar_str_trim(seg)
-            seg = ar_str_decodeURI(seg);
-            if(seg.length == 1) {
-                if(seg[0] == "") continue;
-                result[seg[0]] = 1;
-            } else {
-                result[seg[0]] = seg[1];
-            }
-        }
-        return result;
-    } catch(e) {
-        return {};
-    }
+function parseCookie(input) {
+    if(!input) input = "";
+	var out = {};
+	
+	var mode = 0; // 0 = key, 1 = value
+	var buffer_k = ""; // key
+	var buffer_v = ""; // value
+	
+	for(var i = 0; i < input.length; i++) {
+		var chr = input.charAt(i);
+		
+		var sSkip = false; // jump over char buffer
+        
+        // check for value assignments
+		if(chr == "=" && mode == 0) {
+			mode = 1;
+			sSkip = true;
+		}
+		
+		// char buffer
+		if(chr != ";" && !sSkip) {
+			if(mode == 0) {
+				buffer_k += chr;
+			}
+			if(mode == 1) {
+				buffer_v += chr;
+			}
+		}
+        
+        // check ending of each key/value
+		if(chr == ";" || i == input.length - 1) {
+			mode = 0;
+			
+			// trim whitespaces from beginning and end
+			buffer_k = buffer_k.trim();
+			buffer_v = buffer_v.trim();
+			
+			var valid = true;
+            
+            // ignore empty sets
+			if(buffer_k == "" && buffer_v == "") {
+				valid = false;
+			}
+			
+			if(valid) {
+                // strip quotes (if any)
+				if(buffer_k.charAt(0) == "\"" && buffer_k.charAt(buffer_k.length - 1) == "\"") buffer_k = buffer_k.slice(1, -1);
+				if(buffer_v.charAt(0) == "\"" && buffer_v.charAt(buffer_v.length - 1) == "\"") buffer_v = buffer_v.slice(1, -1);
+                
+                // invalid escape sequences can cause errors
+				try {
+					buffer_k = decodeURIComponent(buffer_k);
+				} catch(e){};
+				try {
+					buffer_v = decodeURIComponent(buffer_v);
+				} catch(e){};
+                
+                // no overrides from sets with the same key
+				if(!(buffer_k in out)) out[buffer_k] = buffer_v;
+			}
+			
+			buffer_k = "";
+			buffer_v = "";
+		}
+	}
+	
+	return out;
 }
 
-var filename_sanitize = (function() { // do not pollute global scope
+// make sure filenames don't contain invalid sequences
+var filename_sanitize = (function() {
 	var illegalRe = /[\/\?<>\\:\*\|":]/g;
 	var controlRe = /[\x00-\x1f\x80-\x9f]/g;
 	var reservedRe = /^\.+$/;
@@ -758,12 +812,13 @@ var filename_sanitize = (function() { // do not pollute global scope
 		return sanitized;
 	}
 
-	return function(input, options) {
+	return function(input) {
 		var replacement = "_";
 		return sanitize(input, replacement);
 	}
 })()
 
+// transfer all values from one object to a main object containing all imports
 function objIncludes(defaultObj, include) {
     var new_obj = {};
     for(var i in defaultObj) {
@@ -775,26 +830,31 @@ function objIncludes(defaultObj, include) {
     return new_obj;
 }
 
+// wait for the client to upload form data to the server
 function wait_response_data(req, dispatch) {
-    var queryData = ""
+    var queryData = "";
     var error = false;
     return new Promise(function(resolve) {
         req.on("data", function(data) {
-            queryData += data;
-            if (queryData.length > 10000000) {
-                queryData = "";
-                dispatch("Payload too large", 413)
-                error = true
-                resolve(null);
+            if(error) return;
+            try {
+                queryData += data;
+                if (queryData.length > 250000) {
+                    queryData = "";
+                    dispatch("Payload too large", 413)
+                    error = true
+                    resolve(null);
+                }
+            } catch(e) {
+                log_error(e);
             }
         });
         req.on("end", function() {
-            if(!error) {
-                try {
-                    resolve(querystring.parse(queryData, null, null, {maxKeys: 1000}))
-                } catch(e) {
-                    resolve(null);
-                }
+            if(error) return;
+            try {
+                resolve(querystring.parse(queryData, null, null, { maxKeys: 256 }))
+            } catch(e) {
+                resolve(null);
             }
         });
     })
@@ -805,6 +865,7 @@ function new_token(len) {
     return token;
 }
 
+// generate an expire string for cookies
 function cookie_expire(timeStamp) {
     var dayWeekList = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     var monthList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -831,29 +892,51 @@ function decode_base64(b64str) {
 }
 
 var https_reference = https;
-var prev_cS = http.createServer;
+var prev_cS = http.createServer; // previous reference to http.createServer
+var https_disabled;
 
 var options = {};
 
-try { // detect ssl keys
-    var options = {
-        key: fs.readFileSync("../le/etc/live/nwot.sytes.net/privkey.pem"),
-        cert: fs.readFileSync("../le/etc/live/nwot.sytes.net/cert.pem"),
-        ca: fs.readFileSync("../le/etc/live/nwot.sytes.net/chain.pem")
-    };
-} catch(e) { // not detected, run without ssl
-    console.log("Running server in HTTP mode")
-	http.createServer = function(opt, func) {
-        return prev_cS(func);
-    }
-    https_reference = http
-}
+function manage_https() {
+    var private_key = settings.ssl.private_key;
+    var cert        = settings.ssl.cert;
+    var chain       = settings.ssl.chain;
 
+    if(settings.ssl_enabled) {
+        // check if paths exist
+        https_disabled = (!fs.existsSync(private_key) || !fs.existsSync(cert) || !fs.existsSync(chain));
+    } else {
+        https_disabled = true;
+    }
+
+    if(https_disabled) {
+        console.log("\x1b[32;1mRunning server in HTTP mode\x1b[0m")
+        http.createServer = function(opt, func) {
+            return prev_cS(func);
+        }
+        https_reference = http
+    } else {
+        console.log("\x1b[32;1mDetected HTTPS keys. Running server in HTTPS mode\x1b[0m");
+        options = {
+            key:  fs.readFileSync(private_key),
+            cert: fs.readFileSync(cert),
+            ca:   fs.readFileSync(chain)
+        };
+    }
+}
+manage_https();
+
+// properly take all data from an error stack
 function process_error_arg(e) {
     var error = {};
-    var keys = Object.getOwnPropertyNames(e);
-    for(var i = 0; i < keys.length; i++) {
-        error[keys[i]] = e[keys[i]];
+    if(typeof e == "object") {
+        // retrieve hidden properties
+        var keys = Object.getOwnPropertyNames(e);
+        for(var i = 0; i < keys.length; i++) {
+            error[keys[i]] = e[keys[i]];
+        }
+    } else {
+        error.data = e;
     }
     return error;
 }
@@ -936,16 +1019,14 @@ async function can_view_world(world, user) {
     var permissions = {
         member: false,
         owner: false,
-        can_write: false,
-        access_denied: false
+        can_write: false
     };
 
     var is_owner = world.owner_id == user.id;
     var superuser = user.superuser;
 
     if(world.readability == 2 && !is_owner) { // owner only
-        permissions.access_denied = true;
-        if(!user.operator) return false;
+        return false;
     }
 
     var is_member = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
@@ -953,8 +1034,7 @@ async function can_view_world(world, user) {
 
     // members (and owners) only
     if(world.readability == 1 && !is_member && !is_owner) {
-        permissions.access_denied = true;
-        if(!user.operator) return false;
+        return false;
     }
 
     permissions.member = !!is_member; // !! because is_member is not a boolean
@@ -1117,9 +1197,15 @@ var server = https_reference.createServer(options, async function(req, res) {
             }
         }
         res.statusCode = 500;
-        res.end(template_data["500.html"]({}))
-        var error = process_error_arg(e);
-        log_error(JSON.stringify(error));
+        var err500Temp = "";
+        try {
+            err500Temp = template_data["500.html"]()
+        } catch(e) {
+            err500Temp = "An error has occured while displaying the 500 internal server error page";
+            handle_error(e);
+        }
+        res.end(err500Temp)
+        handle_error(e); // writes error to error log
     }
 })
 
@@ -1248,8 +1334,6 @@ async function process_request(req, res, current_req_id) {
                     return;
                 }
                 if(method == "POST") {
-                    var error = false;
-                    var queryData = "";
                     var dat = await wait_response_data(req, dispatch)
                     if(!dat) {
                         return;
@@ -1270,9 +1354,9 @@ async function process_request(req, res, current_req_id) {
                         data = {};
                     }
                     data.user = user;
-                    if(data.csrftoken) {
+                    /*if(data.csrftoken) {
                         csrf_tokens[data.csrftoken] = 1;
-                    }
+                    }*/
                     return template_data[path](data);
                 }
                 vars = objIncludes(global_data, { // extra information
@@ -1471,7 +1555,7 @@ async function init_chat_history() {
         var rowid = await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
             ["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0])
         var global_id = rowid.lastID;
-        // if the chat log exists
+        // if a chat log with an old format exists
         if(fs.existsSync(settings.CHAT_LOG)) {
             var chatlogFile = fs.readFileSync(settings.CHAT_LOG, "utf8");
             chatlogFile = JSON.parse(chatlogFile);
@@ -1511,66 +1595,138 @@ async function init_chat_history() {
             await db_ch.run("COMMIT")
         }
     }
-    var globalChannelId = (await db_ch.get("SELECT id FROM channels WHERE name='global'")).id;
-    var globals = await db_ch.all("SELECT * FROM entries WHERE channel=? ORDER BY id", globalChannelId);
-    // pull global chats
-    for(var i = 0; i < globals.length; i++) {
-        var row = JSON.parse(globals[i].data);
-        global_chatlog.push(row);
-    }
-    // pull world chats
-    var default_channels = await db_ch.all("SELECT * FROM default_channels");
-    for(var i = 0; i < default_channels.length; i++) {
-        var channel = default_channels[i].channel_id;
-        var world = default_channels[i].world_id;
-        var world_chats = await db_ch.all("SELECT * FROM entries WHERE channel=? ORDER BY id", channel);
-        var world_name = (await db.get("SELECT name FROM world WHERE id=?", world)).name
-        world_chatlog[world_name] = [];
-        for(var a = 0; a < world_chats.length; a++) {
-            var row = JSON.parse(world_chats[a].data);
-            world_chatlog[world_name].push(row)
-        }
-    }
 
-    // apply world chats to the world data object
-    for(var i in world_chatlog) {
-        var data = world_chatlog[i];
-        var wdat = getWorldData(i);
-        wdat.chatlog = world_chatlog[i];
-    }
-
-    updateChatLogData(); // begin the chatlog update checker
+    updateChatLogData();
 }
 
-var world_chatlog = {}; // Temporary
+var chat_cache = {};
 
-var page_chatlog_limit = Infinity;
-var global_chatlog_limit = Infinity;
-var global_chatlog = [];
+function queue_chat_cache(world_id) {
+    return new Promise(function(res) {
+        chat_cache[world_id].queue.push(function(data) {
+            res(data);
+        })
+    })
+}
+
+// safely delete the chat cache to free up memory
+function invalidate_chat_cache(world_id) {
+    var cache = chat_cache[world_id];
+    if(!cache) return;
+
+    // do not clear caches that are already being loaded
+    if(!cache.loaded) return;
+
+    // if chat entries are not added to the database, do not clear the cache
+    if(world_id == 0) { // global channel
+        if(global_chat_additions.length) return;
+    } else { // world channel
+        if(world_chat_additions[world_id]) return;
+    }
+
+    cache.queue.splice(0);
+    cache.data.splice(0);
+    cache.loaded = false;
+
+    delete chat_cache[world_id];
+}
+
+// every 5 minutes, clear the chat cache
+intv.invalidate_chat_cache = setInterval(function() {
+    for(var i in chat_cache) {
+        invalidate_chat_cache(i);
+    }
+}, Minute * 5)
+
+// Retrieves the chat history of a specific channel instead of loading the entire database into memory
+// The global channel is retrieved by using world id 0
+async function retrieveChatHistory(world_id) {
+    // no cache has been started
+    if(!(world_id in chat_cache)) {
+        chat_cache[world_id] = {queue: [], data: [], loaded: false};
+    } else if(!chat_cache[world_id].loaded) {
+        // a cache is in progress but not loaded yet
+        return await queue_chat_cache(world_id);
+    }
+
+    // data for this channel is already fully loaded and cached
+    if(world_id in chat_cache && chat_cache[world_id].loaded) return chat_cache[world_id].data;
+
+    var default_channel;
+    if(world_id != 0) { // not global channel (world channels)
+        default_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", world_id);
+        if(default_channel) {
+            default_channel = default_channel.channel_id;
+        } else {
+            default_channel = 0;
+        }
+    } else { // global channel
+        default_channel = await db_ch.get("SELECT id FROM channels WHERE world_id=0");
+        if(default_channel) {
+            default_channel = default_channel.id;
+        } else {
+            default_channel = 0;
+        }
+    }
+    // add data if the channel exists. otherwise it's empty
+    if(default_channel) {
+        var world_chats;
+        if(chatIsCleared[world_id]) {
+            // the channel is being cleared. return a blank history
+            world_chats = [];
+        } else {
+            world_chats = await db_ch.all("SELECT * FROM (SELECT * FROM entries WHERE channel=? ORDER BY id DESC LIMIT 100) ORDER BY id ASC", default_channel);
+        }
+        for(var a = 0; a < world_chats.length; a++) {
+            var row = JSON.parse(world_chats[a].data);
+            chat_cache[world_id].data.push(row)
+        }
+    }
+    chat_cache[world_id].loaded = true;
+
+    // other calls to this function requested the same chat history while is was being fetched.
+    // send the complete data to those calls
+    var queue = chat_cache[world_id].queue;
+    for(var i = 0; i < queue.length; i++) {
+        queue[i](chat_cache[world_id].data);
+    }
+
+    return chat_cache[world_id].data;
+}
+
+async function add_to_chatlog(chatData, world_id) {
+    var location = "page"
+    if(world_id == 0) {
+        location = "global"
+    }
+
+    var history = await retrieveChatHistory(world_id);
+
+    history.push(chatData);
+    if(history.length > 100) {
+        history.shift();
+    }
+
+    if(location == "page") {
+        world_chat_additions.push([chatData, world_id]);
+    } else if(location == "global") {
+        global_chat_additions.push(chatData);
+    }
+}
+
 var worldData = {};
 var chatIsCleared = {};
 
 var global_chat_additions = [];
 var world_chat_additions = [];
 
-function add_global_chatlog(data) {
-    global_chatlog.push(data)
-    global_chatlog = global_chatlog.slice(-global_chatlog_limit)
-    global_chat_additions.push(data);
-}
-
-function add_page_chatlog(data, world) {
-    chatlog_has_update = true;
-    var wDat = getWorldData(world);
-    var page_chatlog = wDat.chatlog;
-    page_chatlog.push(data)
-    wDat.chatlog = page_chatlog.slice(-page_chatlog_limit)
-    world_chat_additions.push([data, world])
-}
-
-function clearChatlog(world) {
-    getWorldData(world).chatlog = [];
-    chatIsCleared[world] = true;
+function clearChatlog(world_id) {
+    // clear from cache if it exists
+    if(chat_cache[world_id] && chat_cache[world_id].loaded) {
+        chat_cache[world_id].data.splice(0);
+    }
+    // queue to be cleared
+    chatIsCleared[world_id] = true;
 }
 
 async function updateChatLogData() {
@@ -1592,9 +1748,7 @@ async function updateChatLogData() {
     await db_ch.run("BEGIN TRANSACTION")
 
     for(var i in copy_chatIsCleared) {
-        var worldId = await db.get("SELECT id FROM world WHERE name=? COLLATE NOCASE", i);
-        if(!worldId) continue;
-        worldId = worldId.id;
+        var worldId = i;
         var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId)
         if(!def_channel) continue;
         def_channel = def_channel.channel_id
@@ -1604,10 +1758,10 @@ async function updateChatLogData() {
     for(var i = 0; i < copy_world_chat_additions.length; i++) {
         var row = copy_world_chat_additions[i];
         var chatData = row[0];
-        var worldName = row[1];
-        var worldId = await db.get("SELECT id FROM world WHERE name=? COLLATE NOCASE", worldName);
-        if(!worldId) continue;
-        worldId = worldId.id;
+        var worldId = row[1];
+        var worldName = await db.get("SELECT name FROM world WHERE id=?", worldId);
+        if(!worldName) continue;
+        worldName = worldName.name;
         var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId)
         if(!def_channel) {
             var channelDesc = "Channel - \"" + worldName + "\"";
@@ -1645,8 +1799,7 @@ function getWorldData(world) {
 
     worldData[ref] = {
         client_id: 1,
-        user_count: 0,
-        chatlog: []
+        user_count: 0
     }
 
     return worldData[ref];
@@ -1698,9 +1851,8 @@ function broadcastUserCount() {
     }
 }
 
-var wss;
-function start_server() {
-    (async function() {
+async function initialize_server_components() {
+    await (async function() {
         announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
         if(!announcement_cache) {
             announcement_cache = "";
@@ -1709,10 +1861,36 @@ function start_server() {
         }
     })();
 
-    wss = new WebSocket.Server({ server });
     intv.userCount = setInterval(function() {
         broadcastUserCount();
     }, 2000);
+
+    await (async function clear_expired_sessions() {
+        // clear expires sessions
+        await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
+
+        // clear expired registration keys (and accounts that aren't activated yet)
+        await db.each("SELECT id FROM auth_user WHERE is_active=0 AND ? - date_joined >= ?",
+            [Date.now(), Day * settings.activation_key_days_expire], async function(data) {
+            var id = data.id;
+            await db.run("DELETE FROM registration_registrationprofile WHERE user_id=?", id);
+            await db.run("DELETE FROM auth_user WHERE id=?", id)
+        })
+
+        timt.clearExpiredSessions = setTimeout(clear_expired_sessions, Minute);
+    })();
+
+    server.listen(serverPort, function() {
+        var addr = server.address();
+        console.log("Server is running.\n\x1b[36mAddress: " + addr.address + "\nPort: " + addr.port + "\x1b[0m");
+
+        // start listening for commands
+        command_prompt();
+    });
+
+    wss = new WebSocket.Server({ server });
+    global_data.wss = wss;
+
     ws_broadcast = function(data, world, opts) {
         if(!opts) opts = {};
         data = JSON.stringify(data)
@@ -1744,35 +1922,17 @@ function start_server() {
     global_data.ws_broadcast = ws_broadcast;
     global_data.tile_signal_update = tile_signal_update;
 
-    (async function clear_expired_sessions() {
-        // clear expires sessions
-        await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
-
-        // clear expired registration keys (and accounts that aren't activated yet)
-        await db.each("SELECT id FROM auth_user WHERE is_active=0 AND ? - date_joined >= ?",
-            [Date.now(), Day * settings.activation_key_days_expire], async function(data) {
-            var id = data.id;
-            await db.run("DELETE FROM registration_registrationprofile WHERE user_id=?", id);
-            await db.run("DELETE FROM auth_user WHERE id=?", id)
-        })
-
-        timt.clearExpiredSessions = setTimeout(clear_expired_sessions, Minute);
-    })();
-
-    server.listen(serverPort, function() {
-        var addr = server.address();
-        console.log("Server is running.\nAddress: " + addr.address + "\nPort: " + addr.port);
-
-        // start listening for commands
-        command_prompt();
-    });
-    
     wss.on("connection", async function (ws, req) {
         var ipHeaderAddr = "Unknown"
         try {
-            ipHeaderAddr = req.headers["x-forwarded-for"];
+            var forwd = req.headers["x-forwarded-for"];
+            var realIp = req.headers["X-Real-IP"];
+            if(!forwd) forwd = "None";
+            if(!realIp) realIp = "None";
+            ipHeaderAddr = forwd + " & " + realIp;
             ws.ipHeaderAddr = ipHeaderAddr;
         } catch(e) {
+            ws.ipHeaderAddr = "Internal error";
             log_error(e);
         }
 
@@ -1830,7 +1990,6 @@ function start_server() {
             ws.world_name = world_name;
 
             var initial_user_count = getUserCountFromWorld(world_name);
-            var worldData = getWorldData(world_name);
 
             var cookies = parseCookie(req.headers.cookie);
             var user = await get_user_info(cookies, true)
@@ -1882,7 +2041,7 @@ function start_server() {
                         return;
                     }
                 } catch(e) {
-                    handle_ws_error(e);
+                    handle_error(e);
                     return;
                 }
                 req_id++;
@@ -1929,7 +2088,7 @@ function start_server() {
                         }
                     }
                 } catch(e) {
-                    handle_ws_error(e);
+                    handle_error(e);
                 }
             }
             // Some messages might have been received before the socket finished opening
@@ -1940,9 +2099,21 @@ function start_server() {
                 }
             }
         } catch(e) {
-            handle_ws_error(e);
+            handle_error(e);
         }
     })
+}
+
+var wss;
+function start_server() {
+    (async function() {
+        try {
+            await initialize_server_components();
+        } catch(e) {
+            console.log("An error occured during component initialization");
+            console.log(e);
+        }
+    })();
 }
 
 var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -2079,8 +2250,12 @@ function insert_char_at_index(string, char, index) {
 	return string.join("");
 }
 
-function handle_ws_error(e) {
-    log_error(JSON.stringify(process_error_arg(e)));
+function handle_error(e) {
+    var str = JSON.stringify(process_error_arg(e));
+    log_error(str);
+    if(isTestServer) {
+        console.log(str)
+    }
 }
 
 function html_tag_esc(str, non_breaking_space) {
@@ -2130,15 +2305,15 @@ var global_data = {
     decodeCharProt,
     advancedSplit,
     insert_char_at_index,
-    add_global_chatlog,
-    add_page_chatlog,
+    add_to_chatlog,
     getWorldData,
-    getGlobalChatlog: function() { return global_chatlog },
     clearChatlog,
     html_tag_esc,
-    getWss: function() { return wss },
+    wss, // this is undefined by default, but will get a value once wss is initialized
     topActiveWorlds,
-    NCaseCompare
+    NCaseCompare,
+    handle_error,
+    retrieveChatHistory
 }
 
 function stopPrompt() {
@@ -2151,8 +2326,8 @@ function stopPrompt() {
 }
 
 function stopServer() {
-    server.close();
-    wss.close();
+    if(global.server && global.server.close) server.close();
+    if(global.wss && global.wss.close) wss.close();
 
     for(var i in intv) {
         clearInterval(intv[i]);

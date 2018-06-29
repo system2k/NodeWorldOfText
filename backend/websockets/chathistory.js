@@ -10,7 +10,7 @@ module.exports = async function(ws, data, send, vars) {
     var clientId = vars.clientId;
     var ws_broadcast = vars.ws_broadcast; // site-wide broadcast
     var getWorldData = vars.getWorldData;
-    var getGlobalChatlog = vars.getGlobalChatlog;
+    var retrieveChatHistory = vars.retrieveChatHistory;
 
     var props = JSON.parse(world.properties);
     var chat_perm = props.chat_permission;
@@ -25,11 +25,11 @@ module.exports = async function(ws, data, send, vars) {
     var page_chat_prev = [];
 
     if(can_chat) {
-        page_chat_prev = getWorldData(world.name).chatlog.slice(-100);
+        page_chat_prev = await retrieveChatHistory(world.id)
     }
     
     send({
-        global_chat_prev: getGlobalChatlog().slice(-100),
+        global_chat_prev: await retrieveChatHistory(0),
         page_chat_prev
     })
 }

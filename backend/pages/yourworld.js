@@ -41,14 +41,13 @@ module.exports.GET = async function(req, serve, vars, params) {
         }, vars)
         serve(JSON.stringify(tiles))
     } else { // the HTML page
-        if(!read_permission.access_denied) {
-            if(!world_properties.views) {
-                world_properties.views = 0;
-            }
-            world_properties.views++;
-            await db.run("UPDATE world SET properties=? WHERE id=?",
-                [JSON.stringify(world_properties), world.id])
+        if(!world_properties.views) {
+            world_properties.views = 0;
         }
+        world_properties.views++;
+        await db.run("UPDATE world SET properties=? WHERE id=?",
+            [JSON.stringify(world_properties), world.id])
+
         var pathname = world.name;
         if(pathname != "") {
             pathname = "/" + pathname;
@@ -89,11 +88,11 @@ module.exports.GET = async function(req, serve, vars, params) {
         if(world_properties.square_chars) {
             state.worldModel.square_chars = true;
         }
+        if(world_properties.half_chars) {
+            state.worldModel.half_chars = true;
+        }
         if(announcement) {
             state.announce = announcement;
-        }
-        if(read_permission.access_denied) {
-            state.announce = "You are viewing a private world as an administrator";
         }
         if(params.timemachine) {
             state.worldModel.writability = 0;
