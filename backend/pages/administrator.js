@@ -9,8 +9,6 @@ module.exports.GET = async function(req, serve, vars, params) {
     var uptime = vars.uptime;
     var wss = vars.wss;
 
-    console.log(wss)
-
     // not a superuser...
     if(!user.superuser) {
         return await dispage("404", null, req, serve, vars)

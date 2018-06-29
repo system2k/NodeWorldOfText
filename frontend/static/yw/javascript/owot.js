@@ -2133,7 +2133,7 @@ function renderTile(tileX, tileY, redraw) {
 
     // put this right below the changes to fillStyle for tiles' background color
     var tileColor = ctx.fillStyle;
-    var tileColorInverted = "#" + ("00000" + (16777215 - parseInt(tileColor.substr(1), 16)).toString(16).toUpperCase()).slice(-6);
+    var tileColorInverted = "#" + ("00000" + (16777215 - parseInt(tileColor.substr(1), 16)).toString(16)).slice(-6);
 
     // fill tile background color
     ctx.fillRect(offsetX, offsetY, tileW, tileH);
@@ -2171,7 +2171,7 @@ function renderTile(tileX, tileY, redraw) {
             // highlight flash animation
             if(highlight[y]) {
                 if(highlight[y][x] !== void 0) {
-                    ctx.fillStyle = "rgb(255, 255, " + highlight[y][x][1] + ")";
+                    ctx.fillStyle = "rgb(255,255," + highlight[y][x][1] + ")";
                     ctx.fillRect(offsetX + x * cellW, offsetY + y * cellH, cellW, cellH);
                 }
             }
@@ -2271,7 +2271,7 @@ function renderTile(tileX, tileY, redraw) {
                 textRender.fillStyle = styles.text;
             } else {
                 if(!color) color = 0;
-                textRender.fillStyle = "#" + ("00000" + color.toString(16)).slice(-6);
+                textRender.fillStyle = "rgb(" + (color >> 16 & 255) + "," + (color >> 8 & 255) + "," + (color & 255) + ")";
             }
             // check if this char is a link
             if(props[y]) {

@@ -2015,6 +2015,9 @@ async function initialize_server_components() {
             ws.is_member = user.stats.member;
             ws.is_owner = user.stats.owner;
 
+            // TODO: check if pings prevent cloudflare from terminating connections that have been idle for 50+ seconds
+            // ws.ping("keepalive");
+
             var clientId = generateClientId(world_name);
 
             ws.clientId = clientId;
@@ -2326,8 +2329,8 @@ function stopPrompt() {
 }
 
 function stopServer() {
-    if(global.server && global.server.close) server.close();
-    if(global.wss && global.wss.close) wss.close();
+    server.close();
+    wss.close();
 
     for(var i in intv) {
         clearInterval(intv[i]);
