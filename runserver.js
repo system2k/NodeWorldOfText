@@ -15,7 +15,7 @@ const https         = require("https");
 const isIP          = require("net").isIP;
 const mime          = require("./backend/mime.js");
 const nodemailer    = require("nodemailer");
-const prompt        = require(/*"prompt"*/"./lib/prompt/prompt");
+const prompt        = require("./lib/prompt/prompt");
 const querystring   = require("querystring");
 const sql           = require("sqlite3");
 const swig          = require("swig");
@@ -26,7 +26,6 @@ const zip           = require("adm-zip")
 console.log("Loaded libs");
 
 const settings = require("./settings.json");
-var SERVER_STOP = false;
 
 var serverPort = settings.port;
 var serverDB = settings.DATABASE_PATH;
@@ -140,9 +139,9 @@ function load_modules(default_dir) {
 }
 
 console.log("Loading page files");
-const pages = load_modules("./backend/pages/");
+const pages      = load_modules("./backend/pages/");
 const websockets = load_modules("./backend/websockets/");
-const modules = load_modules("./backend/modules/");
+const modules    = load_modules("./backend/modules/");
 
 // if page modules contain a startup function, run it
 for(var i in pages) {
@@ -1866,6 +1865,16 @@ async function clear_expired_sessions(no_timeout) {
     if(!no_timeout) intv.clearExpiredSessions = setTimeout(clear_expired_sessions, Minute);
 }
 
+var client_ips = {}; // fixes the problem where clients spam and immediately exit
+
+// ping clients every 30 seconds (resolve the issue where cloudflare terminates sockets inactive for approx. 1 minute)
+intv.ping_clients = setInterval(function() {
+    if(!wss) return;
+    wss.clients.forEach(function(ws) {
+        ws.ping("keepalive");
+    })
+}, 1000 * 30)
+
 async function initialize_server_components() {
     await (async function() {
         announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
@@ -1927,14 +1936,20 @@ async function initialize_server_components() {
     wss.on("connection", async function (ws, req) {
         var ipHeaderAddr = "Unknown"
         try {
+            var rnd = Math.floor(Math.random() * 1E4);
             var forwd = req.headers["x-forwarded-for"];
             var realIp = req.headers["X-Real-IP"];
-            if(!forwd) forwd = "None";
-            if(!realIp) realIp = "None";
+            if(!forwd) forwd = "None;" + rnd;
+            if(!realIp) realIp = "None;" + rnd;
             ipHeaderAddr = forwd + " & " + realIp;
             ws.ipHeaderAddr = ipHeaderAddr;
+            ws.ipFwd = forwd;
+            ws.ipReal = realIp;
         } catch(e) {
-            ws.ipHeaderAddr = "Internal error";
+            var error_ip = "ErrC" + Math.floor(Math.random() * 1E4);
+            ws.ipHeaderAddr = error_ip;
+            ws.ipFwd = error_ip;
+            ws.ipReal = error_ip;
             log_error(e);
         }
 
@@ -1963,8 +1978,7 @@ async function initialize_server_components() {
                 log_error(JSON.stringify(process_error_arg(err)));
             });
             var pre_queue = [];
-            // code isn't ready yet, so push data to array and then send after it's ready
-            // Data will be deleted if the socket closes (error or invalid permissions) before the real message event
+            // adds data to a queue. this must be before any async calls and the message event
             function onMessage(msg) {
                 pre_queue.push(msg);
             }
@@ -2002,6 +2016,7 @@ async function initialize_server_components() {
             })
 
             var status = await websockets.Main(ws, world_name, vars);
+
             if(typeof status == "string") {
                 send_ws(JSON.stringify({
                     kind: "error",
@@ -2017,10 +2032,12 @@ async function initialize_server_components() {
             ws.is_member = user.stats.member;
             ws.is_owner = user.stats.owner;
 
-            // TODO: check if pings prevent cloudflare from terminating connections that have been idle for 50+ seconds
-            // ws.ping("keepalive");
-
             var clientId = generateClientId(world_name);
+
+            if(!client_ips[status.world.id]) {
+                client_ips[status.world.id] = {};
+            }
+            client_ips[status.world.id][clientId] = [ws._socket.remoteAddress, ws._socket.address(), ws.ipHeaderAddr];
 
             ws.clientId = clientId;
 
@@ -2318,7 +2335,8 @@ var global_data = {
     topActiveWorlds,
     NCaseCompare,
     handle_error,
-    retrieveChatHistory
+    retrieveChatHistory,
+    client_ips
 }
 
 function stopPrompt() {
@@ -2327,7 +2345,7 @@ function stopPrompt() {
 }
 
 // stops server (for upgrades/maintenance) without crashing everything
-// this lets node terminate the program when all handles are complete
+// This lets node terminate the program when all handles are complete
 function stopServer() {
     console.log("\x1b[32mStopping server...\x1b[0m");
     (async function() {

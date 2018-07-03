@@ -1,9 +1,12 @@
-var selectedChatTab   = 0; // 0 is the page chat, 1 is the global chat
-var chatOpen          = 0;
-var chatPageUnread    = 0;
-var chatGlobalUnread  = 0;
-var initPageTabOpen   = false;
-var initGlobalTabOpen = false;
+var selectedChatTab     = 0; // 0 is the page chat, 1 is the global chat
+var chatOpen            = 0;
+var chatPageUnread      = 0;
+var chatGlobalUnread    = 0;
+var initPageTabOpen     = false;
+var initGlobalTabOpen   = false;
+var chatWriteHistory    = []; // history of user's chats
+var chatWriteHistoryMax = 100; // maximum size of chat write history length
+var chatWriteHistoryIdx = -1; // location in chat write history
 
 var canChat = Permissions.can_chat(state.userModel, state.worldModel);
 if(!canChat) { // can't chat, adjust the chat window for it
@@ -23,13 +26,18 @@ function api_chat_send(message, opts) {
     var nickLim = state.userModel.is_staff ? Infinity : 20;
 
     message = trimSpace(message.slice(0, msgLim));
+    chatWriteHistory.push(message);
+    if(chatWriteHistory.length > chatWriteHistoryMax) {
+        chatWriteHistory.shift();
+    }
+    chatWriteHistoryIdx = -1;
 
     var chatColor;
     if(!opts.color) {
         if(!YourWorld.Color) {
             chatColor = assignColor(YourWorld.Nickname)
         } else {
-            chatColor = "#" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase();
+            chatColor = "#" + ("00000" + YourWorld.Color.toString(16)).slice(-6);
         };
     } else {
         chatColor = opts.color;
@@ -71,15 +79,17 @@ function api_chat_send(message, opts) {
     var id = w.clientId;
     var nickname = YourWorld.Nickname;
 
-    var type = "";
-    if(registered && nickname == username) type = "user";
-    if(registered && nickname != username) type = "user_nick";
-    if(!registered && !nickname) type = "anon";
-    if(!registered && nickname) type = "anon_nick";
+    var type = chatType(registered, nickname, username);
 
     var op = opts.op || state.userModel.is_operator;
     var admin = opts.admin || state.userModel.is_superuser;
     var staff = opts.staff || state.userModel.is_staff;
+
+    if(!op) {
+        message = message.replace(/\&/g, "&amp;");
+        message = message.replace(/\</g, "&lt;");
+        message = message.replace(/\>/g, "&gt;");
+    }
 
     if(!isCommand) addChat(location, id, type, nickname,
                             message, username, op, admin, staff, chatColor);
@@ -143,9 +153,17 @@ $("#chatbar").on("keydown", function(e) {
 
     // scroll through chat history that the client sent
     if(keyCode == 38) { // up
-        
+        chatWriteHistoryIdx++;
+        if(chatWriteHistoryIdx >= chatWriteHistory.length) chatWriteHistoryIdx = chatWriteHistory.length - 1;
+        $("#chatbar")[0].value = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
     } else if(keyCode == 40) { // down
-
+        chatWriteHistoryIdx--;
+        if(chatWriteHistoryIdx < -1) chatWriteHistoryIdx = -1;
+        var str = "";
+        if(chatWriteHistoryIdx != -1) {
+            str = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
+        }
+        $("#chatbar")[0].value = str;
     }
 })
 
@@ -290,6 +308,10 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     nickDom.innerHTML = nickname + ":";
 
     var msgDom = document.createElement("span");
+    if(!op) { // the server should escape html fully. this is an extra basic layer
+        message = message.replace(/\</g, "&lt;");
+        message = message.replace(/\>/g, "&gt;");
+    }
     msgDom.innerHTML = "&nbsp;" + message;
 
     var maxScroll = field[0].scrollHeight - field[0].clientHeight;
@@ -333,10 +355,11 @@ function updateUsrCount() {
 }
 
 function chatType(registered, nickname, realUsername) {
-    if(realUsername == "server") return "user"
+    var nickMatches = (nickname + "").toUpperCase() == (realUsername + "").toUpperCase();
+    if(realUsername == "[ Server ]") return "user"
     var type = "";
-    if(registered && nickname == realUsername) type = "user";
-    if(registered && nickname != realUsername) type = "user_nick";
+    if(registered && nickMatches) type = "user";
+    if(registered && !nickMatches) type = "user_nick";
     if(!registered && !nickname) type = "anon";
     if(!registered && nickname) type = "anon_nick";
     return type;

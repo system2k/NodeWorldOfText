@@ -162,8 +162,8 @@ var tileC = defaultSizes.tileC;
 var tileR = defaultSizes.tileR;
 var tileArea = tileC * tileR;
 
-const dTileW = tileW; // permanent tile sizes in pixel (remains same throughout client's session)
-const dTileH = tileH;
+var dTileW = tileW; // permanent tile sizes in pixel (remains same throughout client's session)
+var dTileH = tileH;
 
 // used to stretch background images
 var backgroundImageCanvasRenderer = document.createElement("canvas");

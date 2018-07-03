@@ -10,6 +10,8 @@ function sanitizeColor(col) {
     return res;
 }
 
+var chat_ip_limits = {};
+
 module.exports = async function(ws, data, send, vars) {
     var db = vars.db;
     var user = vars.user;
@@ -26,6 +28,9 @@ module.exports = async function(ws, data, send, vars) {
     var topActiveWorlds = vars.topActiveWorlds;
     var wss = vars.wss;
     var NCaseCompare = vars.NCaseCompare;
+    var client_ips = vars.client_ips;
+
+    var ipHeaderAddr = ws.ipHeaderAddr;
 
     var props = JSON.parse(world.properties);
     var chat_perm = props.chat_permission;
@@ -80,19 +85,24 @@ module.exports = async function(ws, data, send, vars) {
     var msNow = Date.now();
 
     var second = Math.floor(msNow / 1000);
-    var chatsEverySecond = 3
+    var chatsEverySecond = 2;
 
-    if(ws.lastChatSecond != second) {
-        ws.lastChatSecond = second;
-        ws.chatsSentInSecond = 0;
+    // chat limiter
+    if(!chat_ip_limits[ipHeaderAddr]) {
+        chat_ip_limits[ipHeaderAddr] = {};
+    }
+    var cil = chat_ip_limits[ipHeaderAddr];
+    if(cil.lastChatSecond != second) {
+        cil.lastChatSecond = second;
+        cil.chatsSentInSecond = 0;
     } else {
-        if(ws.chatsSentInSecond >= chatsEverySecond) {
+        if(cil.chatsSentInSecond >= chatsEverySecond - 1) {
             if(!user.staff) {
                 serverChatResponse("You are chatting too fast.", data.location);
                 return;
             }
         } else {
-            ws.chatsSentInSecond++;
+            cil.chatsSentInSecond++;
         }
     }
 
@@ -150,12 +160,14 @@ module.exports = async function(ws, data, send, vars) {
             case "whois":
                 var id = args[1];
                 var ipData = "Client not found"
+                var clientConnected = false;
                 wss.clients.forEach(function(e) {
                     if(e.clientId != id) return;
                     if(!NCaseCompare(e.world_name, world.name)) return;
-                    ipData = JSON.stringify([e._socket.remoteAddress, e._socket.address(), e.ipHeaderAddr])
+                    clientConnected = true;
                 })
-                ipData = id + "; " + ipData;
+                if(client_ips[world.id] && client_ips[world.id][id]) ipData = JSON.stringify(client_ips[world.id][id]);
+                ipData = id + "; " + ipData + "; " + "Client connected: " + clientConnected;
                 serverChatResponse(ipData, data.location);
                 return;
             case "help":
