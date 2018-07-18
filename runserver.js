@@ -1996,7 +1996,14 @@ async function initialize_server_components() {
             }
             if(location.match(/(\/ws\/$)/)) {
                 world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
-            } else {
+            } else if(location === "/ws/r_u_alive/") {
+				send_ws('"sure m8"');
+				onMessage = function() {
+					send_ws('"yes im still alive"');
+				};
+				delete pre_queue;
+				return;
+			} else {
                 send_ws(JSON.stringify({
                     kind: "error",
                     message: "Invalid address"
@@ -2114,11 +2121,12 @@ async function initialize_server_components() {
                 }
             }
             // Some messages might have been received before the socket finished opening
-            if(pre_queue.length > 0) {
+			if(pre_queue.length > 0) {
                 for(var p = 0; p < pre_queue.length; p++) {
                     onMessage(pre_queue[p]);
                     pre_queue.splice(p, 1)
                 }
+                pre_queue.splice(0);
             }
         } catch(e) {
             handle_error(e);
