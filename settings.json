@@ -25,14 +25,16 @@
     "UNCAUGHT_PATH": "../exc.err",
     "TEST_UNCAUGHT_PATH": "../test_exc.err",
 	
-    "REQ_LOG": "../reqs.err",
-    "TEST_REQ_LOG": "../test_reqs.err",
+    "REQ_LOG_PATH": "../reqs.err",
+    "TEST_REQ_LOG_PATH": "../test_reqs.err",
 	
-    "CHAT_LOG": "../chat_log.json",
-    "TEST_CHAT_LOG": "../test_chat_log.json",
+    "CHAT_LOG_PATH": "../chat_log.json",
+    "TEST_CHAT_LOG_PATH": "../test_chat_log.json",
 	
-    "CHAT_HISTORY": "../chat_history.sqlite",
-    "TEST_CHAT_HISTORY": "../test_chat_history.sqlite",
+    "CHAT_HISTORY_PATH": "../chat_history.sqlite",
+    "TEST_CHAT_HISTORY_PATH": "../test_chat_history.sqlite",
+
+    "bypass_key": "../data/bypass_key.txt",
         
     "email": {
         "username": "ourworldoftext@gmail.com",

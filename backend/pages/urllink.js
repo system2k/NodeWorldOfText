@@ -122,6 +122,8 @@ module.exports.POST = async function(req, serve, vars, params) {
     if(!tile_props.cell_props[charY]) tile_props.cell_props[charY] = {};
     if(!tile_props.cell_props[charY][charX]) tile_props.cell_props[charY][charX] = {};
 
+    if(typeof post_data.url != "string") post_data.url = "";
+
     if(link_type == 0) {
         tile_props.cell_props[charY][charX].link = {
             type: "url",

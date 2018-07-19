@@ -60,6 +60,7 @@ module.exports.GET = async function(req, serve, vars) {
             tileX: data.tileX,
             tileY: data.tileY,
             properties: data.properties,
+            writability: data.writability,
             created_at: data.created_at
         })
     })

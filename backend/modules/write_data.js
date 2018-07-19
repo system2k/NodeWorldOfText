@@ -9,7 +9,8 @@ function sanitize_color(col) {
     return col;
 }
 
-var in_queue = [];
+in_queue = []; // locked tiles
+// race condition (with tile data) management system
 function is_queueing(tileX, tileY, worldID) {
     for(var i = 0; i < in_queue.length; i++) {
         if(in_queue[i][0] == tileX && in_queue[i][1] == tileY && in_queue[i][2] == worldID) {
@@ -18,7 +19,7 @@ function is_queueing(tileX, tileY, worldID) {
     }
     return false;
 }
-var is_waiting = []; // functions
+is_waiting = []; // functions that are executed then the lock is released
 function wait_queue(tileX, tileY, worldID) {
     return new Promise(function(resolve) {
         is_waiting.push([tileX, tileY, worldID, function() {
@@ -74,6 +75,16 @@ module.exports = async function(data, vars) {
     var decodeCharProt = vars.decodeCharProt;
     var insert_char_at_index = vars.insert_char_at_index;
     var advancedSplit = vars.advancedSplit;
+    var get_bypass_key = vars.get_bypass_key;
+
+    var bypass_key = get_bypass_key();
+    // the retrieval of the key failed (aka "undefined"). change to a value that cannot be compared to
+    // in case the key provided in the request is also "undefined"
+    if(!bypass_key) {
+        bypass_key = Object;
+    }
+
+    var public_only = data.public_only;
 
     var edits_limit = 500;
     if(user.superuser) {
@@ -83,12 +94,17 @@ module.exports = async function(data, vars) {
     var worldProps = JSON.parse(world.properties);
 
     var no_log_edits = !!worldProps.no_log_edits;
+    var color_text   = !!worldProps.color_text;
 
     var is_owner = user.id == world.owner_id;
     var is_member = user.stats.member;
 
      // can write on public tiles?
     var can_write = user.stats.can_write;
+
+    var can_color_text = true;
+    if(color_text == 1 && !is_member && !is_owner) can_color_text = false;
+    if(color_text == 2 && !is_owner) can_color_text = false;
 
     var edits = data.edits;
     var total_edits = 0;
@@ -99,12 +115,15 @@ module.exports = async function(data, vars) {
         if(typeof edits[i][5] != "string") {
             continue;
         }
+        edits[i][0] = san_nbr(edits[i][0]);
+        edits[i][1] = san_nbr(edits[i][1]);
+
         if (!tiles[edits[i][0] + "," + edits[i][1]]) {
             tiles[edits[i][0] + "," + edits[i][1]] = []
         }
         edits[i][5] = edits[i][5].replace(/\n/g, " ")
         edits[i][5] = edits[i][5].replace(/\r/g, " ")
-        edits[i][5] = edits[i][5].replace(/\ufeff/g, " ");
+        edits[i][5] = edits[i][5].replace(/\x1b/g, " ")
         tiles[edits[i][0] + "," + edits[i][1]].push(edits[i])
         if(total_edits >= edits_limit) { // edit limit reached
             break;
@@ -139,8 +158,8 @@ module.exports = async function(data, vars) {
         if(is_queueing(tileX, tileY, world.id)) {
             await wait_queue(tileX, tileY, world.id); // wait for previous tile to finish
         }
-        in_queue.push([tileX, tileY, world.id]);
-        // this tile is done, let other edits edit the same tile
+        in_queue.push([tileX, tileY, world.id]); // lock this tile
+        // this tile is done, let other edits edit the same tile (unlock tile)
         function free_queue() {
             resolve_queue(tileX, tileY, world.id);
             rem_queue(tileX, tileY, world.id);
@@ -187,6 +206,11 @@ module.exports = async function(data, vars) {
                     }
                     changes.push(editIncome);
                     continue;
+                } else {
+                    // only password holders, superusers, owners, or members can use multiple characters per edit
+                    if(!user.superuser && !(is_owner || is_member) && data.bypass != bypass_key) {
+                        char = char.slice(0, 1);
+                    }
                 }
                 for(var i = 0; i < char.length; i++) {
                     var newIdx = charInsIdx + i;
@@ -219,6 +243,7 @@ module.exports = async function(data, vars) {
 
                 var char_writability = charProt[charInsIdx];
 
+                // permission checking - compute the writability of the cell, accounting for tile and world writing permissions
                 if(char_writability == null) char_writability = tile ? tile.writability : null;
                 if(char_writability == null) char_writability = world.writability;
 
@@ -229,6 +254,12 @@ module.exports = async function(data, vars) {
                 }
                 // tile is member-only, but user is not member (nor owner)
                 if(char_writability == 1 && !is_owner && !is_member) {
+                    rej_edits([change]);
+                    continue;
+                }
+
+                // this edit request is only allowed to write on public areas
+                if(public_only && char_writability != 0) {
                     rej_edits([change]);
                     continue;
                 }
@@ -283,11 +314,13 @@ module.exports = async function(data, vars) {
                     var color_index = 0;
                     for(var s = charY*16 + charX; s < 128; s++) {
                         if(color[color_index] !== -1) {
+                            if(!can_color_text) color[color_index] = 0;
                             properties.color[s] = color[color_index];
                         }
                         color_index++;
                     }
                 } else {
+                    if(!can_color_text) color = 0;
                     if(color !== -1) {
                         properties.color[charY*16 + charX] = color;
                     }

@@ -1,13 +1,29 @@
 function sanitizeColor(col) {
-    var key = "#0123456789ABCDEF(RGB,)(HSV,)%."
-    var res = "";
-    for(var i = 0; i < col.length; i++) {
-        var char = col[i];
-        if(key.indexOf(char) > -1) {
-            res += char;
+    var masks = ["#XXXXXX", "#XXX"];
+
+    var hex_set = "0123456789abcdefABCDEF"
+    
+    for(var m = 0; m < masks.length; m++) {
+        var mask = masks[m];
+        var fail = false;
+        for(var c = 0; c < mask.length; c++) {
+            var mask_char = mask[c];
+            var cmp_char = col[c];
+            if(mask.length != col.length) {
+                fail = true;
+                break;
+            }
+            if(mask_char == "#" && cmp_char == "#") continue;
+            if(mask_char == "X" && hex_set.indexOf(cmp_char) > -1) continue;
+            fail = true;
+            break;
+        }
+        if(!fail) {
+            return col;
         }
     }
-    return res;
+
+    return "#00FF00"; // checking did not pass
 }
 
 var chat_ip_limits = {};
@@ -29,6 +45,7 @@ module.exports = async function(ws, data, send, vars) {
     var wss = vars.wss;
     var NCaseCompare = vars.NCaseCompare;
     var client_ips = vars.client_ips;
+    var uptime = vars.uptime;
 
     var ipHeaderAddr = ws.ipHeaderAddr;
 
@@ -66,7 +83,11 @@ module.exports = async function(ws, data, send, vars) {
     if(data.nickname) {
         nick = data.nickname + "";
     }
-    if(!user.staff) nick = nick.slice(0, 20);
+    if(!user.staff) {
+        nick = nick.slice(0, 20)
+    } else {
+        nick = nick.slice(0, 3030)
+    }
 
     var msg = "";
     if(data.message) {
@@ -79,7 +100,7 @@ module.exports = async function(ws, data, send, vars) {
     data.color += "";
     if(!user.staff) data.color = sanitizeColor(data.color);
     if(!data.color) data.color = "#000000";
-    if(!user.staff) data.color = data.color.slice(0, 20);
+    data.color = data.color.slice(0, 20);
     data.color = data.color.trim();
 
     var msNow = Date.now();
@@ -112,103 +133,213 @@ module.exports = async function(ws, data, send, vars) {
         msg = msg.slice(0, 3030);
     }
 
-    // TODO: Refactor
+    var chatIdBlockLimit = 128;
 
-    // WARNING: Don't look ahead. Graphic content
+    var command_list = [
+        [3, "uptime", null, "get uptime of server"],
+        /* consider: /downtime [view calculated downtime], /stopserver [stop the server], /restartserver [restart the server] */
 
-    // chat commands
-    if(user.superuser && msg[0] == "/") {
-        var args = msg.toLowerCase().substr(1).split(" ")
-        switch(args[0]) {
-            case "worlds":
-                var topCount = 5;
-                var lst = topActiveWorlds(topCount);
-                var worldList = "";
-                for(var i = 0; i < lst.length; i++) {
-                    var row = lst[i];
-                    if(row[1] == "") {
-                        row[1] = "(main)"
-                    } else {
-                        row[1] = `<a href="/${row[1]}" style="color: blue; text-decoration: underline;">${row[1]}</a>`;
+        [2, "worlds", null, "list all worlds"],
+        [2, "ban", ["id"], "ban user from chat by id (referenced by IP)"],
+        [2, "kick", ["id"], "kick user's client from chat by id"],
+        [2, "banip", ["ip"], "ban user from chat by ip"],
+        [2, "kickip", ["ip"], "kick all user's clients from chat by ip"],
+        [2, "whois", ["id"], "get user ip address from id"],
+
+        [0, "help", null, "lists all commands"],
+        [0, "nick", ["nickname"], "changes your nickname"], // client-side
+        [0, "ping", null, "determine the time of server requests"],
+        [0, "warp", ["world"], "warp the connection to a different world"], // client-side
+        [0, "warpserver", ["server"], "force client to use a different server"], // client-side
+        [0, "gridsize", ["WxH"], "change size of cells in client"], // client-side
+        [0, "logout", null, "shortcut to logout your account"],
+        [0, "block", ["id"], "block chats from this client"],
+        /* [0, "invisible", ["on/off"], "make this client invisible to others"] :: TODO: Check if this is necessary */
+        [0, "color", ["color code"], "change current color for this client"], // client-side
+        [0, "chatcolor", ["color code"], "change only the chat color"] // client-side
+        /* [0, "option", null, "reserved for future use"] */
+    ]
+
+    function generate_command_list() {
+        var list = [];
+        for(var i = 0; i < command_list.length; i++) {
+            var command = command_list[i];
+            var rank = command[0];
+            if(rank == 3 && user.operator) list.push(command);
+            if(rank == 2 && user.superuser) list.push(command);
+            if(rank == 1 && user.staff) list.push(command);
+            if(rank == 0) list.push(command);
+        }
+
+        // sort the command list
+        list.sort(function(v1, v2) {
+            return v1[1].localeCompare(v2[1], "en", { sensitivity: "base" })
+        })
+
+        var html = "";
+
+        html += "Command list:<br>"
+
+        html += "<div style=\"background-color: #dadada; font-family: monospace;\">"
+
+        for(var i = 0; i < list.length; i++) {
+            var row = list[i];
+            var command = row[1];
+            var args = row[2];
+            var desc = row[3];
+
+            // display arguments for this command
+            var arg_desc = ""
+            if(args) {
+                arg_desc += html_tag_esc("<")
+                for(var v = 0; v < args.length; v++) {
+                    var arg = args[v];
+                    arg_desc += "<span style=\"font-style: italic\">" + arg + "</span>"
+                    if(v != args.length - 1) {
+                        arg_desc += ", "
                     }
-                    worldList += "-> " + row[1] + " [" + row[0] + "]";
-                    if(i != lst.length - 1) worldList += "<br>"
                 }
-                var listWrapper = `
-                    <div style="background-color: #dadada; font-family: monospace;">
-                        ${worldList}
-                    </div>
-                `;
-                serverChatResponse("Currently loaded worlds (top " + topCount + "): " + listWrapper, data.location)
+                arg_desc += html_tag_esc(">")
+            }
+
+            command = "<span style=\"color: #00006f\">" + html_tag_esc(command) + "</span>"
+
+            var help_row = html_tag_esc("-> /") + command + " " + arg_desc + " :: " + html_tag_esc(desc)
+
+            // alternating stripes
+            if(i % 2 == 1) {
+                help_row = "<div style=\"background-color: #c3c3c3\">" + help_row + "</div>"
+            }
+
+            html += help_row;
+        }
+
+        html += "</div>"
+
+        return html;
+    }
+
+    var com = {
+        worlds: function() {
+            var topCount = 5;
+            var lst = topActiveWorlds(topCount);
+            var worldList = "";
+            for(var i = 0; i < lst.length; i++) {
+                var row = lst[i];
+                if(row[1] == "") {
+                    row[1] = "(main)"
+                } else {
+                    row[1] = `<a href="/${row[1]}" style="color: blue; text-decoration: underline;">${row[1]}</a>`;
+                }
+                worldList += "-> " + row[1] + " [" + row[0] + "]";
+                if(i != lst.length - 1) worldList += "<br>"
+            }
+            var listWrapper = `
+                <div style="background-color: #dadada; font-family: monospace;">
+                    ${worldList}
+                </div>
+            `;
+            serverChatResponse("Currently loaded worlds (top " + topCount + "): " + listWrapper, data.location)
+            return;
+        },
+        ban: function(id) {
+            serverChatResponse(JSON.stringify(id), data.location);
+            return;
+        },
+        kick: function(id) {
+            serverChatResponse(JSON.stringify(id), data.location);
+            return;
+        },
+        banip: function(ip) {
+            serverChatResponse(JSON.stringify(ip), data.location);
+            return;
+        },
+        kickip: function(ip) {
+            serverChatResponse(JSON.stringify(ip), data.location);
+            return;
+        },
+        whois: function(id) {
+            var ipData = "Client not found"
+            var clientConnected = false;
+            wss.clients.forEach(function(e) {
+                if(e.clientId != id) return;
+                if(!NCaseCompare(e.world_name, world.name)) return;
+                clientConnected = true;
+            })
+            if(client_ips[world.id] && client_ips[world.id][id]) ipData = JSON.stringify(client_ips[world.id][id]);
+            ipData = id + "; " + ipData + "; " + "Client connected: " + clientConnected;
+            serverChatResponse(ipData, data.location);
+            return;
+        },
+        help: function() {
+            return serverChatResponse(generate_command_list(), data.location);
+        },
+        logout: async function() {
+            var sessionid = user.session_key;
+            var fromDb;
+            if(sessionid) {
+                fromDb = await db.get("SELECT * FROM auth_session WHERE session_key=?", sessionid);
+            }
+            if(!fromDb) {
+                return serverChatResponse("You are not logged in", data.location);
+            }
+            await db.run("DELETE FROM auth_session WHERE session_key=?", sessionid);
+            serverChatResponse("Logged out from: " + user.username, data.location);
+            return;
+        },
+        block: function(id) {
+            var id = san_nbr(id);
+            if(id < 0) return;
+            var blocks = ws.chat_blocks;
+            if(blocks.length >= chatIdBlockLimit) return;
+            if(blocks.indexOf(id) > -1) return;
+            blocks.push(id);
+            serverChatResponse("Blocked chats from ID: " + id, data.location);
+        },
+        uptime: function() {
+            serverChatResponse("Server uptime: " + uptime(), data.location);
+        }
+    }
+
+    // This is a command
+    if(msg[0] == "/") {
+        var args = msg.toLowerCase().substr(1).split(" ")
+        var command = args[0];
+
+        var operator  = user.operator;
+        var superuser = user.superuser;
+        var staff     = user.staff;
+
+        switch(command) {
+            case "worlds":
+                if(superuser) com.worlds();
                 return;
             case "ban":
-                var id = args[1];
-                serverChatResponse(JSON.stringify(args), data.location);
+                if(superuser) com.ban(args[1]);
                 return;
             case "kick":
-                var id = args[1];
-                serverChatResponse(JSON.stringify(args), data.location);
+                if(superuser) com.kicK(args[1]);
                 return;
             case "banip":
-                var ip = args[1];
-                serverChatResponse(JSON.stringify(args), data.location);
+                if(superuser) com.banip(args[1]);
                 return;
             case "kickip":
-                var ip = args[1];
-                serverChatResponse(JSON.stringify(args), data.location);
+                if(superuser) com.kickip(args[1]);
                 return;
             case "whois":
-                var id = args[1];
-                var ipData = "Client not found"
-                var clientConnected = false;
-                wss.clients.forEach(function(e) {
-                    if(e.clientId != id) return;
-                    if(!NCaseCompare(e.world_name, world.name)) return;
-                    clientConnected = true;
-                })
-                if(client_ips[world.id] && client_ips[world.id][id]) ipData = JSON.stringify(client_ips[world.id][id]);
-                ipData = id + "; " + ipData + "; " + "Client connected: " + clientConnected;
-                serverChatResponse(ipData, data.location);
+                if(superuser) com.whois(args[1]);
                 return;
             case "help":
-                serverChatResponse(
-                    `
-                        Command list:<br>
-                        <div style="background-color: #dadada; font-family: monospace;">
-                        -&gt; /nick &lt;nickname&gt; :: changes your nickname
-                        <br>
-                        -&gt; /help :: lists all commands
-                        <br>
-                        -&gt; /worlds :: list all worlds
-                        <br>
-                        -&gt; /ban &lt;id&gt; :: ban user from chat by id (referenced by IP)
-                        <br>
-                        -&gt; /kick &lt;id&gt; :: kick user's client from chat by id
-                        <br>
-                        -&gt; /banip &lt;ip&gt; :: ban user from chat by ip
-                        <br>
-                        -&gt; /kickip &lt;ip&gt; :: kick all user's clients from chat by ip
-                        <br>
-                        -&gt; /whois &lt;id&gt; :: get user ip address from id
-                        </div>
-                    `, data.location);
+                com.help();
                 return;
-            default:
-                serverChatResponse("Invalid command: " + html_tag_esc(msg));
-        }
-    } else if(msg.charAt(0) == "/") {
-        var args = msg.toLowerCase().substr(1).split(" ")
-        switch(args[0]) {
-            case "help":
-                serverChatResponse(
-                    `
-                        Command list:<br>
-                        <div style="background-color: #dadada; font-family: monospace;">
-                        -&gt; /nick &lt;nickname&gt; :: changes your nickname
-                        <br>
-                        <div style="background-color: #d3d3d3">-&gt; /help :: lists all commands</div>
-                        </div>
-                    `, data.location);
+            case "uptime":
+                if(operator) com.uptime();
+                return;
+            case "block":
+                com.block(args[1]);
+                return;
+            case "logout":
+                await com.logout();
                 return;
             default:
                 serverChatResponse("Invalid command: " + html_tag_esc(msg));
@@ -229,7 +360,7 @@ module.exports = async function(ws, data, send, vars) {
     };
 
     var isCommand = false;
-    if(msg.startsWith("/") || msg.startsWith("\\")) {
+    if(msg.startsWith("/")) {
         isCommand = true;
     }
 
@@ -248,7 +379,9 @@ module.exports = async function(ws, data, send, vars) {
 
     var chatOpts = {
         // Global and Page updates should not appear in worlds with chat disabled
-        chat_perm
+        chat_perm,
+        isChat: true,
+        clientId
     }
 
     if(!isCommand) {

@@ -7,6 +7,7 @@ var initGlobalTabOpen   = false;
 var chatWriteHistory    = []; // history of user's chats
 var chatWriteHistoryMax = 100; // maximum size of chat write history length
 var chatWriteHistoryIdx = -1; // location in chat write history
+var serverPingTime      = 0;
 
 var canChat = Permissions.can_chat(state.userModel, state.worldModel);
 if(!canChat) { // can't chat, adjust the chat window for it
@@ -43,26 +44,101 @@ function api_chat_send(message, opts) {
         chatColor = opts.color;
     }
 
-    if(!exclude_commands) {
-        var nickCommand = "/nick";
-        if(message.startsWith(nickCommand)) {
-            message = trimSpace(message.substr(nickCommand.length));
-            var newNick = message.slice(0, nickLim);
-            if(!newNick) {
-                newNick = state.userModel.username;
+    if(!exclude_commands && message.startsWith("/")) {
+        var args = message.substr(1).split(" ");
+        var command = args[0].toLowerCase();
+        args.shift();
+        if(command == "nick") {
+            var newDisplayName = args[0];
+            if(!newDisplayName) {
+                newDisplayName = state.userModel.username;
             }
-            YourWorld.Nickname = newNick;
+            YourWorld.Nickname = newDisplayName;
             storeNickname();
-            var nickChangeMsg = "Set nickname to `" + message + "`";
-            if(message == "") {
-                nickChangeMsg = "Reset nickname"
-            }
+            var nickChangeMsg = "Set nickname to `" + newDisplayName + "`";
             addChat(null, 0, "user", "[ Server ]", nickChangeMsg, "Server");
+            return;
+        }
+        if(command == "ping") {
+            serverPingTime = Date.now();
+            socket.send("2::@");
+            return;
+        }
+        if(command == "gridsize") {
+            var size = args[0];
+            if(!size) size = "10x18";
+            size = size.split("x");
+            var width = parseInt(size[0]);
+            var height = parseInt(size[1]);
+            if(!width || isNaN(width) || !isFinite(width)) width = 10;
+            if(!height || isNaN(height) || !isFinite(height)) height = 18;
+            if(width < 4) width = 4;
+            if(width > 160) width = 160;
+            if(height < 4) height = 4;
+            if(height > 144) height = 144;
+            defaultSizes.cellW = width;
+            defaultSizes.cellH = height;
+            updateScaleConsts();
+            for(var i in tilePixelCache) delete tilePixelCache[i];
+            renderTiles(true);
+            addChat(null, 0, "user", "[ Server ]", "Changed grid size to " + width + "x" + height, "Server");
+            return;
+        }
+        if(command == "color") {
+            var color = args[0];
+            if(!color) color = "000000";
+            if(color.charAt(0) == "#") color = color.substr(1);
+            if(!color) color = 0;
+            YourWorld.Color = parseInt(color, 16);
+            if(isNaN(color)) color = 0;
+            addChat(null, 0, "user", "[ Server ]", "Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase(), "Server");
+            return;
+        }
+        if(command == "chatcolor") {
+            var color = args[0];
+            if(!color) color = "000000";
+            if(color.charAt(0) == "#") color = color.substr(1);
+            if(!color) color = 0;
+            defaultChatColor = parseInt(color, 16);
+            if(isNaN(color)) color = 0;
+            addChat(null, 0, "user", "[ Server ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(), "Server");
+            return;
+        }
+        if(command == "warp") {
+            // TODO: Warp from the same connection
+            var address = args[0];
+            if(!address) address = "";
+            positionX = 0;
+            positionY = 0;
+            if(address.charAt(0) == "/") address = address.substr(1);
+            state.worldModel.pathname = "/" + address;
+            createWsPath();
+            socket.close()
+            createSocket();
+            clearTiles(true);
+            clearInterval(fetchInterval);
+            addChat(null, 0, "user", "[ Server ]", "Switching to world: \"" + address + "\"", "Server");
+            return;
+        }
+        if(command == "warpserver") {
+            var address = args[0];
+            if(!address) {
+                createWsPath();
+            } else {
+                ws_path = address;
+            }
+            positionX = 0;
+            positionY = 0;
+            socket.close()
+            createSocket();
+            clearTiles(true);
+            clearInterval(fetchInterval);
+            addChat(null, 0, "user", "[ Server ]", "Switching to server: " + address, "Server");
             return;
         }
     }
     var isCommand = false;
-    if(!exclude_commands && (message.startsWith("/") || message.startsWith("\\"))) {
+    if(!exclude_commands && message.startsWith("/")) {
         isCommand = true;
     }
 
@@ -99,7 +175,11 @@ function api_chat_send(message, opts) {
 function sendChat() {
     var chatText = $("#chatbar")[0].value;
     $("#chatbar")[0].value = "";
-    api_chat_send(chatText);
+    var opts = {};
+    if(defaultChatColor != null) {
+        opts.color = "#" + ("00000" + defaultChatColor.toString(16)).slice(-6)
+    }
+    api_chat_send(chatText, opts);
 }
 
 function updateUnread() {
@@ -155,7 +235,9 @@ $("#chatbar").on("keydown", function(e) {
     if(keyCode == 38) { // up
         chatWriteHistoryIdx++;
         if(chatWriteHistoryIdx >= chatWriteHistory.length) chatWriteHistoryIdx = chatWriteHistory.length - 1;
-        $("#chatbar")[0].value = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
+        var upVal = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
+        if(!upVal) return;
+        $("#chatbar")[0].value = upVal;
     } else if(keyCode == 40) { // down
         chatWriteHistoryIdx--;
         if(chatWriteHistoryIdx < -1) chatWriteHistoryIdx = -1;
@@ -308,10 +390,6 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     nickDom.innerHTML = nickname + ":";
 
     var msgDom = document.createElement("span");
-    if(!op) { // the server should escape html fully. this is an extra basic layer
-        message = message.replace(/\</g, "&lt;");
-        message = message.replace(/\>/g, "&gt;");
-    }
     msgDom.innerHTML = "&nbsp;" + message;
 
     var maxScroll = field[0].scrollHeight - field[0].clientHeight;
@@ -349,6 +427,10 @@ function getChatfield(elm) {
 
 function updateUsrCount() {
     var count = w.userCount;
+    if(count == void 0) {
+        $("#usr_online").text("");
+        return;
+    }
     var plural = "s";
     if(count == 1) plural = "";
     $("#usr_online").text(count + " user" + plural + " online");

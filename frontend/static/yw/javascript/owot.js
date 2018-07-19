@@ -1,10 +1,7 @@
 ﻿var YourWorld = {
-    Color: +localStorage.getItem("color") || 0,
+    Color: window.localStorage ? +localStorage.getItem("color") : 0,
     Nickname: state.userModel.username
 }
-
-// edit ID
-var nextObjId = 1;
 
 var owot, textInput, textLater;
 function init_dom() {
@@ -35,18 +32,19 @@ init_dom();
 
 function getStoredNickname() {
     var nick = YourWorld.Nickname;
-    if(localStorage && localStorage.getItem) {
+    if(window.localStorage && localStorage.getItem) {
         nick = localStorage.getItem("nickname");
     }
     if(!nick) nick = YourWorld.Nickname;
     YourWorld.Nickname = nick;
 }
 function storeNickname() {
-    if(localStorage && localStorage.setItem) {
+    if(window.localStorage && localStorage.setItem) {
         localStorage.setItem("nickname", YourWorld.Nickname)
     }
 }
 
+var nextObjId              = 1; // next edit ID
 var width                  = window.innerWidth;
 var height                 = window.innerHeight;
 var positionX              = 0; // position in client in pixels
@@ -67,6 +65,13 @@ var images_to_load         = {
     unloaded: "/static/unloaded.png"
 }
 var worldFocused           = false;
+var useHighlight           = true; // highlight new edits
+var highlightLimit         = 10;
+var ansiBlockFill          = true; // fill certain ansi block characters
+var colorizeLinks          = true;
+var tileFetchOffsetX       = 0; // offset added to tile fetching and sending coordinates
+var tileFetchOffsetY       = 0;
+var defaultChatColor       = null; // 24-bit Uint
 getStoredNickname();
 
 if(state.background) { // add the background image (if it already exists)
@@ -143,24 +148,30 @@ if(state.worldModel.square_chars) {
 if(state.worldModel.half_chars) {
     defaultSizes.cellH = 20;
 }
-defaultSizes.tileW = defaultSizes.cellW * defaultSizes.tileC;
-defaultSizes.tileH = defaultSizes.cellH * defaultSizes.tileR;
-var cellWidthPad = Math.floor((defaultSizes.cellW - 10) / 2); // X text offset if the cell is wider
 
-var tileW = defaultSizes.tileW * zoom | 0;
-var tileH = defaultSizes.tileH * zoom | 0;
-var cellW = defaultSizes.cellW * zoom | 0;
-var cellH = defaultSizes.cellH * zoom | 0;
+var cellWidthPad, tileW, tileH, cellW, cellH, fontBase, specialCharFontBase, font, specialCharFont, tileC, tileR, tileArea;
 
-var fontBase = "px 'Courier New', monospace";
-var specialCharFontBase = "px sans-serif";
+function updateScaleConsts() {
+    defaultSizes.tileW = defaultSizes.cellW * defaultSizes.tileC;
+    defaultSizes.tileH = defaultSizes.cellH * defaultSizes.tileR;
+    cellWidthPad = Math.floor((defaultSizes.cellW - 10) / 2); // X text offset if the cell is wider
 
-var font = (16 * zoom) + fontBase;
-var specialCharFont = (16 * zoom) + specialCharFontBase;
+    tileW = Math.trunc(defaultSizes.tileW * zoom);
+    tileH = Math.trunc(defaultSizes.tileH * zoom);
+    cellW = Math.trunc(defaultSizes.cellW * zoom);
+    cellH = Math.trunc(defaultSizes.cellH * zoom);
 
-var tileC = defaultSizes.tileC;
-var tileR = defaultSizes.tileR;
-var tileArea = tileC * tileR;
+    fontBase = "px 'Courier New', monospace";
+    specialCharFontBase = "px sans-serif";
+
+    font = (16 * zoom) + fontBase;
+    specialCharFont = (16 * zoom) + specialCharFontBase;
+
+    tileC = defaultSizes.tileC;
+    tileR = defaultSizes.tileR;
+    tileArea = tileC * tileR;
+}
+updateScaleConsts();
 
 var dTileW = tileW; // permanent tile sizes in pixel (remains same throughout client's session)
 var dTileH = tileH;
@@ -252,8 +263,8 @@ function browserZoomAdjust(initial) {
     zoomRatio = ratio;
     positionX *= zoomRatio;
     positionY *= zoomRatio;
-    positionX |= 0; // remove decimals
-    positionY |= 0;
+    positionX = Math.trunc(positionX); // remove decimals
+    positionY = Math.trunc(positionY);
 
     adjust_scaling_DOM(ratio);
     doZoom(ratio * 100)
@@ -688,10 +699,15 @@ textLayer.height = height;
 if (window.MozWebSocket)
     window.WebSocket = window.MozWebSocket;
 
-var wsaddr = window.location.host;
-var ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
-var path = state.worldModel.pathname;
-var ws_path = ws_scheme + "://" + wsaddr + path + "/ws/";
+var wsaddr, ws_scheme, path;
+var default_ws_path = null;
+function createWsPath() {
+    wsaddr = window.location.host;
+    ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    path = state.worldModel.pathname;
+    ws_path = ws_scheme + "://" + wsaddr + path + "/ws/";
+}
+createWsPath();
 
 var styles = {};
 
@@ -838,8 +854,8 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
         worldFocused = true;
     }
 
-    var pageX = e.pageX*zoomRatio|0;
-    var pageY = e.pageY*zoomRatio|0;
+    var pageX = Math.trunc(e.pageX*zoomRatio);
+    var pageY = Math.trunc(e.pageY*zoomRatio);
     if(arg_pageX != void 0) pageX = arg_pageX;
     if(arg_pageY != void 0) pageY = arg_pageY;
     if(target != owot && target != linkDiv) {
@@ -915,8 +931,8 @@ function renderCursor(coords) {
     cursorCoordsCurrent = coords;
     renderTile(coords[0], coords[1]);
 
-    var pixelX = (coords[0] * tileW) + (coords[2] * cellW) + positionX + (width / 2 | 0);
-    var pixelY = (coords[1] * tileH) + (coords[3] * cellH) + positionY + (height / 2 | 0);
+    var pixelX = (coords[0] * tileW) + (coords[2] * cellW) + positionX + Math.trunc(width / 2);
+    var pixelY = (coords[1] * tileH) + (coords[3] * cellH) + positionY + Math.trunc(height / 2);
     
     var diff = null;
     // keep record of old positions to check if they changed
@@ -960,8 +976,8 @@ function stopDragging() {
 // tileX, charX
 var lastX = [0, 0];
 function event_mouseup(e, arg_pageX, arg_pageY) {
-    var pageX = e.pageX * zoomRatio | 0;
-    var pageY = e.pageY * zoomRatio | 0;
+    var pageX = Math.trunc(e.pageX * zoomRatio);
+    var pageY = Math.trunc(e.pageY * zoomRatio);
     if(arg_pageX != void 0) pageX = arg_pageX;
     if(arg_pageY != void 0) pageY = arg_pageY;
     stopDragging();
@@ -1012,8 +1028,11 @@ function is_link(tileX, tileY, charX, charY) {
     return false;
 }
 
+// groups small characters into one string (e.g Emojis).
+// this also will group combining character groups into one string.
 function advancedSplit(str) {
-	str += "";
+    str += "";
+    // look for surrogate pairs first. then look for combining characters. finally, look for the rest
 	var data = str.match(/([\uD800-\uDBFF][\uDC00-\uDFFF])|(([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+))|.|\n|\r/g)
     if(data == null) return [];
     for(var i = 0; i < data.length; i++) {
@@ -1169,7 +1188,11 @@ function writeChar(char, doNotMoveCursor) {
         renderTile(tileX, tileY, true)
 
         var editArray = [tileY, tileX, charY, charX, Date.now(), char, nextObjId];
-        if(color) {
+        if(tileFetchOffsetX || tileFetchOffsetY) {
+            editArray[0] += tileFetchOffsetY;
+            editArray[1] += tileFetchOffsetX;
+        }
+        if(YourWorld.Color) {
             editArray.push(YourWorld.Color);
         }
         tellEdit.push([tileX, tileY, charX, charY, nextObjId]);
@@ -1181,11 +1204,12 @@ function writeChar(char, doNotMoveCursor) {
 // write characters inputted
 var write_busy = false; // busy pasting
 var pasteInterval;
-setInterval(function() {
+var char_input_check = setInterval(function() {
     if(write_busy) return;
     var value = textInput[0].value;
     if(value == "") return;
     value = value.replace(/\r\n/g, "\n");
+    value = value.replace(/\r/g, "\n");
     value = advancedSplit(value);
     var index = 1;
     writeChar(value[0]);
@@ -1219,7 +1243,6 @@ $(document).on("keydown", function(e) {
     if(w._state.uiModal) return;
     if(document.activeElement == $("#chatbar")[0]) return;
     textInput.focus();
-    textInput[0].value = "";
     // stop paste
     clearInterval(pasteInterval);
     write_busy = false;
@@ -1306,8 +1329,8 @@ function getTileCoordsFromMouseCoords(x, y, ignoreZoomRatio) {
     var charX = 0;
     var charY = 0;
     // position relative to position in client and mouse
-    var mpX = x - positionX - (width / 2 | 0);
-    var mpY = y - positionY - (height / 2 | 0);
+    var mpX = x - positionX - Math.trunc(width / 2);
+    var mpY = y - positionY - Math.trunc(height / 2);
     // cell position (relative to anywhere)
     charX = Math.floor(mpX / cellW);
     charY = Math.floor(mpY / cellH);
@@ -1362,9 +1385,9 @@ function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
     x += positionX;
     y += positionY;
     // add center offsets
-    x += (width / 2 | 0);
-    y += (height / 2 | 0);
-    return [x/zoomRatio|0, y/zoomRatio|0];
+    x += Math.trunc(width / 2);
+    y += Math.trunc(height / 2);
+    return [Math.trunc(x/zoomRatio), Math.trunc(y/zoomRatio)];
 }
 
 function alertJS(data) {
@@ -1552,15 +1575,15 @@ $(document).on("touchmove", function(e) {
 // get position from touch event
 function touch_pagePos(e) {
     var first_touch = e.originalEvent.touches[0];
-    return [first_touch.pageX * zoomRatio | 0, first_touch.pageY * zoomRatio | 0];
+    return [Math.trunc(first_touch.pageX * zoomRatio), Math.trunc(first_touch.pageY * zoomRatio)];
 }
 
 $(document).on("wheel", function(e) {
     // if focused on chat, don't scroll world
     if($(e.target).closest(getChatfield())[0] == getChatfield()[0]) return;
     if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
-    var deltaX = Math.floor(e.originalEvent.deltaX);
-    var deltaY = Math.floor(e.originalEvent.deltaY);
+    var deltaX = Math.trunc(e.originalEvent.deltaX);
+    var deltaY = Math.trunc(e.originalEvent.deltaY);
     if(e.originalEvent.deltaMode) { // not zero (default)?
         deltaX = 0;
         deltaY = (deltaY / Math.abs(deltaY)) * 100;
@@ -1742,10 +1765,10 @@ function getAndFetchTiles() {
         var range = ranges[i];
         toFetch.push({
             // the range cutter doesn't handle negative coords, so adjust them
-            minX: range[0] + startX,
-            minY: range[1] + startY,
-            maxX: range[2] + startX,
-            maxY: range[3] + startY
+            minX: range[0] + startX + tileFetchOffsetX,
+            minY: range[1] + startY + tileFetchOffsetY,
+            maxX: range[2] + startX + tileFetchOffsetX,
+            maxY: range[3] + startY + tileFetchOffsetY
         });
     }
     if(toFetch.length > 0) {
@@ -1758,20 +1781,24 @@ function getAndFetchTiles() {
 }
 
 // clears all tiles outside the viewport (to free up memory)
-function clearTiles() {
-    var coordinates = getVisibleTiles();
-    // reference to tile coordinates (EG: "5,6")
+function clearTiles(allTiles) {
+    var coordinates;
     var visible = {};
-    for(var i = 0; i < coordinates.length; i++) {
-        visible[coordinates[i][1] + "," + coordinates[i][0]] = 1;
+    if(!allTiles) {
+        coordinates = getVisibleTiles();
+        // reference to tile coordinates (EG: "5,6")
+        visible = {};
+        for(var i = 0; i < coordinates.length; i++) {
+            visible[coordinates[i][1] + "," + coordinates[i][0]] = 1;
+        }
     }
     for(var i in tiles) {
-        if(!(i in visible)) {
+        if(!(i in visible) || allTiles) {
             delete tiles[i];
         }
     }
     for(var i in tilePixelCache) {
-        if(!(i in visible)) {
+        if(!(i in visible) || allTiles) {
             delete tilePixelCache[i];
         }
     }
@@ -1823,7 +1850,7 @@ var world_writability = state.worldModel.writability;
 var writability_styles = [];
 
 var highlightFlash = {};
-var inkLimit = 0;
+var highlightCount = 0;
 
 function highlight(positions) {
     for(var i = 0; i < positions.length; i++) {
@@ -1831,7 +1858,7 @@ function highlight(positions) {
         var tileY = positions[i][1];
         var charX = positions[i][2];
         var charY = positions[i][3];
-        if(inkLimit > 10) return;
+        if(highlightCount > highlightLimit) return;
         if(!highlightFlash[tileY + "," + tileX]) {
             highlightFlash[tileY + "," + tileX] = {};
         }
@@ -1840,7 +1867,7 @@ function highlight(positions) {
         }
         if(!highlightFlash[tileY + "," + tileX][charY][charX]) {
             highlightFlash[tileY + "," + tileX][charY][charX] = [Date.now(), 128];
-            inkLimit++;
+            highlightCount++;
         }
     }
 }
@@ -1855,7 +1882,7 @@ var flashAnimateInterval = setInterval(function() {
                 // after 500 milliseconds
                 if(Date.now() - time >= 500) {
                     delete highlightFlash[tile][charY][charX]
-                    inkLimit--;
+                    highlightCount--;
                 } else {
                     // increase color brightness
                     highlightFlash[tile][charY][charX][1] += 2;
@@ -1953,12 +1980,12 @@ function getTileCanvas(str) {
 }
 
 function generateBackgroundPixels(tileX, tileY, image, returnCanvas) {
-    var tileWidth = tileW | 0;
-    var tileHeight = tileH | 0;
+    var tileWidth = Math.trunc(tileW);
+    var tileHeight = Math.trunc(tileH);
     if(returnCanvas) {
         // returning a canvas (for scaling purposes), so use the constant tile sizes
-        tileWidth = dTileW | 0;
-        tileHeight = dTileH | 0;
+        tileWidth = Math.trunc(dTileW);
+        tileHeight = Math.trunc(dTileH);
     }
     var imgData = textLayerCtx.createImageData(tileWidth, tileHeight);
     if(!image) { // image doesn't exist, return as how it is
@@ -1994,8 +2021,8 @@ function generateBackgroundPixels(tileX, tileY, image, returnCanvas) {
 }
 
 function isTileVisible(tileX, tileY) {
-    var tilePosX = tileX * tileW + positionX + (width / 2 | 0);
-    var tilePosY = tileY * tileH + positionY + (height / 2 | 0);
+    var tilePosX = tileX * tileW + positionX + Math.trunc(width / 2);
+    var tilePosY = tileY * tileH + positionY + Math.trunc(height / 2);
     // too far left or top. check if the right/bottom edge of tile is also too far left/top
     if((tilePosX < 0 || tilePosY < 0) && (tilePosX + tileW - 1 < 0 || tilePosY + tileH - 1 < 0)) {
         return false;
@@ -2083,8 +2110,8 @@ function renderTile(tileX, tileY, redraw) {
         return;
     }
     var str = tileY + "," + tileX;
-    var offsetX = tileX * tileW + (width / 2 | 0) + positionX;
-    var offsetY = tileY * tileH + (height / 2 | 0) + positionY;
+    var offsetX = tileX * tileW + Math.trunc(width / 2) + positionX;
+    var offsetY = tileY * tileH + Math.trunc(height / 2) + positionY;
 
     // unloaded tiles
     if(!tiles[str] || (tiles[str] && !tiles[str].initted)) {
@@ -2266,13 +2293,7 @@ function renderTile(tileX, tileY, redraw) {
             // initialize link color to default text color in case there's no link to color
             var linkColor = styles.text;
             var isLink = false;
-            // if text has no color, use default text color. otherwise, colorize it
-            if(color == 0 || !colorsEnabled) {
-                textRender.fillStyle = styles.text;
-            } else {
-                if(!color) color = 0;
-                textRender.fillStyle = "rgb(" + (color >> 16 & 255) + "," + (color >> 8 & 255) + "," + (color & 255) + ")";
-            }
+
             // check if this char is a link
             if(props[y]) {
                 if(props[y][x]) {
@@ -2288,9 +2309,13 @@ function renderTile(tileX, tileY, redraw) {
                 }
             }
             if(!char) char = " ";
-            // make sure colored text stays the same color after linking
-            if(color == 0 || !colorsEnabled) {
+
+            // if text has no color, use default text color. otherwise, colorize it
+            if(color == 0 || !colorsEnabled || (isLink && !colorizeLinks)) {
                 textRender.fillStyle = linkColor;
+            } else {
+                if(!color) color = 0;
+                textRender.fillStyle = "rgb(" + (color >> 16 & 255) + "," + (color >> 8 & 255) + "," + (color & 255) + ")";
             }
 
             // x padding of text if the char width is > 10
@@ -2301,19 +2326,19 @@ function renderTile(tileX, tileY, redraw) {
                 textRender.fillRect(x * cellW, (y * cellH + textYOffset + zoom), cellW, zoom)
             }
             if(char != "\u0020" && char != "\u00a0") { // ignore whitespace characters
-                if(char == "\u2588") { // █ full block
-                    textRender.fillRect(x*cellW, y*cellH, cellW, cellH);
-                } else if(char == "\u2580") { // ▀ top half block
-                    textRender.fillRect(x*cellW, y*cellH, cellW, cellH / 2 | 0);
-                } else if(char == "\u2584") { // ▄ bottom half block
-                    textRender.fillRect(x*cellW, y*cellH + (cellH/2|0), cellW, cellH / 2 | 0);
-                } else if(char == "\u258c") { // ▌ left half block
-                    textRender.fillRect(x*cellW, y*cellH, cellW/2|0, cellH);
-                } else if(char == "\u2590") { // ▐ right half block
-                    textRender.fillRect(x*cellW + (cellW/2|0), y*cellH, cellW/2|0, cellH);
+                if(char == "\u2588" && ansiBlockFill) { // █ full block
+                    textRender.fillRect(x * cellW, y * cellH, cellW, cellH);
+                } else if(char == "\u2580" && ansiBlockFill) { // ▀ top half block
+                    textRender.fillRect(x * cellW, y * cellH, cellW, Math.trunc(cellH / 2));
+                } else if(char == "\u2584" && ansiBlockFill) { // ▄ bottom half block
+                    textRender.fillRect(x * cellW, y * cellH + Math.trunc(cellH / 2), cellW, Math.trunc(cellH / 2));
+                } else if(char == "\u258c" && ansiBlockFill) { // ▌ left half block
+                    textRender.fillRect(x * cellW, y * cellH, Math.trunc(cellW / 2), cellH);
+                } else if(char == "\u2590" && ansiBlockFill) { // ▐ right half block
+                    textRender.fillRect(x * cellW + Math.trunc(cellW / 2), y * cellH, Math.trunc(cellW / 2), cellH);
                 } else {
                     if(char.length > 1) textRender.font = specialCharFont;
-                    textRender.fillText(char, x*cellW + XPadding, y*cellH + textYOffset)
+                    textRender.fillText(char, x * cellW + XPadding, y * cellH + textYOffset)
                     if(char.length > 1) textRender.font = font;
                 }
             }
@@ -2573,8 +2598,8 @@ var w = {
     fetchUpdates: getAndFetchTiles,
     acceptOwnEdits: false,
     getTileVisibility: function() { // emulate YWOT's getTileVisibility (unused here)
-        var minVisY = (-positionY - (height / 2|0)) / tileH;
-        var minVisX = (-positionX - (width / 2|0)) / tileW;
+        var minVisY = (-positionY - Math.trunc(height / 2)) / tileH;
+        var minVisX = (-positionX - Math.trunc(width / 2)) / tileW;
         var numDown = height / tileH;
         var numAcross = width / tileW;
         var maxVisY = minVisY + numDown;
@@ -2670,28 +2695,45 @@ function animateTile(tile, posStr) {
 	}.bind(this), 200);
 }
 
+function tile_offset_object(data, tileOffX, tileOffY) {
+    var refs = {};
+    var tilef;
+    for(var tilef in data) {
+        refs[tilef] = data[tilef];
+        delete data[tilef];
+    }
+    for(var tkp in refs) {
+        var new_key = getPos(tkp);
+        new_key = (new_key[0] - tileOffY) + "," + (new_key[1] - tileOffX);
+        data[new_key] = refs[tkp];
+    }
+}
+
 var ws_functions = {
     fetch: function(data) {
-        for(var i in data.tiles) {
-			var tile = data.tiles[i];
+        if(tileFetchOffsetX || tileFetchOffsetY) {
+            tile_offset_object(data.tiles, tileFetchOffsetX, tileFetchOffsetY);
+        }
+        for(var tileKey in data.tiles) {
+			var tile = data.tiles[tileKey];
 			if (tile && tile.properties && tile.properties.animation) {
-				animateTile(tile, i); // if it's already animated it will stop the old animation
-			} else if (isAnimated(i)) {
-				stopAnimation(i);
+				animateTile(tile, tileKey); // if it's already animated it will stop the old animation
+			} else if (isAnimated(tileKey)) {
+				stopAnimation(tileKey);
 			}
-            tiles[i] = tile;
-            if(!tiles[i]) tiles[i] = blankTile();
-            tiles[i].initted = true;
-            var pos = getPos(i);
-            if(tiles[i].properties.char) {
-                tiles[i].properties.char = decodeCharProt(tiles[i].properties.char);
+            tiles[tileKey] = tile;
+            if(!tiles[tileKey]) tiles[tileKey] = blankTile();
+            tiles[tileKey].initted = true;
+            var pos = getPos(tileKey);
+            if(tiles[tileKey].properties.char) {
+                tiles[tileKey].properties.char = decodeCharProt(tiles[tileKey].properties.char);
             }
             renderTile(pos[1], pos[0], true);
         }
         // too many tiles, remove tiles outside of the viewport
         var tileLim = 1000;
         if(zoomRatio < 0.5) { // zoomed out too far? make sure tiles don't constantly unload
-            tileLim = 4000;
+            tileLim = 10000;
         }
         if(Object.keys(tiles).length >= tileLim) {
             clearTiles()
@@ -2702,51 +2744,55 @@ var ws_functions = {
         styles.public = data.colors.background;
         styles.cursor = data.colors.cursor;
         styles.member = data.colors.member_area;
-        styles.menu = data.colors.menu;
-        styles.owner = data.colors.owner_area;
-        styles.text = data.colors.text;
+        styles.menu   = data.colors.menu;
+        styles.owner  = data.colors.owner_area;
+        styles.text   = data.colors.text;
         renderTiles(true); // render all tiles with new colors
         menu_color(styles.menu);
     },
     tileUpdate: function(data) {
         var highlights = [];
-        for(i in data.tiles) {
+        // settings are configured to offset server-fetched tiles
+        if(tileFetchOffsetX || tileFetchOffsetY) {
+            tile_offset_object(data.tiles, tileFetchOffsetX, tileFetchOffsetY);
+        }
+        for(tileKey in data.tiles) {
             // if tile isn't loaded, load it blank
-            if(!tiles[i]) {
-                tiles[i] = blankTile();
+            if(!tiles[tileKey]) {
+                tiles[tileKey] = blankTile();
             }
-            if(!data.tiles[i]) {
-                data.tiles[i] = blankTile();
+            if(!data.tiles[tileKey]) {
+                data.tiles[tileKey] = blankTile();
             }
-            if(!data.tiles[i].properties.color) {
-                data.tiles[i].properties.color = Object.assign([], blankColor);
+            if(!data.tiles[tileKey].properties.color) {
+                data.tiles[tileKey].properties.color = Object.assign([], blankColor);
             }
-            if(data.tiles[i].properties.char) {
-                data.tiles[i].properties.char = decodeCharProt(data.tiles[i].properties.char);
+            if(data.tiles[tileKey].properties.char) {
+                data.tiles[tileKey].properties.char = decodeCharProt(data.tiles[tileKey].properties.char);
             }
-			if (data.tiles[i].properties.animation) {
-				animateTile(data.tiles[i], i); // if it's already animated it will stop the old animation
-			} else if (isAnimated(i)) {
-				stopAnimation(i);
+			if (data.tiles[tileKey].properties.animation) {
+				animateTile(data.tiles[tileKey], tileKey); // if it's already animated it will stop the old animation
+			} else if (isAnimated(tileKey)) {
+				stopAnimation(tileKey);
 			}
-            if(!tiles[i].properties.color) {
-                tiles[i].properties.color = Object.assign([], blankColor);
+            if(!tiles[tileKey].properties.color) {
+                tiles[tileKey].properties.color = Object.assign([], blankColor);
             }
-            var pos = getPos(i);
+            var pos = getPos(tileKey);
             var tileX = pos[1];
             var tileY = pos[0];
 
             var newContent = blank;
             var newColors = newColorArray();
             // get content and colors from new tile data
-            if(data.tiles[i]) {
-                newContent = data.tiles[i].content
-                if(data.tiles[i].properties.color) {
-                    newColors = data.tiles[i].properties.color;
+            if(data.tiles[tileKey]) {
+                newContent = data.tiles[tileKey].content
+                if(data.tiles[tileKey].properties.color) {
+                    newColors = data.tiles[tileKey].properties.color;
                 }
             }
-            var oldContent = tiles[i].content;
-            var oldColors = tiles[i].properties.color.slice(0);
+            var oldContent = tiles[tileKey].content;
+            var oldColors = tiles[tileKey].properties.color.slice(0);
             newContent = advancedSplit(newContent);
             oldContent = advancedSplit(oldContent);
             var charX = 0;
@@ -2765,7 +2811,7 @@ var ws_functions = {
                         oldColors[g] = nCol;
                     }
                     // briefly highlight these edits (10 at a time)
-                    highlights.push([tileX, tileY, charX, charY]);
+                    if(useHighlight) highlights.push([tileX, tileY, charX, charY]);
                 }
                 charX++;
                 if(charX >= tileC) {
@@ -2774,15 +2820,15 @@ var ws_functions = {
                 }
             }
             oldContent = oldContent.join("");
-            tiles[i].properties = data.tiles[i].properties; // update tile
-            tiles[i].content = oldContent; // update only necessary character updates
-            tiles[i].properties.color = oldColors; // update only necessary color updates
-            tiles[i].redraw = true;
-            tiles[i].initted = true;
-            var pos = getPos(i);
+            tiles[tileKey].properties = data.tiles[tileKey].properties; // update tile
+            tiles[tileKey].content = oldContent; // update only necessary character updates
+            tiles[tileKey].properties.color = oldColors; // update only necessary color updates
+            tiles[tileKey].redraw = true;
+            tiles[tileKey].initted = true;
+            var pos = getPos(tileKey);
             renderTile(pos[1], pos[0]);
         }
-        if(highlights.length > 0) highlight(highlights);
+        if(highlights.length > 0 && useHighlight) highlight(highlights);
     },
     write: function(data) {
         // after user has written text, the client should expect list of all edit ids that passed
@@ -2810,7 +2856,14 @@ var ws_functions = {
 			w._ui.announce.hide();
 		}
     },
-    ping: function() {
+    ping: function(data) {
+        if(data.time) {
+            var clientReceived = Date.now();
+            // serverPingTime is from chat.js
+            var pingMs = clientReceived - serverPingTime;
+            addChat(null, 0, "user", "[ Server ]", "Ping: " + pingMs + " MS", "Server");
+            return;
+        }
         clearTimeout(pingTimeout);
 		pingTimeout = setTimeout(function() {
 			socket.send("2::");

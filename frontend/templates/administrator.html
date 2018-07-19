@@ -117,7 +117,7 @@
     <div class="content_set">
         <div class="content_set_title">Set Announcement</div>
         <div class="content_set_content">
-            {% if message %}
+            {% if announcement_update_msg %}
 				<span style="font-size:80%"><i>{{ announcement_update_msg }}</i></span>
 			{% endif %}
             <form method="POST" action=".">
@@ -141,6 +141,20 @@
                 <input type="text" name="username" id="user_info_by_id" value="">
                 <input type="submit" value="Enter">
             </form>
+        </div>
+    </div>
+
+    <div class="content_set">
+        <div class="content_set_title">Constants</div>
+        <div class="content_set_content">
+            {% if cons_update_msg %}
+				<span style="font-size:80%"><i>{{ cons_update_msg }}</i></span>
+			{% endif %}
+            <form method="POST" action=".">
+				Bypass key: 
+				<input type="text" name="set_bypass_key" id="set_bypass_key" value="{{ bypass_key }}" style="width: 100%;">
+				<input type="submit" value="Set">
+			</form>
         </div>
     </div>
 

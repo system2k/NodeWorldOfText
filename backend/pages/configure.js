@@ -103,6 +103,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         paste: world.feature_paste,
         membertiles_addremove: world.feature_membertiles_addremove,
         chat_permission: properties.chat_permission || 0,
+        color_text: properties.color_text || 0,
 
         color,
         cursor_color,
@@ -206,6 +207,7 @@ module.exports.POST = async function(req, serve, vars) {
 		var animate = validatePerms(post_data.animate);
         var paste = validatePerms(post_data.paste);
         var chat = validatePerms(post_data.chat);
+        var color_text = validatePerms(post_data.color_text);
         var membertiles_addremove = post_data.membertiles_addremove;
         if(membertiles_addremove == "false") {
             membertiles_addremove = 0;
@@ -215,6 +217,7 @@ module.exports.POST = async function(req, serve, vars) {
             membertiles_addremove = 0;
         }
         properties.chat_permission = chat;
+        properties.color_text = color_text;
 
         await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link,properties)=(?,?,?,?,?,?) WHERE id=?",
             [go_to_coord, membertiles_addremove, paste, coord_link, url_link, JSON.stringify(properties), world.id])
@@ -308,7 +311,7 @@ module.exports.POST = async function(req, serve, vars) {
                 redirect: "/accounts/profile/"
             });
         } else if(post_data.clear_public == "") {
-            var chunkSize = 4;
+            var chunkSize = 2048;
             var idx = 0;
             await transaction.begin();
             while(true) {
@@ -320,6 +323,7 @@ module.exports.POST = async function(req, serve, vars) {
                 for(var d = 0; d < data.length; d++) {
                     var tile = data[d];
                     var properties = JSON.parse(tile.properties);
+                    // this tile contains prcise char data
                     if(properties.char) {
                         var charData = decodeCharProt(properties.char);
                         var content = advancedSplit(tile.content);

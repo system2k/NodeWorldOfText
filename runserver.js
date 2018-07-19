@@ -1,6 +1,8 @@
 /*
 **  Our World of Text
-**  Est. September 17, 2017
+**  Est. November 19, 2016
+**  Reprogrammed September 17, 2017
+**  Released and renamed October 10, 2017
 **  This is the main file
 */
 
@@ -29,7 +31,10 @@ const settings = require("./settings.json");
 
 var serverPort = settings.port;
 var serverDB = settings.DATABASE_PATH;
-var chatDB = settings.CHAT_HISTORY
+var chatDB = settings.CHAT_HISTORY_PATH;
+
+var DATA_PATH = "../data/";
+var DATA_PATH_TEST = DATA_PATH + "test/";
 
 Error.stackTraceLimit = Infinity;
 var isTestServer = false;
@@ -43,15 +48,44 @@ args.forEach(function(a) {
 		isTestServer = true;
 		serverPort = settings.test_port;
 		serverDB = settings.TEST_DATABASE_PATH;
-        chatDB = settings.TEST_CHAT_HISTORY;
+        chatDB = settings.TEST_CHAT_HISTORY_PATH;
         settings.LOG_PATH = settings.TEST_LOG_PATH;
         settings.ZIP_LOG_PATH = settings.TEST_ZIP_LOG_PATH;
         settings.UNCAUGHT_PATH = settings.TEST_UNCAUGHT_PATH;
-        settings.REQ_LOG = settings.TEST_REQ_LOG;
-        settings.CHAT_LOG = settings.TEST_CHAT_LOG;
+        settings.REQ_LOG_PATH = settings.TEST_REQ_LOG_PATH;
+        settings.CHAT_LOG_PATH = settings.TEST_CHAT_LOG_PATH;
 		return;
 	}
 });
+
+const log_error = function(err) {
+	if(settings.error_log) {
+		try {
+			err = JSON.stringify(err);
+			err = "TIME: " + Date.now() + "\r\n" + err + "\r\n" + "-".repeat(20) + "\r\n\r\n\r\n";
+			fs.appendFileSync(settings.LOG_PATH, err);
+		} catch(e) {
+			console.log("Error logging error:", e)
+		}
+	}
+}
+
+// create the data folder that stores all of the server's data
+if(!fs.existsSync(DATA_PATH)) {
+    fs.mkdirSync(DATA_PATH, 0o777);
+}
+// directory used for storing data for the test server
+if(!fs.existsSync(DATA_PATH_TEST)) {
+    fs.mkdirSync(DATA_PATH_TEST, 0o777);
+}
+if(!fs.existsSync(settings.bypass_key)) {
+    var rand = "";
+    var key = "0123456789ABCDEF";
+    for(var i = 0; i < 50; i++) {
+        rand += key[Math.floor(Math.random() * 16)];
+    }
+    fs.writeFileSync(settings.bypass_key, rand);
+}
 
 const database = new sql.Database(serverDB);
 const chat_history = new sql.Database(chatDB);
@@ -268,6 +302,7 @@ function loadEmail() {
             }
         });
     } catch(e) {
+        log_error(e);
         email_available = false;
         console.log("\x1b[31;1mEmail disabled. Error message: " + JSON.stringify(process_error_arg(e)) + "\x1b[0m");
     }
@@ -276,6 +311,7 @@ function loadEmail() {
             transporter.verify()
         }
     } catch(e) {
+        log_error(e);
         email_available = false;
         console.log("\x1b[31;1mEmail is disabled because the verification failed (credentials possibly incorrect)" + JSON.stringify(process_error_arg(e)) + "\x1b[0m");
     }
@@ -358,6 +394,7 @@ function san_nbr(x) {
 }
 
 var announcement_cache = "";
+var bypass_key_cache = "";
 
 async function initialize_server() {
     console.log("Starting server...");
@@ -424,18 +461,6 @@ var prompt_account_yesno = {
 		}
 	}
 };
-
-const log_error = function(err) {
-	if(settings.error_log) {
-		try {
-			err = JSON.stringify(err);
-			err = "TIME: " + Date.now() + "\r\n" + err + "\r\n" + "-".repeat(20) + "\r\n\r\n\r\n";
-			fs.appendFileSync(settings.LOG_PATH, err);
-		} catch(e) {
-			console.log("Error logging error:", e)
-		}
-	}
-}
 
 var pw_encryption = "sha512WithRSAEncryption";
 const encryptHash = function(pass, salt) {
@@ -966,8 +991,7 @@ async function get_user_info(cookies, is_websocket) {
             user = JSON.parse(s_data.session_data);
             if(cookies.csrftoken == user.csrftoken) { // verify csrftoken
                 user.authenticated = true;
-                var level = (await db.get("SELECT level FROM auth_user WHERE id=?",
-                user.id)).level
+                var level = (await db.get("SELECT level FROM auth_user WHERE id=?", user.id)).level
 
                 var operator = level == 3;
                 var superuser = level == 2;
@@ -983,6 +1007,7 @@ async function get_user_info(cookies, is_websocket) {
                     user.scripts = [];
                 }
             }
+            user.session_key = s_data.session_key;
         }
     }
     return user;
@@ -1232,6 +1257,10 @@ async function process_request(req, res, current_req_id) {
         res.write("<html><h1>Test page</h1></html>");
         return res.end();
     }
+    if(sub.length == 1 && compareNoCase(sub[0], "serverrequeststatus")) {
+        res.write("{}");
+        return res.end();
+    }
 
     var URL = url.parse(req.url).pathname;
     if(URL.charAt(0) == "/") {
@@ -1428,6 +1457,12 @@ async function MODIFY_ANNOUNCEMENT(text) {
     })
 }
 
+async function modify_bypass_key(key) {
+    key += "";
+    fs.writeFileSync(settings.bypass_key, key);
+    bypass_key_cache = key;
+}
+
 function announce(text) {
     (async function() {
         await MODIFY_ANNOUNCEMENT(text);
@@ -1555,8 +1590,8 @@ async function init_chat_history() {
             ["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0])
         var global_id = rowid.lastID;
         // if a chat log with an old format exists
-        if(fs.existsSync(settings.CHAT_LOG)) {
-            var chatlogFile = fs.readFileSync(settings.CHAT_LOG, "utf8");
+        if(fs.existsSync(settings.CHAT_LOG_PATH)) {
+            var chatlogFile = fs.readFileSync(settings.CHAT_LOG_PATH, "utf8");
             chatlogFile = JSON.parse(chatlogFile);
             var global = chatlogFile.global_chatlog;
             var world = chatlogFile.world_chatlog;
@@ -1639,6 +1674,7 @@ intv.invalidate_chat_cache = setInterval(function() {
 
 // Retrieves the chat history of a specific channel instead of loading the entire database into memory
 // The global channel is retrieved by using world id 0
+// includes a race condition resolving system
 async function retrieveChatHistory(world_id) {
     // no cache has been started
     if(!(world_id in chat_cache)) {
@@ -1865,15 +1901,32 @@ async function clear_expired_sessions(no_timeout) {
     if(!no_timeout) intv.clearExpiredSessions = setTimeout(clear_expired_sessions, Minute);
 }
 
+function resembles_int_number(string) {
+    if(!string) return false;
+    var set = "0123456789"
+    for(var i = 0; i < string.length; i++) {
+        var chr = string.charAt(i);
+        if(set.indexOf(chr) == -1) return false;
+    }
+    return true;
+}
+
 var client_ips = {}; // fixes the problem where clients spam and immediately exit
 
 // ping clients every 30 seconds (resolve the issue where cloudflare terminates sockets inactive for approx. 1 minute)
-intv.ping_clients = setInterval(function() {
-    if(!wss) return;
-    wss.clients.forEach(function(ws) {
-        ws.ping("keepalive");
-    })
-}, 1000 * 30)
+function initPingAuto() {
+    intv.ping_clients = setInterval(function() {
+        if(!wss) return;
+        wss.clients.forEach(function(ws) {
+            if(ws.readyState != WebSocket.OPEN) return;
+            try {
+                ws.ping("keepalive")
+            } catch(e) {
+                log_error(e);
+            };
+        })
+    }, 1000 * 30)
+}
 
 async function initialize_server_components() {
     await (async function() {
@@ -1885,6 +1938,8 @@ async function initialize_server_components() {
         }
     })();
 
+    bypass_key_cache = fs.readFileSync(settings.bypass_key).toString("utf8");
+
     intv.userCount = setInterval(function() {
         broadcastUserCount();
     }, 2000);
@@ -1893,7 +1948,20 @@ async function initialize_server_components() {
 
     server.listen(serverPort, function() {
         var addr = server.address();
-        console.log("Server is running.\n\x1b[36mAddress: " + addr.address + "\nPort: " + addr.port + "\x1b[0m");
+
+        var cWidth = 50;
+        var cHeight = 7;
+
+        var tmg = new TerminalMessage(cWidth, cHeight);
+
+        tmg.setSquare(0, 0, 25, cHeight - 1, "bright_cyan");
+        tmg.setText("OWOT Server is running", 2, 1, "bright_white")
+        tmg.setText("Address:", 2, 2, "bright_white")
+        tmg.setText(addr.address + "", 4, 3, "cyan")
+        tmg.setText("Port:", 2, 4, "bright_white")
+        tmg.setText(addr.port + "", 4, 5, "cyan")
+
+        console.log(tmg.render());
 
         // start listening for commands
         command_prompt();
@@ -1902,6 +1970,8 @@ async function initialize_server_components() {
     wss = new WebSocket.Server({ server });
     global_data.wss = wss;
 
+    initPingAuto();
+
     ws_broadcast = function(data, world, opts) {
         if(!opts) opts = {};
         data = JSON.stringify(data)
@@ -1909,11 +1979,16 @@ async function initialize_server_components() {
             try {
                 if(client.readyState == WebSocket.OPEN &&
                 world == void 0 || NCaseCompare(client.world_name, world)) {
-                    if(opts.chat_perm == 1) if(!(client.is_member || client.is_owner)) return;
-                    if(opts.chat_perm == 2) if(!client.is_owner) return;
+                    if(opts.isChat) {
+                        if(opts.chat_perm == 1) if(!(client.is_member || client.is_owner)) return;
+                        if(opts.chat_perm == 2) if(!client.is_owner) return;
+                        if(client.chat_blocks.indexOf(opts.clientId) > -1) return;
+                    }
                     client.send(data);
                 }
-            } catch(e) {}
+            } catch(e) {
+                log_error(e);
+            }
         });
     };
 
@@ -1991,25 +2066,30 @@ async function initialize_server_components() {
             var world_name;
             function send_ws(data) {
                 if(ws.readyState === WebSocket.OPEN) {
-                    try {ws.send(data)} catch(e){}; // not protected by callbacks
+                    try {
+                        ws.send(data) // not protected by callbacks
+                    } catch(e) {
+                        log_error(e);
+                    };
                 }
             }
             if(location.match(/(\/ws\/$)/)) {
                 world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
             } else if(location === "/ws/r_u_alive/") {
-				send_ws('"sure m8"');
-				onMessage = function() {
-					send_ws('"yes im still alive"');
-				};
-				delete pre_queue;
-				return;
-			} else {
+                send_ws('"sure m8"');
+                onMessage = function() {
+                    send_ws('"yes im still alive"');
+                };
+                delete pre_queue;
+                return;
+            } else {
                 send_ws(JSON.stringify({
                     kind: "error",
                     message: "Invalid address"
                 }));
                 return ws.close();
             }
+            
             ws.world_name = world_name;
 
             var initial_user_count = getUserCountFromWorld(world_name);
@@ -2047,6 +2127,7 @@ async function initialize_server_components() {
             client_ips[status.world.id][clientId] = [ws._socket.remoteAddress, ws._socket.address(), ws.ipHeaderAddr];
 
             ws.clientId = clientId;
+            ws.chat_blocks = [];
 
             send_ws(JSON.stringify({
                 kind: "channel",
@@ -2077,11 +2158,16 @@ async function initialize_server_components() {
                 var current_req_id = req_id;
                 try {
                     // This is a ping
-                    if(msg == "2::") {
-                        return send_ws(JSON.stringify({
+                    if(msg.startsWith("2::")) {
+                        var args = msg.substr(3);
+                        var res = {
                             kind: "ping",
                             result: "pong"
-                        }));
+                        }
+                        if(args == "@") {
+                            res.time = true;
+                        }
+                        return send_ws(JSON.stringify(res));
                     }
                     // Parse request. If failed, return a "418" message
                     try {
@@ -2092,6 +2178,13 @@ async function initialize_server_components() {
                             message: "418 I'm a Teapot"
                         }))
                         return ws.close()
+                    }
+                    if(!msg || msg.constructor != Object) {
+                        send_ws(JSON.stringify({
+                            kind: "error",
+                            message: "Invalid_Type"
+                        }))
+                        return;
                     }
                     var kind = msg.kind;
                     // Begin calling a websocket function for the necessary request
@@ -2121,12 +2214,12 @@ async function initialize_server_components() {
                 }
             }
             // Some messages might have been received before the socket finished opening
-			if(pre_queue.length > 0) {
+            if(pre_queue.length > 0) {
                 for(var p = 0; p < pre_queue.length; p++) {
                     onMessage(pre_queue[p]);
                     pre_queue.splice(p, 1)
+                    p--;
                 }
-                pre_queue.splice(0);
             }
         } catch(e) {
             handle_error(e);
@@ -2144,6 +2237,219 @@ function start_server() {
             console.log(e);
         }
     })();
+}
+
+function TerminalMessage(cWidth, cHeight) {
+    var charField = new Array(cWidth * cHeight).fill(" ");
+    var foreColorField = new Array(cWidth * cHeight).fill("");
+    var backColorField = new Array(cWidth * cHeight).fill("");
+
+    var chrInf = {
+        vPipe: "\u2551",
+        hPipe: "\u2550",
+        tlPipe: "\u2554",
+        trPipe: "\u2557",
+        blPipe: "\u255a",
+        brPipe: "\u255d",
+        mShade: "\u2592"
+    }
+
+    var fore_colors = {
+        black:          "30",
+        red:            "31",
+        green:          "32",
+        yellow:         "33",
+        blue:           "34",
+        magenta:        "35",
+        cyan:           "36",
+        white:          "37",
+        bright_black:   "30;1",
+        bright_red:     "31;1",
+        bright_green:   "32;1",
+        bright_yellow:  "33;1",
+        bright_blue:    "34;1",
+        bright_magenta: "35;1",
+        bright_cyan:    "36;1",
+        bright_white:   "37;1"
+    };
+    
+    var back_colors = {
+        black:          "40",
+        red:            "41",
+        green:          "42",
+        yellow:         "43",
+        blue:           "44",
+        magenta:        "45",
+        cyan:           "46",
+        white:          "47",
+        bright_black:   "100",
+        bright_red:     "101",
+        bright_green:   "102",
+        bright_yellow:  "103",
+        bright_blue:    "104",
+        bright_magenta: "105",
+        bright_cyan:    "106",
+        bright_white:   "107"
+    };
+
+    this.setChar = function(chr, x, y, fore, back) {
+        if(x < 0 || y < 0 || x >= cWidth || y >= cHeight) return;
+        var idx = y * cWidth + x;
+        if(chr == "\r" || chr == "\n" || chr.length != 1) chr = " ";
+        charField[idx] = chr;
+        if(fore) {
+            foreColorField[idx] = fore_colors[fore]
+        } else if(fore != "i") {
+            foreColorField[idx] = "";
+        }
+        if(back) {
+            backColorField[idx] = back_colors[back]
+        } else if(back != "i") {
+            backColorField[idx] = "";
+        }
+    }
+
+    this.setSquare = function(x1, y1, x2, y2, fore, back) {
+        var tmp;
+        // flip x positions if the X is greater than Y
+        if(x1 > x2) {
+            tmp = x1;
+            x1 = x2;
+            x2 = tmp;
+        }
+        if(y1 > y2) {
+            tmp = y1;
+            y1 = y2;
+            y2 = tmp;
+        }
+
+        // 4 corners
+        this.setChar(chrInf.tlPipe, x1, y1, fore, back)
+        this.setChar(chrInf.brPipe, x2, y2, fore, back)
+        this.setChar(chrInf.trPipe, x2, y1, fore, back)
+        this.setChar(chrInf.blPipe, x1, y2, fore, back)
+
+        // 2 horizontal lines
+        for(var x = 0; x < x2 - x1 - 1; x++) {
+            this.setChar(chrInf.hPipe, x + x1 + 1, y1, fore, back);
+            this.setChar(chrInf.hPipe, x + x1 + 1, y2, fore, back);
+        }
+
+        // 2 vertical lines
+        for(var y = 0; y < y2 - y1 - 1; y++) {
+            this.setChar(chrInf.vPipe, x1, y + y1 + 1, fore, back);
+            this.setChar(chrInf.vPipe, x2, y + y1 + 1, fore, back);
+        }
+    }
+
+    this.setText = function(text, x, y, fore, back) {
+        var cx = x;
+        var cy = y;
+        for(var i = 0; i < text.length; i++) {
+            var chr = text[i];
+            if(chr == "\n") {
+                cx = c;
+                cy++;
+                continue;
+            }
+            this.setChar(chr, cx, cy, fore, back);
+            cx++;
+        }
+    }
+
+    this.setBack = function(back) {
+        for(var i = 0; i < backColorField.length; i++) {
+            backColorField[i] = back_colors[back];
+        }
+    }
+
+    // render the char field into a string to be logged to the terminal
+    this.render = function() {
+        var res = "";
+
+        var use_color = false;
+        var prev_back = "";
+        var prev_fore = "";
+        var prev_is_bright = false;
+
+        var xNl = 0;
+        // is space, reset fore color
+        for(var i = 0; i < charField.length; i++) {
+            if(charField[i] == " ") foreColorField[i] = "";
+        }
+
+        for(var i = 0; i < charField.length; i++) {
+            // with color escape optimizations
+            var foreCol = foreColorField[i];
+            var backCol = backColorField[i];
+
+            var foreColD = foreCol; // original copy of color info (original will get modified)
+            var backColD = backCol;
+            if(foreCol || backCol) use_color = true;
+
+            var col_cmp = "";
+
+            if(backCol && prev_back == backCol) backCol = "";
+            if(foreCol && prev_fore == foreCol) foreCol = "";
+
+            if(foreCol && !backCol) col_cmp = foreCol;
+            if(!foreCol && backCol) col_cmp = backCol;
+            if(foreCol && backCol) col_cmp = foreCol + ";" + backCol;
+
+            var fBlank = false;
+            var bBlank = false;
+            var blank = "";
+
+            // detect if the current character has no color information, but the previous character did
+            if(prev_back && !backColD) {
+                backCol = "";
+                prev_back = "";
+                bBlank = true;
+            }
+            if(prev_fore && !foreColD) {
+                foreCol = "";
+                prev_fore = "";
+                fBlank = true;
+            }
+            // reset to terminal default colors
+            if(fBlank && !bBlank) blank = "\x1b[" + "37" + "m";
+            if(!fBlank && bBlank) blank = "\x1b[" + "40" + "m";
+            if(fBlank && bBlank) blank = "\x1b[" + "0" + "m";
+            res += blank;
+
+            // reset brightness
+            if(prev_is_bright && !foreColD.endsWith(";1")) {
+                res += "\x1b[0m";
+            }
+
+            // set the color of the character
+            if(col_cmp) res += "\x1b[" + col_cmp + "m";
+            res += charField[i];
+
+            if(backCol) prev_back = backCol;
+            if(foreCol) prev_fore = foreCol;
+            if(foreColD.endsWith(";1")) {
+                prev_is_bright = true;
+            } else {
+                prev_is_bright = false;
+            }
+            
+            // detect newlines
+            xNl++;
+            if(xNl >= cWidth) {
+                xNl = 0;
+                if(i != charField.length - 1) res += "\n";
+            }
+        }
+
+        if(use_color) {
+            res += "\x1b[0m"; // terminal reset
+        }
+
+        return res;
+    }
+
+    return this;
 }
 
 var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -2344,7 +2650,9 @@ var global_data = {
     NCaseCompare,
     handle_error,
     retrieveChatHistory,
-    client_ips
+    client_ips,
+    modify_bypass_key,
+    get_bypass_key: function() { return bypass_key_cache }
 }
 
 function stopPrompt() {

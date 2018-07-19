@@ -80,7 +80,8 @@ $("body").on("mousemove.admclr", function(e) {
         if(admclr.lastPos[0] == currentPosition[0] && admclr.lastPos[1] == currentPosition[1]) {
             return;
         }
-        tiles[admclr.lastPos[1] + "," + admclr.lastPos[0]].backgroundColor = "";
+        var tileBackColorRes = tiles[admclr.lastPos[1] + "," + admclr.lastPos[0]];
+        if(tileBackColorRes) tileBackColorRes.backgroundColor = "";
         // re-render the tile
         renderTile(admclr.lastPos[0], admclr.lastPos[1], true);
     }

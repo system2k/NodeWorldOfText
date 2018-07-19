@@ -193,6 +193,19 @@
 							Allows certain users to chat in this page. Not affected by read permissions nor write permissions.
 						</td>
 					</tr>
+					<tr>
+						<td class="feature_name">Change text colors</td>
+						<td>
+							<select name="color_text">
+								<option value="0"{%if color_text==0%} selected{%endif%}>anyone</option>
+								<option value="1"{%if color_text==1%} selected{%endif%}>me and members</option>
+								<option value="2"{%if color_text==2%} selected{%endif%}>only me</option>
+							</select>
+						</td>
+						<td class="feature_description">
+							Change the color of your text.
+						</td>
+					</tr>
 				</table>
 				<input type="hidden" name="form" value="features">
 				<input type="submit" value="Submit">
