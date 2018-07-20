@@ -110,7 +110,9 @@ module.exports.GET = async function(req, serve, vars, params) {
             page_title,
             nsfw: world_properties.page_is_nsfw
         }
-        serve(HTML("yourworld.html", data));
+        serve(HTML("yourworld.html", data), null, {
+            mime: "text/html; charset=utf-8"
+        });
     }
 }
 

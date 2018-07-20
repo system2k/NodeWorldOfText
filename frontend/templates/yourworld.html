@@ -1,4 +1,4 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html lang="en">
     <head>
         <title>{{ page_title }}</title>
@@ -69,13 +69,13 @@
         <div id="color_input_modal" style="display:none">
             <form method="get" action="#" id="color_input_form">
                 <div id="color_input_title" style="max-width:20em"></div>
-                <br><label for="color_input">Color Code: <input class="jscolor" value="000000" id="color_input_form_input">
+                <br><label for="color_input">Color Code: </label><input class="jscolor" value="000000" id="color_input_form_input">
                 <div id="color_input_submit"><input type="submit" value="   Go   "> or <span id="color_input_cancel" class="simplemodal-close simplemodal-closelink">cancel</span></div>
             </form>
         </div>
         <h1 id="loading">Loading...</h1>
-        <div style="display:none"><input type='hidden' name='csrfmiddlewaretoken' value='{{ user.csrftoken }}' /></div>
-        <script type="text/javascript">
+        <div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ user.csrftoken }}" /></div>
+        <script>
             var state = {{ state|safe }};
         </script>
 
@@ -146,25 +146,25 @@
         </div>
 
         {% if nsfw %}
-        <script type="text/javascript" src="/static/yw/javascript/nsfw.js"></script>
+        <script src="/static/yw/javascript/nsfw.js"></script>
         {% endif %}
-        <script type="text/javascript" src="/static/jquery-1.7.min.js"></script>
-        <script type="text/javascript" src="/static/jquery-ui-1.7.2.custom.min.js"></script>
-        <script type="text/javascript" src="/static/jquery.simplemodal-1.3.3.mod.js"></script>
-        <script type="text/javascript" src="/static/reconnecting-ws.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/CoordinateInputModal.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/URLInputModal.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/ColorInputModal.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/menu.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/helpers.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/permissions.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/image_loading.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/ui.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/chat.js"></script>
-        <script type="text/javascript" src="/static/yw/javascript/owot.js"></script>
-        <script type="text/javascript" src="/static/jscolor.min.js"></script>
+        <script src="/static/jquery-1.7.min.js"></script>
+        <script src="/static/jquery-ui-1.7.2.custom.min.js"></script>
+        <script src="/static/jquery.simplemodal-1.3.3.mod.js"></script>
+        <script src="/static/reconnecting-ws.js"></script>
+        <script src="/static/yw/javascript/CoordinateInputModal.js"></script>
+        <script src="/static/yw/javascript/URLInputModal.js"></script>
+        <script src="/static/yw/javascript/ColorInputModal.js"></script>
+        <script src="/static/yw/javascript/menu.js"></script>
+        <script src="/static/yw/javascript/helpers.js"></script>
+        <script src="/static/yw/javascript/permissions.js"></script>
+        <script src="/static/yw/javascript/image_loading.js"></script>
+        <script src="/static/yw/javascript/ui.js"></script>
+        <script src="/static/yw/javascript/chat.js"></script>
+        <script src="/static/yw/javascript/owot.js"></script>
+        <script src="/static/jscolor.min.js"></script>
         {% if user.superuser %}
-            <script type="text/javascript" src="/static/yw/javascript/adminWorldUI.js"></script>
+            <script src="/static/yw/javascript/adminWorldUI.js"></script>
         {% endif %}
     </body>
 </html>

@@ -9,7 +9,7 @@ function init_dom() {
     owot = $("#owot")[0];
     owot.hidden = false;
     owot.style.cursor = "text";
-    textInput = $("#textInput");
+    textInput = document.getElementById("textInput");
     textLayer = $("#text")[0];
     textLayer.hidden = false;
     textLayer.style.pointerEvents = "none";
@@ -642,7 +642,7 @@ $(document).on("keydown", function(e) {
     if(!worldFocused) return;
     // 67 = c, 77 = m
     if(!e.ctrlKey || (e.keyCode != 67 && e.keyCode != 77)) return;
-    textInput[0].value = "";
+    textInput.value = "";
 	// ctrl + c to copy characters where the text cursor is,
 	// ctrl + m to copy characters where the mouse cursor is
 	var pos_ref = cursorCoords
@@ -662,7 +662,7 @@ $(document).on("keydown", function(e) {
 $(document).on("keydown", function(e) {
     if(!worldFocused) return;
     if(!(e.altKey && e.keyCode == 67)) return // if not alt + c, return
-    textInput[0].value = "";
+    textInput.value = "";
     // alt + c to use color of text cell (where mouse cursor is) as main color
     var pos = currentPosition;
     if(!pos) return;
@@ -699,8 +699,7 @@ textLayer.height = height;
 if (window.MozWebSocket)
     window.WebSocket = window.MozWebSocket;
 
-var wsaddr, ws_scheme, path;
-var default_ws_path = null;
+var wsaddr, ws_scheme, path, ws_path;
 function createWsPath() {
     wsaddr = window.location.host;
     ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
@@ -871,7 +870,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
     // stop paste
     clearInterval(pasteInterval);
     write_busy = false;
-    textInput[0].value = "";
+    textInput.value = "";
 
     if(w.isLinking) {
         doLink();
@@ -1206,7 +1205,7 @@ var write_busy = false; // busy pasting
 var pasteInterval;
 var char_input_check = setInterval(function() {
     if(write_busy) return;
-    var value = textInput[0].value;
+    var value = textInput.value;
     if(value == "") return;
     value = value.replace(/\r\n/g, "\n");
     value = value.replace(/\r/g, "\n");
@@ -1214,7 +1213,7 @@ var char_input_check = setInterval(function() {
     var index = 1;
     writeChar(value[0]);
     if(value.length == 1) {
-        textInput[0].value = "";
+        textInput.value = "";
         return
     };
     if (Permissions.can_paste(state.userModel, state.worldModel)) {
@@ -1227,17 +1226,17 @@ var char_input_check = setInterval(function() {
             }
             index++
             if(index >= value.length) {
-                textInput[0].value = "";
+                textInput.value = "";
                 clearInterval(pasteInterval);
                 write_busy = false;
             }
         }, 1)
     } else {
-        textInput[0].value = "";
+        textInput.value = "";
     }
 }, 10);
 
-$(document).on("keydown", function(e) {
+document.onkeydown = function(e) {
     if(!worldFocused) return;
     var key = e.keyCode;
     if(w._state.uiModal) return;
@@ -1272,7 +1271,7 @@ $(document).on("keydown", function(e) {
             linkAuto.active = false;
             break;
     }
-})
+}
 
 var colors = ["#660066", "#003366", "#ff9900", "#ff0066", "#003300", "#ff0000", "#3a3a3a", "#006666", "#3399ff", "#3333ff", "#000000"]
 function assignColor(username) {
