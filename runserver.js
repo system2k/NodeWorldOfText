@@ -655,6 +655,7 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^administrator/users/by_username/(.*)[\\/]?$", pages.administrator_users_by_username],
     ["^administrator/users/by_id/(.*)[\\/]?$", pages.administrator_users_by_id],
     ["^accounts/nsfw/(.*)[\\/]?$", pages.accounts_nsfw],
+    ["^administrator/world_restore[\\/]?$", pages.administrator_world_restore],
     ["^([\\w\\/\\.\\-\\~]*)$", pages.yourworld, { remove_end_slash: true }]
 ]
 

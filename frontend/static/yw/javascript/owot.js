@@ -1343,10 +1343,25 @@ function getTileCoordsFromMouseCoords(x, y, ignoreZoomRatio) {
 }
 
 function getRange(x1, y1, x2, y2) {
+    var tmp;
+    if(x1 > x2) {
+        tmp = x1;
+        x1 = x2;
+        x2 = tmp;
+    }
+    if(y1 > y2) {
+        tmp = y1;
+        y1 = y2;
+        y2 = tmp;
+    }
+
+    assert(intmax([x1, y1, x2, y2]), "Ranges too large")
+
     var coords = [];
     for(var y = y1; y <= y2; y++) {
         for(var x = x1; x <= x2; x++) {
             coords.push([x, y]);
+            if(coords.length >= 10000) throw "Array too large";
         }
     }
     return coords;

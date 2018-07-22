@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}
+	World Restore | Our World of Text
+{% endblock %}
+
+{% block header %}
+	<h1>World Restore</h1>
+    <span><a href="/administrator/">« Back to Admin Panel</a></span>
+    <style>
+        .titlebar {
+            width: 100%;
+            color: white;
+            display: block;
+            text-align: center;
+            font-family: monospace;
+            font-size: 15px;
+        }
+        .progressbar {
+            border-width: 1px;
+            border-style: solid;
+            width: 450px;
+            height: 20px;
+            background-color: #d7d7d7;
+        }
+        .panel {
+            width: 500px;
+            border-style: solid;
+            border-color: #1111FF;
+            margin-bottom: 5px;
+        }
+        .panelContent {
+            padding: 3px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="panel">
+        <div style="width: 100%; background-color: #000000;">
+            <span class="titlebar">Restore world from edit database</span>
+        </div>
+        <div class="panelContent">
+            <div style="padding-bottom: 4px;">
+                <label>World name: </label><input style="width: 460px;" id="filename">
+            </div>
+            <div style="padding-bottom: 4px;">
+                <label>Time code: </label><input style="width: 100px;" id="password">
+            </div>
+            <div style="text-align: right;">
+                <button onclick="upload();" id="upbtn">Begin process</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
