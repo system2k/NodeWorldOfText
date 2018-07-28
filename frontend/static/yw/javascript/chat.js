@@ -17,6 +17,7 @@ if(!canChat) { // can't chat, adjust the chat window for it
 }
 
 function api_chat_send(message, opts) {
+	message = message.replace(/\uFDFD/g, '');
     if(!message) return;
     if(!opts) opts = {};
     var exclude_commands = opts.exclude_commands;

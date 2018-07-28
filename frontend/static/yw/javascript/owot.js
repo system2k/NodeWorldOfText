@@ -1493,7 +1493,18 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             linkElm.title = "Link to coordinates " + pos;
             linkElm.href = "javascript:void(0);";
             linkElm.onclick = function() {
-                w.doGoToCoord(link[0].link_tileY, link[0].link_tileX)
+				function doGoToCoord(y, x) {
+					var maxX = 14073748835532; // do not go beyond these coords
+					var maxY = 15637498706147;
+					if(x > maxX || x < -maxX || y > maxY || y < -maxY) {
+						return;
+					}
+					positionX = -x * tileW * 4;
+					positionY = y * tileH * 4;
+					renderTiles();
+				}
+                // w.doGoToCoord(link[0].link_tileY, link[0].link_tileX)
+				doGoToCoord(link[0].link_tileY, link[0].link_tileX)
             }
             linkElm.target = "";
         }
@@ -2424,7 +2435,20 @@ function buildMenu() {
     });
     menu.addOption("Change color", w.color);
     if (Permissions.can_go_to_coord(state.userModel, state.worldModel)) {
-        menu.addOption("Go to coordinates", w.goToCoord);
+		// menu.addOption("Go to coordinates", w.goToCoord);
+        menu.addOption("Go to coordinates", function goToCoord() {
+			// w._ui.coordinateInputModal.open("Go to coordinates:", w.doGoToCoord.bind(w));
+			w._ui.coordinateInputModal.open("Go to coordinates:", function doGoToCoord(y, x) {
+				var maxX = 14073748835532; // do not go beyond these coords
+				var maxY = 15637498706147;
+				if(x > maxX || x < -maxX || y > maxY || y < -maxY) {
+					return;
+				}
+				positionX = -x * tileW * 4;
+				positionY = y * tileH * 4;
+				renderTiles();
+			}.bind(w));
+		});
     }
     if (Permissions.can_coordlink(state.userModel, state.worldModel)) {
         menu.addOption("Create link to coordinates", w.coordLink);
@@ -2526,19 +2550,6 @@ var w = {
             YourWorld.Color = this_color;
             localStorage.setItem('color', this_color);
         });
-    },
-    goToCoord: function() {
-        w._ui.coordinateInputModal.open("Go to coordinates:", w.doGoToCoord.bind(w));
-    },
-    doGoToCoord: function(y, x) {
-        var maxX = 14073748835532; // do not go beyond these coords
-        var maxY = 15637498706147;
-        if(x > maxX || x < -maxX || y > maxY || y < -maxY) {
-            return;
-        }
-        positionX = -x * tileW * 4;
-        positionY = y * tileH * 4;
-        renderTiles();
     },
     getCenterCoords: function() {
         return [-positionY / tileH, -positionX / tileW]
