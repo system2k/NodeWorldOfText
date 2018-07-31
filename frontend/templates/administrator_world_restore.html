@@ -16,13 +16,6 @@
             font-family: monospace;
             font-size: 15px;
         }
-        .progressbar {
-            border-width: 1px;
-            border-style: solid;
-            width: 450px;
-            height: 20px;
-            background-color: #d7d7d7;
-        }
         .panel {
             width: 500px;
             border-style: solid;
@@ -42,14 +35,64 @@
         </div>
         <div class="panelContent">
             <div style="padding-bottom: 4px;">
-                <label>World name: </label><input style="width: 460px;" id="filename">
+                <label>World name: </label><input style="width: 460px;" id="worldname">
             </div>
             <div style="padding-bottom: 4px;">
-                <label>Time code: </label><input style="width: 100px;" id="password">
+                <label>Time code: </label><input style="width: 100px;" id="timecode">
             </div>
             <div style="text-align: right;">
-                <button onclick="upload();" id="upbtn">Begin process</button>
+                <button onclick="begin_process();" id="be_button">Begin process</button>
             </div>
         </div>
+        <span id="com" style="display: none;">---</span>
     </div>
+    <script>
+        var be_button = document.getElementById("be_button");
+        function begin_process() {
+            be_button.innerText = "Restoring...";
+            be_button.disabled = true;
+            var world = document.getElementById("worldname").value;
+            var timecode = document.getElementById("timecode").value;
+            var com = document.getElementById("com");
+            com.style.display = "";
+            com.innerText = "Restoring is in progress...";
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("post", "/administrator/world_restore/", true);
+
+            xhr.onload = function(res, b) {
+                var res = xhr.responseText;
+                com.style.display = "";
+                be_button.innerText = "Begin process";
+                be_button.disabled = false;
+                // errors
+                if(res == "NO_WORLD") {
+                    com.style.color = "red";
+                    com.innerText = "This world does not exist";
+                    return;
+                } else if(res == "MANY_EDITS") {
+                    com.style.color = "red";
+                    com.innerText = "This world has too many edits";
+                    return;
+                } else if(res == "NO_EDITS") {
+                    com.style.color = "red";
+                    com.innerText = "This world has no edits";
+                    return;
+                }
+
+                // successful events
+                if(res == "COMPLETED") {
+                    com.style.color = "";
+                    com.innerText = "World restoration has completed";
+                    return;
+                }
+
+                // no response data
+                com.style.color = "red";
+                com.innerText = "The request has completed with no response data";
+            }
+
+            xhr.send("world=" + world + "&time=" + timecode);
+        }
+    </script>
 {% endblock %}

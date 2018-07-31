@@ -55,7 +55,10 @@ module.exports.POST = async function(req, serve, vars) {
     await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
         [user.id, 0, 0, 0, Date.now(), "@" + JSON.stringify({
             kind: "administrator_user",
-            user_edit,
+            user_edit: {
+                id: user_edit.id,
+                username: user_edit.username
+            },
             post_data
         })]);
 

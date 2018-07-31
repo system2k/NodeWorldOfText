@@ -26,6 +26,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         announcement_update_msg: params.announcement_update_msg,
         cons_update_msg: params.cons_update_msg,
         uptime: uptime(),
+        machine_uptime: uptime(process.hrtime()[0] * 1000),
         client_num,
         bypass_key: get_bypass_key()
     }
@@ -59,8 +60,13 @@ module.exports.POST = async function(req, serve, vars) {
         await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
             [user.id, 0, 0, 0, Date.now(), "@" + JSON.stringify({
                 kind: "administrator_announce",
-                post_data,
-                user
+                post_data: {
+                    announcement: post_data.announcement,
+                },
+                user: {
+                    id: user.id,
+                    username: user.username
+                }
             })]);
     
         return await dispage("administrator", {

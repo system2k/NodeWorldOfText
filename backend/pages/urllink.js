@@ -70,9 +70,11 @@ module.exports.POST = async function(req, serve, vars, params) {
     var tileY = parseInt(post_data.tileY);
     var charX = parseInt(post_data.charX);
     var charY = parseInt(post_data.charY);
+    var link_tileY = null;
+    var link_tileX = null;
     if(link_type == 1) {
-        var link_tileY = parseInt(post_data.link_tileY);
-        var link_tileX = parseInt(post_data.link_tileX);
+        link_tileY = parseInt(post_data.link_tileY);
+        link_tileX = parseInt(post_data.link_tileX);
     }
 
     var numb_check = [tileX, tileY, charX, charY]; // check if the arguments are not numbers
@@ -127,7 +129,7 @@ module.exports.POST = async function(req, serve, vars, params) {
     if(link_type == 0) {
         tile_props.cell_props[charY][charX].link = {
             type: "url",
-            url: post_data.url.slice(0, 10000) // size limit of urls
+            url: post_data.url.slice(0, 10064) // size limit of urls
         }
     } else if(link_type == 1) {
         tile_props.cell_props[charY][charX].link = {
@@ -137,13 +139,24 @@ module.exports.POST = async function(req, serve, vars, params) {
         }
     }
 
+    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+        [user.id, world.id, tileY, tileX, Date.now(), "@" + JSON.stringify({
+            kind: "link",
+            charX,
+            charY,
+            link_type,
+            link_tileX: link_tileX,
+            link_tileY: link_tileX,
+            url: post_data.url.slice(0, 10064)
+        })]);
+
     var content = " ".repeat(128);
     var actual_writability = null;
     if(tile) {
         content = tile.content;
         actual_writability = tile.writability;
-        await db.run("UPDATE tile SET properties=? WHERE world_id=? AND tileY=? AND tileX=?",
-            [JSON.stringify(tile_props), world.id, tileY, tileX])
+        await db.run("UPDATE tile SET properties=? WHERE id=?",
+            [JSON.stringify(tile_props), tile.id])
     } else {
         await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, null, ?)",
             [world.id, " ".repeat(128), tileY, tileX, JSON.stringify(tile_props), Date.now()])

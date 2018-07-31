@@ -16,9 +16,20 @@ if(!canChat) { // can't chat, adjust the chat window for it
     $("#chat_open").hide();
 }
 
+if(!String.prototype.startsWith) {
+    console.log("String.startsWith not supported. Using polyfill.");
+    String.prototype.startsWith = function(str) {
+        if(str.length > this.length) return false;
+        for(var i = 0; i < str.length; i++) {
+            if(str.charAt(i) != this.charAt(i)) return false;
+        }
+        return true;
+    }
+}
+
 function api_chat_send(message, opts) {
-	message = message.replace(/\uFDFD/g, '');
     if(!message) return;
+    message = message.replace(/\uFDFD/g, "");
     if(!opts) opts = {};
     var exclude_commands = opts.exclude_commands;
     var nick = opts.nick || YourWorld.Nickname;

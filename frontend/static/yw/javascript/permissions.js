@@ -110,12 +110,16 @@ Permissions = {
 	},
 	can_chat: function(user, world) {
 		return Permissions.user_matches_perm(user, world, world.chat_permission);
+	},
+	can_color_text: function(user, world) {
+		return Permissions.user_matches_perm(user, world, world.color_text);
 	}
 };
+
 {
-	Object.defineProperty(window, 'Permissions', {
-	  value: Permissions,
-	  writable: false
+	Object.defineProperty(window, "Permissions", {
+		value: Permissions,
+		writable: false
 	});
 	var keys = Object.keys(Permissions);
 	for(var i = 0; i < keys.length; i++) {

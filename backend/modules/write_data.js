@@ -107,24 +107,30 @@ module.exports = async function(data, vars) {
     if(color_text == 2 && !is_owner) can_color_text = false;
 
     var edits = data.edits;
+    if(!edits) return;
+    if(!Array.isArray(edits)) return;
+    
     var total_edits = 0;
     var tiles = {};
     // organize edits into tile coordinates
     for(var i = 0; i < edits.length; i++) {
+        var segment = edits[i];
+        if(!segment || !Array.isArray(segment)) continue;
+
         total_edits++;
-        if(typeof edits[i][5] != "string") {
+        if(typeof segment[5] != "string") {
             continue;
         }
-        edits[i][0] = san_nbr(edits[i][0]);
-        edits[i][1] = san_nbr(edits[i][1]);
+        segment[0] = san_nbr(segment[0]);
+        segment[1] = san_nbr(segment[1]);
 
-        if (!tiles[edits[i][0] + "," + edits[i][1]]) {
-            tiles[edits[i][0] + "," + edits[i][1]] = []
+        if (!tiles[segment[0] + "," + segment[1]]) {
+            tiles[segment[0] + "," + segment[1]] = []
         }
-        edits[i][5] = edits[i][5].replace(/\n/g, " ")
-        edits[i][5] = edits[i][5].replace(/\r/g, " ")
-        edits[i][5] = edits[i][5].replace(/\x1b/g, " ")
-        tiles[edits[i][0] + "," + edits[i][1]].push(edits[i])
+        segment[5] = segment[5].replace(/\n/g, " ")
+        segment[5] = segment[5].replace(/\r/g, " ")
+        segment[5] = segment[5].replace(/\x1b/g, " ")
+        tiles[segment[0] + "," + segment[1]].push(segment)
         if(total_edits >= edits_limit) { // edit limit reached
             break;
         }
@@ -342,8 +348,8 @@ module.exports = async function(data, vars) {
                 accepted_changes.push(eLog)
             }
             if(tile) { // tile exists, update
-                await db.run("UPDATE tile SET (content, properties)=(?, ?) WHERE world_id=? AND tileY=? AND tileX=?",
-                    [tile_data, JSON.stringify(properties), world.id, tileY, tileX])
+                await db.run("UPDATE tile SET (content, properties)=(?, ?) WHERE id=?",
+                    [tile_data, JSON.stringify(properties), tile.id])
             } else { // tile doesn't exist, insert
                 await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, null, ?)",
                     [world.id, tile_data, tileY, tileX, JSON.stringify(properties), date])

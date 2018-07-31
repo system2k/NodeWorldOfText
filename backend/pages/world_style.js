@@ -36,5 +36,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         menu: menuColor
     }
 
-    serve(JSON.stringify(style))
+    serve(JSON.stringify(style), null, {
+        mime: "application/json"
+    })
 }

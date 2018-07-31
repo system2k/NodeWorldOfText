@@ -37,6 +37,8 @@ var DATA_PATH = "../data/";
 var DATA_PATH_TEST = DATA_PATH + "test/";
 
 Error.stackTraceLimit = Infinity;
+if(!global.AsyncFunction) var AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+
 var isTestServer = false;
 
 var intv = {}; // intervals and timeouts
@@ -302,7 +304,7 @@ function loadEmail() {
             }
         });
     } catch(e) {
-        log_error(e);
+        handle_error(e);
         email_available = false;
         console.log("\x1b[31;1mEmail disabled. Error message: " + JSON.stringify(process_error_arg(e)) + "\x1b[0m");
     }
@@ -311,7 +313,7 @@ function loadEmail() {
             transporter.verify()
         }
     } catch(e) {
-        log_error(e);
+        handle_error(e);
         email_available = false;
         console.log("\x1b[31;1mEmail is disabled because the verification failed (credentials possibly incorrect)" + JSON.stringify(process_error_arg(e)) + "\x1b[0m");
     }
@@ -871,7 +873,7 @@ function wait_response_data(req, dispatch) {
                     resolve(null);
                 }
             } catch(e) {
-                log_error(e);
+                handle_error(e);
             }
         });
         req.on("end", function() {
@@ -1026,13 +1028,16 @@ function plural(int, plEnding) {
 async function world_get_or_create(name, do_not_create, force_create) {
     name += "";
     if(typeof name != "string") name = "";
+    if(name.length > 10000) {
+        do_not_create = true;
+    }
     var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
     if(!world) { // world doesn't exist, create it
         if((name.match(/^([\w\.\-]*)$/g) && !do_not_create) || force_create) {
             var date = Date.now();
-            await db.run("INSERT INTO world VALUES(null, ?, null, ?, 2, 0, 0, 0, 0, '', '', '', '', '', '', 0, 0, '{}')",
+            var rw = await db.run("INSERT INTO world VALUES(null, ?, null, ?, 2, 0, 0, 0, 0, '', '', '', '', '', '', 0, 0, '{}')",
                 [name, date])
-            world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name)
+            world = await db.get("SELECT * FROM world WHERE id=?", rw.lastID)
         } else { // special world names that must not be created
             return false;
         }
@@ -1155,58 +1160,59 @@ process.on("uncaughtException", function(e) {
 
 var start_time = Date.now();
 var _time_ago = ["millisecond", "second", "minute", "hour", "day", "month", "year"];
-function uptime() {
+function uptime(custom_ms_ago) {
     // (milliseconds ago)
-	var seconds_ago = Date.now() - start_time;
+    var difference = custom_ms_ago || (Date.now() - start_time);
+    var milliseconds_ago = difference;
     var _data = _time_ago[0];
     var show_minutes = true; // EG: ... and 20 minutes
     var divided = 1;
-	if(seconds_ago >= 30067200000) {
+	if(milliseconds_ago >= 30067200000) {
         _data = _time_ago[6];
         divided = 30067200000;
-		seconds_ago = Math.floor(seconds_ago / divided);
-	} else if(seconds_ago >= 2505600000) {
+		milliseconds_ago = Math.floor(milliseconds_ago / divided);
+	} else if(milliseconds_ago >= 2505600000) {
         _data = _time_ago[5];
         divided = 2505600000;
-		seconds_ago = Math.floor(seconds_ago / divided);
-	} else if(seconds_ago >= 86400000) {
+		milliseconds_ago = Math.floor(milliseconds_ago / divided);
+	} else if(milliseconds_ago >= 86400000) {
         _data = _time_ago[4];
         divided = 86400000;
-		seconds_ago = Math.floor(seconds_ago / divided);
-	} else if(seconds_ago >= 3600000) {
+		milliseconds_ago = Math.floor(milliseconds_ago / divided);
+	} else if(milliseconds_ago >= 3600000) {
         _data = _time_ago[3];
         divided = 3600000;
-		seconds_ago = Math.floor(seconds_ago / divided);
-    } else if(seconds_ago >= 60000) {
+		milliseconds_ago = Math.floor(milliseconds_ago / divided);
+    } else if(milliseconds_ago >= 60000) {
         _data = _time_ago[2];
         divided = 60000;
         show_minutes = false;
-		seconds_ago = Math.floor(seconds_ago / divided);
-    } else if(seconds_ago >= 1000) {
+		milliseconds_ago = Math.floor(milliseconds_ago / divided);
+    } else if(milliseconds_ago >= 1000) {
         _data = _time_ago[1];
         divided = 1000;
         show_minutes = false;
-		seconds_ago = Math.floor(seconds_ago / divided);
+		milliseconds_ago = Math.floor(milliseconds_ago / divided);
 	} else {
         show_minutes = false;
     }
-	if(seconds_ago !== 1) {
+	if(milliseconds_ago !== 1) {
 		_data += "s";
     }
     var extra = "";
     if(show_minutes) {
-        var difference = Date.now() - start_time;
-        difference -= divided;
-        if(difference > 0) {
-            difference %= divided
-            difference = Math.floor(difference / 60000);
-            if(difference > 0) {
-                extra = " and " + difference + " minute";
-                if(difference != 1) extra += "s";
+        var t_difference = difference;
+        t_difference -= divided;
+        if(t_difference > 0) {
+            t_difference %= divided
+            t_difference = Math.floor(t_difference / 60000);
+            if(t_difference > 0) {
+                extra = " and " + t_difference + " minute";
+                if(t_difference != 1) extra += "s";
             }
         }
     }
-	return seconds_ago + " " + _data + extra;
+	return milliseconds_ago + " " + _data + extra;
 }
 
 var server = https_reference.createServer(options, async function(req, res) {
@@ -1471,8 +1477,6 @@ function announce(text) {
     })();
 }
 
-// ignore_already_owned: if user already owns world, do not complain that the user
-// owns that world
 async function validate_claim_worldname(worldname, vars, rename_casing, world_id) {
     var user = vars.user;
     var db = vars.db;
@@ -1486,6 +1490,12 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
             message: "Worldname cannot be blank"
         }
     }
+    if(worldname.length > 10000) {
+        return {
+            error: true,
+            message: "Error while claiming this world"
+        }
+    }
     worldname = worldname.split("/");
     for(var i in worldname) {
         // make sure there is no blank segment (superusers bypass this)
@@ -1496,7 +1506,7 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
             }
         }
         // make sure segment is valid
-        if(!(worldname[i].match(/^([\w\.\-]*)$/g) && (worldname[i].length > 0 || user.superuser))) {
+        if(!(worldname[i].match(/^([\w\.\-]*)$/g) && worldname[i].length > 0)) {
             return {
                 error: true,
                 message: "Invalid world name. Contains invalid characters. Must contain either letters, numbers, or _. It can be seperated by /"
@@ -1835,7 +1845,7 @@ function getWorldData(world) {
 
     worldData[ref] = {
         client_id: 1,
-        user_count: 0
+        user_count: 1
     }
 
     return worldData[ref];
@@ -1882,7 +1892,11 @@ function broadcastUserCount() {
                 source: "signal",
                 kind: "user_count",
                 count: new_count
-            }, user_world);
+            }, user_world, {
+                isChat: true,
+                clientId: 0,
+                chat_perm: "INHERIT"
+            });
         }
     }
 }
@@ -1923,7 +1937,7 @@ function initPingAuto() {
             try {
                 ws.ping("keepalive")
             } catch(e) {
-                log_error(e);
+                handle_error(e);
             };
         })
     }, 1000 * 30)
@@ -1981,14 +1995,16 @@ async function initialize_server_components() {
                 if(client.readyState == WebSocket.OPEN &&
                 world == void 0 || NCaseCompare(client.world_name, world)) {
                     if(opts.isChat) {
+                        // when Inherited, it refers to the client's cached settings to avoid constant db lookups
+                        if(opts.chat_perm == "INHERIT") opts.chat_perm = client.chat_permission;
                         if(opts.chat_perm == 1) if(!(client.is_member || client.is_owner)) return;
                         if(opts.chat_perm == 2) if(!client.is_owner) return;
-                        if(client.chat_blocks.indexOf(opts.clientId) > -1) return;
+                        if(client.chat_blocks && client.chat_blocks.indexOf(opts.clientId) > -1) return;
                     }
                     client.send(data);
                 }
             } catch(e) {
-                log_error(e);
+                handle_error(e);
             }
         });
     };
@@ -2013,8 +2029,8 @@ async function initialize_server_components() {
         var ipHeaderAddr = "Unknown"
         try {
             var rnd = Math.floor(Math.random() * 1E4);
-            var forwd = req.headers["x-forwarded-for"];
-            var realIp = req.headers["X-Real-IP"];
+            var forwd = req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"];
+            var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
             if(!forwd) forwd = "None;" + rnd;
             if(!realIp) realIp = "None;" + rnd;
             ipHeaderAddr = forwd + " & " + realIp;
@@ -2026,7 +2042,7 @@ async function initialize_server_components() {
             ws.ipHeaderAddr = error_ip;
             ws.ipFwd = error_ip;
             ws.ipReal = error_ip;
-            log_error(e);
+            handle_error(e);
         }
 
         var req_per_second = 133;
@@ -2051,7 +2067,7 @@ async function initialize_server_components() {
         try {
             // must be at the top before any async calls (errors would occur before this event declaration)
             ws.on("error", function(err) {
-                log_error(JSON.stringify(process_error_arg(err)));
+                handle_error(JSON.stringify(process_error_arg(err)));
             });
             var pre_queue = [];
             // adds data to a queue. this must be before any async calls and the message event
@@ -2070,7 +2086,7 @@ async function initialize_server_components() {
                     try {
                         ws.send(data) // not protected by callbacks
                     } catch(e) {
-                        log_error(e);
+                        handle_error(e);
                     };
                 }
             }
@@ -2093,8 +2109,6 @@ async function initialize_server_components() {
             
             ws.world_name = world_name;
 
-            var initial_user_count = getUserCountFromWorld(world_name);
-
             var cookies = parseCookie(req.headers.cookie);
             var user = await get_user_info(cookies, true)
             var channel = new_token(16);
@@ -2115,6 +2129,18 @@ async function initialize_server_components() {
             vars.world = status.world;
             vars.timemachine = status.timemachine
 
+            var properties = JSON.parse(status.world.properties);
+            var chat_permission = properties.chat_permission;
+            if(!chat_permission) chat_permission = 0;
+            ws.chat_permission = chat_permission;
+
+            var can_chat = chat_permission == 0 || (chat_permission == 1 && status.permission.member) || (chat_permission == 2 && status.permission.owner);
+
+            var initial_user_count;
+            if(can_chat) {
+                initial_user_count = getUserCountFromWorld(world_name);
+            }
+
             user.stats = status.permission;
 
             ws.is_member = user.stats.member;
@@ -2130,10 +2156,12 @@ async function initialize_server_components() {
             ws.clientId = clientId;
             ws.chat_blocks = [];
 
+            var sentClientId = clientId;
+            if(!can_chat) sentClientId = -1;
             send_ws(JSON.stringify({
                 kind: "channel",
                 sender: channel,
-                id: clientId,
+                id: sentClientId,
                 initial_user_count
             }))
             onMessage = async function(msg) {

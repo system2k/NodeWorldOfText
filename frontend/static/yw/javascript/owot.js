@@ -49,7 +49,6 @@ var width                  = window.innerWidth;
 var height                 = window.innerHeight;
 var positionX              = 0; // position in client in pixels
 var positionY              = 0;
-var pingInterval           = 50; // in seconds
 var gridEnabled            = false;
 var subgridEnabled         = true; // character-level grid
 var linksEnabled           = true;
@@ -114,6 +113,17 @@ function loadImgPixelData(callback) {
     loadImageElm.onerror = function() {
         error = true;
         loadImageElm.onload();
+    }
+}
+
+if(!Math.trunc) {
+    console.log("Math.trunc is not supported. Using polyfill.");
+    Math.trunc = function(x) {
+        if(x < 0) {
+            return Math.ceil(x)
+        } else {
+            return Math.floor(x);
+        }
     }
 }
 
@@ -213,17 +223,6 @@ function doZoom(percentage) {
             ctx.font = font;
         }
         renderTiles(true);
-    }
-}
-
-if(!Math.trunc) {
-    console.log("Math.trunc is not supported. Using polyfill.");
-    Math.trunc = function(x) {
-        if(x < 0) {
-            return Math.ceil(x)
-        } else {
-            return Math.floor(x);
-        }
     }
 }
 
@@ -982,6 +981,14 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
     stopDragging();
     if(e.target != owot && e.target != linkDiv) return;
 
+    if(e.which == 3) { // right click
+        owot.style.pointerEvents = "none";
+        setTimeout(function() {
+            owot.style.pointerEvents = "";
+        }, 1)
+        return;
+    }
+
     // set cursor
     var pos = getTileCoordsFromMouseCoords(pageX, pageY, true);
     if(tiles[pos[1] + "," + pos[0]] !== void 0) {
@@ -1171,8 +1178,10 @@ function writeChar(char, doNotMoveCursor) {
             }
         }
         // change color
-        color[charY * tileC + charX] = YourWorld.Color;
-        tiles[tileY + "," + tileX].properties.color = color;
+        if(Permissions.can_color_text(state.userModel, state.worldModel)) {
+            color[charY * tileC + charX] = YourWorld.Color;
+            tiles[tileY + "," + tileX].properties.color = color;
+        }
 
         // update cell properties (link positions)
         tiles[tileY + "," + tileX].properties.cell_props = cell_props;
@@ -1191,7 +1200,7 @@ function writeChar(char, doNotMoveCursor) {
             editArray[0] += tileFetchOffsetY;
             editArray[1] += tileFetchOffsetX;
         }
-        if(YourWorld.Color) {
+        if(YourWorld.Color && Permissions.can_color_text(state.userModel, state.worldModel)) {
             editArray.push(YourWorld.Color);
         }
         tellEdit.push([tileX, tileY, charX, charY, nextObjId]);
@@ -1298,9 +1307,27 @@ var OWOT = {
         OWOT.events[type].push(call);
     },
     broadcastCommand: function(data) {
+        /*
+            Clients would receive broadcasted data if they send the following data to the server:
+            {
+                kind: "cmd_opt"
+            }
+            The server will return the following data once mode opt-in is complete:
+            {
+                kind: "cmd_opt",
+                enabled: true
+            }
+            Clients would receive broadcasted data in the following format:
+            {
+                kind: "cmd",
+                data: <utf8 string, maximum length of 2048>,
+                sender: <utf8 string>,
+                source: "cmd"
+            }
+        */
         socket.send(JSON.stringify({
             kind: "cmd",
-            data: data // max len of 1024
+            data: data // max len of 2048
         }))
     }
 };
@@ -1493,18 +1520,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             linkElm.title = "Link to coordinates " + pos;
             linkElm.href = "javascript:void(0);";
             linkElm.onclick = function() {
-				function doGoToCoord(y, x) {
-					var maxX = 14073748835532; // do not go beyond these coords
-					var maxY = 15637498706147;
-					if(x > maxX || x < -maxX || y > maxY || y < -maxY) {
-						return;
-					}
-					positionX = -x * tileW * 4;
-					positionY = y * tileH * 4;
-					renderTiles();
-				}
-                // w.doGoToCoord(link[0].link_tileY, link[0].link_tileX)
-				doGoToCoord(link[0].link_tileY, link[0].link_tileX)
+                w.doGoToCoord(link[0].link_tileY, link[0].link_tileX)
             }
             linkElm.target = "";
         }
@@ -1722,7 +1738,6 @@ function cutRanges(map, width, height) {
     return ranges;
 }
 
-var pingTimeout;
 var fetchInterval;
 var timesConnected = 0;
 function createSocket() {
@@ -1745,8 +1760,6 @@ function createSocket() {
         fetchInterval = setInterval(function() {
             getAndFetchTiles();
         }, checkTileFetchInterval)
-        if(socket.readyState == WebSocket.OPEN) socket.send("2::"); // initial ping
-        // ping is so that the socket won't close after every minute
         if(timesConnected == 1) {
             if(Permissions.can_chat(state.userModel, state.worldModel)) {
                 socket.send(JSON.stringify({
@@ -2433,22 +2446,11 @@ function buildMenu() {
     }, function() {
         return $("#coords").hide();
     });
-    menu.addOption("Change color", w.color);
+    if(Permissions.can_color_text(state.userModel, state.worldModel)) {
+        menu.addOption("Change color", w.color);
+    }
     if (Permissions.can_go_to_coord(state.userModel, state.worldModel)) {
-		// menu.addOption("Go to coordinates", w.goToCoord);
-        menu.addOption("Go to coordinates", function goToCoord() {
-			// w._ui.coordinateInputModal.open("Go to coordinates:", w.doGoToCoord.bind(w));
-			w._ui.coordinateInputModal.open("Go to coordinates:", function doGoToCoord(y, x) {
-				var maxX = 14073748835532; // do not go beyond these coords
-				var maxY = 15637498706147;
-				if(x > maxX || x < -maxX || y > maxY || y < -maxY) {
-					return;
-				}
-				positionX = -x * tileW * 4;
-				positionY = y * tileH * 4;
-				renderTiles();
-			}.bind(w));
-		});
+        menu.addOption("Go to coordinates", w.goToCoord);
     }
     if (Permissions.can_coordlink(state.userModel, state.worldModel)) {
         menu.addOption("Create link to coordinates", w.coordLink);
@@ -2550,6 +2552,19 @@ var w = {
             YourWorld.Color = this_color;
             localStorage.setItem('color', this_color);
         });
+    },
+    goToCoord: function() {
+        w._ui.coordinateInputModal.open("Go to coordinates:", w.doGoToCoord.bind(w));
+    },
+    doGoToCoord: function(y, x) {
+        var maxX = 14073748835532; // do not go beyond these coords
+        var maxY = 15637498706147;
+        if(x > maxX || x < -maxX || y > maxY || y < -maxY) {
+            return;
+        }
+        positionX = -x * tileW * 4;
+        positionY = y * tileH * 4;
+        renderTiles();
     },
     getCenterCoords: function() {
         return [-positionY / tileH, -positionX / tileW]
@@ -2889,10 +2904,6 @@ var ws_functions = {
             addChat(null, 0, "user", "[ Server ]", "Ping: " + pingMs + " MS", "Server");
             return;
         }
-        clearTimeout(pingTimeout);
-		pingTimeout = setTimeout(function() {
-			socket.send("2::");
-		}, pingInterval * 1000)
     },
     tile_clear: function(data) {
         var pos = data.tileY + "," + data.tileX;

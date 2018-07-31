@@ -53,10 +53,13 @@ module.exports.GET = async function(req, serve, vars, params) {
             pathname = "/" + pathname;
         }
 		if(params.timemachine) {
-			pathname = "/" + path;
+            pathname = "/" + path;
+            if(pathname.charAt(pathname.length - 1) == "/") pathname = pathname.slice(0, -1);
         }
         var chat_permission = world_properties.chat_permission;
         if(!chat_permission) chat_permission = 0;
+        var color_text = world_properties.color_text;
+        if(!color_text) color_text = 0;
         var state = {
             userModel: {
                 username: user.username,
@@ -79,7 +82,8 @@ module.exports.GET = async function(req, serve, vars, params) {
                 readability: world.readability,
                 feature_coord_link: world.feature_coord_link,
                 pathname,
-                chat_permission
+                chat_permission,
+                color_text
             }
         }
         if(world_properties.page_is_nsfw) {
