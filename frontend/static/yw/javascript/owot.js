@@ -28,6 +28,22 @@ function deviceRatio() {
     return ratio;
 }
 
+var clientOnload = [];
+window.addEventListener("load", function() {
+    for(var i = 0; i < clientOnload.length; i++) clientOnload[i]();
+})
+
+function byId(a){
+    return document.getElementById(a);
+}
+
+clientOnload.push(function() {
+    byId("color_input_form_input").jscolor.fromRGB(
+        (YourWorld.Color >> 16) & 255, 
+        (YourWorld.Color >> 8) & 255, 
+         YourWorld.Color & 255);
+})
+
 init_dom();
 
 function getStoredNickname() {
@@ -2453,6 +2469,7 @@ function buildMenu() {
             renderTiles(true);
         }, true);
     }
+    menu.addEntry("<input onchange=\"doZoom(this.value)\" title=\"Zoom\" type=\"range\" value=\"100\" min=\"20\" max=\"1000\">");
 }
 
 document.onselectstart = function(e) {
@@ -2480,7 +2497,9 @@ var w = {
     protect_bg: "",
     _state: state,
     _ui: {
-		announce: $("#announce"),
+        announce: $("#announce"),
+        announce_text: $("#announce_text"),
+        announce_close: $("#announce_close"),
 		coordinateInputModal: new CoordinateInputModal(),
 		scrolling: null,
 		urlInputModal: new URLInputModal(),
@@ -2606,8 +2625,12 @@ var w = {
 }
 
 if (state.announce) {
-    w._ui.announce.html(w._state.announce);
+    w._ui.announce_text.html(w._state.announce);
     w._ui.announce.show();
+}
+
+w._ui.announce_close[0].onclick = function() {
+    w._ui.announce.hide();
 }
 
 w._state.goToCoord = {};
@@ -2836,7 +2859,7 @@ var ws_functions = {
     },
     announcement: function(data) {
         if(data.text) {
-			w._ui.announce.html(data.text);
+			w._ui.announce_text.html(data.text);
 			w._ui.announce.show();
 		} else {
 			w._ui.announce.hide();

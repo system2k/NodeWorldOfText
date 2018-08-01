@@ -11,10 +11,7 @@
             <script src="/script_manager/view/{{ script.name }}/"></script>
         {% endfor %}
         <style>
-            .screen {
-                overflow: hidden;
-            }
-            html, body {
+            html, body, .screen {
                 overflow: hidden;
             }
         </style>
@@ -145,7 +142,7 @@
             </div>
         </div>
 
-        <script type="text/javascript" src="/static/js/polyfills.js"></script>
+        <script type="text/javascript" src="/static/yw/javascript/polyfills.js"></script>
         {% if nsfw %}
         <script src="/static/yw/javascript/nsfw.js"></script>
         {% endif %}
@@ -153,6 +150,7 @@
         <script src="/static/lib/jquery-ui-1.7.2.custom.min.js"></script>
         <script src="/static/lib/jquery.simplemodal-1.3.3.mod.js"></script>
         <script src="/static/lib/reconnecting-ws.js"></script>
+        <script src="/static/lib/jscolor.min.js"></script>
         <script src="/static/yw/javascript/Modals.js"></script>
         <script src="/static/yw/javascript/menu.js"></script>
         <script src="/static/yw/javascript/helpers.js"></script>
@@ -160,7 +158,6 @@
         <script src="/static/yw/javascript/image_loading.js"></script>
         <script src="/static/yw/javascript/chat.js"></script>
         <script src="/static/yw/javascript/owot.js"></script>
-        <script src="/static/lib/jscolor.min.js"></script>
         {% if user.superuser %}
             <script src="/static/yw/javascript/adminWorldUI.js"></script>
         {% endif %}
