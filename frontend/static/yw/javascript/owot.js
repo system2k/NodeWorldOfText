@@ -116,17 +116,6 @@ function loadImgPixelData(callback) {
     }
 }
 
-if(!Math.trunc) {
-    console.log("Math.trunc is not supported. Using polyfill.");
-    Math.trunc = function(x) {
-        if(x < 0) {
-            return Math.ceil(x)
-        } else {
-            return Math.floor(x);
-        }
-    }
-}
-
 function beginLoadingOWOT() {
     loadImgPixelData(function() {
         imageLoader.start(function() { // Load image resources
@@ -555,34 +544,6 @@ $("body").on("keyup.linkAuto", function(e) {
     linkAuto.ctrlDown = e.ctrlKey;
     linkAuto.shiftDown = e.shiftKey;
 })
-
-// polyfill for Object.assign
-if (typeof Object.assign != "function") { // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign#Polyfill
-	// Must be writable: true, enumerable: false, configurable: true
-	Object.defineProperty(Object, "assign", {
-		value: function assign(target, varArgs) { // .length of function is 2
-			"use strict";
-			if (target == null) { // TypeError if undefined or null
-				throw new TypeError("Cannot convert undefined or null to object");
-			}
-			var to = Object(target);
-			for (var index = 1; index < arguments.length; index++) {
-				var nextSource = arguments[index];
-				if (nextSource != null) { // Skip over if undefined or null
-					for (var nextKey in nextSource) {
-						// Avoid bugs when hasOwnProperty is shadowed
-						if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
-							to[nextKey] = nextSource[nextKey];
-						}
-					}
-				}
-			}
-			return to;
-		},
-		writable: true,
-		configurable: true
-	});
-}
 
 // adjust canvas width, canvas display width, and variable width to
 // disobey the browser zoom so that the custom zoom can be used
@@ -1336,12 +1297,8 @@ if(Permissions.can_chat(state.userModel, state.worldModel)) {
     OWOT.on("chat", event_on_chat); // Chat event
 }
 
-function trimSpacePolyfill(txt) {
-    return txt.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, "");
-}
-
 function trimSpace(txt) {
-    return txt.trim ? txt.trim() : trimSpacePolyfill(txt);
+    return txt.trim ? txt.trim() : txt.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, "");
 }
 
 function getTileCoordsFromMouseCoords(x, y, ignoreZoomRatio) {
@@ -2104,17 +2061,6 @@ function encodeCharProt(array) {
 		str += base64table.charAt(code)
 	}
 	return str;
-}
-
-if(!Array.prototype.fill) {
-    console.log("Array.prototype.fill is not supported. Using basic polyfill")
-    Array.prototype.fill = function(val) {
-        var ar = this;
-        for(var i = 0; i < ar.length; i++) {
-            ar[i] = val;
-        }
-        return ar;
-    }
 }
 
 function decodeCharProt(str) {

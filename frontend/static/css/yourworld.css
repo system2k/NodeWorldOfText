@@ -100,16 +100,6 @@ a:visited {
     background: #E5E5FF;
     border-left: 1px solid #ccc;
 }
-.coordLink {
-    color: green;
-    text-decoration: underline;
-    cursor: pointer;
-}
-.urlLink {
-    color: blue;
-    text-decoration: underline;
-    cursor: pointer;
-}
 #nav {
     display: none;
     position: absolute;
@@ -137,10 +127,7 @@ a:visited {
 * html #nav ul {
     line-height: 0;
 }
-#nav ul a {
-    zoom: 1;
-}
-#nav a {}#nav li.hover {
+#nav li.hover {
     background-color: white;
 }
 #simplemodal-overlay {
