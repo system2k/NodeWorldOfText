@@ -13,26 +13,26 @@
 	
     "error_log": true,
 	
-    "DATABASE_PATH": "../nwot.sqlite",
-    "TEST_DATABASE_PATH": "../nwot_test.sqlite",
+    "DATABASE_PATH": "../data/nwot.sqlite",
+    "TEST_DATABASE_PATH": "../data/test/nwot_test.sqlite",
 	
-    "LOG_PATH": "../nwot_log.log",
-    "TEST_LOG_PATH": "../test_nwot_log.log",
+    "LOG_PATH": "../data/nwot_log.log",
+    "TEST_LOG_PATH": "../data/test/test_nwot_log.log",
         
-    "ZIP_LOG_PATH": "../nwot_error_logs.zip",
-    "TEST_ZIP_LOG_PATH": "../test_nwot_error_logs.zip",
+    "ZIP_LOG_PATH": "../data/nwot_error_logs.zip",
+    "TEST_ZIP_LOG_PATH": "../data/test/test_nwot_error_logs.zip",
         
-    "UNCAUGHT_PATH": "../exc.err",
-    "TEST_UNCAUGHT_PATH": "../test_exc.err",
+    "UNCAUGHT_PATH": "../data/exc.err",
+    "TEST_UNCAUGHT_PATH": "../data/test/test_exc.err",
 	
-    "REQ_LOG_PATH": "../reqs.err",
-    "TEST_REQ_LOG_PATH": "../test_reqs.err",
+    "REQ_LOG_PATH": "../data/reqs.err",
+    "TEST_REQ_LOG_PATH": "../data/test/test_reqs.err",
 	
-    "CHAT_LOG_PATH": "../chat_log.json",
-    "TEST_CHAT_LOG_PATH": "../test_chat_log.json",
+    "CHAT_LOG_PATH": "../data/chat_log.json",
+    "TEST_CHAT_LOG_PATH": "../data/test/test_chat_log.json",
 	
-    "CHAT_HISTORY_PATH": "../chat_history.sqlite",
-    "TEST_CHAT_HISTORY_PATH": "../test_chat_history.sqlite",
+    "CHAT_HISTORY_PATH": "../data/chat_history.sqlite",
+    "TEST_CHAT_HISTORY_PATH": "../data/test/test_chat_history.sqlite",
 
     "bypass_key": "../data/bypass_key.txt",
         
