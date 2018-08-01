@@ -27,20 +27,31 @@ const zip           = require("adm-zip")
 
 console.log("Loaded libs");
 
-if(!fs.existsSync("./settings.json")) {
-    fs.writeFileSync("./settings.json", fs.readFileSync("./settings_template.json"));
+var DATA_PATH = "../data/";
+var DATA_PATH_TEST = DATA_PATH + "test/";
+
+// create the data folder that stores all of the server's data
+if(!fs.existsSync(DATA_PATH)) {
+    fs.mkdirSync(DATA_PATH, 0o777);
+}
+// directory used for storing data for the test server
+if(!fs.existsSync(DATA_PATH_TEST)) {
+    fs.mkdirSync(DATA_PATH_TEST, 0o777);
+}
+
+var SETTINGS_PATH = DATA_PATH + "settings.json";
+
+if(!fs.existsSync(SETTINGS_PATH)) {
+    fs.writeFileSync(SETTINGS_PATH, fs.readFileSync("./settings_template.json"));
     console.log("Created the settings file. You must configure the settings file and then start the server back up again.");
     process.exit();
 }
 
-const settings = require("./settings.json");
+const settings = require(SETTINGS_PATH);
 
 var serverPort = settings.port;
 var serverDB = settings.DATABASE_PATH;
 var chatDB = settings.CHAT_HISTORY_PATH;
-
-var DATA_PATH = "../data/";
-var DATA_PATH_TEST = DATA_PATH + "test/";
 
 Error.stackTraceLimit = Infinity;
 if(!global.AsyncFunction) var AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
@@ -78,14 +89,6 @@ const log_error = function(err) {
 	}
 }
 
-// create the data folder that stores all of the server's data
-if(!fs.existsSync(DATA_PATH)) {
-    fs.mkdirSync(DATA_PATH, 0o777);
-}
-// directory used for storing data for the test server
-if(!fs.existsSync(DATA_PATH_TEST)) {
-    fs.mkdirSync(DATA_PATH_TEST, 0o777);
-}
 if(!fs.existsSync(settings.bypass_key)) {
     var rand = "";
     var key = "0123456789ABCDEF";
