@@ -198,7 +198,7 @@ backgroundImageCanvasRenderer.height = tileH;
 var backgroundImageCtx = backgroundImageCanvasRenderer.getContext("2d");
 
 function doZoom(percentage) {
-    if(percentage < 20 || percentage > 1000) { // zoomed too far in/out?
+    if(percentage < 20 || percentage > 1000) {
         return;
     }
     percentage = decimal(percentage);
@@ -257,8 +257,6 @@ function generateAlertFavicon() {
 }
 
 function browserZoomAdjust(initial) {
-    // make the canvas as if it were at 100% zoom,
-    // except it uses the proper zoom function
     var ratio = window.devicePixelRatio;
     if(!ratio) ratio = 1;
     if(zoomRatio == ratio && !initial) return; // ratio is still the same, do nothing
@@ -378,9 +376,7 @@ $(document).on("mousemove.tileProtectAuto", function() {
 $("body").on("keydown.tileProtectAuto", function(e) {
     if(!worldFocused) return;
     if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to protect tiles
-        if(e.ctrlKey) { // prevent browser's ctrl+s from executing
-            e.preventDefault();
-        }
+        if(e.ctrlKey) e.preventDefault();
         var selected = tileProtectAuto.selected;
         var types = ["owner-only", "member-only", "public"];
         var keys = Object.keys(selected);
@@ -494,9 +490,7 @@ $(document).on("mousemove.linkAuto", function() {
 $("body").on("keydown.linkAuto", function(e) {
     if(!worldFocused) return;
     if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to add links
-        if(e.ctrlKey) { // is Ctrl+S
-            e.preventDefault();
-        }
+        if(e.ctrlKey) e.preventDefault();
         var selected = linkAuto.selected;
         var keys = Object.keys(selected);
         if(keys.length == 0) return;
@@ -564,21 +558,17 @@ $("body").on("keyup.linkAuto", function(e) {
 // adjust canvas width, canvas display width, and variable width to
 // disobey the browser zoom so that the custom zoom can be used
 function adjust_scaling_DOM(ratio) {
-    // the size of the viewport
     var window_width = window.innerWidth;
     var window_height = window.innerHeight;
-
     // change variable sizes to the screen-width of the inner browser (same, regardless of zoom)
     width = Math.round(window_width * ratio);
     height = Math.round(window_height * ratio);
-
     // make size of canvas the size of the inner browser screen-size
     owot.width = Math.round(window_width * ratio);
     owot.height = Math.round(window_height * ratio);
     // make the display size the suze of the viewport
     owot.style.width = window_width + "px";
     owot.style.height = window_height + "px";
-
     // comments above apply below
     textLayer.width = Math.round(window_width * ratio);
     textLayer.height = Math.round(window_height * ratio);
@@ -637,7 +627,7 @@ $(document).on("keydown", function(e) {
 // color picker
 $(document).on("keydown", function(e) {
     if(!worldFocused) return;
-    if(!(e.altKey && e.keyCode == 67)) return // if not alt + c, return
+    if(!(e.altKey && e.keyCode == 67)) return; // if not alt + c, return
     textInput.value = "";
     // alt + c to use color of text cell (where mouse cursor is) as main color
     var pos = currentPosition;
@@ -675,12 +665,9 @@ textLayer.height = height;
 if (window.MozWebSocket)
     window.WebSocket = window.MozWebSocket;
 
-var wsaddr, ws_scheme, path, ws_path;
+var ws_path;
 function createWsPath() {
-    wsaddr = window.location.host;
-    ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
-    path = state.worldModel.pathname;
-    ws_path = ws_scheme + "://" + wsaddr + path + "/ws/";
+    ws_path = "ws" + (window.location.protocol === "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/";
 }
 createWsPath();
 
@@ -1245,6 +1232,10 @@ document.onkeydown = function(e) {
         case 39:
             moveCursor("right");
             break;
+        case 9: // tab
+            for(var i = 0; i < 4; i++) writeChar(" ");
+            e.preventDefault();
+            break;
         case 8: // backspace
             moveCursor("left", true);
             writeChar(" ", true);
@@ -1313,16 +1304,11 @@ if(Permissions.can_chat(state.userModel, state.worldModel)) {
     OWOT.on("chat", event_on_chat); // Chat event
 }
 
-function trimSpace(txt) {
-    return txt.trim ? txt.trim() : txt.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, "");
-}
-
 function getTileCoordsFromMouseCoords(x, y, ignoreZoomRatio) {
     if(!ignoreZoomRatio) {
         x *= zoomRatio;
         y *= zoomRatio;
     }
-    
     var tileX = 0;
     var tileY = 0;
     var charX = 0;
@@ -1820,8 +1806,7 @@ function getPos(ref) {
     return [parseInt(ref[0]), parseInt(ref[1])];
 }
 
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/charAt
-// fixes cases where characters can break String.charAt()
+// fixes cases where characters can break String.charAt() : https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/charAt
 function fixedCharAt(str, idx) {
     var ret = "";
     str += "";

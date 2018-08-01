@@ -16,17 +16,6 @@ if(!canChat) { // can't chat, adjust the chat window for it
     $("#chat_open").hide();
 }
 
-if(!String.prototype.startsWith) {
-    console.log("String.startsWith not supported. Using polyfill.");
-    String.prototype.startsWith = function(str) {
-        if(str.length > this.length) return false;
-        for(var i = 0; i < str.length; i++) {
-            if(str.charAt(i) != this.charAt(i)) return false;
-        }
-        return true;
-    }
-}
-
 function api_chat_send(message, opts) {
     if(!message) return;
     message = message.replace(/\uFDFD/g, "");
@@ -38,7 +27,7 @@ function api_chat_send(message, opts) {
     var msgLim = state.userModel.is_staff ? Infinity : 400;
     var nickLim = state.userModel.is_staff ? Infinity : 20;
 
-    message = trimSpace(message.slice(0, msgLim));
+    message = message.slice(0, msgLim).trim();
     chatWriteHistory.push(message);
     if(chatWriteHistory.length > chatWriteHistoryMax) {
         chatWriteHistory.shift();
@@ -417,9 +406,6 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     }
     chatGroup.appendChild(nickDom);
     chatGroup.appendChild(msgDom);
-
-    chatGroup.style.wordWrap = "break-word";
-    chatGroup.style.wordBreak = "break-all";
 
     field.append(chatGroup);
 
