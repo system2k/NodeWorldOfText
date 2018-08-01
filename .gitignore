@@ -2,3 +2,4 @@
 package-lock.json
 /.vscode
 /build
+settings.json

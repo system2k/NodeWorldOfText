@@ -27,6 +27,12 @@ const zip           = require("adm-zip")
 
 console.log("Loaded libs");
 
+if(!fs.existsSync("./settings.json")) {
+    fs.writeFileSync("./settings.json", fs.readFileSync("./settings_template.json"));
+    console.log("Created the settings file. You must configure the settings file and then start the server back up again.");
+    process.exit();
+}
+
 const settings = require("./settings.json");
 
 var serverPort = settings.port;
