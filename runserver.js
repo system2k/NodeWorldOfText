@@ -17,6 +17,7 @@ const https         = require("https");
 const isIP          = require("net").isIP;
 const mime          = require("./backend/mime.js");
 const nodemailer    = require("nodemailer");
+const path          = require("path");
 const prompt        = require("./lib/prompt/prompt");
 const querystring   = require("querystring");
 const sql           = require("sqlite3");
@@ -43,7 +44,8 @@ var SETTINGS_PATH = DATA_PATH + "settings.json";
 
 if(!fs.existsSync(SETTINGS_PATH)) {
     fs.writeFileSync(SETTINGS_PATH, fs.readFileSync("./settings_template.json"));
-    console.log("Created the settings file. You must configure the settings file and then start the server back up again.");
+    console.log("Created the settings file at [" + SETTINGS_PATH + "]. You must configure the settings file and then start the server back up again.");
+    console.log("Full path of settings: " + path.resolve(SETTINGS_PATH));
     process.exit();
 }
 
@@ -2628,7 +2630,7 @@ function handle_error(e) {
     var str = JSON.stringify(process_error_arg(e));
     log_error(str);
     if(isTestServer) {
-        console.log(str)
+        console.log("Error:", str)
     }
 }
 
