@@ -368,9 +368,18 @@ module.exports.POST = async function(req, serve, vars) {
                 }
                 idx++;
             }
+            await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+                [user.id, world.id, 0, 0, Date.now(), "@" + JSON.stringify({
+                    kind: "clear_public"
+                })]);
             await transaction.end();
         } else if(post_data.clear_all == "") {
+            // small command, big impact
             await db.run("DELETE FROM tile WHERE world_id=?", world.id);
+            await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+                [user.id, world.id, 0, 0, Date.now(), "@" + JSON.stringify({
+                    kind: "clear_all"
+                })]);
         } else if(post_data.clear_chat_hist == "") {
             clearChatlog(world.id);
         }
