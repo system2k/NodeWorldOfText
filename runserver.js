@@ -43,7 +43,7 @@ if(!fs.existsSync(DATA_PATH_TEST)) {
 var SETTINGS_PATH = DATA_PATH + "settings.json";
 
 if(!fs.existsSync(SETTINGS_PATH)) {
-    fs.writeFileSync(SETTINGS_PATH, fs.readFileSync("./settings_template.json"));
+    fs.writeFileSync(SETTINGS_PATH, fs.readFileSync("./settings_example.json"));
     console.log("Created the settings file at [" + SETTINGS_PATH + "]. You must configure the settings file and then start the server back up again.");
     console.log("Full path of settings: " + path.resolve(SETTINGS_PATH));
     process.exit();
