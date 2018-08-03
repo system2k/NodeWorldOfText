@@ -87,6 +87,7 @@ var colorizeLinks          = true;
 var tileFetchOffsetX       = 0; // offset added to tile fetching and sending coordinates
 var tileFetchOffsetY       = 0;
 var defaultChatColor       = null; // 24-bit Uint
+var ignoreCanvasContext    = true; // ignore canvas context menu when right clicking
 getStoredNickname();
 
 if(state.background) { // add the background image (if it already exists)
@@ -197,6 +198,7 @@ backgroundImageCanvasRenderer.width = tileW;
 backgroundImageCanvasRenderer.height = tileH;
 var backgroundImageCtx = backgroundImageCanvasRenderer.getContext("2d");
 
+// performs the zoom calculations and changes all constants
 function doZoom(percentage) {
     if(percentage < 20 || percentage > 1000) {
         return;
@@ -229,6 +231,18 @@ function doZoom(percentage) {
         }
         renderTiles(true);
     }
+}
+
+// called from the zoombar, adjusts client position to be in center
+function changeZoom(percentage) {
+    positionX /= zoom;
+    positionY /= zoom;
+    doZoom(percentage);
+    positionX *= zoom;
+    positionY *= zoom;
+    positionX = Math.trunc(positionX); // remove decimals
+    positionY = Math.trunc(positionY);
+    renderTiles();
 }
 
 function generateAlertFavicon() {
@@ -946,10 +960,12 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
     if(e.target != owot && e.target != linkDiv) return;
 
     if(e.which == 3) { // right click
-        owot.style.pointerEvents = "none";
-        setTimeout(function() {
-            owot.style.pointerEvents = "";
-        }, 1)
+        if(ignoreCanvasContext) {
+            owot.style.pointerEvents = "none";
+            setTimeout(function() {
+                owot.style.pointerEvents = "";
+            }, 1)
+        }
         return;
     }
 
@@ -2454,7 +2470,7 @@ function buildMenu() {
             renderTiles(true);
         }, true);
     }
-    menu.addEntry("<input onchange=\"doZoom(this.value)\" title=\"Zoom\" type=\"range\" value=\"100\" min=\"20\" max=\"1000\">");
+    menu.addEntry("<input onchange=\"changeZoom(this.value)\" title=\"Zoom\" type=\"range\" value=\"100\" min=\"20\" max=\"1000\">");
 }
 
 document.onselectstart = function(e) {
@@ -2726,7 +2742,7 @@ var ws_functions = {
         }
         // too many tiles, remove tiles outside of the viewport
         var tileLim = 1000;
-        if(zoomRatio < 0.5) { // zoomed out too far? make sure tiles don't constantly unload
+        if(zoom < 0.5) { // zoomed out too far? make sure tiles don't constantly unload
             tileLim = 10000;
         }
         if(Object.keys(tiles).length >= tileLim) {
