@@ -39,7 +39,9 @@ module.exports.GET = async function(req, serve, vars, params) {
                 maxX: query_data.max_tileX
             }]
         }, vars)
-        serve(JSON.stringify(tiles))
+        serve(JSON.stringify(tiles), null, {
+            mime: "text/plain; charset=utf-8"
+        })
     } else { // the HTML page
         if(!world_properties.views) {
             world_properties.views = 0;
