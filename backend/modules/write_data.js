@@ -332,10 +332,16 @@ module.exports = async function(data, vars) {
                     }
                 }
         
+                // detect overriden links
                 if(properties.cell_props) {
                     if(properties.cell_props[charY]) {
+                        // clear properties for this char
                         if(properties.cell_props[charY][charX]) {
-                            properties.cell_props[charY][charX] = {};
+                            delete properties.cell_props[charY][charX];
+                        }
+                        // the row for this tile is empty
+                        if(Object.keys(properties.cell_props[charY]).length == 0) {
+                            delete properties.cell_props[charY];
                         }
                     }
                 }
