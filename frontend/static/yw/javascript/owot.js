@@ -1613,11 +1613,17 @@ $(document).on("wheel", function(e) {
     renderTiles();
 })
 
-// gets list of ranges to fetch
+/*
+    === cutRanges ===
+    (returns a list of ranges based off unloaded tiles)
+    map:    array of values determining if a tile has been loaded or not
+    width:  the width of the view
+    height: the height of the view
+*/
 function cutRanges(map, width, height) {
     function getPos(x, y) {
-        if(x >= width || y >= height) return
-        return map[y * width + x]
+        if(x >= width || y >= height) return;
+        return map[y * width + x];
     }
     
     var ranges = [];
@@ -1632,82 +1638,98 @@ function cutRanges(map, width, height) {
     }
     
     function cut() {
-        var zeros = false
-        var x = 0
-        var y = 0
-        var startX = 0
-        var startY = 0
-        var endX = 0
-        var endY = 0
-        var endXSet = false
-        var lastX = -1
+        // reached uninitialized value
+        var zeros = false;
+        // current scanning position
+        var x = 0;
+        var y = 0;
+        // starting position of range
+        var startX = 0;
+        var startY = 0;
+        // ending position of range
+        var endX = 0;
+        var endY = 0;
+        // width of range is final
+        var endXSet = false;
+        // x position of previous row scan
+        var lastX = -1;
         for(var i = 0; i < width * height; i++) {
-            var dat = getPos(x, y)
+            var dat = getPos(x, y);
+            // set first detected unitialized value as the starting point
             if(dat === 0 && !zeros) {
-                zeros = true
-                startX = x
-                startY = y
+                zeros = true;
+                startX = x;
+                startY = y;
             }
-    
+            // we reached the edge of map and the next row contains initialized values
             if(dat === 1 && zeros && x <= endX) {
-                endY--
+                endY--;
                 fillRange(startX, startY, endX, endY);
-                break
+                break;
             }
-    
+            // we hit a barrier
             if(dat === 1 && zeros) {
-                var xTemp = x
+                var xTemp = x;
+                // finalize range width
                 if(!endXSet && lastX > -1) {
-                    endX = lastX
-                    endXSet = true
+                    endX = lastX;
+                    endXSet = true;
                 }
-                x = startX
-                endY++
-                y++
+                // move to next row
+                x = startX;
+                endY++;
+                y++;
+                // there is already a value, exit
                 if(getPos(x, y)) {
-                    endY--
+                    endY--;
                     fillRange(startX, startY, endX, endY);
-                    break
+                    break;
                 }
+                // we reached the bottom, exit
                 if(y >= height) {
-                    endY--
+                    endY--;
                     if(lastX === xTemp) {
-                        endY--
+                        endY--;
                     }
                     fillRange(startX, startY, endX, endY);
-                    break
+                    break;
                 }
-                continue
+                continue;
             }
-            lastX = x
-            x++
+            lastX = x;
+            x++;
+            // we reached the right edge of the map
             if(x >= width) {
+                // no width of range is defined, set it
                 if(!endXSet && zeros && dat === 0 && lastX > -1) {
-                    endX = lastX
-                    endXSet = true
+                    endX = lastX;
+                    endXSet = true;
                 }
-                x = startX
-                y++
-                endY++
+                // move to next row
+                x = startX;
+                y++;
+                endY++;
+                // we reached the bottom of the map
                 if(y >= height) {
-                    endY--
+                    endY--;
                     fillRange(startX, startY, endX, endY);
-                    break
+                    break;
                 }
             }
         }
     }
     function containsBlank() {
         for(var i = 0; i < map.length; i++) {
-            if(map[i] === 0) return true
+            if(map[i] === 0) return true;
         }
-        return false
+        return false;
     }
+    // ensure all unloaded tiles in the map are processed
     for(var i = 0; i < width * height; i++) {
         if(containsBlank()) {
-            cut()
+            cut();
         } else {
-            break
+            break;
         }
     }
     return ranges;
