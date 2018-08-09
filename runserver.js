@@ -11,7 +11,6 @@ console.log("\x1b[36;1mStarting up...\x1b[0m")
 const crypto        = require("crypto");
 const dump_dir      = require("./backend/dump_dir");
 const fs            = require("fs");
-const html_minify   = require("html-minifier").minify;
 const http          = require("http");
 const https         = require("https");
 const isIP          = require("net").isIP;
@@ -103,26 +102,18 @@ if(!fs.existsSync(settings.bypass_key)) {
 const database = new sql.Database(serverDB);
 const chat_history = new sql.Database(chatDB);
 
-async function minify_js(file_in, file_out) {
-	return new Promise(function(res) {
-		compressor.minify({
-			compressor: "uglifyjs",
-			input: file_in,
-			output: file_out,
-			callback: function() {
-				res(fs.readFileSync(file_out));
-			}
-		});
-	})
-}
-
-function minify_html(data) {
-	return html_minify(data, {
-		collapseWhitespace: true,
-		minifyCSS: true,
-		minifyJS: true,
-		removeComments: true
-	});
+function trimHTML(html) {
+    // ensure all lines are \r\n instead of just \n (consistent)
+    html = html.replace(/\r\n/g, "\n");
+    html = html.split("\n");
+    var newHtml = [];
+    for(var i = 0; i < html.length; i++) {
+        html[i] = html[i].trim();
+        if(html[i]) {
+            newHtml.push(html[i]);
+        }
+    }
+    return newHtml.join("\r\n");
 }
 
 var static_path = "./frontend/static/";
@@ -1264,6 +1255,8 @@ var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
 
 async function process_request(req, res, current_req_id) {
     var hostname = req.headers.host;
+    if(!hostname) hostname = "";
+    hostname = hostname.slice(0, 1000);
 	var offset = 2;
     var subdomains = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
     var sub = subdomains.slice(offset);
@@ -1403,7 +1396,7 @@ async function process_request(req, res, current_req_id) {
                     /*if(data.csrftoken) {
                         csrf_tokens[data.csrftoken] = 1;
                     }*/
-                    return template_data[path](data);
+                    return trimHTML(template_data[path](data));
                 }
                 vars = objIncludes(global_data, { // extra information
                     cookies,
@@ -2692,7 +2685,8 @@ var global_data = {
     retrieveChatHistory,
     client_ips,
     modify_bypass_key,
-    get_bypass_key: function() { return bypass_key_cache }
+    get_bypass_key: function() { return bypass_key_cache },
+    trimHTML
 }
 
 function stopPrompt() {

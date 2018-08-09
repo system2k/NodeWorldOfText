@@ -2,8 +2,8 @@ var imageLoader = {};
 
 imageLoader.res = { /*"myimage": <img>*/ };
 
-imageLoader.path = [ // Modifiable
-    ["favicon", "/static/favicon.png"]
+imageLoader.path = [
+    // ["favicon", "/static/favicon.png"]
 ];
 
 imageLoader.start = function(callback) {
@@ -24,6 +24,12 @@ imageLoader.start = function(callback) {
                 loop();
             }
         }
+        // TODO: handle images that failed to load
+        imgElm.onerror = imgElm.onload;
     }
-    loop();
+    if(total) {
+        loop();
+    } else {
+        callback();
+    }
 }

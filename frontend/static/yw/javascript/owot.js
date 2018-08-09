@@ -134,11 +134,9 @@ function loadImgPixelData(callback) {
 }
 
 function beginLoadingOWOT() {
+    // load main images
     loadImgPixelData(function() {
-        imageLoader.start(function() { // Load image resources
-            // ui.execute(); // Create the UI
-            begin();
-        })
+        begin();
     });
 }
 beginLoadingOWOT();
@@ -1411,7 +1409,8 @@ function alertJS(data) {
     js_alert_active = true;
     confirm_js.style.display = "";
     confirm_js_code.innerText = data;
-    run_js_confirm.href = "javascript:confirmRunJsLink(\"" + escapeQuote(data) + "\");"
+    run_js_confirm_risk.href = "javascript:confirmRunJsLink(\"" + escapeQuote(data) + "\");"
+    run_js_confirm.href = "javascript:confirmRunJsLink(null, true);"
     confirm_js_cancel.onclick = closeJSAlert;
     confirm_js_cancel_x.onclick = closeJSAlert;
 }
@@ -1421,9 +1420,16 @@ function closeJSAlert() {
     js_alert_active = false;
     confirm_js.style.display = "none";
     run_js_confirm.href = "javascript:void 0;"
+    run_js_confirm.innerText = "run";
+    run_js_confirm_risk.style.display = "none";
 }
 
-function confirmRunJsLink(data) {
+function confirmRunJsLink(data, confirmWarning) {
+    if(confirmWarning) {
+        run_js_confirm_risk.style.display = "";
+        run_js_confirm.text = "run ▲";
+        return; 
+    }
     var doRun = confirm("Are you sure you want to run this javascript link?\nPress cancel to NOT run it.\n\"" + escapeQuote(data.slice(0, 256)) + "\"");
     if(!doRun) return closeJSAlert();
     var link = document.createElement("a");

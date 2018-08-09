@@ -10,11 +10,6 @@
         {% for script in user.scripts %}
             <script src="/script_manager/view/{{ script.name }}/"></script>
         {% endfor %}
-        <style>
-            html, body, .screen {
-                overflow: hidden;
-            }
-        </style>
     </head>
     <body>
         <div id="topbar" class="ui">
@@ -125,11 +120,12 @@
             </div>
         </div>
         <div id="confirm_js" style="display: none;">
-            <a href="javascript:void 0;" style="position: absolute; color: blue; text-decoration: underline; top: 220px; left: 20px;" id="run_js_confirm">run</a>
+            <a href="javascript:void 0;" id="run_js_confirm_risk" style="display: none;">Accept the risk and run</a>
+            <a href="javascript:void 0;" id="run_js_confirm">run</a>
             <span id="confirm_js_msg">
                 Are you sure you want to run this javascript link?
                 <br>
-                Press Close to NOT run it.
+                Press Close to <i>not</i> run it.
             </span>
             <span id="confirm_js_code">
                 --
@@ -155,7 +151,6 @@
         <script src="/static/yw/javascript/menu.js"></script>
         <script src="/static/yw/javascript/helpers.js"></script>
         <script src="/static/yw/javascript/permissions.js"></script>
-        <script src="/static/yw/javascript/image_loading.js"></script>
         <script src="/static/yw/javascript/chat.js"></script>
         <script src="/static/yw/javascript/owot.js"></script>
         {% if user.superuser %}

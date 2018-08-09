@@ -2,6 +2,9 @@
     margin: 0;
     padding: 0;
 }
+html, body, .screen {
+    overflow: hidden;
+}
 body {
     background: #ccc;
 }
@@ -280,8 +283,8 @@ a:visited {
     background-color: #e6e6e6;
     position: absolute;
     width: 365px;
-    height: 90px;
-    top: 100px;
+    height: 110px;
+    top: 90px;
     left: 35px;
     padding: 3px;
     font-family: "Courier New", monospace;
@@ -295,14 +298,14 @@ a:visited {
     font-family: Helvetica;
     background-color: green;
     border-style: solid;
-    width: 100px;
-    height: 30px;
-    top: 200px;
-    left: 300px;
+    width: 80px;
+    height: 17px;
+    top: 220px;
+    left: 340px;
     border-width: 1px;
-    padding: 7px;
+    padding: 2px;
     text-align: center;
-    font-size: 25px;
+    font-size: 15px;
     color: white;
     border-color: black;
     cursor: pointer;
@@ -332,4 +335,18 @@ a:visited {
 }
 #confirm_js_cancel:hover {
     background-color: #00AE00;
+}
+#run_js_confirm {
+    position: absolute;
+    color: blue;
+    text-decoration: underline;
+    top: 220px;
+    left: 20px;
+}
+#run_js_confirm_risk {
+    position: absolute;
+    color: blue;
+    text-decoration: underline;
+    top: 205px;
+    left: 50px;
 }
