@@ -323,7 +323,7 @@ module.exports.POST = async function(req, serve, vars) {
                 for(var d = 0; d < data.length; d++) {
                     var tile = data[d];
                     var properties = JSON.parse(tile.properties);
-                    // this tile contains prcise char data
+                    // this tile contains precise char data
                     if(properties.char) {
                         var charData = decodeCharProt(properties.char);
                         var content = advancedSplit(tile.content);

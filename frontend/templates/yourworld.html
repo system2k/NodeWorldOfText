@@ -32,39 +32,67 @@
             X: <span id="coord_X"></span>
             Y: <span id="coord_Y"></span>
         </div>
-        <div id="coordinate_input_modal" style="display:none">
-            <form method="get" action="#" id="coord_input_form">
-                <div id="coord_input_title" style="max-width:20em">Go to coordinates:</div>
-                <br>
-                <table>
-                    <tbody>
-                        <tr>
-                            <td>X: </td>
-                            <td><input type="text" name="coord_input_X" value=""></td>
-                        </tr>
-                        <tr>
-                            <td>Y: </td>
-                            <td><input type="text" name="coord_input_Y" value=""></td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div id="coord_input_submit"><input type="submit" value="   Go   "> or <span id="coord_input_cancel" class="simplemodal-close simplemodal-closelink">cancel</span></div>
-            </form>
+
+        <div id="simplemodal-overlay" class="simplemodal-overlay" style="opacity: 0.5; height: 100%; width: 100%; position: fixed; left: 0px; top: 0px; z-index: 1001; display: none;"></div>
+
+        <div id="coord_input_panel" class="simplemodal-container" style="position: fixed; z-index: 1002; display: none;">
+            <div tabindex="-1" class="simplemodal-wrap" style="height: 100%; outline: 0px; width: 100%;">
+                <div id="coordinate_input_modal" class="simplemodal-data">
+                    <form method="get" action="#" id="coord_input_form">
+                        <div id="coord_input_title" style="max-width:20em">Go to coordinates:</div>
+                        <br>
+                        <table>
+                            <tbody>
+                                <tr>
+                                    <td>X: </td>
+                                    <td><input id="coord_input_X" type="text" name="coord_input_X" value=""></td>
+                                </tr>
+                                <tr>
+                                    <td>Y: </td>
+                                    <td><input id="coord_input_Y" type="text" name="coord_input_Y" value=""></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div id="coord_input_submit">
+                            <input type="submit" value="   Go   "> or <span id="coord_input_cancel" class="simplemodal-close simplemodal-closelink">cancel</span>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
-        <div id="url_input_modal" style="display:none">
-            <form method="get" action="#" id="url_input_form">
-                <div id="url_input_title" style="max-width:20em"></div>
-                <br><label for="url_input">URL: </label><input id="url_input_form_input" type="text" name="url_input" value="">
-                <div id="url_input_submit"><input type="submit" value="   Go   "> or <span id="url_input_cancel" class="simplemodal-close simplemodal-closelink">cancel</span></div>
-            </form>
+        <div id="url_input_panel" class="simplemodal-container" style="position: fixed; z-index: 1002; display: none;">
+            <a class="modalCloseImg simplemodal-close" title="Close"></a>
+            <div tabindex="-1" class="simplemodal-wrap" style="height: 100%; outline: 0px; width: 100%;">
+                <div id="url_input_modal" class="simplemodal-data">
+                    <form method="get" action="#" id="url_input_form">
+                        <div id="url_input_title" style="max-width:20em"></div>
+                        <br>
+                        <label for="url_input">URL: </label>
+                        <input id="url_input_form_input" type="text" name="url_input" value="">
+                        <div id="url_input_submit">
+                            <input type="submit" value="   Go   "> or <span id="url_input_cancel" class="simplemodal-close simplemodal-closelink">cancel</span>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
-        <div id="color_input_modal" style="display:none">
-            <form method="get" action="#" id="color_input_form">
-                <div id="color_input_title" style="max-width:20em"></div>
-                <br><label for="color_input">Color Code: </label><input class="jscolor" value="000000" id="color_input_form_input">
-                <div id="color_input_submit"><input type="submit" value="   Go   "> or <span id="color_input_cancel" class="simplemodal-close simplemodal-closelink">cancel</span></div>
-            </form>
+        <div id="color_input_panel" class="simplemodal-container" style="position: fixed; z-index: 1002; display: none;">
+            <a class="modalCloseImg simplemodal-close" title="Close"></a>
+            <div tabindex="-1" class="simplemodal-wrap" style="height: 100%; outline: 0px; width: 100%;">
+                <div id="color_input_modal" class="simplemodal-data">
+                    <form method="get" action="#" id="color_input_form">
+                        <div id="color_input_title" style="max-width:20em"></div>
+                        <br>
+                        <label for="color_input">Color Code: </label>
+                        <input class="jscolor" value="000000" id="color_input_form_input">
+                        <div id="color_input_submit">
+                            <input type="submit" value="   Go   "> or <span id="color_input_cancel" class="simplemodal-close simplemodal-closelink">cancel</span>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
+
         <h1 id="loading">Loading...</h1>
         <div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ user.csrftoken }}" /></div>
         <script>
@@ -138,13 +166,11 @@
             </div>
         </div>
 
-        <script type="text/javascript" src="/static/yw/javascript/polyfills.js"></script>
+        <script src="/static/yw/javascript/polyfills.js"></script>
         {% if nsfw %}
         <script src="/static/yw/javascript/nsfw.js"></script>
         {% endif %}
         <script src="/static/lib/jquery-1.7.min.js"></script>
-        <script src="/static/lib/jquery-ui-1.7.2.custom.min.js"></script>
-        <script src="/static/lib/jquery.simplemodal-1.3.3.mod.js"></script>
         <script src="/static/lib/reconnecting-ws.js"></script>
         <script src="/static/lib/jscolor.min.js"></script>
         <script src="/static/yw/javascript/Modals.js"></script>

@@ -136,13 +136,13 @@ a:visited {
     background-color: #000;
     cursor: default;
 }
-#simplemodal-container {
+.simplemodal-container {
     color: #333;
     background-color: #e5e5ff;
     border: 6px solid #c3c3ff;
     padding: 12px;
 }
-#simplemodal-container a {
+.simplemodal-container a {
     color: #ddd;
 }
 .simplemodal-closelink {

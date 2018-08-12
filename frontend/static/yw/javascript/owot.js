@@ -233,6 +233,7 @@ function doZoom(percentage) {
 
 // called from the zoombar, adjusts client position to be in center
 function changeZoom(percentage) {
+    zoombar.value = percentage;
     positionX /= zoom;
     positionY /= zoom;
     doZoom(percentage);
@@ -2498,7 +2499,8 @@ function buildMenu() {
             renderTiles(true);
         }, true);
     }
-    menu.addEntry("<input onchange=\"changeZoom(this.value)\" title=\"Zoom\" type=\"range\" value=\"100\" min=\"20\" max=\"1000\">");
+    menu.addEntry("<input onchange=\"changeZoom(this.value)\" title=\"Zoom\" type=\"range\" value=\"100\" min=\"20\" max=\"1000\" style=\"width: 80px;\" id=\"zoombar\">" +
+        "<button onclick=\"changeZoom(100)\">x</button>");
 }
 
 document.onselectstart = function(e) {
