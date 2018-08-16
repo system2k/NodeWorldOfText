@@ -27,25 +27,24 @@ var URLInputModal = (function() {
 		this.overlay = document.getElementById("simplemodal-overlay");
 		this.input = document.getElementById("url_input_form_input");
 		this.cancel = document.getElementById("url_input_cancel");
+		this.form = document.getElementById("url_input_form");
+		this.el = document.getElementById("url_input_modal");
 		ModalRefs.push(this);
 		this.close = function() {
 			_this.panel.style.display = "none";
 			_this.overlay.style.display = "none";
-			$(document).trigger("simplemodal_onclose");
+			simplemodal_onclose();
 		};
 		this.cancel.onclick = this.close;
 		this.onSubmit = function() {
-			var url = $("#url_input_form_input").val();
+			var url = _this.input.value;
 			_this.close();
 			setTimeout((function() {
 				return _this.callback(url);
 			}), 0);
 			return false;
 		};
-		this.$el = $("#url_input_modal");
-		assert(this.$el.length === 1);
-		this.el = this.$el[0];
-		this.$el.find("form").submit(this.onSubmit);
+		this.form.onsubmit = this.onSubmit;
 	}
 	URLInputModal.prototype.open = function(callback) {
 		this.isOpen = true;
@@ -53,7 +52,7 @@ var URLInputModal = (function() {
 		this.panel.style.display = "";
 		this.overlay.style.display = "";
 		this.input.focus();
-		$(document).trigger("simplemodal_onopen");
+		simplemodal_onopen();
 		this.panel.style.width = "";
 		this.panel.style.height = "";
 		var el_width = this.el.offsetWidth;
@@ -75,30 +74,33 @@ var CoordinateInputModal = (function() {
 		this.overlay = document.getElementById("simplemodal-overlay");
 		this.input = document.getElementById("coord_input_X");
 		this.cancel = document.getElementById("coord_input_cancel");
+		this.form = document.getElementById("coord_input_form");
+		this.el = document.getElementById("coordinate_input_modal");
 		ModalRefs.push(this);
+		this.title = document.getElementById("coord_input_title");
 		this.close = function() {
 			_this.panel.style.display = "none";
 			_this.overlay.style.display = "none";
-			$(document).trigger("simplemodal_onclose");
+			simplemodal_onclose();
 		};
 		this.cancel.onclick = this.close;
 		this.onSubmit = function() {
-			var f = _this.$el.find("form")[0];
+			var f = _this.form;
 			var y = parseInt(f.coord_input_Y.value, 10);
 			var x = parseInt(f.coord_input_X.value, 10);
 			var fail = false;
 			if (isNaN(y)) {
 				fail = true;
-				$(f.coord_input_Y).css("border", "1px solid red");
+				f.coord_input_Y.style.border = "1px solid red";
 			} else {
-				$(f.coord_input_Y).css("border", "");
+				f.coord_input_Y.style.border = "";
 				f.coord_input_Y.value = y;
 			}
 			if (isNaN(x)) {
 				fail = true;
-				$(f.coord_input_X).css("border", "1px solid red");
+				f.coord_input_X.style.border = "1px solid red";
 			} else {
-				$(f.coord_input_X).css("border", "");
+				f.coord_input_X.style.border = "";
 				f.coord_input_X.value = x;
 			}
 			if (!fail) {
@@ -109,19 +111,16 @@ var CoordinateInputModal = (function() {
 			}
 			return false;
 		};
-		this.$el = $("#coordinate_input_modal");
-		assert(this.$el.length === 1);
-		this.el = this.$el[0];
-		this.$el.find("form").submit(this.onSubmit);
+		this.form.onsubmit = this.onSubmit;
 	}
 	CoordinateInputModal.prototype.open = function(title, callback) {
-		$("#coord_input_title").text(title);
+		this.title.innerText = title;
 		this.isOpen = true;
 		this.callback = callback;
 		this.panel.style.display = "";
 		this.overlay.style.display = "";
 		this.input.focus();
-		$(document).trigger("simplemodal_onopen");
+		simplemodal_onopen();
 		this.panel.style.width = "";
 		this.panel.style.height = "";
 		var el_width = this.el.offsetWidth;
@@ -143,25 +142,24 @@ var ColorInputModal = (function() {
 		this.overlay = document.getElementById("simplemodal-overlay");
 		this.input = document.getElementById("color_input_form_input");
 		this.cancel = document.getElementById("color_input_cancel");
+		this.form = document.getElementById("color_input_form");
+		this.el = document.getElementById("color_input_modal");
 		ModalRefs.push(this);
 		this.close = function() {
 			_this.panel.style.display = "none";
 			_this.overlay.style.display = "none";
-			$(document).trigger("simplemodal_onclose");
+			simplemodal_onclose();
 		};
 		this.cancel.onclick = this.close;
 		this.onSubmit = function() {
-			var code = $("#color_input_form_input").val();
+			var code = _this.input.value;
 			_this.close();
 			setTimeout((function() {
 				return _this.callback(code);
 			}), 0);
 			return false;
 		};
-		this.$el = $("#color_input_modal");
-		assert(this.$el.length === 1);
-		this.el = this.$el[0];
-		this.$el.find("form").submit(this.onSubmit);
+		this.form.onsubmit = this.onSubmit;
 	}
 	ColorInputModal.prototype.open = function(callback) {
 		this.isOpen = true;
@@ -169,7 +167,7 @@ var ColorInputModal = (function() {
 		this.panel.style.display = "";
 		this.overlay.style.display = "";
 		this.input.focus();
-		$(document).trigger("simplemodal_onopen");
+		simplemodal_onopen();
 		this.panel.style.width = "";
 		this.panel.style.height = "";
 		var el_width = this.el.offsetWidth;

@@ -9,11 +9,25 @@ var chatWriteHistoryMax = 100; // maximum size of chat write history length
 var chatWriteHistoryIdx = -1; // location in chat write history
 var serverPingTime      = 0;
 
+var chat_window = document.getElementById("chat_window");
+var chat_open = document.getElementById("chat_open");
+var chatsend = document.getElementById("chatsend");
+var chatbar = document.getElementById("chatbar");
+var chat_close = document.getElementById("chat_close");
+var page_chatfield = document.getElementById("page_chatfield");
+var global_chatfield = document.getElementById("global_chatfield");
+var chat_page_tab = document.getElementById("chat_page_tab");
+var chat_global_tab = document.getElementById("chat_global_tab");
+var usr_online = document.getElementById("usr_online");
+var total_unread = document.getElementById("total_unread");
+var page_unread = document.getElementById("page_unread");
+var global_unread = document.getElementById("global_unread");
+
 var canChat = Permissions.can_chat(state.userModel, state.worldModel);
 if(!canChat) { // can't chat, adjust the chat window for it
     selectedChatTab = 1;
-    $("#chat_window").hide();
-    $("#chat_open").hide();
+    chat_window.style.display = "none";
+    chat_open.style.display = "none";
 }
 
 function api_chat_send(message, opts) {
@@ -174,8 +188,8 @@ function api_chat_send(message, opts) {
 
 // Performs send-chat-operation on chatbox
 function sendChat() {
-    var chatText = $("#chatbar")[0].value;
-    $("#chatbar")[0].value = "";
+    var chatText = chatbar.value;
+    chatbar.value = "";
     var opts = {};
     if(defaultChatColor != null) {
         opts.color = "#" + ("00000" + defaultChatColor.toString(16)).slice(-6)
@@ -184,24 +198,24 @@ function sendChat() {
 }
 
 function updateUnread() {
-    var total = $("#total_unread");
-    var page = $("#page_unread");
-    var global = $("#global_unread");
+    var total = total_unread;
+    var page = page_unread;
+    var global = global_unread;
     var totalCount = chatPageUnread + chatGlobalUnread;
-    total.hide();
-    global.hide();
-    page.hide();
+    total.style.display = "none";
+    global.style.display = "none";
+    page.style.display = "none";
     if(totalCount) {
-        total.show();
-        total.text(totalCount > 99 ? "99+" : "(" + totalCount + ")");
+        total.style.display = "";
+        total.innerText = totalCount > 99 ? "99+" : "(" + totalCount + ")";
     }
     if(chatPageUnread) {
-        page.show();
-        page.text(chatPageUnread > 99 ? "99+" : "(" + chatPageUnread + ")");
+        page.style.display = "";
+        page.innerText = chatPageUnread > 99 ? "99+" : "(" + chatPageUnread + ")";
     }
     if(chatGlobalUnread) {
-        global.show();
-        global.text(chatGlobalUnread > 99 ? "99+" : "(" + chatGlobalUnread + ")");
+        global.style.display = "";
+        global.innerText = chatGlobalUnread > 99 ? "99+" : "(" + chatGlobalUnread + ")";
     }
 }
 
@@ -217,11 +231,11 @@ function event_on_chat(data) {
         data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color);
 }
 
-$("#chatsend").on("click", function() {
+chatsend.addEventListener("click", function() {
     sendChat();
 })
 
-$("#chatbar").on("keypress", function(e) {
+chatbar.addEventListener("keypress", function(e) {
     var keyCode = e.keyCode;
     if(keyCode == 13) { // Enter
         sendChat();
@@ -229,7 +243,7 @@ $("#chatbar").on("keypress", function(e) {
     }
 })
 
-$("#chatbar").on("keydown", function(e) {
+chatbar.addEventListener("keydown", function(e) {
     var keyCode = e.keyCode;
 
     // scroll through chat history that the client sent
@@ -238,7 +252,7 @@ $("#chatbar").on("keydown", function(e) {
         if(chatWriteHistoryIdx >= chatWriteHistory.length) chatWriteHistoryIdx = chatWriteHistory.length - 1;
         var upVal = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
         if(!upVal) return;
-        $("#chatbar")[0].value = upVal;
+        chatbar.value = upVal;
     } else if(keyCode == 40) { // down
         chatWriteHistoryIdx--;
         if(chatWriteHistoryIdx < -1) chatWriteHistoryIdx = -1;
@@ -246,68 +260,68 @@ $("#chatbar").on("keydown", function(e) {
         if(chatWriteHistoryIdx != -1) {
             str = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
         }
-        $("#chatbar")[0].value = str;
+        chatbar.value = str;
     }
 })
 
-$("#chat_close").on("click", function() {
-    $("#chat_window").hide();
-    $("#chat_open").show();
+chat_close.addEventListener("click", function() {
+    chat_window.style.display = "none";
+    chat_open.style.display = "";
     chatOpen = false;
 })
 
-$("#chat_open").on("click", function() {
-    $("#chat_window").show();
-    $("#chat_open").hide();
+chat_open.addEventListener("click", function() {
+    chat_window.style.display = "";
+    chat_open.style.display = "none";
     chatOpen = true;
     if(selectedChatTab == 0) {
         chatPageUnread = 0;
         updateUnread();
         if(!initPageTabOpen) {
             initPageTabOpen = true;
-            $("#page_chatfield")[0].scrollTop = $("#page_chatfield")[0].scrollHeight;
+            page_chatfield.scrollTop = page_chatfield.scrollHeight;
         }
     } else {
         chatGlobalUnread = 0;
         updateUnread();
         if(!initGlobalTabOpen) {
             initGlobalTabOpen = true;
-            $("#global_chatfield")[0].scrollTop = $("#global_chatfield")[0].scrollHeight;
+            global_chatfield.scrollTop = global_chatfield.scrollHeight;
         }
     }
 })
 
-$("#chat_page_tab").on("click", function() {
-    $("#chat_global_tab")[0].style.backgroundColor = "";
-    $("#chat_global_tab")[0].style.color = "";
-    $("#chat_page_tab")[0].style.backgroundColor = "#8c8c8c";
-    $("#chat_page_tab")[0].style.color = "white";
+chat_page_tab.addEventListener("click", function() {
+    chat_global_tab.style.backgroundColor = "";
+    chat_global_tab.style.color = "";
+    chat_page_tab.style.backgroundColor = "#8c8c8c";
+    chat_page_tab.style.color = "white";
 
-    $("#global_chatfield").hide();
-    $("#page_chatfield").show();
+    global_chatfield.style.display = "none";
+    page_chatfield.style.display=  "";
     selectedChatTab = 0;
     chatPageUnread = 0;
     updateUnread();
     if(!initPageTabOpen) {
         initPageTabOpen = true;
-        $("#page_chatfield")[0].scrollTop = $("#page_chatfield")[0].scrollHeight;
+        page_chatfield.scrollTop = page_chatfield.scrollHeight;
     }
 })
 
-$("#chat_global_tab").on("click", function() {
-    $("#chat_global_tab")[0].style.backgroundColor = "#8c8c8c";
-    $("#chat_global_tab")[0].style.color = "white";
-    $("#chat_page_tab")[0].style.backgroundColor = "";
-    $("#chat_page_tab")[0].style.color = "";
+chat_global_tab.addEventListener("click", function() {
+    chat_global_tab.style.backgroundColor = "#8c8c8c";
+    chat_global_tab.style.color = "white";
+    chat_page_tab.style.backgroundColor = "";
+    chat_page_tab.style.color = "";
 
-    $("#global_chatfield").show();
-    $("#page_chatfield").hide();
+    global_chatfield.style.display = "";
+    page_chatfield.style.display = "none";
     selectedChatTab = 1;
     chatGlobalUnread = 0;
     updateUnread();
     if(!initGlobalTabOpen) {
         initGlobalTabOpen = true;
-        $("#global_chatfield")[0].scrollTop = $("#global_chatfield")[0].scrollHeight;
+        global_chatfield.scrollTop = global_chatfield.scrollHeight;
     }
 })
 
@@ -325,9 +339,9 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     if(!color) color = assignColor(nickname);
     var field;
     if(chatfield == "page") {
-        field = $("#page_chatfield");
+        field = document.getElementById("page_chatfield");
     } else if(chatfield == "global") {
-        field = $("#global_chatfield");
+        field = document.getElementById("global_chatfield");
     } else {
         field = getChatfield();
     }
@@ -393,8 +407,8 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     var msgDom = document.createElement("span");
     msgDom.innerHTML = "&nbsp;" + message;
 
-    var maxScroll = field[0].scrollHeight - field[0].clientHeight;
-    var scroll = field[0].scrollTop;
+    var maxScroll = field.scrollHeight - field.clientHeight;
+    var scroll = field.scrollTop;
     var doScrollBottom = false;
     if(maxScroll - scroll < 20) { // if scrolled at least 20 pixels above bottom
         doScrollBottom = true;
@@ -407,31 +421,31 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     chatGroup.appendChild(nickDom);
     chatGroup.appendChild(msgDom);
 
-    field.append(chatGroup);
+    field.appendChild(chatGroup);
 
-    maxScroll = field[0].scrollHeight - field[0].clientHeight;
+    maxScroll = field.scrollHeight - field.clientHeight;
     if(doScrollBottom) {
-        field[0].scrollTop = maxScroll;
+        field.scrollTop = maxScroll;
     }
 }
 
 function getChatfield(elm) {
     if(selectedChatTab == 0) {
-        return $("#page_chatfield");
+        return document.getElementById("page_chatfield");
     } else if(selectedChatTab == 1) {
-        return $("#global_chatfield");
+        return document.getElementById("global_chatfield");
     }
 }
 
 function updateUsrCount() {
     var count = w.userCount;
     if(count == void 0) {
-        $("#usr_online").text("");
+        usr_online.innerText = "";
         return;
     }
     var plural = "s";
     if(count == 1) plural = "";
-    $("#usr_online").text(count + " user" + plural + " online");
+    usr_online.innerText = count + " user" + plural + " online";
 }
 
 function chatType(registered, nickname, realUsername) {

@@ -3,19 +3,34 @@
     Nickname: state.userModel.username
 }
 
-var owot, textInput, textLater;
+var loading = document.getElementById("loading");
+var coord_Y = document.getElementById("coord_Y");
+var coord_X = document.getElementById("coord_X");
+var chatbar = document.getElementById("chatbar");
+var color_input_form_input = document.getElementById("color_input_form_input");
+var protect_precision = document.getElementById("protect_precision");
+var announce = document.getElementById("announce");
+var announce_text = document.getElementById("announce_text");
+var announce_close = document.getElementById("announce_close");
+var tile_choice = document.getElementById("tile_choice");
+var char_choice = document.getElementById("char_choice");
+var menu_elm = document.getElementById("menu");
+var nav_elm = document.getElementById("nav");
+var coords = document.getElementById("coords");
+
+var owot, textInput, textLayer;
 function init_dom() {
-    $("#loading").hide();
-    owot = $("#owot")[0];
+    loading.style.display = "none";
+    owot = document.getElementById("owot");
     owot.hidden = false;
     owot.style.cursor = "text";
     textInput = document.getElementById("textInput");
-    textLayer = $("#text")[0];
+    textLayer = document.getElementById("text");
     textLayer.hidden = false;
     textLayer.style.pointerEvents = "none";
 
-    $("#coord_Y").text(0);
-    $("#coord_X").text(0);
+    coord_Y.innerText = "0";
+    coord_X.innerText = "0";
 }
 
 function decimal(percentage) {
@@ -37,8 +52,10 @@ function byId(a){
     return document.getElementById(a);
 }
 
+var jscolorInput;
 clientOnload.push(function() {
-    byId("color_input_form_input").jscolor.fromRGB(
+    jscolorInput = byId("color_input_form_input").jscolor;
+    jscolorInput.fromRGB(
         (YourWorld.Color >> 16) & 255, 
         (YourWorld.Color >> 8) & 255, 
          YourWorld.Color & 255);
@@ -142,7 +159,7 @@ function beginLoadingOWOT() {
 beginLoadingOWOT();
 
 if(state.userModel.is_staff) {
-    $("#chatbar")[0].removeAttribute("maxLength");
+    chatbar.removeAttribute("maxLength");
 }
 
 var defaultSizes = {
@@ -336,7 +353,7 @@ function updateAutoProg() {
 }
 
 // Fast tile protecting
-$(document).on("mousemove.tileProtectAuto", function() {
+function mousemove_tileProtectAuto() {
     if(!tileProtectAuto.active) return;
     var tile = tiles[currentPosition[1] + "," + currentPosition[0]];
     if(!tile) return;
@@ -384,9 +401,10 @@ $(document).on("mousemove.tileProtectAuto", function() {
             renderTile(tileX, tileY);
         }
     }
-})
+}
+document.addEventListener("mousemove", mousemove_tileProtectAuto)
 
-$("body").on("keydown.tileProtectAuto", function(e) {
+function keydown_tileProtectAuto(e) {
     if(!worldFocused) return;
     if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to protect tiles
         if(e.ctrlKey) e.preventDefault();
@@ -426,41 +444,44 @@ $("body").on("keydown.tileProtectAuto", function(e) {
                 data.charX = charX;
                 data.charY = charY;
             }
-            jQuery.ajax({
+            ajaxRequest({
                 type: "POST",
                 url: ajaxStr,
-                data: data
-            }).done(function() {
-                autoTotal--;
-                updateAutoProg();
-                if(precision == 0) {
-                    selected[cstr][2].backgroundColor = "";
-                } else if(precision == 1) {
-                    delete selected[cstr];
-                    uncolorChar(tileX, tileY, charX, charY);
+                data: data,
+                done: function() {
+                    autoTotal--;
+                    updateAutoProg();
+                    if(precision == 0) {
+                        selected[cstr][2].backgroundColor = "";
+                    } else if(precision == 1) {
+                        delete selected[cstr];
+                        uncolorChar(tileX, tileY, charX, charY);
+                    }
+                    renderTile(tileX, tileY, true);
+                    // advance the loop
+                    i++;
+                    if(i < keys.length) {
+                        protectLoop();
+                    }
                 }
-                renderTile(tileX, tileY, true);
-                // advance the loop
-                i++;
-                if(i < keys.length) {
-                    protectLoop();
-                }
-            });
+            })
         }
         protectLoop()
     } else {
         tileProtectAuto.ctrlDown = e.ctrlKey;
         tileProtectAuto.shiftDown = e.shiftKey;
     }
-})
+}
+document.body.addEventListener("keydown", keydown_tileProtectAuto)
 
-$("body").on("keyup.tileProtectAuto", function(e) {
+function keyup_tileProtectAuto(e) {
     tileProtectAuto.ctrlDown = e.ctrlKey;
     tileProtectAuto.shiftDown = e.shiftKey;
-})
+}
+document.body.addEventListener("keyup", keyup_tileProtectAuto)
 
 // Fast linking
-$(document).on("mousemove.linkAuto", function() {
+function mousemove_linkAuto() {
     if(!linkAuto.active) return;
     var tile = tiles[currentPosition[1] + "," + currentPosition[0]];
     if(!tile) return;
@@ -498,9 +519,10 @@ $(document).on("mousemove.linkAuto", function() {
             delete linkAuto.selected[tileY + "," + tileX + "," + charY + "," + charX];
         }
     }
-})
+}
+document.addEventListener("mousemove", mousemove_linkAuto)
 
-$("body").on("keydown.linkAuto", function(e) {
+function keydown_linkAuto(e) {
     if(!worldFocused) return;
     if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to add links
         if(e.ctrlKey) e.preventDefault();
@@ -539,34 +561,37 @@ $("body").on("keydown.linkAuto", function(e) {
                 data.link_tileX = linkData[0];
                 data.link_tileY = linkData[1];
             }
-            jQuery.ajax({
+            ajaxRequest({
                 type: "POST",
                 url: ajaxStr,
-                data: data
-            }).done(function(){
-                autoTotal--;
-                updateAutoProg();
-                delete selected[cstr];
-                uncolorChar(tileX, tileY, charX, charY);
-                renderTile(tileX, tileY, true);
-                // advance the loop
-                i++;
-                if(i < keys.length) {
-                    protectLoop();
+                data: data,
+                done: function() {
+                    autoTotal--;
+                    updateAutoProg();
+                    delete selected[cstr];
+                    uncolorChar(tileX, tileY, charX, charY);
+                    renderTile(tileX, tileY, true);
+                    // advance the loop
+                    i++;
+                    if(i < keys.length) {
+                        protectLoop();
+                    }
                 }
-            });
+            })
         }
         protectLoop()
     } else {
         linkAuto.ctrlDown = e.ctrlKey;
         linkAuto.shiftDown = e.shiftKey;
     }
-})
+}
+document.body.addEventListener("keydown", keydown_linkAuto)
 
-$("body").on("keyup.linkAuto", function(e) {
+function keyup_linkAuto(e) {
     linkAuto.ctrlDown = e.ctrlKey;
     linkAuto.shiftDown = e.shiftKey;
-})
+}
+document.body.addEventListener("keyup", keyup_linkAuto)
 
 // adjust canvas width, canvas display width, and variable width to
 // disobey the browser zoom so that the custom zoom can be used
@@ -589,7 +614,7 @@ function adjust_scaling_DOM(ratio) {
     textLayer.style.height = window_height + "px";
 }
 
-$(window).on("resize", function(e) {
+window.addEventListener("resize", function(e) {
     var ratio = window.devicePixelRatio;
     if(!ratio) ratio = 1;
 
@@ -617,7 +642,7 @@ function getCharColor(tileX, tileY, charX, charY) {
 }
 
 // copy individual chars
-$(document).on("keydown", function(e) {
+document.addEventListener("keydown", function(e) {
     if(!worldFocused) return;
     // 67 = c, 77 = m
     if(!e.ctrlKey || (e.keyCode != 67 && e.keyCode != 77)) return;
@@ -638,7 +663,7 @@ $(document).on("keydown", function(e) {
 })
 
 // color picker
-$(document).on("keydown", function(e) {
+document.addEventListener("keydown", function(e) {
     if(!worldFocused) return;
     if(!(e.altKey && e.keyCode == 67)) return; // if not alt + c, return
     textInput.value = "";
@@ -654,7 +679,7 @@ $(document).on("keydown", function(e) {
     localStorage.setItem('color', color);
     // update color textbox in "change color" menu
     if(!color) color = 0;
-    $(".jscolor")[0].value = ("00000" + color.toString(16)).slice(-6);
+    color_input_form_input.value = ("00000" + color.toString(16)).slice(-6);
 })
 
 owot.width = width;
@@ -675,7 +700,7 @@ var textLayerCtx = textLayer.getContext("2d");
 textLayer.width = width;
 textLayer.height = height;
 
-if (window.MozWebSocket)
+if (!window.WebSocket && window.MozWebSocket)
     window.WebSocket = window.MozWebSocket;
 
 var ws_path;
@@ -691,25 +716,58 @@ function menu_color(color) {
     // change menu color
     if(!window.menuStyle) {
         menuStyle = document.createElement("style")
-        $("head").append(menuStyle)
+        document.head.appendChild(menuStyle)
     }
     menuStyle.innerHTML = "#menu.hover, #nav { background: " + color + "; }"
+}
+
+function ajaxRequest(settings) {
+    var req = new XMLHttpRequest();
+    req.open(settings.type, settings.url, true);
+    req.onload = function() {
+        if(req.status >= 200 && req.status < 400) {
+            if(settings.done) {
+                settings.done(req.responseText, req);
+            }
+        } else {
+            if(settings.error) {
+                settings.error(req);
+            }
+        }
+    }
+    req.onerror = function() {
+        if(settings.error) {
+            settings.error(req);
+        }
+    }
+    var formData = "";
+    var ampAppend = false;
+    if(settings.data) {
+        for(var i in settings.data) {
+            if(ampAppend) formData += "&";
+            ampAppend = true;
+            formData += encodeURIComponent(i) + "=" + encodeURIComponent(settings.data[i]);
+        }
+        req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    }
+    req.send(formData);
 }
 
 // begin OWOT's client
 function begin() {
     // get world style
-    jQuery.ajax({
+    ajaxRequest({
         type: "GET",
         url: "/world_style/?world=" + state.worldModel.name,
-        success: function(e) {
-            createSocket();
-            styles = e;
+        done: function(data) {
+            data = JSON.parse(data);
+            styles = data;
             menu_color(styles.menu);
-            writability_styles = [styles.public, styles.member, styles.owner]
-        },
-        dataType: "json"
-    });
+            writability_styles = [styles.public, styles.member, styles.owner];
+            createSocket();
+        }
+    })
+    // dataType: "json"
 }
 
 function stopLinkUI() {
@@ -748,7 +806,7 @@ function removeTileProtectHighlight() {
 function stopTileUI() {
     if(!lastTileHover) return;
     if(!w.isProtecting) return;
-    $("#protect_precision").css("display", "none");
+    protect_precision.style.display = "none";
     w.isProtecting = false;
     tileProtectAuto.active = false;
     owot.style.cursor = "text";
@@ -778,11 +836,11 @@ function doLink() {
         data.link_tileY = w.coord_input_y;
         ajax_url = "/ajax/coordlink/";
     }
-    $.ajax({
+    ajaxRequest({
         type: "POST",
         url: ajax_url,
         data: data
-    });
+    })
 }
 
 function doProtect() {
@@ -808,11 +866,20 @@ function doProtect() {
         data.charX = lastTileHover[3];
         data.charY = lastTileHover[4];
     }
-    $.ajax({
+    ajaxRequest({
         type: "POST",
         url: ajax_url,
         data: data
-    });
+    })
+}
+
+function closest(element, parElement) {
+    var currentElm = element;
+    while(currentElm) {
+        if(currentElm == parElement) return true;
+        currentElm = currentElm.parentNode;
+    }
+    return false;
 }
 
 var dragStartX = 0;
@@ -823,7 +890,7 @@ var dragPosY = 0;
 var isDragging = false;
 function event_mousedown(e, arg_pageX, arg_pageY) {
     var target = e.target;
-    if($(target).closest(getChatfield())[0] == getChatfield()[0] || target == $("#chatbar")[0]) {
+    if(closest(target, getChatfield()) || target == chatbar) {
         worldFocused = false;
     } else {
         worldFocused = true;
@@ -856,10 +923,10 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
     }
     owot.style.cursor = "move";
 }
-$(document).on("mousedown", function(e) {
+document.addEventListener("mousedown", function(e) {
     event_mousedown(e);
 })
-$(document).on("touchstart", function(e) {
+document.addEventListener("touchstart", function(e) {
     var pos = touch_pagePos(e);
     touchPosX = pos[0];
     touchPosY = pos[1];
@@ -981,17 +1048,17 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
         }
     };
 }
-$(document).on("mouseup", function(e) {
+document.addEventListener("mouseup", function(e) {
     event_mouseup(e);
 })
-$(document).on("touchend", function(e) {
+document.addEventListener("touchend", function(e) {
     event_mouseup(e, touchPosX, touchPosY);
 })
 
-$(document).on("mouseleave", function(e) {
+document.addEventListener("mouseleave", function(e) {
     stopDragging();
 })
-$(document).on("mouseenter", function(e) {
+document.addEventListener("mouseenter", function(e) {
     stopDragging();
 })
 function is_link(tileX, tileY, charX, charY) {
@@ -1228,7 +1295,7 @@ document.onkeydown = function(e) {
     if(!worldFocused) return;
     var key = e.keyCode;
     if(w._state.uiModal) return;
-    if(document.activeElement == $("#chatbar")[0]) return;
+    if(document.activeElement == chatbar) return;
     textInput.focus();
     // stop paste
     clearInterval(pasteInterval);
@@ -1450,7 +1517,7 @@ function escapeQuote(text) { // escapes " and ' and \
 var linkMargin = 100; // px
 var linkElm = document.createElement("a");
 linkElm.href = "";
-$("body")[0].appendChild(linkElm);
+document.body.appendChild(linkElm);
 var linkDiv = document.createElement("div");
 linkDiv.style.width = (cellW + (linkMargin * 2)) + "px";
 linkDiv.style.height = (cellH + (linkMargin * 2)) + "px";
@@ -1584,10 +1651,10 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 
     renderTiles();
 }
-$(document).on("mousemove", function(e) {
+document.addEventListener("mousemove", function(e) {
     event_mousemove(e);
 })
-$(document).on("touchmove", function(e) {
+document.addEventListener("touchmove", function(e) {
     e.preventDefault();
     var pos = touch_pagePos(e);
     touchPosX = pos[0];
@@ -1601,13 +1668,13 @@ function touch_pagePos(e) {
     return [Math.trunc(first_touch.pageX * zoomRatio), Math.trunc(first_touch.pageY * zoomRatio)];
 }
 
-$(document).on("wheel", function(e) {
+document.addEventListener("wheel", function(e) {
     // if focused on chat, don't scroll world
-    if($(e.target).closest(getChatfield())[0] == getChatfield()[0]) return;
+    if(closest(e.target, getChatfield())) return;
     if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
-    var deltaX = Math.trunc(e.originalEvent.deltaX);
-    var deltaY = Math.trunc(e.originalEvent.deltaY);
-    if(e.originalEvent.deltaMode) { // not zero (default)?
+    var deltaX = Math.trunc(e.deltaX);
+    var deltaY = Math.trunc(e.deltaY);
+    if(e.deltaMode) { // not zero (default)?
         deltaX = 0;
         deltaY = (deltaY / Math.abs(deltaY)) * 100;
     }
@@ -2388,8 +2455,8 @@ function renderTiles(redraw) {
     var tileCoordY = Math.floor(-positionY / tileH);
     var centerY = -Math.floor(tileCoordY / 4);
     var centerX = Math.floor(tileCoordX / 4);
-    $("#coord_Y").text(centerY);
-    $("#coord_X").text(centerX);
+    coord_Y.innerText = centerY;
+    coord_X.innerText = centerX;
 
     if(redraw) {
         for(var i in tiles) {
@@ -2425,18 +2492,18 @@ function protectPrecisionOption(option) { // 0 being tile and 1 being char
         case 1:
             charChoiceColor = "#FF6600";
     }
-    $("#tile_choice").css("background-color", tileChoiceColor);
-    $("#char_choice").css("background-color", charChoiceColor);
+    tile_choice.style.backgroundColor = tileChoiceColor;
+    char_choice.style.backgroundColor = charChoiceColor;
 }
 protectPrecisionOption(protectPrecision);
 
 var menu;
 function buildMenu() {
-    menu = new Menu($("#menu"), $("#nav"));
+    menu = new Menu(menu_elm, nav_elm);
     menu.addCheckboxOption(" Show coordinates", function() {
-        return $("#coords").show();
+        return coords.style.display = "";
     }, function() {
-        return $("#coords").hide();
+        return coords.style.display = "none";
     });
     if(Permissions.can_color_text(state.userModel, state.worldModel)) {
         menu.addOption("Change color", w.color);
@@ -2505,7 +2572,7 @@ function buildMenu() {
 
 document.onselectstart = function(e) {
     var target = e.target;
-    if($(target).closest(getChatfield())[0] == getChatfield()[0] || target == $("#chatbar")[0]) {
+    if(closest(target, getChatfield()) || target == chatbar) {
         return true;
     }
     return w._state.uiModal;
@@ -2528,9 +2595,9 @@ var w = {
     protect_bg: "",
     _state: state,
     _ui: {
-        announce: $("#announce"),
-        announce_text: $("#announce_text"),
-        announce_close: $("#announce_close"),
+        announce: announce,
+        announce_text: announce_text,
+        announce_close: announce_close,
 		coordinateInputModal: new CoordinateInputModal(),
 		scrolling: null,
 		urlInputModal: new URLInputModal(),
@@ -2546,7 +2613,7 @@ var w = {
                 this_color = 0;
             }
             YourWorld.Color = this_color;
-            localStorage.setItem('color', this_color);
+            localStorage.setItem("color", this_color);
         });
     },
     goToCoord: function() {
@@ -2597,7 +2664,7 @@ var w = {
     },
     doProtect: function(protectType, unprotect) {
         // show the protection precision menu
-        $("#protect_precision").css("display", "");
+        protect_precision.style.display = "";
         tileProtectAuto.active = true;
 		if(unprotect) { // default area protection
 			tileProtectAuto.mode = 3;
@@ -2656,12 +2723,12 @@ var w = {
 }
 
 if (state.announce) {
-    w._ui.announce_text.html(w._state.announce);
-    w._ui.announce.show();
+    w._ui.announce_text.innerHTML = w._state.announce;
+    w._ui.announce.style.display = "";
 }
 
-w._ui.announce_close[0].onclick = function() {
-    w._ui.announce.hide();
+w._ui.announce_close.onclick = function() {
+    w._ui.announce.style.display = "none";
 }
 
 w._state.goToCoord = {};
@@ -2669,12 +2736,12 @@ w._state.uiModal = false; // is the UI open? (coord, url, go to coord)
 
 buildMenu();
 
-$(document).bind("simplemodal_onopen", function() {
+var simplemodal_onopen = function() {
     return w._state.uiModal = true;
-});
-$(document).bind("simplemodal_onclose", function() {
+}
+var simplemodal_onclose = function() {
     return w._state.uiModal = false;
-});
+}
 
 var tellEdit = [];
 // tileX, tileY, charX, charY, editID
@@ -2890,10 +2957,10 @@ var ws_functions = {
     },
     announcement: function(data) {
         if(data.text) {
-			w._ui.announce_text.html(data.text);
-			w._ui.announce.show();
+			w._ui.announce_text.innerHTML = data.text;
+			w._ui.announce.style.display = "";
 		} else {
-			w._ui.announce.hide();
+			w._ui.announce.style.display = "none";
 		}
     },
     ping: function(data) {

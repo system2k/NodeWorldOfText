@@ -7,7 +7,7 @@ atcInfo.style.color = "white";
 atcInfo.style.position = "absolute";
 atcInfo.style.left = "0px";
 atcInfo.style.top = "0px";
-$("body").append(atcInfo);
+document.body.appendChild(atcInfo);
 
 var admclrActivated = document.createElement("label");
 admclrActivated.innerText = " [ ACTIVE ]";
@@ -55,7 +55,7 @@ var admclr = {
 };
 
 // ctrl is pressed
-$("body").on("keydown.admclr", function(e) {
+function keydown_admclr(e) {
     if(!admclr.activated) return;
     if(admclr.ctrlDown) return;
     if(e.ctrlKey) {
@@ -65,10 +65,11 @@ $("body").on("keydown.admclr", function(e) {
         admclr.renderTile(true);
         admclr.handleClear(currentPosition[0], currentPosition[1]);
 	}
-});
+}
+document.body.addEventListener("keydown", keydown_admclr);
 
 // mouse is moved
-$("body").on("mousemove.admclr", function(e) {
+function mousemove_admclr(e) {
     if(!admclr.activated) return;
     if(admclr.lastPos) {
         /*
@@ -90,10 +91,11 @@ $("body").on("mousemove.admclr", function(e) {
     if(admclr.ctrlDown) {
         admclr.handleClear(currentPosition[0], currentPosition[1]);
     }
-})
+}
+document.body.addEventListener("mousemove", mousemove_admclr)
 
 // a key is released
-$("body").on("keyup.admclr", function(e) {
+function keyup_admclr(e) {
     if(!admclr.activated) return;
     admclr.ctrlDown = false;
     admclrActivated.style.display = "none";
@@ -108,4 +110,5 @@ $("body").on("keyup.admclr", function(e) {
     tiles[currentPosition[1] + "," + currentPosition[0]].backgroundColor = "";
     renderTile(currentPosition[0], currentPosition[1], true);
 	admclr.lastPos = null;
-})
+}
+document.body.addEventListener("keyup", keyup_admclr)

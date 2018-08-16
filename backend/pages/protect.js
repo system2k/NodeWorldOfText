@@ -158,7 +158,7 @@ module.exports.POST = async function(req, serve, vars, params) {
         };
     }
     if(consistent) {
-        // don'y include null, because a protection will be cancelled out if the tile is full-null
+        // don't include null, because a protection will be cancelled out if the tile is full-null
         if(mainWritability != null) {
             new_writability = mainWritability;
         }
@@ -191,5 +191,7 @@ module.exports.POST = async function(req, serve, vars, params) {
     tile_signal_update(world.name, tileX, tileY, content,
         JSON.parse(properties), new_writability)
 
-    serve();
+    serve(null, null, {
+        mime: "text/html; charset=utf-8"
+    });
 }

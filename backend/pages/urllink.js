@@ -164,5 +164,7 @@ module.exports.POST = async function(req, serve, vars, params) {
 
     tile_signal_update(world.name, tileX, tileY, content, tile_props, actual_writability)
 
-    serve();
+    serve(null, null, {
+        mime: "text/html; charset=utf-8"
+    });
 }

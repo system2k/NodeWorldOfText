@@ -14,21 +14,21 @@
     <body>
         <div id="topbar" class="ui">
             <div id="topbar_inner">
-                <div id="announce" class="ui-vis">
+                <div id="announce" class="ui-vis" style="display: none;">
                     <span align="center" id="announce_text"></span>
                     <span id="announce_close" class="announce_close">X</span>
                 </div>
-                <span id="menu" class="ui-vis tab menu">Menu <span style="font-size:50%">▼</span></span>
+                <span id="menu" class="ui-vis tab menu" style="display: none;">Menu <span style="font-size:50%">▼</span></span>
             </div>
         </div>
-        <div id="nav" class="ui menu ui-vis">
+        <div id="nav" class="ui menu ui-vis" style="display: none;">
             <ul>
                 <li>
                     <a href="/home/" target="_blank">More...&nbsp;<img src="/static/Icon_External_Link.png"></a>
                 </li>
             </ul>
         </div>
-        <div id="coords" class="ui ui-vis">
+        <div id="coords" class="ui ui-vis" style="display: none;">
             X: <span id="coord_X"></span>
             Y: <span id="coord_Y"></span>
         </div>
@@ -119,7 +119,7 @@
         <div id="chat_open">
             Chat&nbsp;<b id="total_unread" class="unread" style="display: none; font-size: 15px;">(-)</b>
         </div>
-        <div id="chat_window">
+        <div id="chat_window" style="display: none;">
             <span style="position: absolute; top: 5px; left: 210px;" id="usr_online">-- users online</span>
             <div class="chat_tab_button" style="background-color: #8c8c8c; color: white; left: 3px; width: 100px !important;" id="chat_page_tab">
                 This page&nbsp;<b id="page_unread" class="unread" style="display: none;">(-)</b>
@@ -168,9 +168,8 @@
 
         <script src="/static/yw/javascript/polyfills.js"></script>
         {% if nsfw %}
-        <script src="/static/yw/javascript/nsfw.js"></script>
+            <script src="/static/yw/javascript/nsfw.js"></script>
         {% endif %}
-        <script src="/static/lib/jquery-1.7.min.js"></script>
         <script src="/static/lib/reconnecting-ws.js"></script>
         <script src="/static/lib/jscolor.min.js"></script>
         <script src="/static/yw/javascript/Modals.js"></script>

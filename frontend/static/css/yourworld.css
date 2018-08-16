@@ -76,14 +76,10 @@ a:visited {
 .message a {
     color: blue;
 }
-#announce {
-    display: none;
-}
 #loading {
     font-family: Verdana;
 }
 #coords {
-    display: none;
     position: absolute;
     bottom: 0;
     right: 0;
@@ -92,7 +88,6 @@ a:visited {
 }
 .menu {
     right: 0;
-    display: none;
 }
 #menu {
     cursor: pointer;
@@ -103,7 +98,6 @@ a:visited {
     border-left: 1px solid #ccc;
 }
 #nav {
-    display: none;
     position: absolute;
     text-align: right;
     top: 1.5em;
@@ -250,7 +244,6 @@ a:visited {
     height: 300px;
     border-style: solid;
     border-width: 1px;
-    display: none;
 }
 #chat_close {
     background-color: red;
