@@ -38,9 +38,14 @@ module.exports.GET = async function(req, serve, vars, params) {
             url: world_url,
             member_plural: plural(member_total),
             views_plural: plural(properties.views),
-            views
+            views,
+            name: world.name
         })
     }
+
+    world_list.sort(function(v1, v2) {
+        return v1.name.localeCompare(v2.name, "en", { sensitivity: "base" })
+    })
 
     var whitelists = await db.all("SELECT * FROM whitelist WHERE user_id=?", user.id)
 
