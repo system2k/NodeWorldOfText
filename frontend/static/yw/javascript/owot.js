@@ -2567,7 +2567,7 @@ function buildMenu() {
         }, true);
     }
     menu.addEntry("<input onchange=\"changeZoom(this.value)\" title=\"Zoom\" type=\"range\" value=\"100\" min=\"20\" max=\"1000\" style=\"width: 80px;\" id=\"zoombar\">" +
-        "<button onclick=\"changeZoom(100)\">x</button>");
+        "<button onclick=\"changeZoom(100)\" id=\"reset_zoom\">x</button>");
 }
 
 document.onselectstart = function(e) {
