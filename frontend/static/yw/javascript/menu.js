@@ -7,11 +7,12 @@ var mstate = "up";
 var inProg = false;
 function slideElement(direction, element, speed) {
 	if(inProg) return;
-	inProg = true;
 	var interval = 13;
 
 	if(mstate == "up" && direction == "up") return;
 	if(mstate == "down" && direction == "down") return;
+
+	inProg = true;
 
 	mstate = direction;
 
