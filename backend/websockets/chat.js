@@ -137,7 +137,9 @@ module.exports = async function(ws, data, send, vars) {
 
     var command_list = [
         [3, "uptime", null, "get uptime of server"],
-        /* consider: /downtime [view calculated downtime], /stopserver [stop the server], /restartserver [restart the server] */
+        /* [3, "downtime", null, "view calculated downtime"] */
+        /* [3, "stopserver", null, "stop the server"] */
+        /* [3, "restartserver", null, "restart the server"] */
 
         [2, "worlds", null, "list all worlds"],
         [2, "ban", ["id"], "ban user from chat by id (referenced by IP)"],
@@ -154,7 +156,7 @@ module.exports = async function(ws, data, send, vars) {
         [0, "gridsize", ["WxH"], "change size of cells in client"], // client-side
         [0, "logout", null, "shortcut to logout your account"],
         [0, "block", ["id"], "block chats from this client"],
-        /* [0, "invisible", ["on/off"], "make this client invisible to others"] :: TODO: Check if this is necessary */
+        /* [0, "invisible", ["on/off"], "make this client invisible to others"] */
         [0, "color", ["color code"], "change current color for this client"], // client-side
         [0, "chatcolor", ["color code"], "change only the chat color"] // client-side
         /* [0, "option", null, "reserved for future use"] */

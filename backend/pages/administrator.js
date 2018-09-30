@@ -21,7 +21,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     })
 
     var data = {
-        user_ranks: await db.all("SELECT * FROM auth_user WHERE level > 0"),
+        user_ranks: await db.all("SELECT * FROM auth_user WHERE level > 0 ORDER BY level DESC"),
         announcement: announcement(),
         announcement_update_msg: params.announcement_update_msg,
         cons_update_msg: params.cons_update_msg,

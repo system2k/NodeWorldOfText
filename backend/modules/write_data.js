@@ -63,7 +63,11 @@ function fixColors(colors) {
 //let's leave this as just a feature for who knows this secret top top secret
 var NOT_SO_SECRET = "@^&$%!#*%^#*)~@$^*#!)~*%38259`25equfahgrqieavkj4bh8ofweieagrHG*FNV#@#OIFENUOGIVEOSFKNL<CDOLFKEWNSCOIEAFM:COGPEWWRG>BVPZL:MBGOEWSV";
 
+var write_data_call_id = 0;
 module.exports = async function(data, vars) {
+    var call_id = write_data_call_id;
+    write_data_call_id++;
+
     var db = vars.db;
     var user = vars.user;
     var world = vars.world;
@@ -76,6 +80,7 @@ module.exports = async function(data, vars) {
     var insert_char_at_index = vars.insert_char_at_index;
     var advancedSplit = vars.advancedSplit;
     var get_bypass_key = vars.get_bypass_key;
+    var tile_database = vars.tile_database;
 
     var bypass_key = get_bypass_key();
     // the retrieval of the key failed (aka "undefined"). change to a value that cannot be compared to
@@ -136,17 +141,101 @@ module.exports = async function(data, vars) {
         }
     }
 
-    var accepted = [];
-    var rejected = {};
-    var upd_tiles = {};
+    tile_database.reserveCallId(write_data_call_id);
 
-    // accepts only an ARRAY of edits
-    function rej_edits(edits) {
-        for(var i = 0; i < edits.length; i++) {
-            rejected[edits[i][6]] = "NO_TILE_PERM"
+    for(var i in tiles) {
+        var incomingEdits = tiles[i];
+
+        var changes = [];
+
+        for(var k = 0; k < incomingEdits.length; k++) {
+            var editIncome = incomingEdits[k];
+
+            var charX = san_nbr(editIncome[3]);
+            var charY = san_nbr(editIncome[2]);
+            var charInsIdx = charY * 16 + charX;
+            if(charInsIdx < 0) charInsIdx = 0;
+            if(charInsIdx > 127) charInsIdx = 127;
+
+            charX = charInsIdx % 16;
+            charY = Math.floor(charInsIdx / 16);
+            editIncome[3] = charX;
+            editIncome[2] = charY;
+
+            var char = editIncome[5];
+            if(typeof char != "string") {
+                char = "?";
+            }
+            char = advancedSplit(char);
+            if(char.length <= 1) {
+                if(!editIncome[7]) editIncome[7] = 0;
+                if(Array.isArray(editIncome[7])) {
+                    editIncome[7] = fixColors(editIncome[7][0])
+                } else {
+                    editIncome[7] = fixColors(editIncome[7]);
+                }
+                changes.push(editIncome);
+                continue;
+            } else {
+                // only password holders, superusers, owners, or members can use multiple characters per edit
+                if(!user.superuser && !(is_owner || is_member) && data.bypass != bypass_key) {
+                    char = char.slice(0, 1);
+                }
+            }
+            for(var i = 0; i < char.length; i++) {
+                var newIdx = charInsIdx + i;
+                if(newIdx > 127) continue; // overflow
+                // convert back to proper X/Y
+                var newX = newIdx % 16;
+                var newY = Math.floor(newIdx / 16);
+                var newChar = char[i];
+                var newColor = editIncome[7];
+                if(Array.isArray(newColor)) {
+                    // color is an array, get individual values
+                    newColor = fixColors(newColor[i]);
+                } else {
+                    // color is a number
+                    newColor = fixColors(newColor);
+                }
+                if(!newColor) newColor = 0;
+
+                var newAr = [editIncome[0], editIncome[1],
+                            newY, newX,
+                            editIncome[4], newChar, editIncome[6], newColor];
+                if(editIncome[8]) {
+                    newAr.push(editIncome[8]);
+                }
+                changes.push(newAr);
+            }
+        }
+
+        var DateNow = Date.now();
+        // send to tile database manager
+        for(var e = 0; e < changes.length; e++) {
+            var change = changes[e];
+            
+            var tileY = change[0];
+            var tileX = change[1];
+            var charY = change[2];
+            var charX = change[3];
+            var time = DateNow;
+            var char = change[5];
+            var editId = change[6];
+            var color = change[7];
+            var animation = change[8];
+
+            tile_database.write(tileX, tileY, charX, charY, char, color, world.id, {
+                time, editId, animation, user, world, is_owner, is_member,
+                can_color_text, public_only, no_log_edits, write_data_call_id
+            });
         }
     }
 
+    var resp = await tile_database.editResponse(write_data_call_id);
+
+    return { accepted: resp[0], rejected: resp[1] };
+
+    /*
     // begin writing the edits
     await transaction.begin();
     for(var i in tiles) {
@@ -301,7 +390,7 @@ module.exports = async function(data, vars) {
 									okFrames.push([frameText, frameColors]);
 								}
 							}
-							if (okFrames.length /* > 0*/) {
+							if (okFrames.length) {
 								properties.animation = {
 									changeInterval,
 									repeat,
@@ -389,5 +478,5 @@ module.exports = async function(data, vars) {
         }, world.name)
     }
 
-    return { accepted, rejected };
+    return { accepted, rejected };*/
 }

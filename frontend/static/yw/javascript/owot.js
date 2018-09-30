@@ -1528,8 +1528,6 @@ linkElm.style.display = "block";
 linkElm.target = "_blank";
 linkElm.style.cursor = "pointer";
 
-var waitTimeout = Math.floor(1000 / 60); // 60 fps max for dragging
-var lastRender = 0;
 var touchPosX = 0;
 var touchPosY = 0;
 function event_mousemove(e, arg_pageX, arg_pageY) {
@@ -1554,6 +1552,8 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
         linkElm.onclick = "";
         linkElm.target = "_blank";
         linkElm.href = "";
+        linkElm.onclick = null;
+        linkElm.rel = "";
         if(link[0].type == "url") {
             var URL_Link = link[0].url;
             linkElm.title = "Link to URL " + URL_Link;
@@ -1563,6 +1563,8 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             if(linkProtocol == "javascript:" || isJSLink) {
                 URL_Link = "javascript:runJsLink(\"" + escapeQuote(URL_Link) + "\");"
                 linkElm.href = URL_Link;
+            } else {
+                linkElm.rel = "noopener noreferrer";
             }
         } else if(link[0].type == "coord") {
             var pos = link[0].link_tileX + "," + link[0].link_tileY;
@@ -1641,10 +1643,6 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
     if(pageX >= width || pageY >= height || pageX < 0 || pageY < 0) stopDragging();
 
     if(!isDragging) return;
-
-    // wait before updating coords and tiles
-    if(Date.now() - lastRender < waitTimeout) return;
-    lastRender = Date.now();
 
     positionX = dragPosX + (pageX - dragStartX);
     positionY = dragPosY + (pageY - dragStartY);

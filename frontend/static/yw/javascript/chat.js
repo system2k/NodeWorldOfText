@@ -64,13 +64,19 @@ function api_chat_send(message, opts) {
         var command = args[0].toLowerCase();
         args.shift();
         if(command == "nick") {
-            var newDisplayName = args[0];
+            var newDisplayName = args.join(" ");
             if(!newDisplayName) {
                 newDisplayName = state.userModel.username;
             }
+            newDisplayName = newDisplayName.slice(0, nickLim);
             YourWorld.Nickname = newDisplayName;
             storeNickname();
-            var nickChangeMsg = "Set nickname to `" + newDisplayName + "`";
+            var nickChangeMsg;
+            if(newDisplayName) {
+                nickChangeMsg = "Set nickname to `" + newDisplayName + "`";
+            } else {
+                nickChangeMsg = "Removed nickname";
+            }
             addChat(null, 0, "user", "[ Server ]", nickChangeMsg, "Server");
             return;
         }

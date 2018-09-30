@@ -180,6 +180,7 @@ console.log("Loading page files");
 const pages      = load_modules("./backend/pages/");
 const websockets = load_modules("./backend/websockets/");
 const modules    = load_modules("./backend/modules/");
+const systems    = load_modules("./backend/systems/");
 
 // if page modules contain a startup function, run it
 for(var i in pages) {
@@ -1224,7 +1225,7 @@ var server = https_reference.createServer(options, async function(req, res) {
         await process_request(req, res, current_req_id)
     } catch(e) {
         if(transaction_active) {
-            if(transaction_req_id == current_req_id) {
+            if(transaction_req_id == current_req_id && transaction_req_id > -1) {
                 transaction_active = false;
                 await db.run("COMMIT");
             }
@@ -1255,7 +1256,7 @@ var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
 
 async function process_request(req, res, current_req_id) {
     var hostname = req.headers.host;
-    if(!hostname) hostname = "";
+    if(!hostname) hostname = "www.ourworldoftext.com";
     hostname = hostname.slice(0, 1000);
 	var offset = 2;
     var subdomains = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
@@ -1270,6 +1271,10 @@ async function process_request(req, res, current_req_id) {
     }
     if(sub.length == 1 && compareNoCase(sub[0], "serverrequeststatus")) {
         res.write("{}");
+        return res.end();
+    }
+    if(sub.length == 1 && compareNoCase(sub[0], "info")) {
+        res.write("<html><h1>Info</h1></html>");
         return res.end();
     }
 
@@ -1779,14 +1784,7 @@ function clearChatlog(world_id) {
     chatIsCleared[world_id] = true;
 }
 
-async function updateChatLogData(no_timeout) {
-    if(!(global_chat_additions.length > 0 ||
-          world_chat_additions.length > 0 ||
-          Object.keys(chatIsCleared).length > 0)) {
-        if(!no_timeout) intv.updateChatLogData = setTimeout(updateChatLogData, 1000);
-        return;
-    }
-
+async function doUpdateChatLogData() {
     var copy_global_chat_additions = global_chat_additions.slice(0);
     var copy_world_chat_additions = world_chat_additions.slice(0);
     var copy_chatIsCleared = Object.assign(chatIsCleared, {})
@@ -1838,6 +1836,21 @@ async function updateChatLogData(no_timeout) {
     }
 
     await db_ch.run("COMMIT")
+}
+
+async function updateChatLogData(no_timeout) {
+    if(!(global_chat_additions.length > 0 ||
+          world_chat_additions.length > 0 ||
+          Object.keys(chatIsCleared).length > 0)) {
+        if(!no_timeout) intv.updateChatLogData = setTimeout(updateChatLogData, 1000);
+        return;
+    }
+
+    try {
+        await doUpdateChatLogData();
+    } catch(e) {
+        handle_error(e);
+    }
 
     if(!no_timeout) intv.updateChatLogData = setTimeout(updateChatLogData, 5000);
 }
@@ -1989,6 +2002,8 @@ async function initialize_server_components() {
     wss = new WebSocket.Server({ server });
     global_data.wss = wss;
 
+    sysLoad();
+
     initPingAuto();
 
     ws_broadcast = function(data, world, opts) {
@@ -2122,6 +2137,8 @@ async function initialize_server_components() {
             })
 
             var status = await websockets.Main(ws, world_name, vars);
+
+            ws.world_id = status.world.id;
 
             if(typeof status == "string") {
                 send_ws(JSON.stringify({
@@ -2686,7 +2703,19 @@ var global_data = {
     client_ips,
     modify_bypass_key,
     get_bypass_key: function() { return bypass_key_cache },
-    trimHTML
+    trimHTML,
+    tile_database: systems.tile_database,
+    g_transaction: transaction_obj(-1),
+    intv,
+    WebSocket
+}
+
+function sysLoad() {
+    // initialize variables in the systems
+    for(var i in systems) {
+        var sys = systems[i];
+        sys.main(global_data);
+    }
 }
 
 function stopPrompt() {
