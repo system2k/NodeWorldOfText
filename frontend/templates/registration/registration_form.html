@@ -56,14 +56,4 @@ Registration | Our World of Text
 {% endblock %}
 
 {% block endbody %}
-<script type="text/javascript" src="/static/lib/zxcvbn.js"></script>
-<script type="text/javascript">
-	document.getElementById("id_password1").addEventListener("input", function oninput() {
-        var a = [document.getElementById("id_username").value,
-                 document.getElementById("id_email").value,
-                "wot", "ywot", "nwot", "world of text", "your world of text", "node world of text",
-                "yourworldoftext", "nodeworldoftext", "worldoftext", "your", "node", "world", "of", "text"];
-		this.style.backgroundColor = this.value.length ? "#"+"FF0000,FFA500,FFFF00,00FF00,006400".split(",")[zxcvbn(this.value, a).score] : "";
-	});
-</script>
 {% endblock %}
