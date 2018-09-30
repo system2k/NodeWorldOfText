@@ -2656,6 +2656,29 @@ function html_tag_esc(str, non_breaking_space) {
     return str;
 }
 
+function sanitize_color(col) {
+    if(!col) col = 0;
+    col = parseInt(col);
+    if(!col) col = 0;
+    if(col == -1) return -1; // skips the colors if -1
+    col = Math.floor(col);
+    if(col < 0) col = 0;
+    if(col > 16777215) col = 16777215;
+    return col;
+}
+
+function fixColors(colors) {
+	if(Array.isArray(colors)) {
+		colors = colors.slice(0, 128);
+		for(var g = 0; g < colors.length; g++) {
+			colors[g] = sanitize_color(colors[g]);
+		}
+	} else {
+		colors = sanitize_color(colors);
+	}
+	return colors;
+}
+
 var global_data = {
     template_data,
     db,
@@ -2707,7 +2730,9 @@ var global_data = {
     tile_database: systems.tile_database,
     g_transaction: transaction_obj(-1),
     intv,
-    WebSocket
+    WebSocket,
+    fixColors,
+    sanitize_color
 }
 
 function sysLoad() {

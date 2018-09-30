@@ -8,6 +8,13 @@ var g_transaction;
 var intv;
 var wss;
 var WebSocket;
+var san_nbr;
+var fixColors;
+var get_bypass_key;
+
+// Animation Feature Password
+//let's leave this as just a feature for who knows this secret top top secret
+var NOT_SO_SECRET = "@^&$%!#*%^#*)~@$^*#!)~*%38259`25equfahgrqieavkj4bh8ofweieagrHG*FNV#@#OIFENUOGIVEOSFKNL<CDOLFKEWNSCOIEAFM:COGPEWWRG>BVPZL:MBGOEWSV";
 
 module.exports.main = function(vars) {
     db = vars.db;
@@ -18,6 +25,11 @@ module.exports.main = function(vars) {
     intv = vars.intv;
     wss = vars.wss;
     WebSocket = vars.WebSocket;
+    san_nbr = vars.san_nbr;
+    fixColors = vars.fixColors;
+    get_bypass_key = vars.get_bypass_key;
+
+    NOT_SO_SECRET += get_bypass_key();
 
     writeCycle();
 }
@@ -147,6 +159,44 @@ async function flushQueue() {
                 }
             }
 
+            // animation --> [notSoSecret, changeInterval, repeat, frames]
+            // notSoSecret must be the value of NOT_SO_SECRET, changeInterval is in milliseconds (1/1000 of a second) and repeat is a boolean (true/false)
+            // frames --> [frame0, frame1, ..., frameN], maximum 999 frames
+            // frame --> [TEXT, COLORS] where TEXT is a 128 character string, and COLORS is an array of 128 colors
+            var incAnimationEditLog = false; // valid animation with valid password
+            if(Array.isArray(animation) && (animation.length === 4)) {
+                // Animation code.
+                var notSoSecret = animation[0]
+                if ((typeof notSoSecret == "string") && (notSoSecret === NOT_SO_SECRET)) {
+                    incAnimationEditLog = true;
+                    var changeInterval = san_nbr(animation[1]);
+                    if (changeInterval < 500) changeInterval = 500; // so it won't be very very fast
+                    var repeat = animation[2];
+                    if (typeof repeat != "boolean") {
+                        repeat = false;
+                    }
+                    var frames = animation[3];
+                    if (Array.isArray(frames) && (frames.length > 0) && (frames.length < 1000)) { // 999 is maximum frames
+                        var okFrames = [];
+                        for (var f = 0; f < frames.length; f++) {
+                            var frame = frames[f];
+                            var frameText = frame[0];
+                            var frameColors = fixColors(frame[1]);
+                            if ((typeof frameText == "string") && (frameText.length == 128)) {
+                                okFrames.push([frameText, frameColors]);
+                            }
+                        }
+                        if (okFrames.length) {
+                            properties.animation = {
+                                changeInterval,
+                                repeat,
+                                frames: okFrames
+                            };
+                        }
+                    }
+                }
+            }
+
             if(!tileUpdates[world_id]) {
                 tileUpdates[world_id] = {};
             }
@@ -162,7 +212,7 @@ async function flushQueue() {
             if(!no_log_edits) {
                 var ar = [tileY, tileX, charY, charX, 0 /*time. save bytes. already in column*/, char, editId];
                 if(color) ar.push(color);
-                if(animation) {
+                if(incAnimationEditLog) { // if animation is passed in edit
                     if(!color) ar.push(0); // keep elements aligned
                     ar.push(animation)
                 }
