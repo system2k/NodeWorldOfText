@@ -106,14 +106,14 @@ async function flushQueue() {
             var no_log_edits = data.no_log_edits;
             var is_owner = data.is_owner;
             var is_member = data.is_member;
-            var write_data_call_id = data.write_data_call_id;
+            var call_id = data.call_id;
 
             var offset = charY * 16 + charX;
 
             var char_writability = charProt[offset];
 
             // repeated again to make sure
-            if(!cids[write_data_call_id]) cids[write_data_call_id] = [[], {}];
+            if(!cids[call_id]) cids[call_id] = [[], {}];
 
             // permission checking - compute the writability of the cell, accounting for tile and world writing permissions
             if(char_writability == null) char_writability = tile ? tile.writability : null;
@@ -121,22 +121,22 @@ async function flushQueue() {
 
             // tile is owner-only, but user is not owner
             if(char_writability == 2 && !is_owner) {
-                cids[write_data_call_id][1][editId] = "NO_TILE_PERM";
+                cids[call_id][1][editId] = "NO_TILE_PERM";
                 continue;
             }
             // tile is member-only, but user is not member (nor owner)
             if(char_writability == 1 && !is_owner && !is_member) {
-                cids[write_data_call_id][1][editId] = "NO_TILE_PERM";
+                cids[call_id][1][editId] = "NO_TILE_PERM";
                 continue;
             }
 
             // this edit request is only allowed to write on public areas
             if(public_only && char_writability != 0) {
-                cids[write_data_call_id][1][editId] = "NO_TILE_PERM";
+                cids[call_id][1][editId] = "NO_TILE_PERM";
                 continue;
             }
 
-            cids[write_data_call_id][0].push(editId);
+            cids[call_id][0].push(editId);
 
             tile_data = insert_char_at_index(tile_data, char, offset);
 
@@ -333,7 +333,7 @@ async function writeCycle() {
         try {
             await flushQueue();
         } catch(e) {
-            handle_error(e); /////////////////////////////////////////////////////////////////////////////////////////////////
+            handle_error(e);
         }
         await g_transaction.end();
         intv.writeCycle = setTimeout(writeCycle, cycleTimeout);

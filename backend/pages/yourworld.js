@@ -1,7 +1,46 @@
 module.exports = {};
 
+var intv;
+var handle_error;
+var db;
+var worldViews;
+module.exports.startup_internal = function(vars) {
+    intv = vars.intv;
+    handle_error = vars.handle_error;
+    db = vars.db;
+    worldViews = vars.worldViews;
+
+    // wait at least 5 minutes and then allow user to download again
+    worldViewCommit();
+}
+
+module.exports.server_exit = function() {
+    worldViewCommit(true);
+}
+
+async function worldViewCommit(no_interval) {
+    try {
+        for(var i in worldViews) {
+            var world_id = parseInt(i);
+    
+            var world = await db.get("SELECT properties FROM world WHERE id=?", world_id);
+            
+            var props = JSON.parse(world.properties);
+
+            if(!props.views) props.views = 0;
+            props.views += worldViews[i];
+
+            await db.run("UPDATE world SET properties=? WHERE id=?", [JSON.stringify(props), world_id]);
+
+            delete worldViews[i];
+        }
+    } catch(e) {
+        handle_error(e);
+    }
+    if(!no_interval) intv.worldViewCommitTimeout = setTimeout(worldViewCommit, 1000 * 5);
+}
+
 module.exports.GET = async function(req, serve, vars, params) {
-    var cookies = vars.cookies;
     var query_data = vars.query_data;
     var path = vars.path;
     var db = vars.db;
@@ -18,14 +57,14 @@ module.exports.GET = async function(req, serve, vars, params) {
         world_name = params.world;
     }
 
-    var world = await world_get_or_create(world_name)
+    var world = await world_get_or_create(world_name);
     if(!world) return;
 
-    var world_properties = JSON.parse(world.properties)
+    var world_properties = JSON.parse(world.properties);
 
     var read_permission = await can_view_world(world, user, db);
     if(!read_permission) {
-        return redirect("/accounts/private/")
+        return redirect("/accounts/private/");
     }
 
     if(query_data.fetch == 1) { // fetch request
@@ -43,12 +82,8 @@ module.exports.GET = async function(req, serve, vars, params) {
             mime: "text/plain; charset=utf-8"
         })
     } else { // the HTML page
-        if(!world_properties.views) {
-            world_properties.views = 0;
-        }
-        world_properties.views++;
-        await db.run("UPDATE world SET properties=? WHERE id=?",
-            [JSON.stringify(world_properties), world.id])
+        if(!worldViews[world.id]) worldViews[world.id] = 0;
+        worldViews[world.id]++;
 
         var pathname = world.name;
         if(pathname != "") {

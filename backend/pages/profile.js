@@ -6,6 +6,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var db = vars.db;
     var user = vars.user;
     var plural = vars.plural;
+    var worldViews = vars.worldViews;
 
     if(!user.authenticated) {
         return serve(null, null, {
@@ -29,6 +30,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         var properties = JSON.parse(world.properties)
         var views = properties.views;
         if(!views) views = 0;
+        if(worldViews[world.id]) views += worldViews[world.id];
         world_list.push({
             public_writable: world.writability == 0,
             public_readable: world.readability == 0,

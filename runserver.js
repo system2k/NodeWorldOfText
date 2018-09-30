@@ -182,16 +182,6 @@ const websockets = load_modules("./backend/websockets/");
 const modules    = load_modules("./backend/modules/");
 const systems    = load_modules("./backend/systems/");
 
-// if page modules contain a startup function, run it
-for(var i in pages) {
-    var mod = pages[i];
-    if(mod.startup_internal) {
-        mod.startup_internal({
-            intv
-        });
-    }
-}
-
 function asyncDbSystem(database) {
     const db = {
         // gets data from the database (only 1 row at a time)
@@ -2003,6 +1993,7 @@ async function initialize_server_components() {
     global_data.wss = wss;
 
     sysLoad();
+    sintLoad();
 
     initPingAuto();
 
@@ -2679,6 +2670,8 @@ function fixColors(colors) {
 	return colors;
 }
 
+var worldViews = {};
+
 var global_data = {
     template_data,
     db,
@@ -2732,7 +2725,8 @@ var global_data = {
     intv,
     WebSocket,
     fixColors,
-    sanitize_color
+    sanitize_color,
+    worldViews
 }
 
 function sysLoad() {
@@ -2740,6 +2734,16 @@ function sysLoad() {
     for(var i in systems) {
         var sys = systems[i];
         sys.main(global_data);
+    }
+}
+
+function sintLoad() {
+    // if page modules contain a startup function, run it
+    for(var i in pages) {
+        var mod = pages[i];
+        if(mod.startup_internal) {
+            mod.startup_internal(global_data);
+        }
     }
 }
 
@@ -2762,6 +2766,20 @@ function stopServer() {
 
         await updateChatLogData(true);
         await clear_expired_sessions(true);
+
+        for(var i in pages) {
+            var mod = pages[i];
+            if(mod.server_exit) {
+                mod.server_exit();
+            }
+        }
+
+        for(var i in systems) {
+            var sys = systems[i];
+            if(sys.server_exit) {
+                sys.server_exit();
+            }
+        }
 
         server.close();
         wss.close();
