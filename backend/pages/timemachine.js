@@ -1,5 +1,3 @@
-module.exports = {};
-
 function fjoin(ar, str, len) {
 	var s = ""
 	for(var i = 0; i < len; i++) {

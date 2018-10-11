@@ -1505,7 +1505,8 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
             }
         }
         // make sure segment is valid
-        if(!(worldname[i].match(/^([\w\.\-]*)$/g) && worldname[i].length > 0)) {
+        var claimMainPage = (worldname[i] == "" && worldname.length == 1 && user.superuser); // if superusers claim the front page
+        if(!(worldname[i].match(/^([\w\.\-]*)$/g) && (worldname[i].length > 0 || claimMainPage))) {
             return {
                 error: true,
                 message: "Invalid world name. Contains invalid characters. Must contain either letters, numbers, or _. It can be seperated by /"
@@ -2770,14 +2771,14 @@ function stopServer() {
         for(var i in pages) {
             var mod = pages[i];
             if(mod.server_exit) {
-                mod.server_exit();
+                await mod.server_exit();
             }
         }
 
         for(var i in systems) {
             var sys = systems[i];
             if(sys.server_exit) {
-                sys.server_exit();
+                await sys.server_exit();
             }
         }
 

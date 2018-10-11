@@ -1,5 +1,3 @@
-module.exports = {};
-
 var db;
 var decodeCharProt;
 var insert_char_at_index;

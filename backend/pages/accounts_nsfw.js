@@ -1,5 +1,3 @@
-module.exports = {};
-
 module.exports.GET = async function(req, serve, vars) {
     var HTML = vars.HTML;
     var get_third = vars.get_third;

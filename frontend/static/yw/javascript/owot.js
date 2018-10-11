@@ -676,7 +676,7 @@ document.addEventListener("keydown", function(e) {
     var charY = pos[3];
     var color = getCharColor(tileX, tileY, charX, charY)
     YourWorld.Color = color;
-    localStorage.setItem('color', color);
+    localStorage.setItem("color", color);
     // update color textbox in "change color" menu
     if(!color) color = 0;
     color_input_form_input.value = ("00000" + color.toString(16)).slice(-6);
@@ -685,9 +685,9 @@ document.addEventListener("keydown", function(e) {
 owot.width = width;
 owot.height = height;
 
-var cursorCoords = null;
-var cursorCoordsCurrent = [0, 0, 0, 0, "NOT_INITTED"]; // cursorCoords that don't reset to null
-var currentPosition = [0, 0, 0, 0];
+var cursorCoords = null; // [tileX, tileY, charX, charY]. if mouse is deselected, the value is null.
+var cursorCoordsCurrent = [0, 0, 0, 0, "NOT_INITTED"]; // cursorCoords that don't reset to null. [tileX, tileY, charX, charY]
+var currentPosition = [0, 0, 0, 0]; // [tileX, tileY, charX, charY]
 var currentPositionInitted = false;
 
 var tiles = {};
@@ -986,7 +986,7 @@ function renderCursor(coords) {
         positionX += diff;
     }
     if(pixelX + cellW >= width) { // cursor too far right
-        diff = Math.abs(width - pixelX);
+        diff = width - pixelX;
         positionX -= cellW - diff;
     }
     if(pixelY < 0) { // cursor too far up
@@ -994,7 +994,7 @@ function renderCursor(coords) {
         positionY += diff;
     }
     if(pixelY + cellH >= height) { // cursor too far down
-        diff = Math.abs(height - pixelY);
+        diff = height - pixelY;
         positionY -= cellH - diff;
     }
 
@@ -2565,7 +2565,7 @@ function buildMenu() {
         }, true);
     }
     menu.addEntry("<input onchange=\"changeZoom(this.value)\" title=\"Zoom\" type=\"range\" value=\"100\" min=\"20\" max=\"1000\" style=\"width: 80px;\" id=\"zoombar\">" +
-        "<button onclick=\"changeZoom(100)\" id=\"reset_zoom\">x</button>");
+        "<span id=\"reset_zoom\" onclick=\"changeZoom(100)\"></span>");
 }
 
 document.onselectstart = function(e) {

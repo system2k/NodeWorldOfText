@@ -1,5 +1,3 @@
-module.exports = {};
-
 function escape_control(str) {
     str += "";
     str = str.replace(/\\/g, "\\\\");

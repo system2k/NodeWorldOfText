@@ -151,8 +151,8 @@ module.exports = async function(ws, data, send, vars) {
         [0, "help", null, "lists all commands"],
         [0, "nick", ["nickname"], "changes your nickname"], // client-side
         [0, "ping", null, "determine the time of server requests"],
-        [0, "warp", ["world"], "warp the connection to a different world"], // client-side
-        [0, "warpserver", ["server"], "force client to use a different server"], // client-side
+        [0, "goto", ["world"], "force client to another world"], // client-side
+        [0, "gotoserver", ["server"], "force client to a different server"], // client-side
         [0, "gridsize", ["WxH"], "change size of cells in client"], // client-side
         [0, "logout", null, "shortcut to logout your account"],
         [0, "block", ["id"], "block chats from this client"],
@@ -293,7 +293,7 @@ module.exports = async function(ws, data, send, vars) {
             var id = san_nbr(id);
             if(id < 0) return;
             var blocks = ws.chat_blocks;
-            if(blocks.length >= chatIdBlockLimit) return;
+            if(blocks.length >= chatIdBlockLimit) return serverChatResponse("Too many blocked IDs", data.location);
             if(blocks.indexOf(id) > -1) return;
             blocks.push(id);
             serverChatResponse("Blocked chats from ID: " + id, data.location);

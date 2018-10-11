@@ -1,5 +1,3 @@
-module.exports = {};
-
 var intv;
 var handle_error;
 var db;
@@ -14,8 +12,8 @@ module.exports.startup_internal = function(vars) {
     worldViewCommit();
 }
 
-module.exports.server_exit = function() {
-    worldViewCommit(true);
+module.exports.server_exit = async function() {
+    await worldViewCommit(true);
 }
 
 async function worldViewCommit(no_interval) {

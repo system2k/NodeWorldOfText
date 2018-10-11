@@ -1,5 +1,3 @@
-module.exports = {};
-
 module.exports.GET = async function(req, serve, vars) {
     var cookies = vars.cookies;
     var db = vars.db;

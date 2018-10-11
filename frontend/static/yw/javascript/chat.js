@@ -125,8 +125,8 @@ function api_chat_send(message, opts) {
             addChat(null, 0, "user", "[ Server ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(), "Server");
             return;
         }
-        if(command == "warp") {
-            // TODO: Warp from the same connection
+        // in case user warps to another world in another server
+        if(command == "goto" || command == "warp") {
             var address = args[0];
             if(!address) address = "";
             positionX = 0;
@@ -141,7 +141,7 @@ function api_chat_send(message, opts) {
             addChat(null, 0, "user", "[ Server ]", "Switching to world: \"" + address + "\"", "Server");
             return;
         }
-        if(command == "warpserver") {
+        if(command == "gotoserver" || command == "warpserver") {
             var address = args[0];
             if(!address) {
                 createWsPath();

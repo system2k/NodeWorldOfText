@@ -1,5 +1,3 @@
-module.exports = {};
-
 var intv;
 module.exports.startup_internal = function(vars) {
     intv = vars.intv;

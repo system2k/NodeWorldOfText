@@ -1,5 +1,3 @@
-module.exports = {};
-
 // 0 = false, 1 = true
 function bint(x) {
     return !!parseInt(x);

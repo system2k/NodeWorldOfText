@@ -1,5 +1,3 @@
-module.exports = {};
-
 function is_number(x) {
     return typeof x == "number" && isFinite(x) && !isNaN(x);
 }

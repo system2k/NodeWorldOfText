@@ -1,5 +1,3 @@
-module.exports = {};
-
 module.exports.GET = async function(req, serve, vars, params) {
     var user = vars.user;
     var dispage = vars.dispage;
