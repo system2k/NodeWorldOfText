@@ -23,7 +23,9 @@ Registration | Our World of Text
 <tr>
     <td align="right" valign="top">Email:</td>
     <td>
-        <input id="id_email" type="text" class="required" name="email" maxlength="75" value="{{ email }}" /> <br/>
+        <input id="id_email" type="text" class="required" name="email" maxlength="75" value="{{ email }}" />
+        <span style="color: blue; text-decoration: underline; cursor: help;" title="An activation email will be sent to you. This field is optional.">?</span>
+        <br/>
         {% for error in form_email_errors %}
         <div><span style="color:red">{{ error }}</span></div>
         {% endfor %}

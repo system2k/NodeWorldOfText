@@ -97,9 +97,7 @@ function autocomplete(options) {
 
     var timeout;
     var previousValue = "";
-    //var cache = $.Autocompleter.Cache(options);
-
-    var cache = {load: function(){return []}, add: function(){}}
+    var cache = autocomplete_cache(options);
 
     var hasFocus = 0;
     var lastKeyPressCode;
@@ -392,6 +390,20 @@ function autocomplete(options) {
             }
 
 
+            ajaxRequest({
+                type: "GET",
+                url: options.url,
+                data: Object.assign({
+                    q: lastWord(term),
+                    limit: options.max
+                }, extraParams),
+                done: function(data) {
+                    var parsed = options.parse && options.parse(data) || parse(data);
+                    cache.add(term, parsed);
+                    success(term, parsed);
+                }
+            });
+            
 
             /*$.ajax({
                 // try to leverage ajaxQueue plugin to abort previous requests
@@ -410,10 +422,6 @@ function autocomplete(options) {
                     success(term, parsed);
                 }
             });*/
-            var data = "a\nb\cd\nd\ne\nf\ng"
-            var parsed = options.parse && options.parse(data) || parse(data);
-                    cache.add(term, parsed);
-                    success(term, parsed);
 
 
         } else if (options.dataLoader) {
@@ -448,7 +456,7 @@ function autocomplete(options) {
     };
 }
 
-/*$.Autocompleter.Cache = function(options) {
+function autocomplete_cache(options) {
 
     var data = {};
     var length = 0;
@@ -518,12 +526,19 @@ function autocomplete(options) {
         };
 
         // add the data items to the cache
-        $.each(stMatchSets, function(i, value) {
+       /* $.each(stMatchSets, function(i, value) {
             // increase the cache size
             options.cacheLength++;
             // add to the cache
             add(i, value);
-        });
+        });*/
+        for(var i in stMatchSets) {
+            var value = stMatchSets[i];
+            // increase the cache size
+            options.cacheLength++;
+            // add to the cache
+            add(i, value);
+        }
     }
     
     // populate any existing data
@@ -554,12 +569,22 @@ function autocomplete(options) {
                     // this prevents duplicates
                     if( k.length > 0 ){
                         var c = data[k];
-                        $.each(c, function(i, x) {
+                       /* $.each(c, function(i, x) {
                             // if we've got a match, add it to the array
                             if (matchSubset(x.value, q)) {
                                 csub.push(x);
                             }
-                        });
+                        });*/
+
+
+
+                        for(var i in c) {
+                            var x = c[i];
+                            // if we've got a match, add it to the array
+                            if (matchSubset(x.value, q)) {
+                                csub.push(x);
+                            }
+                        }
                     }
                 }				
                 return csub;
@@ -573,11 +598,19 @@ function autocomplete(options) {
                     var c = data[q.substr(0, i)];
                     if (c) {
                         var csub = [];
-                        $.each(c, function(i, x) {
+                        /*$.each(c, function(i, x) {
                             if (matchSubset(x.value, q)) {
                                 csub[csub.length] = x;
                             }
-                        });
+                        });*/
+
+
+                        for(var i in c) {
+                            var x = c[i];
+                            if (matchSubset(x.value, q)) {
+                                csub[csub.length] = x;
+                            }
+                        }
                         return csub;
                     }
                 }
@@ -585,7 +618,7 @@ function autocomplete(options) {
             return null;
         }
     };
-};*/
+};
 
 function recursive_node_search(elm, nodename, array) {
     var ch = elm.children;
@@ -594,6 +627,61 @@ function recursive_node_search(elm, nodename, array) {
             array.push(ch[i]);
         }
         recursive_node_search(ch[i], nodename, array);
+    }
+}
+
+var element_data = {};
+var element_data_id = 0;
+function set_element_data(node, name, data) {
+    var id = element_data_id;
+    element_data_id++;
+    node.elmData = id;
+    element_data[id] = {};
+    element_data[id][name] = data;
+}
+function get_element_data(node, name) {
+    if(node.elmData == undefined) return;
+    return element_data[node.elmData][name];
+}
+
+function ajaxRequest(settings) {
+    var req = new XMLHttpRequest();
+
+    var formData = "";
+    var ampAppend = false;
+    if(settings.data) {
+        for(var i in settings.data) {
+            if(ampAppend) formData += "&";
+            ampAppend = true;
+            formData += encodeURIComponent(i) + "=" + encodeURIComponent(settings.data[i]);
+        }
+    }
+    // append form data to url if this is a GET
+    if(settings.type == "GET" && formData) {
+        settings.url += "?" + formData;
+    }
+    req.open(settings.type, settings.url, true);
+    req.onload = function() {
+        if(req.status >= 200 && req.status < 400) {
+            if(settings.done) {
+                settings.done(req.responseText, req);
+            }
+        } else {
+            if(settings.error) {
+                settings.error(req);
+            }
+        }
+    }
+    req.onerror = function() {
+        if(settings.error) {
+            settings.error(req);
+        }
+    }
+    if(settings.type == "POST") {
+        if(formData) req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+        req.send(formData);
+    } else {
+        req.send();
     }
 }
 
@@ -643,6 +731,7 @@ function autocomplete_select(options, input, select, config) {
                         break;
                     }
                 }
+                target(event).classList.add(CLASSES.ACTIVE);
                 //console.log(EList, tgt)
             }
         }
@@ -716,8 +805,9 @@ function autocomplete_select(options, input, select, config) {
             /*listItems.slice(0, active).each(function() {
                 offset += this.offsetHeight;
             });*/
+            //console.log(list.innerHeight)
             if((offset + activeItem[0].offsetHeight - list.scrollTop) > list.clientHeight) {
-                list.scrollTop = offset + activeItem[0].offsetHeight - list.innerHeight();
+                list.scrollTop = offset + activeItem[0].offsetHeight - (list.offsetHeight - parseInt(getComputedStyle(list).padding.split("px")[0]))/*list.innerHeight()*/;
             } else if(offset < list.scrollTop) {
                 list.scrollTop = offset;
             }
@@ -741,7 +831,7 @@ function autocomplete_select(options, input, select, config) {
     
     function fillList() {
         //console.log("TO EMPTY", list)
-        while(list.firstChild) list.removeChild(list.firstChild);
+        while(list.firstChild) list.removeChild(list.firstChild); // empty the element
         //list.empty();
         var max = limitNumberOfItems(data.length);
         for (var i=0; i < max; i++) {
@@ -750,22 +840,20 @@ function autocomplete_select(options, input, select, config) {
             var formatted = options.formatItem(data[i].data, i+1, max, data[i].value, term);
             if ( formatted === false )
                 continue;
-            console.log("SOME LI STUFF")
             //var li = $("<li/>").html( options.highlight(formatted, term) ).addClass(i%2 == 0 ? "ac_even" : "ac_odd").appendTo(list)[0];
             //$.data(li, "ac_data", data[i]);
             var li = document.createElement("li");
             li.innerHTML = options.highlight(formatted, term);
             li.classList.add(i%2 == 0 ? "ac_even" : "ac_odd");
             list.appendChild(li);
+
+            set_element_data(li, "ac_data", data[i]);
         }
-        console.log("LISTITEMS = ", list, "find", "li")
 
 
 
         listItems = [];
         recursive_node_search(list, "LI", listItems);
-
-        console.log(listItems)
 
         //listItems = list.find("li");
         if ( options.selectFirst ) {
@@ -878,7 +966,20 @@ function autocomplete_select(options, input, select, config) {
             }
         },
         selected: function() {
-            console.log("LISTITEMS", listItems)
+            console.log("LISTITEMS", listItems, "." + CLASSES.ACTIVE)
+            for(var i = 0; i < listItems.length; i++) {
+                var classes = listItems[i].classList;
+                for(var c = 0; c < classes.length; c++) {
+                    var cls = classes[c];
+                    if(cls == CLASSES.ACTIVE) {
+                        // selected items
+                        classes.remove(CLASSES.ACTIVE);
+                        return get_element_data(listItems[i], "ac_data");
+                    }
+                }
+            }
+            return false;
+            //console.log(listItems, $(listItems).filter("." + CLASSES.ACTIVE))
             /*var selected = listItems && listItems.filter("." + CLASSES.ACTIVE).removeClass(CLASSES.ACTIVE);
             return selected && selected.length && $.data(selected[0], "ac_data");*/
         },

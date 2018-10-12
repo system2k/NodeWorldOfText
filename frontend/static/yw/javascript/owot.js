@@ -723,6 +723,20 @@ function menu_color(color) {
 
 function ajaxRequest(settings) {
     var req = new XMLHttpRequest();
+
+    var formData = "";
+    var ampAppend = false;
+    if(settings.data) {
+        for(var i in settings.data) {
+            if(ampAppend) formData += "&";
+            ampAppend = true;
+            formData += encodeURIComponent(i) + "=" + encodeURIComponent(settings.data[i]);
+        }
+    }
+    // append form data to url if this is a GET
+    if(settings.type == "GET" && formData) {
+        settings.url += "?" + formData;
+    }
     req.open(settings.type, settings.url, true);
     req.onload = function() {
         if(req.status >= 200 && req.status < 400) {
@@ -740,17 +754,12 @@ function ajaxRequest(settings) {
             settings.error(req);
         }
     }
-    var formData = "";
-    var ampAppend = false;
-    if(settings.data) {
-        for(var i in settings.data) {
-            if(ampAppend) formData += "&";
-            ampAppend = true;
-            formData += encodeURIComponent(i) + "=" + encodeURIComponent(settings.data[i]);
-        }
-        req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    if(settings.type == "POST") {
+        if(formData) req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+        req.send(formData);
+    } else {
+        req.send();
     }
-    req.send(formData);
 }
 
 // begin OWOT's client
