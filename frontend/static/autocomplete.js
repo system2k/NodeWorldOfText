@@ -1,40 +1,3 @@
-/*$.fn.extend({
-    autocomplete: function(urlOrData, options) {
-        var isUrl = typeof urlOrData == "string";
-        options = $.extend({}, $.Autocompleter.defaults, {
-            url: isUrl ? urlOrData : null,
-            data: isUrl ? null : urlOrData,
-            delay: isUrl ? $.Autocompleter.defaults.delay : 10,
-            max: options && !options.scroll ? 10 : 150
-        }, options);
-        
-        // if highlight is set to false, replace it with a do-nothing function
-        options.highlight = options.highlight || function(value) { return value; };
-        
-        // if the formatMatch option is not specified, then use formatItem for backwards compatibility
-        options.formatMatch = options.formatMatch || options.formatItem;
-        
-        return this.each(function() {
-            new $.Autocompleter(this, options);
-        });
-    },
-    result: function(handler) {
-        return this.bind("result", handler);
-    },
-    search: function(handler) {
-        return this.trigger("search", [handler]);
-    },
-    flushCache: function() {
-        return this.trigger("flushCache");
-    },
-    setOptions: function(options){
-        return this.trigger("setOptions", [options]);
-    },
-    unautocomplete: function() {
-        return this.trigger("unautocomplete");
-    }
-});*/
-
 var autocomplete_defaults = {
     inputClass: "ac_input",
     resultsClass: "ac_results",
@@ -63,7 +26,6 @@ var autocomplete_defaults = {
     scrollHeight: 180
 };
 
-
 function autocomplete(options) {
     var input = options.element;
 
@@ -73,7 +35,6 @@ function autocomplete(options) {
             options[i] = autocomplete_defaults[i];
         }
     }
-
     
     var KEY = {
         UP: 38,
@@ -88,12 +49,8 @@ function autocomplete(options) {
         BACKSPACE: 8
     };
 
-    // Create $ object for input element
-    //var $input = $(input).attr("autocomplete", "off").addClass(options.inputClass);
     input.setAttribute("autocomplete", "off");
     input.classList.add(options.inputClass);
-
-    //var $input = $(input)
 
     var timeout;
     var previousValue = "";
@@ -104,20 +61,7 @@ function autocomplete(options) {
     var config = {
         mouseDownOnSelect: false
     };
-    var select = autocomplete_select(options, input, selectCurrent, config); //$.Autocompleter.Select(options, input, selectCurrent, config);
-    
-    var blockSubmit;
-    
-    // prevent form submit in opera when selecting with return key
-   /* $.browser.opera && $(input.form).bind("submit.autocomplete", function() {
-        if (blockSubmit) {
-            blockSubmit = false;
-            return false;
-        }
-    });*/
-    
-    // only opera doesn't trigger keydown multiple times while pressed, others don't work with keypress at all
-
+    var select = autocomplete_select(options, input, selectCurrent, config);
     input.addEventListener("keydown", function(event) {
         // a keypress means the input has focus
         // avoids issue where input had focus before the autocomplete was applied
@@ -125,7 +69,6 @@ function autocomplete(options) {
         // track last key pressed
         lastKeyPressCode = event.keyCode;
         switch(event.keyCode) {
-        
             case KEY.UP:
                 event.preventDefault();
                 if ( select.visible() ) {
@@ -217,17 +160,8 @@ function autocomplete(options) {
             var words = trimWords(input.value);
             if ( words.length > 1 ) {
                 var seperator = options.multipleSeparator.length;
-                var cursorAt = autocomplete_selection(input);//$(input).selection().start;
-                //console.log(cursorAt)
+                var cursorAt = autocomplete_selection(input);
                 var wordAt, progress = 0;
-               /* $.each(words, function(i, word) {
-                    progress += word.length;
-                    if (cursorAt <= progress) {
-                        wordAt = i;
-                        return false;
-                    }
-                    progress += seperator;
-                });*/
 
                 for(var i in words) {
                     var word = words[i];
@@ -242,25 +176,23 @@ function autocomplete(options) {
 
                 words[wordAt] = v;
                 // TODO this should set the cursor to the right position, but it gets overriden somewhere
-                //$.Autocompleter.Selection(input, progress + seperator, progress + seperator);
                 v = words.join( options.multipleSeparator );
             }
             v += options.multipleSeparator;
         }
         
-        input.value = v; //$input.val(v);
+        input.value = v;
         hideResultsNow();
-        ///////////////$input.trigger("result", [selected.data, selected.value]);
         return true;
     }
     
-    function onChange(crap, skipPrevCheck) {
+    function onChange(a, skipPrevCheck) {
         if( lastKeyPressCode == KEY.DEL ) {
             select.hide();
             return;
         }
         
-        var currentValue = input.value; //$input.val();
+        var currentValue = input.value;
         
         if ( !skipPrevCheck && currentValue == previousValue )
             return;
@@ -269,7 +201,7 @@ function autocomplete(options) {
         
         currentValue = lastWord(currentValue);
         if ( currentValue.length >= options.minChars) {
-            input.classList.add(options.loadingClass); //$input.addClass(options.loadingClass);
+            input.classList.add(options.loadingClass);
             if (!options.matchCase)
                 currentValue = currentValue.toLowerCase();
             request(currentValue, receiveData, hideResultsNow);
@@ -283,10 +215,8 @@ function autocomplete(options) {
         if (!value)
             return [""];
         if (!options.multiple)
-            return [/*$.trim(value)*/value.trim()];
-        return /*$.map(value.split(options.multipleSeparator), function(word) {
-            return $.trim(value).length ? $.trim(word) : null;
-        });*/ value.split(options.multipleSeparator).map(function(word) {
+            return [value.trim()];
+        return value.split(options.multipleSeparator).map(function(word) {
             return value.trim().length ? word.trim() : null;
         })
     }
@@ -297,7 +227,7 @@ function autocomplete(options) {
         var words = trimWords(value);
         if (words.length == 1) 
             return words[0];
-        var cursorAt = autocomplete_selection(input);//$(input).selection().start;
+        var cursorAt = autocomplete_selection(input);
         if (cursorAt == value.length) {
             words = trimWords(value)
         } else {
@@ -314,14 +244,7 @@ function autocomplete(options) {
         // if the last user key pressed was backspace, don't autofill
         if( options.autoFill && (lastWord(input.value).toLowerCase() == q.toLowerCase()) && lastKeyPressCode != KEY.BACKSPACE ) {
             // fill in the value (keep the case the user has typed)
-
-
-
-            //$input.val($input.val() + sValue.substring(lastWord(previousValue).length));
             input.value = input.value + sValue.substring(lastWord(previousValue).length)
-
-
-
             // select the portion of the value not typed by the user (so the next character will erase)
             autocomplete_selection(input, previousValue.length, previousValue.length + sValue.length)//$(input).selection(previousValue.length, previousValue.length + sValue.length);
         }
@@ -337,24 +260,6 @@ function autocomplete(options) {
         select.hide();
         clearTimeout(timeout);
         stopLoading();
-        /*if (options.mustMatch) {
-            // call search and run callback
-            $input.search(
-                function (result){
-                    // if no value found, clear the input box
-                    if( !result ) {
-                        if (options.multiple) {
-                            var words = trimWords($input.val()).slice(0, -1);
-                            $input.val( words.join(options.multipleSeparator) + (words.length ? options.multipleSeparator : "") );
-                        }
-                        else {
-                            $input.val( "" );
-                            $input.trigger("result", null);
-                        }
-                    }
-                }
-            );
-        }*/
     };
 
     function receiveData(q, data) {
@@ -377,18 +282,14 @@ function autocomplete(options) {
             success(term, data);
         // if an AJAX url has been supplied, try loading the data now
         } else if( (typeof options.url == "string") && (options.url.length > 0) ){
-            
             var extraParams = {
                 timestamp: +new Date()
             };
-            /*$.each(options.extraParams, function(key, param) {
-                extraParams[key] = typeof param == "function" ? param() : param;
-            });*/
+
             for(var key in options.extraParams) {
                 var param = options.extraParams[key];
                 extraParams[key] = typeof param == "function" ? param() : param;
             }
-
 
             ajaxRequest({
                 type: "GET",
@@ -403,27 +304,6 @@ function autocomplete(options) {
                     success(term, parsed);
                 }
             });
-            
-
-            /*$.ajax({
-                // try to leverage ajaxQueue plugin to abort previous requests
-                mode: "abort",
-                // limit abortion to this input
-                port: "autocomplete" + input.name,
-                dataType: options.dataType,
-                url: options.url,
-                data: $.extend({
-                    q: lastWord(term),
-                    limit: options.max
-                }, extraParams),
-                success: function(data) {
-                    var parsed = options.parse && options.parse(data) || parse(data);
-                    cache.add(term, parsed);
-                    success(term, parsed);
-                }
-            });*/
-
-
         } else if (options.dataLoader) {
                 options.dataLoader(options, term, success, input, parse);
         } else {
@@ -451,7 +331,6 @@ function autocomplete(options) {
     };
 
     function stopLoading() {
-        //$input.removeClass(options.loadingClass);
         input.classList.remove(options.loadingClass);
     };
 }
@@ -526,12 +405,6 @@ function autocomplete_cache(options) {
         };
 
         // add the data items to the cache
-       /* $.each(stMatchSets, function(i, value) {
-            // increase the cache size
-            options.cacheLength++;
-            // add to the cache
-            add(i, value);
-        });*/
         for(var i in stMatchSets) {
             var value = stMatchSets[i];
             // increase the cache size
@@ -556,7 +429,7 @@ function autocomplete_cache(options) {
         load: function(q) {
             if (!options.cacheLength || !length)
                 return null;
-            // 
+                // 
                 // if dealing w/local data and matchContains than we must make sure
                 // to loop through all the data collections looking for matches
                 //
@@ -569,15 +442,6 @@ function autocomplete_cache(options) {
                     // this prevents duplicates
                     if( k.length > 0 ){
                         var c = data[k];
-                       /* $.each(c, function(i, x) {
-                            // if we've got a match, add it to the array
-                            if (matchSubset(x.value, q)) {
-                                csub.push(x);
-                            }
-                        });*/
-
-
-
                         for(var i in c) {
                             var x = c[i];
                             // if we've got a match, add it to the array
@@ -598,13 +462,6 @@ function autocomplete_cache(options) {
                     var c = data[q.substr(0, i)];
                     if (c) {
                         var csub = [];
-                        /*$.each(c, function(i, x) {
-                            if (matchSubset(x.value, q)) {
-                                csub[csub.length] = x;
-                            }
-                        });*/
-
-
                         for(var i in c) {
                             var x = c[i];
                             if (matchSubset(x.value, q)) {
@@ -642,6 +499,18 @@ function set_element_data(node, name, data) {
 function get_element_data(node, name) {
     if(node.elmData == undefined) return;
     return element_data[node.elmData][name];
+}
+
+function autocomplete_dom_filter(dom, filter_class) {
+    for(var i = 0; i < dom.length; i++) {
+        var classes = dom[i].classList;
+        for(var c = 0; c < classes.length; c++) {
+            var cls = classes[c];
+            if(cls == filter_class) {
+                return dom[i];
+            }
+        }
+    }
 }
 
 function ajaxRequest(settings) {
@@ -702,11 +571,7 @@ function autocomplete_select(options, input, select, config) {
     function init() {
         if (!needsInit)
             return;
-        element = document.createElement("div");//$("<div/>")
-        /*.hide()
-        .addClass(options.resultsClass)
-        .css("position", "absolute")
-        .appendTo(document.body);*/
+        element = document.createElement("div");
         element.style.display = "none";
         element.classList.add(options.resultsClass);
         element.style.position = "absolute";
@@ -716,9 +581,7 @@ function autocomplete_select(options, input, select, config) {
         element.appendChild(list);
 
         list.onmouseover = function(event) {
-            if(target(event).nodeName && target(event).nodeName.toUpperCase() == "LI") {
-                //active = $("li", list).removeClass(CLASSES.ACTIVE).index(target(event));
-                //$(target(event)).addClass(CLASSES.ACTIVE);     
+            if(target(event).nodeName && target(event).nodeName.toUpperCase() == "LI") { 
                 var EList = list.getElementsByTagName("li");
                 for(var i = 0; i < EList.length; i++) {
                     EList[i].classList.remove(CLASSES.ACTIVE);
@@ -732,13 +595,11 @@ function autocomplete_select(options, input, select, config) {
                     }
                 }
                 target(event).classList.add(CLASSES.ACTIVE);
-                //console.log(EList, tgt)
             }
         }
         list.onclick = function(event) {
             var tgt = target(event);
             if(tgt) tgt.classList.add(CLASSES.ACTIVE);
-            //$(target(event)).addClass(CLASSES.ACTIVE);
             select();
             // TODO provide option to avoid setting focus again after selection? useful for cleanup-on-focus
             input.focus();
@@ -750,23 +611,6 @@ function autocomplete_select(options, input, select, config) {
         list.onmouseup = function() {
             config.mouseDownOnSelect = false;
         }
-
-        /*list = $("<ul/>").appendTo(element).mouseover( function(event) {
-            if(target(event).nodeName && target(event).nodeName.toUpperCase() == 'LI') {
-                active = $("li", list).removeClass(CLASSES.ACTIVE).index(target(event));
-                $(target(event)).addClass(CLASSES.ACTIVE);       
-            }
-        }).click(function(event) {
-            $(target(event)).addClass(CLASSES.ACTIVE);
-            select();
-            // TODO provide option to avoid setting focus again after selection? useful for cleanup-on-focus
-            input.focus();
-            return false;
-        }).mousedown(function() {
-            config.mouseDownOnSelect = true;
-        }).mouseup(function() {
-            config.mouseDownOnSelect = false;
-        });*/
         
         if( options.width > 0 )
             element.css("width", options.width);
@@ -789,23 +633,17 @@ function autocomplete_select(options, input, select, config) {
         for(var i = 0; i < liSlice1.length; i++) {
             liSlice1[i].classList.remove(CLASSES.ACTIVE);
         }
-        //listItems.slice(active, active + 1).removeClass(CLASSES.ACTIVE);
         movePosition(step);
         var activeItem = listItems.slice(active, active + 1);
         for(var i = 0; i < activeItem.length; i++) {
             activeItem[i].classList.add(CLASSES.ACTIVE);
         }
-        //var activeItem = listItems.slice(active, active + 1).addClass(CLASSES.ACTIVE);
         if(options.scroll) {
             var offset = 0;
             var liGroup1 = listItems.slice(0, active);
             for(var i = 0; i < liGroup1.length; i++) {
                 offset += liGroup1[i].offsetHeight;
             }
-            /*listItems.slice(0, active).each(function() {
-                offset += this.offsetHeight;
-            });*/
-            //console.log(list.innerHeight)
             if((offset + activeItem[0].offsetHeight - list.scrollTop) > list.clientHeight) {
                 list.scrollTop = offset + activeItem[0].offsetHeight - (list.offsetHeight - parseInt(getComputedStyle(list).padding.split("px")[0]))/*list.innerHeight()*/;
             } else if(offset < list.scrollTop) {
@@ -830,9 +668,7 @@ function autocomplete_select(options, input, select, config) {
     }
     
     function fillList() {
-        //console.log("TO EMPTY", list)
         while(list.firstChild) list.removeChild(list.firstChild); // empty the element
-        //list.empty();
         var max = limitNumberOfItems(data.length);
         for (var i=0; i < max; i++) {
             if (!data[i])
@@ -840,8 +676,6 @@ function autocomplete_select(options, input, select, config) {
             var formatted = options.formatItem(data[i].data, i+1, max, data[i].value, term);
             if ( formatted === false )
                 continue;
-            //var li = $("<li/>").html( options.highlight(formatted, term) ).addClass(i%2 == 0 ? "ac_even" : "ac_odd").appendTo(list)[0];
-            //$.data(li, "ac_data", data[i]);
             var li = document.createElement("li");
             li.innerHTML = options.highlight(formatted, term);
             li.classList.add(i%2 == 0 ? "ac_even" : "ac_odd");
@@ -855,20 +689,13 @@ function autocomplete_select(options, input, select, config) {
         listItems = [];
         recursive_node_search(list, "LI", listItems);
 
-        //listItems = list.find("li");
         if ( options.selectFirst ) {
-            //listItems.slice(0, 1).addClass(CLASSES.ACTIVE);
-           // console.log("SLICE", listItems.slice(0, 1))
-            //listItems.slice(0, 1).addClass(CLASSES.ACTIVE);
             var liSlice = listItems.slice(0, 1);
             for(var i = 0; i < liSlice.length; i++) {
                 liSlice[i].classList.add(CLASSES.ACTIVE);
             }
             active = 0;
         }
-       /* // apply bgiframe if available
-        if ( $.fn.bgiframe )
-            list.bgiframe();*/
     }
     
     return {
@@ -899,10 +726,7 @@ function autocomplete_select(options, input, select, config) {
             }
         },
         hide: function() {
-            //element && element.hide();
             element && (element.style.display = "none");
-            //console.log("REMOVE", listItems)
-            //listItems && listItems.classList.remove("CLASSES.ACTIVE");
 
             if(listItems) {
                 for(var i = 0; i < listItems.length; i++) {
@@ -913,75 +737,40 @@ function autocomplete_select(options, input, select, config) {
             active = -1;
         },
         visible : function() {
-            //console.log("VISIBLE", element, ":visible")
-            //return element && element.is(":visible");
             if(element) {
                 if(element.style.display == "") return true;
             }
             return false;
         },
         current: function() {
-            console.log("CURRENT", listItems, CLASSES.ACTIVE)
-            //return this.visible() && (listItems.filter("." + CLASSES.ACTIVE)[0] || options.selectFirst && listItems[0]);
+            if(this.visible()) {
+                var item = autocomplete_dom_filter(listItems, CLASSES.ACTIVE);
+                if(item) {
+                    return (item || options.selectFirst && item);
+                }
+            }
         },
         show: function() {
-            //var offset = $(input).offset();
             var offset = input.getBoundingClientRect();
-           /* element.css({
-                width: typeof options.width == "string" || options.width > 0 ? options.width : $(input).width(),
-                top: offset.top + input.offsetHeight,
-                left: offset.left
-            }).show();*/
 
             element.style.width = (typeof options.width == "string" || options.width > 0 ? options.width : input.offsetWidth) + "px";
-            element.style.top = (/*offset.top*/input.offsetTop + input.offsetHeight) + "px";
+            element.style.top = (input.offsetTop + input.offsetHeight) + "px";
             element.style.left = offset.left + "px";
             element.style.display = "";
 
             if(options.scroll) {
-                //list.scrollTop(0);
                 list.scrollTop = 0;
-                /*list.css({
-                    maxHeight: options.scrollHeight,
-                    overflow: "auto"
-                });*/
                 list.style.maxHeight = options.scrollHeight + "px";
                 list.style.overflow = "auto";
-                
-                /*if($.browser.msie && typeof document.body.style.maxHeight === "undefined") {
-                    var listHeight = 0;
-                    listItems.each(function() {
-                        listHeight += this.offsetHeight;
-                    });
-                    var scrollbarsVisible = listHeight > options.scrollHeight;
-                    //list.css('height', scrollbarsVisible ? options.scrollHeight : listHeight );
-                    list.style.height = (scrollbarsVisible ? options.scrollHeight : listHeight) + "px";
-                    if (!scrollbarsVisible) {
-                        // IE doesn't recalculate width when scrollbar disappears
-                        listItems.width( list.width() - parseInt(listItems.style["padding-left"]) - parseInt(listItems.style["padding-right"]) );
-                        //listItems.width( list.width() - parseInt(listItems.css("padding-left")) - parseInt(listItems.css("padding-right")) );
-                    }
-                }*/
-                
             }
         },
         selected: function() {
-            console.log("LISTITEMS", listItems, "." + CLASSES.ACTIVE)
-            for(var i = 0; i < listItems.length; i++) {
-                var classes = listItems[i].classList;
-                for(var c = 0; c < classes.length; c++) {
-                    var cls = classes[c];
-                    if(cls == CLASSES.ACTIVE) {
-                        // selected items
-                        classes.remove(CLASSES.ACTIVE);
-                        return get_element_data(listItems[i], "ac_data");
-                    }
-                }
+            var item = autocomplete_dom_filter(listItems, CLASSES.ACTIVE);
+            if(item) {
+                item.classList.remove(CLASSES.ACTIVE);
+                return get_element_data(item, "ac_data");
             }
             return false;
-            //console.log(listItems, $(listItems).filter("." + CLASSES.ACTIVE))
-            /*var selected = listItems && listItems.filter("." + CLASSES.ACTIVE).removeClass(CLASSES.ACTIVE);
-            return selected && selected.length && $.data(selected[0], "ac_data");*/
         },
         emptyList: function (){
             list && list.empty();
