@@ -2073,7 +2073,6 @@ async function initialize_server_components() {
                 current_second = compare_second;
                 return true;
             }
-            return false;
         }
         try {
             // must be at the top before any async calls (errors would occur before this event declaration)

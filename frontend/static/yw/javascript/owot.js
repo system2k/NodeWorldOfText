@@ -776,7 +776,6 @@ function begin() {
             createSocket();
         }
     })
-    // dataType: "json"
 }
 
 function stopLinkUI() {
@@ -830,26 +829,25 @@ function doLink() {
     var charX = lastLinkHover[2];
     var charY = lastLinkHover[3];
     var data = {
-        world: state.worldModel.name,
         tileY: tileY,
         tileX: tileX,
         charY: charY,
         charX: charX
     }
-    var ajax_url = "";
+    var link_type;
     if(w.link_input_type == 0) {
-        ajax_url = "/ajax/urllink/";
         data.url = w.url_input;
+        link_type = "url";
     } else if(w.link_input_type == 1) {
         data.link_tileX = w.coord_input_x;
         data.link_tileY = w.coord_input_y;
-        ajax_url = "/ajax/coordlink/";
+        link_type = "coord";
     }
-    ajaxRequest({
-        type: "POST",
-        url: ajax_url,
-        data: data
-    })
+    w.socket.send(JSON.stringify({
+        kind: "link",
+        data: data,
+        type: link_type
+    }))
 }
 
 function doProtect() {
@@ -859,27 +857,26 @@ function doProtect() {
     var tileY = lastTileHover[2];
     var types = ["public", "member-only", "owner-only"];
     var data = {
-        world: state.worldModel.name,
         tileY: tileY,
         tileX: tileX
     }
-    var ajax_url = "";
+    var action;
     if(w.protect_type == null) {
-        ajax_url = "/ajax/unprotect/";
+        action = "unprotect";
     } else {
-        ajax_url = "/ajax/protect/";
+        action = "protect";
         data.type = types[w.protect_type];
     }
     if(protectPrecision == 1) {
-        ajax_url += "char/";
+        data.precise = true;
         data.charX = lastTileHover[3];
         data.charY = lastTileHover[4];
     }
-    ajaxRequest({
-        type: "POST",
-        url: ajax_url,
-        data: data
-    })
+    w.socket.send(JSON.stringify({
+        kind: "protect",
+        data: data,
+        action: action
+    }))
 }
 
 function closest(element, parElement) {
@@ -917,7 +914,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
     dragPosX = positionX;
     dragPosY = positionY;
     isDragging = true;
-    textInput.focus(); // for mobile typing
+    if(document.activeElement == textInput) textInput.focus(); // for mobile typing
 
     // stop paste
     clearInterval(pasteInterval);
@@ -1130,7 +1127,7 @@ var writeInterval = setInterval(function() {
     };
     // clear buffer
     writeBuffer.splice(0);
-    socket.send(JSON.stringify(data));
+    w.socket.send(JSON.stringify(data));
 }, 1000)
 
 function moveCursor(direction, do_not_change_enter_x) {
@@ -1305,7 +1302,7 @@ document.onkeydown = function(e) {
     var key = e.keyCode;
     if(w._state.uiModal) return;
     if(document.activeElement == chatbar) return;
-    textInput.focus();
+    if(document.activeElement != textInput) textInput.focus();
     // stop paste
     clearInterval(pasteInterval);
     write_busy = false;
@@ -1384,7 +1381,7 @@ var OWOT = {
                 source: "cmd"
             }
         */
-        socket.send(JSON.stringify({
+        w.socket.send(JSON.stringify({
             kind: "cmd",
             data: data // max len of 2048
         }))
@@ -1888,10 +1885,9 @@ function getAndFetchTiles() {
         });
     }
     if(toFetch.length > 0) {
-        socket.send(JSON.stringify({
+        w.socket.send(JSON.stringify({
             fetchRectangles: toFetch,
-            kind: "fetch",
-            v: "3"
+            kind: "fetch"
         }))
     }
 }
@@ -2158,31 +2154,6 @@ var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678
 		1: members
 		2: owners
 */
-function encodeCharProt(array) {
-	// convert array from writability-format to base64-format
-	for(var c = 0; c < array.length; c++) {
-		switch(array[c]) {
-			case null: array[c] = 0; continue;
-			case 0: array[c] = 1; continue;
-			case 1: array[c] = 2; continue;
-			case 2: array[c] = 3; continue;
-		}
-	}
-	var str = "@";
-	var bytes = Math.ceil(128 / 3)
-	for(var i = 0; i < bytes; i++) {
-		var idx = i * 3;
-		var char1 = ((4*4)*array[idx + 0]);
-		var char2 = ((4)*array[idx + 1])
-		var char3 = ((1)*array[idx + 2])
-		if(idx + 1 > 127) char2 = 0;
-		if(idx + 2 > 127) char3 = 0;
-		var code = char1 + char2 + char3;
-		str += base64table.charAt(code)
-	}
-	return str;
-}
-
 function decodeCharProt(str) {
 	var res = new Array(128).fill(0);
 	str = str.substr(1);
