@@ -414,59 +414,53 @@ function keydown_tileProtectAuto(e) {
         if(keys.length == 0) return;
         autoTotal += keys.length;
         updateAutoProg();
-        var i = 0;
-        function protectLoop() {
-            // get tileX/Y position from key
-            var pos = keys[i].split(",").map(Number);
-            var cstr = keys[i];
-            var precision = selected[cstr][0];
-            var prot = selected[cstr][1];
+
+        for(var i in selected) {
+            var pos = i.split(",").map(Number);
+            var precision = selected[i][0];
+            var prot = selected[i][1];
 
             var tileX = pos[1];
             var tileY = pos[0];
-            var charX = selected[cstr][3][2];
-            var charY = selected[cstr][3][3];
-            var ajaxStr = "/ajax/protect/"
-            if(prot == 3) ajaxStr = "/ajax/unprotect/"
-            if(precision == 1) {
-                ajaxStr += "char/";
-            }
-            
+            var charX = selected[i][3][2];
+            var charY = selected[i][3][3];
+
             var data = {
-                world: state.worldModel.name,
                 tileY: tileY,
                 tileX: tileX
-            };
-            if(prot != 3) { // if unprotect type
+            }
+
+            var action;
+            if(prot == 3) {
+                action = "unprotect";
+            } else {
+                action = "protect";
                 data.type = types[prot];
             }
+
             if(precision == 1) {
                 data.charX = charX;
                 data.charY = charY;
+                data.precise = true;
             }
-            ajaxRequest({
-                type: "POST",
-                url: ajaxStr,
+
+            w.socket.send(JSON.stringify({
+                kind: "protect",
                 data: data,
-                done: function() {
-                    autoTotal--;
-                    updateAutoProg();
-                    if(precision == 0) {
-                        selected[cstr][2].backgroundColor = "";
-                    } else if(precision == 1) {
-                        delete selected[cstr];
-                        uncolorChar(tileX, tileY, charX, charY);
-                    }
-                    renderTile(tileX, tileY, true);
-                    // advance the loop
-                    i++;
-                    if(i < keys.length) {
-                        protectLoop();
-                    }
-                }
-            })
+                action: action
+            }))
+
+            autoTotal--;
+            updateAutoProg();
+            if(precision == 0) {
+                selected[i][2].backgroundColor = "";
+            } else if(precision == 1) {
+                uncolorChar(tileX, tileY, charX, charY);
+            }
+            delete selected[i];
+            renderTile(tileX, tileY, true);
         }
-        protectLoop()
+
     } else {
         tileProtectAuto.ctrlDown = e.ctrlKey;
         tileProtectAuto.shiftDown = e.shiftKey;
@@ -531,55 +525,49 @@ function keydown_linkAuto(e) {
         if(keys.length == 0) return;
         autoTotal += keys.length;
         updateAutoProg();
-        var i = 0;
-        function protectLoop() {
-            // get tileX/Y position from key
-            var pos = keys[i].split(",").map(Number);
-            var cstr = keys[i];
 
+        for(var i in selected) {
+            var pos = i.split(",").map(Number);
             var tileX = pos[1];
             var tileY = pos[0];
             var charX = pos[3];
             var charY = pos[2];
 
-            var mode = selected[cstr][4];
-            var linkData = selected[cstr][5];
+            var mode = selected[i][4];
+            var linkData = selected[i][5];
 
-            var ajaxStr = "/ajax/urllink/";
-            if(mode == 1) ajaxStr = "/ajax/coordlink/";
-            
             var data = {
-                world: state.worldModel.name,
                 tileY: tileY,
                 tileX: tileX,
                 charY: charY,
-                charX : charX
-            };
+                charX: charX
+            }
+
+            var link_type;
             if(mode == 0) {
+                data.url = w.url_input;
+                link_type = "url";
                 data.url = linkData[0];
             } else if(mode == 1) {
+                data.link_tileX = w.coord_input_x;
+                data.link_tileY = w.coord_input_y;
+                link_type = "coord";
                 data.link_tileX = linkData[0];
                 data.link_tileY = linkData[1];
             }
-            ajaxRequest({
-                type: "POST",
-                url: ajaxStr,
+
+            w.socket.send(JSON.stringify({
+                kind: "link",
                 data: data,
-                done: function() {
-                    autoTotal--;
-                    updateAutoProg();
-                    delete selected[cstr];
-                    uncolorChar(tileX, tileY, charX, charY);
-                    renderTile(tileX, tileY, true);
-                    // advance the loop
-                    i++;
-                    if(i < keys.length) {
-                        protectLoop();
-                    }
-                }
-            })
+                type: link_type
+            }))
+
+            autoTotal--;
+            updateAutoProg();
+            delete selected[i];
+            uncolorChar(tileX, tileY, charX, charY);
+            renderTile(tileX, tileY, true);
         }
-        protectLoop()
     } else {
         linkAuto.ctrlDown = e.ctrlKey;
         linkAuto.shiftDown = e.shiftKey;
@@ -762,6 +750,18 @@ function ajaxRequest(settings) {
     }
 }
 
+function defaultStyles() {
+    return {
+        owner: "#ddd",
+        member: "#eee",
+        public: "#fff",
+        cursor: "#ff0",
+        guestCursor: "#ffffee",
+        text: "#000",
+        menu: "#e5e5ff"
+    };
+}
+
 // begin OWOT's client
 function begin() {
     // get world style
@@ -769,8 +769,19 @@ function begin() {
         type: "GET",
         url: "/world_style/?world=" + state.worldModel.name,
         done: function(data) {
-            data = JSON.parse(data);
-            styles = data;
+            try {
+                data = JSON.parse(data);
+                styles = data;
+            } catch(e) {
+                styles = defaultStyles();
+            }
+            menu_color(styles.menu);
+            writability_styles = [styles.public, styles.member, styles.owner];
+            createSocket();
+        },
+        error: function() {
+            console.warn("An error occured while loading the world style");
+            styles = defaultStyles();
             menu_color(styles.menu);
             writability_styles = [styles.public, styles.member, styles.owner];
             createSocket();
@@ -1071,7 +1082,6 @@ function is_link(tileX, tileY, charX, charY) {
     if(tiles[tileY + "," + tileX]) {
         var tile = tiles[tileY + "," + tileX]
         if(tile) {
-            var pos = charY * tileC + charX;
             var props = tile.properties.cell_props;
             if(!props) props = {};
             if(props[charY]) {

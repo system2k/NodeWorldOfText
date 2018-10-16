@@ -714,7 +714,7 @@ static_file_returner.GET = function(req, serve) {
 // push static file urls to regexp array
 var static_regexp = [];
 for (var i in static_data) {
-    static_regexp.push(["^" + i + "[\\/]?$", static_file_returner])
+    static_regexp.push(["^" + i + "[\\/]?$", static_file_returner, { no_login: true }])
 }
 url_regexp = static_regexp.concat(url_regexp);
 
@@ -905,10 +905,10 @@ function cookie_expire(timeStamp) {
 }
 
 function encode_base64(str) {
-    return new Buffer(str).toString("base64")
+    return new Buffer(str).toString("base64");
 }
 function decode_base64(b64str) {
-    return new Buffer(b64str, "base64").toString("ascii")
+    return new Buffer(b64str, "base64").toString("ascii");
 }
 
 var https_reference = https;
@@ -930,11 +930,11 @@ function manage_https() {
     }
 
     if(https_disabled) {
-        console.log("\x1b[32;1mRunning server in HTTP mode\x1b[0m")
+        console.log("\x1b[32;1mRunning server in HTTP mode\x1b[0m");
         http.createServer = function(opt, func) {
             return prev_cS(func);
         }
-        https_reference = http
+        https_reference = http;
     } else {
         console.log("\x1b[32;1mDetected HTTPS keys. Running server in HTTPS mode\x1b[0m");
         options = {
@@ -987,18 +987,18 @@ async function get_user_info(cookies, is_websocket) {
             user = JSON.parse(s_data.session_data);
             if(cookies.csrftoken == user.csrftoken) { // verify csrftoken
                 user.authenticated = true;
-                var level = (await db.get("SELECT level FROM auth_user WHERE id=?", user.id)).level
+                var level = (await db.get("SELECT level FROM auth_user WHERE id=?", user.id)).level;
 
                 var operator = level == 3;
                 var superuser = level == 2;
                 var staff = level == 1;
 
-                user.operator = operator
-                user.superuser = superuser || operator
-                user.staff = staff || superuser || operator
+                user.operator = operator;
+                user.superuser = superuser || operator;
+                user.staff = staff || superuser || operator;
 
                 if(user.staff && !is_websocket) {
-                    user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id)
+                    user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id);
                 } else {
                     user.scripts = [];
                 }
@@ -1146,7 +1146,7 @@ function transaction_obj(id) {
 }
 
 process.on("uncaughtException", function(e) {
-    fs.writeFileSync(settings.UNCAUGHT_PATH, JSON.stringify(process_error_arg(e)))
+    fs.writeFileSync(settings.UNCAUGHT_PATH, JSON.stringify(process_error_arg(e)));
     console.log("Uncaught error:", e);
     process.exit();
 });
@@ -1197,7 +1197,7 @@ function uptime(custom_ms_ago) {
         var t_difference = difference;
         t_difference -= divided;
         if(t_difference > 0) {
-            t_difference %= divided
+            t_difference %= divided;
             t_difference = Math.floor(t_difference / 60000);
             if(t_difference > 0) {
                 extra = " and " + t_difference + " minute";
@@ -1212,7 +1212,7 @@ var server = https_reference.createServer(options, async function(req, res) {
     req_id++;
     var current_req_id = req_id;
     try {
-        await process_request(req, res, current_req_id)
+        await process_request(req, res, current_req_id);
     } catch(e) {
         if(transaction_active) {
             if(transaction_req_id == current_req_id && transaction_req_id > -1) {
@@ -1228,7 +1228,7 @@ var server = https_reference.createServer(options, async function(req, res) {
             err500Temp = "An error has occured while displaying the 500 internal server error page";
             handle_error(e);
         }
-        res.end(err500Temp)
+        res.end(err500Temp);
         handle_error(e); // writes error to error log
     }
 })
@@ -1343,19 +1343,25 @@ async function process_request(req, res, current_req_id) {
         if(URL.match(row[0])) {
             found_url = true;
             if(typeof row[1] == "object") {
+                var no_login = options.no_login;
                 var method = req.method.toUpperCase();
                 var post_data = {};
                 var query_data = querystring.parse(url.parse(req.url).query)
                 var cookies = parseCookie(req.headers.cookie);
-                var user = await get_user_info(cookies);
-                // check if user is logged in
-                if(!cookies.csrftoken) {
-                    var token = new_token(32)
-                    var date = Date.now();
-                    include_cookies.push("csrftoken=" + token + "; expires=" + cookie_expire(date + Year) + "; path=/;")
-                    user.csrftoken = token;
+                var user;
+                if(no_login) {
+                    user = {};
                 } else {
-                    user.csrftoken = cookies.csrftoken;
+                    user = await get_user_info(cookies);
+                    // check if user is logged in
+                    if(!cookies.csrftoken) {
+                        var token = new_token(32)
+                        var date = Date.now();
+                        include_cookies.push("csrftoken=" + token + "; expires=" + cookie_expire(date + Year) + "; path=/;")
+                        user.csrftoken = token;
+                    } else {
+                        user.csrftoken = cookies.csrftoken;
+                    }
                 }
                 var redirected = false;
                 function redirect(path) {
@@ -2088,7 +2094,7 @@ async function initialize_server_components() {
                 if(!can_process_req()) return;
                 onMessage(msg);
             });
-            ws.on("close", function(data) {})
+            ws.on("close", function(data) {});
             var location = url.parse(req.url).pathname;
             var world_name;
             function send_ws(data) {
