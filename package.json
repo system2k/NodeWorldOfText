@@ -10,7 +10,7 @@
         "ws": "^6.0.0"
     },
     "scripts": {
-        "start": "node runserver.js",
+        "start": "node --expose-gc runserver.js",
         "tst": "node runserver.js --test-server",
         "dbg": "node --trace-warnings --stack-trace-limit=1024 runserver.js --test-server"
     },

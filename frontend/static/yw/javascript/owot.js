@@ -3,21 +3,6 @@
     Nickname: state.userModel.username
 }
 
-var loading = document.getElementById("loading");
-var coord_Y = document.getElementById("coord_Y");
-var coord_X = document.getElementById("coord_X");
-var chatbar = document.getElementById("chatbar");
-var color_input_form_input = document.getElementById("color_input_form_input");
-var protect_precision = document.getElementById("protect_precision");
-var announce = document.getElementById("announce");
-var announce_text = document.getElementById("announce_text");
-var announce_close = document.getElementById("announce_close");
-var tile_choice = document.getElementById("tile_choice");
-var char_choice = document.getElementById("char_choice");
-var menu_elm = document.getElementById("menu");
-var nav_elm = document.getElementById("nav");
-var coords = document.getElementById("coords");
-
 var owot, textInput, textLayer;
 function init_dom() {
     loading.style.display = "none";
@@ -51,6 +36,21 @@ window.addEventListener("load", function() {
 function byId(a){
     return document.getElementById(a);
 }
+
+var loading = byId("loading");
+var coord_Y = byId("coord_Y");
+var coord_X = byId("coord_X");
+var chatbar = byId("chatbar");
+var color_input_form_input = byId("color_input_form_input");
+var protect_precision = byId("protect_precision");
+var announce = byId("announce");
+var announce_text = byId("announce_text");
+var announce_close = byId("announce_close");
+var tile_choice = byId("tile_choice");
+var char_choice = byId("char_choice");
+var menu_elm = byId("menu");
+var nav_elm = byId("nav");
+var coords = byId("coords");
 
 var jscolorInput;
 clientOnload.push(function() {
@@ -415,7 +415,10 @@ function keydown_tileProtectAuto(e) {
         autoTotal += keys.length;
         updateAutoProg();
 
-        for(var i in selected) {
+        var idx = 0;
+        function step() {
+            var i = keys[idx];
+            idx++;
             var pos = i.split(",").map(Number);
             var precision = selected[i][0];
             var prot = selected[i][1];
@@ -459,7 +462,11 @@ function keydown_tileProtectAuto(e) {
             }
             delete selected[i];
             renderTile(tileX, tileY, true);
+
+            if(idx >= keys.length) return;
+            setTimeout(step, 20);
         }
+        step();
 
     } else {
         tileProtectAuto.ctrlDown = e.ctrlKey;
@@ -526,7 +533,10 @@ function keydown_linkAuto(e) {
         autoTotal += keys.length;
         updateAutoProg();
 
-        for(var i in selected) {
+        var idx = 0;
+        function step() {
+            var i = keys[idx];
+            idx++;
             var pos = i.split(",").map(Number);
             var tileX = pos[1];
             var tileY = pos[0];
@@ -567,7 +577,11 @@ function keydown_linkAuto(e) {
             delete selected[i];
             uncolorChar(tileX, tileY, charX, charY);
             renderTile(tileX, tileY, true);
+
+            if(idx >= keys.length) return;
+            setTimeout(step, 20);
         }
+        step();
     } else {
         linkAuto.ctrlDown = e.ctrlKey;
         linkAuto.shiftDown = e.shiftKey;

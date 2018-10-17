@@ -1858,7 +1858,8 @@ function getWorldData(world) {
     if(worldData[ref]) return worldData[ref];
 
     worldData[ref] = {
-        client_id: 1,
+        client_ids: {},
+        id_overflow_int: 10000,
         user_count: 1
     }
 
@@ -1866,8 +1867,19 @@ function getWorldData(world) {
 }
 function generateClientId(world) {
     var worldObj = getWorldData(world);
-    worldObj.client_id++;
-    return worldObj.client_id - 1;
+
+    var client_ids = worldObj.client_ids;
+
+    // attempt to get a random id
+	for(var i = 0; i < 64; i++) {
+		var inclusive_id = Math.floor(Math.random() * ((9999 - 1000) + 1)) + 1000;
+		if(!client_ids[inclusive_id]) return inclusive_id;
+	}
+	// attempt to enumerate if it failed
+	for(var i = 1000; i <= 9999; i++) {
+		if(!client_ids[i]) return i;
+    }
+    return worldObj.id_overflow_int++;
 }
 
 function getUserCountFromWorld(world) {
@@ -1940,7 +1952,25 @@ function resembles_int_number(string) {
     return true;
 }
 
-var client_ips = {}; // fixes the problem where clients spam and immediately exit
+var client_ips = {};
+var closed_client_limit = 1000 * 60 * 16;
+// TODO: some leftover disconnected clients (although rare)
+intv.clear_closed_clients = setInterval(function() {
+    var curTime = Date.now();
+    for(var w in client_ips) {
+        var world = client_ips[w];
+        for(var c in world) {
+            var client = world[c];
+            if(client[4] && client[3] > -1 && client[3] + closed_client_limit <= curTime) {
+                delete world[c];
+            }
+        }
+        var keys = Object.keys(world);
+        if(keys.length == 0) {
+            delete client_ips[w];
+        }
+    }
+}, 1000 * 60)
 
 // ping clients every 30 seconds (resolve the issue where cloudflare terminates sockets inactive for approx. 1 minute)
 function initPingAuto() {
@@ -2094,7 +2124,15 @@ async function initialize_server_components() {
                 if(!can_process_req()) return;
                 onMessage(msg);
             });
-            ws.on("close", function(data) {});
+            var status, clientId = void 0;
+            ws.on("close", function() {
+                if(status && clientId != void 0) {
+                    if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
+                        client_ips[status.world.id][clientId][4] = true;
+                        client_ips[status.world.id][clientId][3] = Date.now();
+                    }
+                }
+            });
             var location = url.parse(req.url).pathname;
             var world_name;
             function send_ws(data) {
@@ -2133,7 +2171,7 @@ async function initialize_server_components() {
                 channel
             })
 
-            var status = await websockets.Main(ws, world_name, vars);
+            status = await websockets.Main(ws, world_name, vars);
 
             ws.world_id = status.world.id;
 
@@ -2164,12 +2202,12 @@ async function initialize_server_components() {
             ws.is_member = user.stats.member;
             ws.is_owner = user.stats.owner;
 
-            var clientId = generateClientId(world_name);
+            clientId = generateClientId(world_name);
 
             if(!client_ips[status.world.id]) {
                 client_ips[status.world.id] = {};
             }
-            client_ips[status.world.id][clientId] = [ws._socket.remoteAddress, ws._socket.address(), ws.ipHeaderAddr];
+            client_ips[status.world.id][clientId] = [ws._socket.remoteAddress, ws._socket.address(), ws.ipHeaderAddr, -1, false];
 
             ws.clientId = clientId;
             ws.chat_blocks = [];
