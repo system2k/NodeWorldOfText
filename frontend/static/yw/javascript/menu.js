@@ -1,72 +1,3 @@
-function easeOutQuad(h, f, j, i) {
-	return -j * (h /= i) * (h - 2) + f
-}
-
-var mstate = "up";
-
-var inProg = false;
-function slideElement(direction, element, speed) {
-	if(inProg) return;
-	var interval = 13;
-
-	if(mstate == "up" && direction == "up") return;
-	if(mstate == "down" && direction == "down") return;
-
-	inProg = true;
-
-	mstate = direction;
-
-	element.style.overflow = "hidden";
-	element.style.marginTop = "0px";
-	element.style.marginBottom = "0px";
-
-	element.style.display = "block";
-	var destHeight = element.offsetHeight;
-	if(direction == "down") element.style.height = "0px";
-
-	var start = Date.now();
-	var end = start + speed;
-	var lapse = end - start;
-	var int = setInterval(function() {
-		element.style.display = "block";
-		var duration = Date.now() - start;
-
-		if(duration >= lapse) {
-			inProg = false;
-			clearInterval(int);
-
-			if(direction == "down") {
-				element.style.display = "";
-			} else if(direction == "up") {
-				element.style.display = "none";
-			}
-			element.style.overflow = "";
-			element.style.marginTop = "";
-			element.style.marginBottom = "";
-			element.style.height = "";
-			element.style.paddingTop = "";
-			element.style.paddingBottom = "";
-
-			return;
-		}
-
-		var multiply = easeOutQuad(duration, 0, 1, speed);
-
-		var currentHeight = multiply * destHeight;
-		var currentPadding = multiply * 2;
-	
-		if(direction == "up") {
-			currentHeight = destHeight - currentHeight;
-			currentPadding = 2 - currentPadding;
-		}
-
-		element.style.height = currentHeight + "px";
-		element.style.paddingTop = currentPadding + "px";
-		element.style.paddingBottom = currentPadding + "px";
-
-	}, interval);
-}
-
 var Menu = (function() {
 	function Menu(titleEl, menuEl) {
 		var _this = this;
@@ -112,16 +43,14 @@ var Menu = (function() {
 		this.cancelHide = false;
 		this.hide = function() {
 			_this.cancelHide = false;
-			//$.data(_this.menuEl, "cancelHide", false);
 			setTimeout((function() {
-				if (!/*($.data(_this.menuEl, "cancelHide"))*/_this.cancelHide) {
+				if (!_this.cancelHide) {
 					_this.hideNow();
 				}
 			}), 500);
 		};
 		this.show = function() {
 			_this.cancelHide = true;
-			//$.data(_this.menuEl, "cancelHide", true);
 			slideElement("down", _this.menuEl, _this._SPEED)
 			_this.titleEl.classList.add("hover");
 		};
@@ -174,10 +103,75 @@ var Menu = (function() {
 		this.titleEl.onmouseenter = this.show;
 		this.titleEl.onmouseleave = this.hide;
 
-		//this.titleEl.click(this.show, this.hide);
-
 		this.menuEl.onmouseenter = this.show;
 		this.menuEl.onmouseleave = this.hide;
 	}
 	return Menu;
 }());
+
+function easeOutQuad(h, f, j, i) {
+	return -j * (h /= i) * (h - 2) + f;
+}
+
+var menuAnimationState = "up";
+var menuAnimationActive = false;
+function slideElement(direction, element, speed) {
+	if(menuAnimationActive) return;
+	var interval = 13;
+
+	if(menuAnimationState == "up" && direction == "up") return;
+	if(menuAnimationState == "down" && direction == "down") return;
+
+	menuAnimationActive = true;
+	menuAnimationState = direction;
+
+	element.style.overflow = "hidden";
+	element.style.marginTop = "0px";
+	element.style.marginBottom = "0px";
+
+	element.style.display = "block";
+	var destHeight = element.offsetHeight;
+	if(direction == "down") element.style.height = "0px";
+
+	var start = Date.now();
+	var end = start + speed;
+	var lapse = end - start;
+	var int = setInterval(function() {
+		element.style.display = "block";
+		var duration = Date.now() - start;
+
+		if(duration >= lapse) {
+			menuAnimationActive = false;
+			clearInterval(int);
+
+			if(direction == "down") {
+				element.style.display = "";
+			} else if(direction == "up") {
+				element.style.display = "none";
+			}
+			element.style.overflow = "";
+			element.style.marginTop = "";
+			element.style.marginBottom = "";
+			element.style.height = "";
+			element.style.paddingTop = "";
+			element.style.paddingBottom = "";
+
+			return;
+		}
+
+		var multiply = easeOutQuad(duration, 0, 1, speed);
+
+		var currentHeight = multiply * destHeight;
+		var currentPadding = multiply * 2;
+	
+		if(direction == "up") {
+			currentHeight = destHeight - currentHeight;
+			currentPadding = 2 - currentPadding;
+		}
+
+		element.style.height = currentHeight + "px";
+		element.style.paddingTop = currentPadding + "px";
+		element.style.paddingBottom = currentPadding + "px";
+
+	}, interval);
+}
