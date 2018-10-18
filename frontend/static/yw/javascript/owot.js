@@ -694,6 +694,11 @@ var currentPositionInitted = false;
 
 var tiles = {};
 
+var Tile = {};
+Tile.setTile = function(tileX, tileY, data) {
+    tiles[tileY + "," + tileX] = data;
+}
+
 var ctx = owot.getContext("2d");
 ctx.fillStyle = "#eee";
 ctx.fillRect(0, 0, width, height);
@@ -1092,6 +1097,7 @@ document.addEventListener("mouseleave", function(e) {
 document.addEventListener("mouseenter", function(e) {
     stopDragging();
 })
+
 function is_link(tileX, tileY, charX, charY) {
     if(tiles[tileY + "," + tileX]) {
         var tile = tiles[tileY + "," + tileX]
@@ -1240,7 +1246,7 @@ function writeChar(char, doNotMoveCursor) {
     // add the character at where the cursor was from
     if(!newLine) {
         if(!tiles[tileY + "," + tileX]) {
-            tiles[tileY + "," + tileX] = blankTile();
+            Tile.setTile(tileX, tileY, blankTile());
         }
         var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
         if(!cell_props) cell_props = {};
@@ -1373,47 +1379,6 @@ function assignColor(username) {
 		avg += (chr * chr | (i * chr) % 628) * (i << chr) + (chr*(i + 19 + (chr % 56))*chr)
 	}
 	return colors[(Math.abs(avg | 0)) % colLen]
-}
-
-var OWOT = {
-    events: {},
-    chat: {
-        send: api_chat_send
-    },
-    on: function(type, call) {
-        if(!OWOT.events[type]) {
-            OWOT.events[type] = [];
-        }
-        OWOT.events[type].push(call);
-    },
-    broadcastCommand: function(data) {
-        /*
-            Clients would receive broadcasted data if they send the following data to the server:
-            {
-                kind: "cmd_opt"
-            }
-            The server will return the following data once mode opt-in is complete:
-            {
-                kind: "cmd_opt",
-                enabled: true
-            }
-            Clients would receive broadcasted data in the following format:
-            {
-                kind: "cmd",
-                data: <utf8 string, maximum length of 2048>,
-                sender: <utf8 string>,
-                source: "cmd"
-            }
-        */
-        w.socket.send(JSON.stringify({
-            kind: "cmd",
-            data: data // max len of 2048
-        }))
-    }
-};
-
-if(Permissions.can_chat(state.userModel, state.worldModel)) {
-    OWOT.on("chat", event_on_chat); // Chat event
 }
 
 function getTileCoordsFromMouseCoords(x, y, ignoreZoomRatio) {
@@ -1885,12 +1850,15 @@ function getAndFetchTiles() {
     // fill the map
     var map = [];
     for(var i = 0; i < data.length; i++) {
-        var coord = data[i][1] + "," + data[i][0];
+        var cell = data[i];
+        var tileY = cell[1];
+        var tileX = cell[0];
+        var coord = tileY + "," + tileX;
         if(coord in tiles) {
             map.push(1);
         } else {
             map.push(0);
-            tiles[coord] = null;
+            Tile.setTile(tileX, tileY, null);
         }
     }
     var width = getWidth(margin);
@@ -2236,7 +2204,7 @@ function renderTile(tileX, tileY, redraw) {
     var tile = tiles[str];
 
     if(tile == null) {
-        tiles[str] = blankTile();
+        Tile.setTile(tileX, tileY, blankTile());
         tile = tiles[str];
     }
 
@@ -2604,7 +2572,7 @@ var w = {
 		scrolling: null,
 		urlInputModal: new URLInputModal(),
 		colorInputModal: new ColorInputModal()
-	},
+    },
     color: function() {
         w._ui.colorInputModal.open(function(color) {
             var this_color = 0;
@@ -2721,7 +2689,47 @@ var w = {
             centerY: centerY,
             centerX: centerX
         };
+    },
+    events: {},
+    chat: {
+        send: api_chat_send
+    },
+    on: function(type, call) {
+        if(!OWOT.events[type]) {
+            OWOT.events[type] = [];
+        }
+        OWOT.events[type].push(call);
+    },
+    broadcastCommand: function(data) {
+        /*
+            Clients would receive broadcasted data if they send the following data to the server:
+            {
+                kind: "cmd_opt"
+            }
+            The server will return the following data once mode opt-in is complete:
+            {
+                kind: "cmd_opt",
+                enabled: true
+            }
+            Clients would receive broadcasted data in the following format:
+            {
+                kind: "cmd",
+                data: <utf8 string, maximum length of 2048>,
+                sender: <utf8 string>,
+                source: "cmd"
+            }
+        */
+        w.socket.send(JSON.stringify({
+            kind: "cmd",
+            data: data // max len of 2048
+        }))
     }
+}
+
+var OWOT = w;
+
+if(Permissions.can_chat(state.userModel, state.worldModel)) {
+    OWOT.on("chat", event_on_chat); // Chat event
 }
 
 if (state.announce) {
@@ -2771,6 +2779,7 @@ function isAnimated(posStr) {
 }
 
 function animateTile(tile, posStr) {
+    var pos = getPos(posStr);
 	if (isAnimated(posStr))
 		stopAnimation(posStr);
 	setTimeout(function() { // delay it a bit, so the parent code is fully executed
@@ -2784,14 +2793,14 @@ function animateTile(tile, posStr) {
 		var framenum = frames.length;
 		var animationInterval;
 		var atFrame = 0;
-		var animationInterval = tilesAnimated[posStr] = setInterval(function doAnimation() {
+		animationInterval = tilesAnimated[posStr] = setInterval(function doAnimation() {
 			if (!tiles[posStr]) // not visible
 				stopAnimation(posStr);
 			var frame = frames[atFrame];
 			var newTile = tile;
 			newTile.content = frame[0];
 			newTile.properties.color = frame[1];
-			tiles[posStr] = newTile;
+            Tile.setTile(tileX, tileY, newTile)
 			renderTile(tileX, tileY, true);
 			atFrame++;
 			if (atFrame >= framenum) {
@@ -2824,16 +2833,16 @@ var ws_functions = {
             tile_offset_object(data.tiles, tileFetchOffsetX, tileFetchOffsetY);
         }
         for(var tileKey in data.tiles) {
-			var tile = data.tiles[tileKey];
+            var tile = data.tiles[tileKey];
+            var pos = getPos(tileKey);
 			if (tile && tile.properties && tile.properties.animation) {
 				animateTile(tile, tileKey); // if it's already animated it will stop the old animation
 			} else if (isAnimated(tileKey)) {
 				stopAnimation(tileKey);
-			}
-            tiles[tileKey] = tile;
-            if(!tiles[tileKey]) tiles[tileKey] = blankTile();
+            }
+            Tile.setTile(pos[1], pos[0], tile);
+            if(!tiles[tileKey]) Tile.setTile(pos[1], pos[0], blankTile());
             tiles[tileKey].initted = true;
-            var pos = getPos(tileKey);
             if(tiles[tileKey].properties.char) {
                 tiles[tileKey].properties.char = decodeCharProt(tiles[tileKey].properties.char);
             }
@@ -2866,9 +2875,12 @@ var ws_functions = {
             tile_offset_object(data.tiles, tileFetchOffsetX, tileFetchOffsetY);
         }
         for(tileKey in data.tiles) {
+            var pos = getPos(tileKey);
+            var tileX = pos[1];
+            var tileY = pos[0];
             // if tile isn't loaded, load it blank
             if(!tiles[tileKey]) {
-                tiles[tileKey] = blankTile();
+                Tile.setTile(tileX, tileY, blankTile());
             }
             if(!data.tiles[tileKey]) {
                 data.tiles[tileKey] = blankTile();
@@ -2887,9 +2899,6 @@ var ws_functions = {
             if(!tiles[tileKey].properties.color) {
                 tiles[tileKey].properties.color = Object.assign([], blankColor);
             }
-            var pos = getPos(tileKey);
-            var tileX = pos[1];
-            var tileY = pos[0];
 
             var newContent = blank;
             var newColors = newColorArray();
@@ -2978,7 +2987,7 @@ var ws_functions = {
         var pos = data.tileY + "," + data.tileX;
         if(tiles[pos]) {
             var writability = tiles[pos].properties.writability;
-            tiles[pos] = blankTile();
+            Tile.setTile(data.tileX, data.tileY, blankTile());
             tiles[pos].initted = true;
             tiles[pos].properties.writability = writability;
             renderTile(data.tileX, data.tileY);
