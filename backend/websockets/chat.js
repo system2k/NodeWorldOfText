@@ -133,7 +133,7 @@ module.exports = async function(ws, data, send, vars) {
         msg = msg.slice(0, 3030);
     }
 
-    var chatIdBlockLimit = 128;
+    var chatIdBlockLimit = 256;
 
     var command_list = [
         [3, "uptime", null, "get uptime of server"],
@@ -290,8 +290,10 @@ module.exports = async function(ws, data, send, vars) {
             return;
         },
         block: function(id) {
-            var id = san_nbr(id);
-            if(id < 0) return;
+            if(id != "*") {
+                id = san_nbr(id);
+                if(id < 0) return;
+            }
             var blocks = ws.chat_blocks;
             if(blocks.length >= chatIdBlockLimit) return serverChatResponse("Too many blocked IDs", data.location);
             if(blocks.indexOf(id) > -1) return;

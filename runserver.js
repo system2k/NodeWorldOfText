@@ -2050,7 +2050,8 @@ async function initialize_server_components() {
                         if(opts.chat_perm == "INHERIT") opts.chat_perm = client.chat_permission;
                         if(opts.chat_perm == 1) if(!(client.is_member || client.is_owner)) return;
                         if(opts.chat_perm == 2) if(!client.is_owner) return;
-                        if(client.chat_blocks && client.chat_blocks.indexOf(opts.clientId) > -1) return;
+                        if(client.chat_blocks && client.chat_blocks.indexOf(opts.clientId) > -1 ||
+                            (client.chat_blocks.indexOf("*") > -1) && opts.clientId != 0) return;
                     }
                     client.send(data);
                 }
