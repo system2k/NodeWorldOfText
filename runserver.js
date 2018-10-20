@@ -574,8 +574,12 @@ var prompt_stopped = false;
 function command_prompt() {
     function on_input(err, input) {
         if(err) return console.log(err);
+        var code = input.input;
+        if(code == "stop") {
+            return stopServer();
+        }
         try {
-            console.dir(eval(input.input), { colors: true });
+            console.dir(eval(code), { colors: true });
         } catch(e) {
             console.dir(e, { colors: true });
         }

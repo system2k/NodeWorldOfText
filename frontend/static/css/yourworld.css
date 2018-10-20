@@ -2,7 +2,13 @@
     margin: 0;
     padding: 0;
 }
-html, body, .screen {
+body {
+    overflow: hidden;
+}
+.screen_canvas {
+    position: absolute;
+    left: 0px;
+    top: 0px;
     overflow: hidden;
 }
 body {
@@ -237,8 +243,6 @@ a:visited {
 }
 #chat_window {
     position: absolute;
-    bottom: 0px;
-    left: 0px;
     background-color: #e0e0e0;
     width: 400px;
     height: 300px;
@@ -269,8 +273,6 @@ a:visited {
     border-width: 2px;
     border-style: solid;
     border-color: black;
-    top: 50px;
-    left: 100px;
 }
 #confirm_js_code {
     background-color: #e6e6e6;

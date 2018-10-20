@@ -12,6 +12,9 @@
         {% endfor %}
     </head>
     <body>
+        <canvas id="owot" class="screen_canvas" hidden></canvas>
+        <canvas id="text" class="screen_canvas" hidden></canvas>
+
         <div id="topbar" class="ui">
             <div id="topbar_inner">
                 <div id="announce" class="ui-vis" style="display: none;">
@@ -99,8 +102,6 @@
             var state = {{ state|safe }};
         </script>
 
-        <canvas id="owot" class="screen" hidden></canvas>
-        <canvas id="text" class="screen" style="position: absolute; left: 0px; top: 0px;" hidden></canvas>
         <textarea autocapitalize="off" autocorrect="off" autocomplete="off" style="left: -1000px; top: -1000px; position: absolute;" id="textInput"></textarea>
 
         <div id="protect_precision" style="display: none;">
@@ -119,8 +120,8 @@
         <div id="chat_open">
             Chat&nbsp;<b id="total_unread" class="unread" style="display: none; font-size: 15px;">(-)</b>
         </div>
-        <div id="chat_window" style="display: none;">
-            <span style="position: absolute; top: 5px; left: 210px;" id="usr_online">-- users online</span>
+        <div id="chat_window" style="display: none; bottom: 0px; left: 0px;">
+            <span style="position: absolute; top: 5px; left: 210px;" id="usr_online"></span>
             <div class="chat_tab_button" style="background-color: #8c8c8c; color: white; left: 3px; width: 100px !important;" id="chat_page_tab">
                 This page&nbsp;<b id="page_unread" class="unread" style="display: none;">(-)</b>
             </div>
@@ -147,7 +148,7 @@
                 </table>
             </div>
         </div>
-        <div id="confirm_js" style="display: none;">
+        <div id="confirm_js" style="display: none; top: 50px; left: 100px;">
             <a href="javascript:void 0;" id="run_js_confirm_risk" style="display: none;">Accept the risk and run</a>
             <a href="javascript:void 0;" id="run_js_confirm">run</a>
             <span id="confirm_js_msg">

@@ -51,6 +51,8 @@ var char_choice = byId("char_choice");
 var menu_elm = byId("menu");
 var nav_elm = byId("nav");
 var coords = byId("coords");
+var chat_window = byId("chat_window");
+var confirm_js = byId("confirm_js");
 
 var jscolorInput;
 clientOnload.push(function() {
@@ -62,6 +64,72 @@ clientOnload.push(function() {
 })
 
 init_dom();
+
+var draggable_element_mousemove = [];
+var draggable_element_mouseup = [];
+function draggable_element(dragger, dragged) {
+    if(!dragged) {
+        dragged = dragger;
+    }
+    var elmX = 0;
+    var elmY = 0;
+    var elmHeight = 0;
+    var elmWidth = 0;
+    var dragging = false;
+
+    var clickX = 0;
+    var clickY = 0;
+
+    dragger.addEventListener("mousedown", function(e) {
+        if(e.target != dragged) return;
+        elmX = dragged.offsetLeft;
+        elmY = dragged.offsetTop;
+        elmWidth = dragged.offsetWidth;
+        elmHeight = dragged.offsetHeight;
+        dragging = true;
+        clickX = e.pageX;
+        clickY = e.pageY;
+    })
+    // when the element is being dragged
+    draggable_element_mousemove.push(function(e, arg_pageX, arg_pageY) {
+        if(!dragging) return;
+
+        dragged.style.top = "";
+        dragged.style.bottom = "";
+        dragged.style.left = "";
+        dragged.style.right = "";
+
+        var diffX = arg_pageX - clickX;
+        var diffY = arg_pageY - clickY;
+
+        var newY = elmY + diffY;
+        var newX = elmX + diffX;
+
+        dragged.style.top = newY + "px";
+        dragged.style.left = newX + "px";
+        if(newX <= elementSnapApprox) {
+            dragged.style.left = "0px";
+        }
+        if(newX + elmWidth >= window.innerWidth - elementSnapApprox) {
+            dragged.style.left = "";
+            dragged.style.right = "0px";
+        }
+        if(newY <= elementSnapApprox) {
+            dragged.style.top = "0px";
+        }
+        if(newY + elmHeight >= window.innerHeight - elementSnapApprox) {
+            dragged.style.top = "";
+            dragged.style.bottom = "0px";
+        }
+    })
+    // when the element is released
+    draggable_element_mouseup.push(function() {
+        dragging = false;
+    })
+}
+
+draggable_element(chat_window);
+draggable_element(confirm_js);
 
 function getStoredNickname() {
     var nick = YourWorld.Nickname;
@@ -105,6 +173,7 @@ var tileFetchOffsetX       = 0; // offset added to tile fetching and sending coo
 var tileFetchOffsetY       = 0;
 var defaultChatColor       = null; // 24-bit Uint
 var ignoreCanvasContext    = true; // ignore canvas context menu when right clicking
+var elementSnapApprox      = 10;
 getStoredNickname();
 
 if(state.background) { // add the background image (if it already exists)
@@ -1059,6 +1128,11 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
     if(arg_pageX != void 0) pageX = arg_pageX;
     if(arg_pageY != void 0) pageY = arg_pageY;
     stopDragging();
+
+    for(var i = 0; i < draggable_element_mouseup.length; i++) {
+        draggable_element_mouseup[i](e, pageX, pageY);
+    }
+
     if(e.target != owot && e.target != linkDiv) return;
 
     if(e.which == 3) { // right click
@@ -1537,6 +1611,11 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
     var tileY = coords[1];
     var charX = coords[2];
     var charY = coords[3];
+
+    for(var i = 0; i < draggable_element_mousemove.length; i++) {
+        draggable_element_mousemove[i](e, pageX, pageY);
+    }
+
     if(e.target != owot && e.target != linkDiv) return;
     var link = is_link(tileX, tileY, charX, charY);
     if(link && linksEnabled) {
