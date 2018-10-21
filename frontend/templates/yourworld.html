@@ -3,13 +3,13 @@
     <head>
         <title>{{ page_title }}</title>
         <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+        <link rel="shortcut icon" type="image/png" href="/static/favicon.png">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description" content="An infinite grid of text editable by anyone. This is like YourWorldOfText, but with more features.">
-        <link type="text/css" rel="stylesheet" href="/static/css/yourworld.css">
-        <link rel="shortcut icon" type="image/png" href="/static/favicon.png" id="mainFavIcon">
         {% for script in user.scripts %}
             <script src="/script_manager/view/{{ script.name }}/"></script>
         {% endfor %}
+        <link type="text/css" rel="stylesheet" href="/static/css/yourworld.css">
     </head>
     <body>
         <canvas id="owot" class="screen_canvas" hidden></canvas>
@@ -118,7 +118,7 @@
         <div id="auto_prog" class="auto_prog_panel" style="display: none"></div>
 
         <div id="chat_open">
-            Chat&nbsp;<b id="total_unread" class="unread" style="display: none; font-size: 15px;">(-)</b>
+            Chat&nbsp;<b id="total_unread" class="unread" style="display: none;">(-)</b>
         </div>
         <div id="chat_window" style="display: none; bottom: 0px; left: 0px;">
             <span style="position: absolute; top: 5px; left: 210px;" id="usr_online"></span>

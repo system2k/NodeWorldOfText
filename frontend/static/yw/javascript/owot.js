@@ -17,16 +17,50 @@ function init_dom() {
     coord_Y.innerText = "0";
     coord_X.innerText = "0";
 }
-
 function decimal(percentage) {
     return percentage / 100;
 }
-
 function deviceRatio() {
     var ratio = window.devicePixelRatio;
     if(!ratio) ratio = 1;
     return ratio;
 }
+function getWndWidth() {
+    return document.body.clientWidth;
+}
+function getWndHeight() {
+    return document.body.clientHeight;
+}
+
+var nextObjId              = 1; // next edit ID
+var width                  = getWndWidth();
+var height                 = getWndHeight();
+var positionX              = 0; // position in client in pixels
+var positionY              = 0;
+var gridEnabled            = false;
+var subgridEnabled         = true; // character-level grid
+var linksEnabled           = true;
+var colorsEnabled          = true;
+var backgroundEnabled      = true; // if any
+var zoomRatio              = window.devicePixelRatio; // browser's zoom ratio
+var protectPrecision       = 0; // 0 being tile and 1 being char
+var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
+var zoom                   = decimal(100); // zoom value
+var images                 = {}; // { name: [data RGBA, width, height] }
+var js_alert_active        = false; // js alert window open
+var images_to_load         = {
+    unloaded: "/static/unloaded.png"
+}
+var worldFocused           = false;
+var useHighlight           = true; // highlight new edits
+var highlightLimit         = 10;
+var ansiBlockFill          = true; // fill certain ansi block characters
+var colorizeLinks          = true;
+var tileFetchOffsetX       = 0; // offset added to tile fetching and sending coordinates
+var tileFetchOffsetY       = 0;
+var defaultChatColor       = null; // 24-bit Uint
+var ignoreCanvasContext    = true; // ignore canvas context menu when right clicking
+var elementSnapApprox      = 10;
 
 var clientOnload = [];
 window.addEventListener("load", function() {
@@ -110,14 +144,14 @@ function draggable_element(dragger, dragged) {
         if(newX <= elementSnapApprox) {
             dragged.style.left = "0px";
         }
-        if(newX + elmWidth >= window.innerWidth - elementSnapApprox) {
+        if(newX + elmWidth >= getWndWidth() - elementSnapApprox) {
             dragged.style.left = "";
             dragged.style.right = "0px";
         }
         if(newY <= elementSnapApprox) {
             dragged.style.top = "0px";
         }
-        if(newY + elmHeight >= window.innerHeight - elementSnapApprox) {
+        if(newY + elmHeight >= getWndHeight() - elementSnapApprox) {
             dragged.style.top = "";
             dragged.style.bottom = "0px";
         }
@@ -145,35 +179,6 @@ function storeNickname() {
     }
 }
 
-var nextObjId              = 1; // next edit ID
-var width                  = window.innerWidth;
-var height                 = window.innerHeight;
-var positionX              = 0; // position in client in pixels
-var positionY              = 0;
-var gridEnabled            = false;
-var subgridEnabled         = true; // character-level grid
-var linksEnabled           = true;
-var colorsEnabled          = true;
-var backgroundEnabled      = true; // if any
-var zoomRatio              = window.devicePixelRatio; // browser's zoom ratio
-var protectPrecision       = 0; // 0 being tile and 1 being char
-var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
-var zoom                   = decimal(100); // zoom value
-var images                 = {}; // { name: [data RGBA, width, height] }
-var js_alert_active        = false; // js alert window open
-var images_to_load         = {
-    unloaded: "/static/unloaded.png"
-}
-var worldFocused           = false;
-var useHighlight           = true; // highlight new edits
-var highlightLimit         = 10;
-var ansiBlockFill          = true; // fill certain ansi block characters
-var colorizeLinks          = true;
-var tileFetchOffsetX       = 0; // offset added to tile fetching and sending coordinates
-var tileFetchOffsetY       = 0;
-var defaultChatColor       = null; // 24-bit Uint
-var ignoreCanvasContext    = true; // ignore canvas context menu when right clicking
-var elementSnapApprox      = 10;
 getStoredNickname();
 
 if(state.background) { // add the background image (if it already exists)
@@ -342,15 +347,15 @@ function generateAlertFavicon() {
     
     fico.beginPath();
     fico.arc(21, 21, 9, 0, 2 * Math.PI);
-	fico.strokeStyle = "#FF2222"
+	fico.strokeStyle = "#FF2222";
     fico.stroke();
 
-	fico.fillStyle = "#DD0000"
+	fico.fillStyle = "#DD0000";
 	fico.fill();
 	
-	fico.fillStyle = "#FFFFFF"
-	fico.font = "bold 20px Arial"
-	fico.fillText("8", 15, 28)
+	fico.fillStyle = "#FFFFFF";
+	fico.font = "bold 20px Arial";
+	fico.fillText("8", 15, 28);
 
     mainFavIcon.href = microCanvas.toDataURL();
 }
@@ -368,7 +373,7 @@ function browserZoomAdjust(initial) {
     positionY = Math.trunc(positionY);
 
     adjust_scaling_DOM(ratio);
-    doZoom(ratio * 100)
+    doZoom(ratio * 100);
 }
 
 function removeAlpha(data) {
@@ -667,8 +672,8 @@ document.body.addEventListener("keyup", keyup_linkAuto)
 // adjust canvas width, canvas display width, and variable width to
 // disobey the browser zoom so that the custom zoom can be used
 function adjust_scaling_DOM(ratio) {
-    var window_width = window.innerWidth;
-    var window_height = window.innerHeight;
+    var window_width = getWndWidth();
+    var window_height = getWndHeight();
     // change variable sizes to the screen-width of the inner browser (same, regardless of zoom)
     width = Math.round(window_width * ratio);
     height = Math.round(window_height * ratio);
@@ -766,6 +771,9 @@ var tiles = {};
 var Tile = {};
 Tile.setTile = function(tileX, tileY, data) {
     tiles[tileY + "," + tileX] = data;
+}
+Tile.delete = function(tileX, tileY) {
+    delete tiles[tileY + "," + tileX];
 }
 
 var ctx = owot.getContext("2d");
@@ -1736,7 +1744,7 @@ document.addEventListener("touchmove", function(e) {
 
 // get position from touch event
 function touch_pagePos(e) {
-    var first_touch = e.originalEvent.touches[0];
+    var first_touch = e.touches[0];
     return [Math.trunc(first_touch.pageX * zoomRatio), Math.trunc(first_touch.pageY * zoomRatio)];
 }
 
@@ -1977,7 +1985,8 @@ function clearTiles(allTiles) {
     }
     for(var i in tiles) {
         if(!(i in visible) || allTiles) {
-            delete tiles[i];
+            var pos = getPos(i);
+            Tile.delete(pos[1], pos[0]);
         }
     }
     for(var i in tilePixelCache) {
@@ -2268,13 +2277,12 @@ function renderTile(tileX, tileY, redraw) {
             return;
         }
         // generate tile background
-        var imgData = generateBackgroundPixels(tileX, tileY, images.unloaded);
+        var imgData = generateBackgroundPixels(tileX, tileY, images.unloaded, true);
         // get main canvas of the tile
         var tileCanv = getTileCanvas(str);
-        var textRenderCanvas = tileCanv[0];
         // get the canvas context
         var textRender = tileCanv[1];
-        textRender.putImageData(imgData, 0, 0);
+        textRender.drawImage(imgData, 0, 0, tileW, tileH);
         textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
         textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
         return;
