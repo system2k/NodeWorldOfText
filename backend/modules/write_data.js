@@ -1,8 +1,4 @@
-var write_data_call_id = 0;
 module.exports = async function(data, vars) {
-    var call_id = write_data_call_id;
-    write_data_call_id++;
-
     var user = vars.user;
     var world = vars.world;
     var san_nbr = vars.san_nbr;
@@ -66,6 +62,8 @@ module.exports = async function(data, vars) {
             break;
         }
     }
+
+    var call_id = tile_database.newCallId();
 
     tile_database.reserveCallId(call_id);
 

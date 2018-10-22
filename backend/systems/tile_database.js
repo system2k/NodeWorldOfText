@@ -366,3 +366,8 @@ module.exports.write = function(tileX, tileY, charX, charY, char, color, world_i
 module.exports.reserveCallId = function(id) {
     if(!cids[id]) cids[id] = [[], {}, null, false];
 }
+
+var current_call_id = 0;
+module.exports.newCallId = function() {
+    return current_call_id++;
+}

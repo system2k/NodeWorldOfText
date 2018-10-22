@@ -197,18 +197,22 @@ a:visited {
     left: 0px;
     width: 70px;
     text-align: center;
-    background-color: rgba(12, 72, 193, 0.58);
+    background-color: rgba(73, 119, 255, 0.78);
     color: white;
-    height: 17px;
+    height: 19px;
+    line-height: 19px;
     cursor: default;
     font-family: Verdana;
     font-size: 12px;
+    text-shadow: 1px 1px #000000;
 }
-#chat_open:hover {
-    background-color: #2763dc;
+#chat_open span {
+    display: inline-block;
+    vertical-align: middle;
+    line-height: normal;
 }
 #chat_open:active {
-    background-color: #0e2961;
+    background-color: rgba(14, 41, 97, 0.78);
 }
 .chat_tab_button {
     position: absolute;

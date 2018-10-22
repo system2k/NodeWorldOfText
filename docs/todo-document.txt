@@ -90,7 +90,7 @@ TODO:
 - keep up with the times. http2 (and ssl on the server's side (not cloudflare's))
 - just update the node version already
 - menu too big? some scrollbar if longer than screen height
-- as part of the library reduction movement, de-librarifying the color picker
+- as part of the library reduction movement, de-librarifying the color picker (probably pick between simuations of edge/firefox/chrome/osx color pickers) (due to license of jscolor)
 - also no need for ws library. refactor the removal of jquery in autocomplete library
 - 95% of the homepage css is junk css.
 - no redirects on favicon, etc

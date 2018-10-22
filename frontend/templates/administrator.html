@@ -31,10 +31,14 @@
             return false;
         }
         onload = function() {
-            $('#username_config').autocomplete('/accounts/member_autocomplete/', {delay: 50})
+            autocomplete({
+                element: document.getElementById("username_config"),
+                url: "/accounts/member_autocomplete/",
+                delay: 50
+            });
         }
     </script>
-    <link rel="stylesheet" type="text/css" href="/static/jquery.autocomplete.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/autocomplete.css">
 {% endblock %}
 
 {% block header %}
@@ -183,6 +187,5 @@
 {% endblock %}
 
 {% block endbody %}
-<script type="text/javascript" src="/static/lib/jquery.autocomplete.min.js"></script>
-<script type="text/javascript" src="/static/profile.js"></script>
+<script type="text/javascript" src="/static/autocomplete.js"></script>
 {% endblock %}

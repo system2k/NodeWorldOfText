@@ -56,6 +56,7 @@ var useHighlight           = true; // highlight new edits
 var highlightLimit         = 10;
 var ansiBlockFill          = true; // fill certain ansi block characters
 var colorizeLinks          = true;
+var brlBlockFill           = false;
 var tileFetchOffsetX       = 0; // offset added to tile fetching and sending coordinates
 var tileFetchOffsetY       = 0;
 var defaultChatColor       = null; // 24-bit Uint
@@ -180,6 +181,14 @@ function storeNickname() {
 }
 
 getStoredNickname();
+
+// certain scripts may need JQuery
+function installJQuery(callback) {
+	var script = document.createElement("script");
+	script.src = "/static/lib/jquery-1.7.min.js";
+	document.body.appendChild(script)
+	script.onload = callback;
+}
 
 if(state.background) { // add the background image (if it already exists)
     images_to_load.background = state.background;
@@ -2408,7 +2417,6 @@ function renderTile(tileX, tileY, redraw) {
     }
 
     var tileCanv = getTileCanvas(str);
-    var textRenderCanvas = tileCanv[0];
     var textRender = tileCanv[1];
 
     // first, clear text renderer canvas
@@ -2463,12 +2471,12 @@ function renderTile(tileX, tileY, redraw) {
                 }
             }
             if(!char) char = " ";
+            var cCode = char.charCodeAt(0);
 
             // if text has no color, use default text color. otherwise, colorize it
             if(color == 0 || !colorsEnabled || (isLink && !colorizeLinks)) {
                 textRender.fillStyle = linkColor;
             } else {
-                if(!color) color = 0;
                 textRender.fillStyle = "rgb(" + (color >> 16 & 255) + "," + (color >> 8 & 255) + "," + (color & 255) + ")";
             }
 
@@ -2480,7 +2488,18 @@ function renderTile(tileX, tileY, redraw) {
                 textRender.fillRect(x * cellW, (y * cellH + textYOffset + zoom), cellW, zoom)
             }
             if(char != "\u0020" && char != "\u00a0") { // ignore whitespace characters
-                if(char == "\u2588" && ansiBlockFill) { // █ full block
+                if(cCode >= 0x2800 && cCode <= 0x28FF && brlBlockFill) {
+                    var dimX = cellW / 2;
+                    var dimY = cellH / 4;
+                    if((cCode >> 0) & 1) textRender.fillRect(x * cellW, y * cellH, dimX, dimY);
+                    if((cCode >> 3) & 1) textRender.fillRect(x * cellW + dimX, y * cellH, dimX, dimY);
+                    if((cCode >> 1) & 1) textRender.fillRect(x * cellW, y * cellH + dimY, dimX, dimY);
+                    if((cCode >> 4) & 1) textRender.fillRect(x * cellW + dimX, y * cellH + dimY, dimX, dimY);
+                    if((cCode >> 2) & 1) textRender.fillRect(x * cellW, y * cellH + dimY * 2, dimX, dimY);
+                    if((cCode >> 5) & 1) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 2, dimX, dimY);
+                    if((cCode >> 6) & 1) textRender.fillRect(x * cellW, y * cellH + dimY * 3, dimX, dimY);
+                    if((cCode >> 7) & 1) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 3, dimX, dimY);
+                } else if(char == "\u2588" && ansiBlockFill) { // █ full block
                     textRender.fillRect(x * cellW, y * cellH, cellW, cellH);
                 } else if(char == "\u2580" && ansiBlockFill) { // ▀ top half block
                     textRender.fillRect(x * cellW, y * cellH, cellW, Math.trunc(cellH / 2));
@@ -2491,6 +2510,7 @@ function renderTile(tileX, tileY, redraw) {
                 } else if(char == "\u2590" && ansiBlockFill) { // ▐ right half block
                     textRender.fillRect(x * cellW + Math.trunc(cellW / 2), y * cellH, Math.trunc(cellW / 2), cellH);
                 } else {
+                    // finally, render the text
                     if(char.length > 1) textRender.font = specialCharFont;
                     textRender.fillText(char, x * cellW + XPadding, y * cellH + textYOffset)
                     if(char.length > 1) textRender.font = font;
@@ -2557,6 +2577,7 @@ protectPrecisionOption(protectPrecision);
 var menu;
 function buildMenu() {
     menu = new Menu(menu_elm, nav_elm);
+    menu.addEntry("<li><a href=\"/home/\" target=\"_blank\">More...&nbsp;<img src=\"/static/Icon_External_Link.png\"></a></li>");
     menu.addCheckboxOption(" Show coordinates", function() {
         return coords.style.display = "";
     }, function() {
@@ -2912,6 +2933,42 @@ function tile_offset_object(data, tileOffX, tileOffY) {
         new_key = (new_key[0] - tileOffY) + "," + (new_key[1] - tileOffX);
         data[new_key] = refs[tkp];
     }
+}
+
+function ReconnectingWebSocket(url) {
+    this.binaryType = "blob";
+    this.onopen = null;
+    this.onclose = null;
+    this.onmessage = null;
+    this.onerror = null;
+    var closed = false;
+    var self = this;
+    function connect() {
+        self.socket = new WebSocket(url);
+        self.socket.onclose = function(r) {
+            self.onclose(r);
+            if(closed) return;
+            connect();
+        }
+        self.socket.onopen = function(e) {
+            self.socket.onmessage = self.onmessage;
+            self.socket.onerror = self.onerror;
+            self.socket.binaryType = self.binaryType;
+            self.onopen(e);
+        }
+    }
+    connect();
+    this.send = function(data) {
+        this.socket.send(data);
+    }
+    this.close = function() {
+        closed = true;
+        this.socket.close();
+    }
+    this.refresh = function() {
+        this.socket.close();
+    }
+    return this;
 }
 
 var ws_functions = {

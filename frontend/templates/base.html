@@ -4,10 +4,9 @@
         <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
         <title>{% block title %}Our World of Text{% endblock %}</title>
         <link rel="stylesheet" href="/static/css/blueprint/screen.css" type="text/css" media="screen, projection">
-        <link rel="stylesheet" href="/static/css/blueprint/print.css" type="text/css" media="print">    
+        <link rel="stylesheet" href="/static/css/blueprint/print.css" type="text/css" media="print"> <!-- Affect appearance when previewing in print settings -->
         <link rel="shortcut icon" type="image/png" href="/static/favicon.png"/>
-        <!--[if lt IE 8]><link rel="stylesheet" href="/static/css/blueprint/ie.css" type="text/css" media="screen, projection"><![endif]-->
-        <link rel="stylesheet" type="text/css" href="/static/css/site.css?v=3">
+        <link rel="stylesheet" type="text/css" href="/static/css/site.css">
         <link rel="shortcut icon" href="/static/favicon.png">
         {% block endhead %}{% endblock %}
         {% for script in user.scripts %}
@@ -48,9 +47,8 @@
                     &nbsp;
                 </div>
             </div>
-        </div><!-- container -->
+        </div>
         
-        <!--<script type="text/javascript" src="/static/lib/jquery-1.3.2.min.js"></script>-->
         {% block endbody %}{% endblock %}
     </body>
 </html>

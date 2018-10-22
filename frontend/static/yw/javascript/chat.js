@@ -39,7 +39,6 @@ function api_chat_send(message, opts) {
     var location = opts.location ? opts.location : (selectedChatTab == 0 ? "page" : "global");
 
     var msgLim = state.userModel.is_staff ? Infinity : 400;
-    var nickLim = state.userModel.is_staff ? Infinity : 20;
 
     message = message.slice(0, msgLim).trim();
     chatWriteHistory.push(message);
@@ -63,98 +62,8 @@ function api_chat_send(message, opts) {
         var args = message.substr(1).split(" ");
         var command = args[0].toLowerCase();
         args.shift();
-        if(command == "nick") {
-            var newDisplayName = args.join(" ");
-            if(!newDisplayName) {
-                newDisplayName = state.userModel.username;
-            }
-            newDisplayName = newDisplayName.slice(0, nickLim);
-            YourWorld.Nickname = newDisplayName;
-            storeNickname();
-            var nickChangeMsg;
-            if(newDisplayName) {
-                nickChangeMsg = "Set nickname to `" + newDisplayName + "`";
-            } else {
-                nickChangeMsg = "Removed nickname";
-            }
-            addChat(null, 0, "user", "[ Server ]", nickChangeMsg, "Server");
-            return;
-        }
-        if(command == "ping") {
-            serverPingTime = Date.now();
-            socket.send("2::@");
-            return;
-        }
-        if(command == "gridsize") {
-            var size = args[0];
-            if(!size) size = "10x18";
-            size = size.split("x");
-            var width = parseInt(size[0]);
-            var height = parseInt(size[1]);
-            if(!width || isNaN(width) || !isFinite(width)) width = 10;
-            if(!height || isNaN(height) || !isFinite(height)) height = 18;
-            if(width < 4) width = 4;
-            if(width > 160) width = 160;
-            if(height < 4) height = 4;
-            if(height > 144) height = 144;
-            defaultSizes.cellW = width;
-            defaultSizes.cellH = height;
-            updateScaleConsts();
-            for(var i in tilePixelCache) delete tilePixelCache[i];
-            renderTiles(true);
-            addChat(null, 0, "user", "[ Server ]", "Changed grid size to " + width + "x" + height, "Server");
-            return;
-        }
-        if(command == "color") {
-            var color = args[0];
-            if(!color) color = "000000";
-            if(color.charAt(0) == "#") color = color.substr(1);
-            if(!color) color = 0;
-            YourWorld.Color = parseInt(color, 16);
-            if(isNaN(color)) color = 0;
-            addChat(null, 0, "user", "[ Server ]", "Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase(), "Server");
-            return;
-        }
-        if(command == "chatcolor") {
-            var color = args[0];
-            if(!color) color = "000000";
-            if(color.charAt(0) == "#") color = color.substr(1);
-            if(!color) color = 0;
-            defaultChatColor = parseInt(color, 16);
-            if(isNaN(color)) color = 0;
-            addChat(null, 0, "user", "[ Server ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(), "Server");
-            return;
-        }
-        // in case user warps to another world in another server
-        if(command == "goto" || command == "warp") {
-            var address = args[0];
-            if(!address) address = "";
-            positionX = 0;
-            positionY = 0;
-            if(address.charAt(0) == "/") address = address.substr(1);
-            state.worldModel.pathname = "/" + address;
-            createWsPath();
-            socket.close()
-            createSocket();
-            clearTiles(true);
-            clearInterval(fetchInterval);
-            addChat(null, 0, "user", "[ Server ]", "Switching to world: \"" + address + "\"", "Server");
-            return;
-        }
-        if(command == "gotoserver" || command == "warpserver") {
-            var address = args[0];
-            if(!address) {
-                createWsPath();
-            } else {
-                ws_path = address;
-            }
-            positionX = 0;
-            positionY = 0;
-            socket.close()
-            createSocket();
-            clearTiles(true);
-            clearInterval(fetchInterval);
-            addChat(null, 0, "user", "[ Server ]", "Switching to server: " + address, "Server");
+        if(client_commands[command]) {
+            client_commands[command](args);
             return;
         }
     }
@@ -191,6 +100,99 @@ function api_chat_send(message, opts) {
     if(!isCommand) addChat(location, id, type, nickname,
                             message, username, op, admin, staff, chatColor);
 };
+
+var client_commands = {
+    nick: function (args) {
+        var newDisplayName = args.join(" ");
+        if(!newDisplayName) {
+            newDisplayName = state.userModel.username;
+        }
+        var nickLim = state.userModel.is_staff ? Infinity : 20;
+        newDisplayName = newDisplayName.slice(0, nickLim);
+        YourWorld.Nickname = newDisplayName;
+        storeNickname();
+        var nickChangeMsg;
+        if(newDisplayName) {
+            nickChangeMsg = "Set nickname to `" + newDisplayName + "`";
+        } else {
+            nickChangeMsg = "Removed nickname";
+        }
+        addChat(null, 0, "user", "[ Server ]", nickChangeMsg, "Server");
+    },
+    ping: function() {
+        serverPingTime = Date.now();
+        socket.send("2::@");
+    },
+    gridsize: function (args) {
+        var size = args[0];
+        if(!size) size = "10x18";
+        size = size.split("x");
+        var width = parseInt(size[0]);
+        var height = parseInt(size[1]);
+        if(!width || isNaN(width) || !isFinite(width)) width = 10;
+        if(!height || isNaN(height) || !isFinite(height)) height = 18;
+        if(width < 4) width = 4;
+        if(width > 160) width = 160;
+        if(height < 4) height = 4;
+        if(height > 144) height = 144;
+        defaultSizes.cellW = width;
+        defaultSizes.cellH = height;
+        updateScaleConsts();
+        for(var i in tilePixelCache) delete tilePixelCache[i];
+        renderTiles(true);
+        addChat(null, 0, "user", "[ Server ]", "Changed grid size to " + width + "x" + height, "Server");
+    },
+    color: function(args) {
+        var color = args[0];
+        if(!color) color = "000000";
+        if(color.charAt(0) == "#") color = color.substr(1);
+        if(!color) color = 0;
+        YourWorld.Color = parseInt(color, 16);
+        if(isNaN(color)) color = 0;
+        addChat(null, 0, "user", "[ Server ]", "Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase(), "Server");
+    },
+    chatcolor: function(args) {
+        var color = args[0];
+        if(!color) color = "000000";
+        if(color.charAt(0) == "#") color = color.substr(1);
+        if(!color) color = 0;
+        defaultChatColor = parseInt(color, 16);
+        if(isNaN(color)) color = 0;
+        addChat(null, 0, "user", "[ Server ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(), "Server");
+    },
+    goto: function(args) {
+        var address = args[0];
+        if(!address) address = "";
+        positionX = 0;
+        positionY = 0;
+        if(address.charAt(0) == "/") address = address.substr(1);
+        state.worldModel.pathname = "/" + address;
+        createWsPath();
+        socket.close()
+        createSocket();
+        clearTiles(true);
+        clearInterval(fetchInterval);
+        addChat(null, 0, "user", "[ Server ]", "Switching to world: \"" + address + "\"", "Server");
+    },
+    gotoserver: function(args) {
+        var address = args[0];
+        if(!address) {
+            createWsPath();
+        } else {
+            ws_path = address;
+        }
+        positionX = 0;
+        positionY = 0;
+        socket.close()
+        createSocket();
+        clearTiles(true);
+        clearInterval(fetchInterval);
+        addChat(null, 0, "user", "[ Server ]", "Switching to server: " + ws_path, "Server");
+    }
+}
+// below are deprecated names
+client_commands.warp = client_commands.goto;
+client_commands.warpserver = client_commands.gotoserver;
 
 // Performs send-chat-operation on chatbox
 function sendChat() {

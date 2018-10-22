@@ -98,18 +98,6 @@ module.exports = async function(data, vars) {
         }
     }
 
-    // world restore replay
-    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
-        [user.id, world.id, tileY, tileX, Date.now(), "@" + JSON.stringify({
-            kind: "link",
-            charX,
-            charY,
-            type,
-            link_tileX: link_tileX,
-            link_tileY: link_tileX,
-            url: url.slice(0, 10064)
-        })]);
-
     var content = " ".repeat(128);
     var actual_writability = null;
     if(tile) {

@@ -25,11 +25,7 @@
             </div>
         </div>
         <div id="nav" class="ui menu ui-vis" style="display: none;">
-            <ul>
-                <li>
-                    <a href="/home/" target="_blank">More...&nbsp;<img src="/static/Icon_External_Link.png"></a>
-                </li>
-            </ul>
+            <ul></ul>
         </div>
         <div id="coords" class="ui ui-vis" style="display: none;">
             X: <span id="coord_X"></span>
@@ -118,7 +114,7 @@
         <div id="auto_prog" class="auto_prog_panel" style="display: none"></div>
 
         <div id="chat_open">
-            Chat&nbsp;<b id="total_unread" class="unread" style="display: none;">(-)</b>
+            <span>Chat&nbsp;<b id="total_unread" class="unread" style="display: none;">(-)</b></span>
         </div>
         <div id="chat_window" style="display: none; bottom: 0px; left: 0px;">
             <span style="position: absolute; top: 5px; left: 210px;" id="usr_online"></span>
@@ -171,7 +167,6 @@
         {% if nsfw %}
             <script src="/static/yw/javascript/nsfw.js"></script>
         {% endif %}
-        <script src="/static/lib/reconnecting-ws.js"></script>
         <script src="/static/lib/jscolor.min.js"></script>
         <script src="/static/yw/javascript/Modals.js"></script>
         <script src="/static/yw/javascript/menu.js"></script>
