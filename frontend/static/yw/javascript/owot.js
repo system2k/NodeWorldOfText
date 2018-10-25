@@ -2644,8 +2644,7 @@ function buildMenu() {
             renderTiles(true);
         }, true);
     }
-    menu.addEntry("<input onchange=\"changeZoom(this.value)\" title=\"Zoom\" type=\"range\" value=\"100\" min=\"20\" max=\"1000\" style=\"width: 80px;\" id=\"zoombar\">" +
-        "<span id=\"reset_zoom\" onclick=\"changeZoom(100)\"></span>");
+    menu.addEntry("<input oninput=\"changeZoom(this.value)\" ondblclick=\"changeZoom(100)\" title=\"Zoom\" type=\"range\" value=\"100\" min=\"20\" max=\"1000\" style=\"width: 80px;\" id=\"zoombar\">");
 }
 
 document.onselectstart = function(e) {
