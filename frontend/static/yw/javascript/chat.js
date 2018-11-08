@@ -160,7 +160,7 @@ var client_commands = {
         if(isNaN(color)) color = 0;
         addChat(null, 0, "user", "[ Server ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(), "Server");
     },
-    goto: function(args) {
+    warp: function(args) {
         var address = args[0];
         if(!address) address = "";
         positionX = 0;
@@ -174,7 +174,7 @@ var client_commands = {
         clearInterval(fetchInterval);
         addChat(null, 0, "user", "[ Server ]", "Switching to world: \"" + address + "\"", "Server");
     },
-    gotoserver: function(args) {
+    warpserver: function(args) {
         var address = args[0];
         if(!address) {
             createWsPath();
@@ -190,9 +190,6 @@ var client_commands = {
         addChat(null, 0, "user", "[ Server ]", "Switching to server: " + ws_path, "Server");
     }
 }
-// below are deprecated names
-client_commands.warp = client_commands.goto;
-client_commands.warpserver = client_commands.gotoserver;
 
 // Performs send-chat-operation on chatbox
 function sendChat() {

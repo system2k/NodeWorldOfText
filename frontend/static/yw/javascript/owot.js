@@ -56,12 +56,14 @@ var useHighlight           = true; // highlight new edits
 var highlightLimit         = 10;
 var ansiBlockFill          = true; // fill certain ansi block characters
 var colorizeLinks          = true;
-var brlBlockFill           = false;
+var brBlockFill           = false;
 var tileFetchOffsetX       = 0; // offset added to tile fetching and sending coordinates
 var tileFetchOffsetY       = 0;
 var defaultChatColor       = null; // 24-bit Uint
 var ignoreCanvasContext    = true; // ignore canvas context menu when right clicking
 var elementSnapApprox      = 10;
+var combiningCharsEnabled   = true;
+var surrogateCharsEnabled   = true;
 
 var clientOnload = [];
 window.addEventListener("load", function() {
@@ -263,7 +265,10 @@ if(state.worldModel.half_chars) {
     defaultSizes.cellH = 20;
 }
 
-var cellWidthPad, tileW, tileH, cellW, cellH, fontBase, specialCharFontBase, font, specialCharFont, tileC, tileR, tileArea;
+var cellWidthPad, tileW, tileH, cellW, cellH, font, specialCharFont, tileC, tileR, tileArea;
+
+var fontTemplate = "$px 'Courier New', monospace";
+var specialCharFontTemplate = "$px consolas, monospace";
 
 function updateScaleConsts() {
     defaultSizes.tileW = defaultSizes.cellW * defaultSizes.tileC;
@@ -275,11 +280,8 @@ function updateScaleConsts() {
     cellW = Math.trunc(defaultSizes.cellW * zoom);
     cellH = Math.trunc(defaultSizes.cellH * zoom);
 
-    fontBase = "px 'Courier New', monospace";
-    specialCharFontBase = "px sans-serif";
-
-    font = (16 * zoom) + fontBase;
-    specialCharFont = (16 * zoom) + specialCharFontBase;
+    font = fontTemplate.replace("$", 16 * zoom);
+    specialCharFont = specialCharFontTemplate.replace("$", 16 * zoom);
 
     tileC = defaultSizes.tileC;
     tileR = defaultSizes.tileR;
@@ -309,8 +311,8 @@ function doZoom(percentage) {
     tileH = defaultSizes.tileH * zoom;
     cellW = defaultSizes.cellW * zoom;
     cellH = defaultSizes.cellH * zoom;
-    font = (16 * zoom) + fontBase;
-    specialCharFont = (16 * zoom) + specialCharFontBase;
+    font = fontTemplate.replace("$", 16 * zoom);
+    specialCharFont = specialCharFontTemplate.replace("$", 16 * zoom);
 
     // if the tile system has loaded yet. otherwise, update it
     if(window.tilePixelCache) {
@@ -540,11 +542,13 @@ function keydown_tileProtectAuto(e) {
             updateAutoProg();
             if(precision == 0) {
                 selected[i][2].backgroundColor = "";
+                delete selected[i];
+                renderTile(tileX, tileY);
             } else if(precision == 1) {
+                delete selected[i];
                 uncolorChar(tileX, tileY, charX, charY);
+                renderTile(tileX, tileY, true);
             }
-            delete selected[i];
-            renderTile(tileX, tileY, true);
 
             if(idx >= keys.length) return;
             setTimeout(step, 20);
@@ -778,11 +782,16 @@ var currentPositionInitted = false;
 var tiles = {};
 
 var Tile = {};
-Tile.setTile = function(tileX, tileY, data) {
+Tile.set = function(tileX, tileY, data) {
     tiles[tileY + "," + tileX] = data;
 }
 Tile.delete = function(tileX, tileY) {
-    delete tiles[tileY + "," + tileX];
+    var str = tileY + "," + tileX;
+    if(str in tilePixelCache) {
+        delete tilePixelCache[str][0];
+        delete tilePixelCache[str]
+    }
+    delete tiles[str];
 }
 
 var ctx = owot.getContext("2d");
@@ -1207,17 +1216,28 @@ function is_link(tileX, tileY, charX, charY) {
     return false;
 }
 
-// groups small characters into one string (e.g Emojis).
-// this also will group combining character groups into one string.
+var surrogateRegexStr = "([\\uD800-\\uDBFF][\\uDC00-\\uDFFF])";
+var surrogateRegex = new RegExp(surrogateRegexStr, "g");
+var combiningRegexStr = "(([\\0-\\u02FF\\u0370-\\u1DBF\\u1E00-\\u20CF\\u2100-\\uD7FF\\uDC00-\\uFE1F\\uFE30-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF])([\\u0300-\\u036F\\u1DC0-\\u1DFF\\u20D0-\\u20FF\\uFE20-\\uFE2F]+))";
+var combiningRegex = new RegExp(combiningRegexStr, "g");
+var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\n|\\r", "g");
+
+// Split a string properly with surrogates and combining characters in mind
 function advancedSplit(str) {
     str += "";
     // look for surrogate pairs first. then look for combining characters. finally, look for the rest
-	var data = str.match(/([\uD800-\uDBFF][\uDC00-\uDFFF])|(([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+))|.|\n|\r/g)
+	var data = str.match(splitRegex)
     if(data == null) return [];
     for(var i = 0; i < data.length; i++) {
         // contains surrogates without second character?
         if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
             data.splice(i, 1)
+        }
+        if(!surrogateCharsEnabled && data[i].match(surrogateRegex)) {
+            data[i] = "?";
+        }
+        if(!combiningCharsEnabled && data[i].match(combiningRegex)) {
+            data[i] = data[i].charAt(0);
         }
     }
 	return data;
@@ -1337,7 +1357,7 @@ function writeChar(char, doNotMoveCursor) {
     // add the character at where the cursor was from
     if(!newLine) {
         if(!tiles[tileY + "," + tileX]) {
-            Tile.setTile(tileX, tileY, blankTile());
+            Tile.set(tileX, tileY, blankTile());
         }
         var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
         if(!cell_props) cell_props = {};
@@ -1954,7 +1974,7 @@ function getAndFetchTiles() {
             map.push(1);
         } else {
             map.push(0);
-            Tile.setTile(tileX, tileY, null);
+            Tile.set(tileX, tileY, null);
         }
     }
     var width = getWidth(margin);
@@ -1981,10 +2001,10 @@ function getAndFetchTiles() {
 }
 
 // clears all tiles outside the viewport (to free up memory)
-function clearTiles(allTiles) {
+function clearTiles(all) {
     var coordinates;
     var visible = {};
-    if(!allTiles) {
+    if(!all) {
         coordinates = getVisibleTiles();
         // reference to tile coordinates (EG: "5,6")
         visible = {};
@@ -1993,14 +2013,9 @@ function clearTiles(allTiles) {
         }
     }
     for(var i in tiles) {
-        if(!(i in visible) || allTiles) {
+        if(!(i in visible) || all) {
             var pos = getPos(i);
             Tile.delete(pos[1], pos[0]);
-        }
-    }
-    for(var i in tilePixelCache) {
-        if(!(i in visible) || allTiles) {
-            delete tilePixelCache[i];
         }
     }
 }
@@ -2300,7 +2315,7 @@ function renderTile(tileX, tileY, redraw) {
     var tile = tiles[str];
 
     if(tile == null) {
-        Tile.setTile(tileX, tileY, blankTile());
+        Tile.set(tileX, tileY, blankTile());
         tile = tiles[str];
     }
 
@@ -2488,7 +2503,7 @@ function renderTile(tileX, tileY, redraw) {
                 textRender.fillRect(x * cellW, (y * cellH + textYOffset + zoom), cellW, zoom)
             }
             if(char != "\u0020" && char != "\u00a0") { // ignore whitespace characters
-                if(cCode >= 0x2800 && cCode <= 0x28FF && brlBlockFill) {
+                if(cCode >= 0x2800 && cCode <= 0x28FF && brBlockFill) {
                     var dimX = cellW / 2;
                     var dimY = cellH / 4;
                     if((cCode >> 0) & 1) textRender.fillRect(x * cellW, y * cellH, dimX, dimY);
@@ -2629,11 +2644,9 @@ function buildMenu() {
         linksEnabled = false;
     }, true);
     menu.addCheckboxOption(" Colors enabled", function() {
-        colorsEnabled = true;
-        renderTiles(true);
+        w.enableColors();
     }, function() {
-        colorsEnabled = false;
-        renderTiles(true);
+        w.disableColors();
     }, true);
     if("background" in images) {
         menu.addCheckboxOption(" Background", function() {
@@ -2644,7 +2657,7 @@ function buildMenu() {
             renderTiles(true);
         }, true);
     }
-    menu.addEntry("<input oninput=\"changeZoom(this.value)\" ondblclick=\"changeZoom(100)\" title=\"Zoom\" type=\"range\" value=\"100\" min=\"20\" max=\"1000\" style=\"width: 80px;\" id=\"zoombar\">");
+    menu.addEntry("<input oninput=\"changeZoom(this.value)\" ondblclick=\"changeZoom(100)\" title=\"Zoom\" type=\"range\" value=\"100\" min=\"20\" max=\"1000\" id=\"zoombar\">");
 }
 
 document.onselectstart = function(e) {
@@ -2830,6 +2843,60 @@ var w = {
             kind: "cmd",
             data: data // max len of 2048
         }))
+    },
+    redraw: function() {
+        // redraw all tiles, clearing the cahe
+        renderTiles(true);
+    },
+    changeFont: function(fontData) {
+        // change the global font
+        fontTemplate = fontData;
+        font = fontTemplate.replace("$", 16 * zoom);
+        for(var i in tilePixelCache) {
+            tilePixelCache[i][1].font = font;
+        }
+        w.redraw();
+    },
+    changeSpecialCharFont: function(fontData) {
+        specialCharFontTemplate = fontData;
+        specialCharFont = specialCharFontTemplate.replace("$", 16 * zoom);
+        w.redraw();
+    },
+    enableCombining: function(nr) {
+        combiningCharsEnabled = true;
+        if(!nr) w.redraw();
+    },
+    disableCombining: function(nr) {
+        combiningCharsEnabled = false;
+        if(!nr) w.redraw();
+    },
+    enableSurrogates: function(nr) {
+        surrogateCharsEnabled = true;
+        if(!nr) w.redraw();
+    },
+    disableSurrogates: function(nr) {
+        surrogateCharsEnabled = false;
+        if(!nr) w.redraw();
+    },
+    enableColors: function(nr) {
+        colorsEnabled = true;
+        if(!nr) w.redraw();
+    },
+    disableColors: function(nr) {
+        colorsEnabled = false;
+        if(!nr) w.redraw();
+    },
+    basic: function() {
+        w.disableSurrogates(1);
+        w.disableCombining(1);
+        w.disableColors(1);
+        w.redraw();
+    },
+    restore: function() {
+        w.enableSurrogates(1);
+        w.enableCombining(1);
+        w.enableColors(1);
+        w.redraw();
     }
 }
 
@@ -2907,7 +2974,7 @@ function animateTile(tile, posStr) {
 			var newTile = tile;
 			newTile.content = frame[0];
 			newTile.properties.color = frame[1];
-            Tile.setTile(tileX, tileY, newTile)
+            Tile.set(tileX, tileY, newTile)
 			renderTile(tileX, tileY, true);
 			atFrame++;
 			if (atFrame >= framenum) {
@@ -2983,8 +3050,8 @@ var ws_functions = {
 			} else if (isAnimated(tileKey)) {
 				stopAnimation(tileKey);
             }
-            Tile.setTile(pos[1], pos[0], tile);
-            if(!tiles[tileKey]) Tile.setTile(pos[1], pos[0], blankTile());
+            Tile.set(pos[1], pos[0], tile);
+            if(!tiles[tileKey]) Tile.set(pos[1], pos[0], blankTile());
             tiles[tileKey].initted = true;
             if(tiles[tileKey].properties.char) {
                 tiles[tileKey].properties.char = decodeCharProt(tiles[tileKey].properties.char);
@@ -3023,7 +3090,7 @@ var ws_functions = {
             var tileY = pos[0];
             // if tile isn't loaded, load it blank
             if(!tiles[tileKey]) {
-                Tile.setTile(tileX, tileY, blankTile());
+                Tile.set(tileX, tileY, blankTile());
             }
             if(!data.tiles[tileKey]) {
                 data.tiles[tileKey] = blankTile();
@@ -3130,7 +3197,7 @@ var ws_functions = {
         var pos = data.tileY + "," + data.tileX;
         if(tiles[pos]) {
             var writability = tiles[pos].properties.writability;
-            Tile.setTile(data.tileX, data.tileY, blankTile());
+            Tile.set(data.tileX, data.tileY, blankTile());
             tiles[pos].initted = true;
             tiles[pos].properties.writability = writability;
             renderTile(data.tileX, data.tileY);

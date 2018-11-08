@@ -142,17 +142,12 @@ module.exports = async function(ws, data, send, vars) {
         /* [3, "restartserver", null, "restart the server"] */
 
         [2, "worlds", null, "list all worlds"],
-        [2, "ban", ["id"], "ban user from chat by id (referenced by IP)"],
-        [2, "kick", ["id"], "kick user's client from chat by id"],
-        [2, "banip", ["ip"], "ban user from chat by ip"],
-        [2, "kickip", ["ip"], "kick all user's clients from chat by ip"],
-        [2, "whois", ["id"], "get user ip address from id"],
 
         [0, "help", null, "lists all commands"],
         [0, "nick", ["nickname"], "changes your nickname"], // client-side
         [0, "ping", null, "determine the time of server requests"],
-        [0, "goto", ["world"], "force client to another world"], // client-side
-        [0, "gotoserver", ["server"], "force client to a different server"], // client-side
+        [0, "warp", ["world"], "force client to another world"], // client-side
+        [0, "warpserver", ["server"], "force client to a different server"], // client-side
         [0, "gridsize", ["WxH"], "change size of cells in client"], // client-side
         [0, "logout", null, "shortcut to logout your account"],
         [0, "block", ["id"], "block chats from this client"],
@@ -244,35 +239,6 @@ module.exports = async function(ws, data, send, vars) {
             serverChatResponse("Currently loaded worlds (top " + topCount + "): " + listWrapper, data.location)
             return;
         },
-        ban: function(id) {
-            serverChatResponse(JSON.stringify(id), data.location);
-            return;
-        },
-        kick: function(id) {
-            serverChatResponse(JSON.stringify(id), data.location);
-            return;
-        },
-        banip: function(ip) {
-            serverChatResponse(JSON.stringify(ip), data.location);
-            return;
-        },
-        kickip: function(ip) {
-            serverChatResponse(JSON.stringify(ip), data.location);
-            return;
-        },
-        whois: function(id) {
-            var ipData = "Client not found"
-            var clientConnected = false;
-            wss.clients.forEach(function(e) {
-                if(e.clientId != id) return;
-                if(!NCaseCompare(e.world_name, world.name)) return;
-                clientConnected = true;
-            })
-            if(client_ips[world.id] && client_ips[world.id][id]) ipData = JSON.stringify(client_ips[world.id][id]);
-            ipData = id + "; " + ipData + "; " + "Client connected: " + clientConnected;
-            serverChatResponse(ipData, data.location);
-            return;
-        },
         help: function() {
             return serverChatResponse(generate_command_list(), data.location);
         },
@@ -317,21 +283,6 @@ module.exports = async function(ws, data, send, vars) {
         switch(command) {
             case "worlds":
                 if(superuser) com.worlds();
-                return;
-            case "ban":
-                if(superuser) com.ban(args[1]);
-                return;
-            case "kick":
-                if(superuser) com.kicK(args[1]);
-                return;
-            case "banip":
-                if(superuser) com.banip(args[1]);
-                return;
-            case "kickip":
-                if(superuser) com.kickip(args[1]);
-                return;
-            case "whois":
-                if(superuser) com.whois(args[1]);
                 return;
             case "help":
                 com.help();

@@ -50,9 +50,10 @@ module.exports = async function(data, vars) {
 
     var tiles = {};
     var editLimit = 100000; // don't overload server
+    var fetchRectLimit = 40;
 
     var len = data.fetchRectangles.length
-    if(len >= 1000) len = 1000;
+    if(len >= fetchRectLimit) len = fetchRectLimit;
     for(var i = 0; i < len; i++) {
         var rect = data.fetchRectangles[i];
         var minY = san_nbr(rect.minY)

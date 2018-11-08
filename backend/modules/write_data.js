@@ -148,9 +148,10 @@ module.exports = async function(data, vars) {
             var color = change[7];
             var animation = change[8];
 
-            tile_database.write(tileX, tileY, charX, charY, char, color, world.id, {
+            tile_database.write(call_id, tile_database.type.write, {
+                tileX, tileY, charX, charY, char, color,
                 time, editId, animation, user, world, is_owner, is_member,
-                can_color_text, public_only, no_log_edits, call_id
+                can_color_text, public_only, no_log_edits
             });
         }
     }

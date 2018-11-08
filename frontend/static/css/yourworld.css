@@ -199,17 +199,12 @@ a:visited {
     text-align: center;
     background-color: rgba(73, 119, 255, 0.78);
     color: white;
-    height: 19px;
-    line-height: 19px;
+    height: 18px;
+    line-height: 18px;
     cursor: default;
     font-family: Verdana;
     font-size: 12px;
     text-shadow: 1px 1px #000000;
-}
-#chat_open span {
-    display: inline-block;
-    vertical-align: middle;
-    line-height: normal;
 }
 #chat_open:active {
     background-color: rgba(14, 41, 97, 0.78);
@@ -349,14 +344,4 @@ a:visited {
     text-decoration: underline;
     top: 205px;
     left: 50px;
-}
-#reset_zoom {
-    background-color: #7a7a7a;
-    width: 6px;
-    height: 19px;
-    display: inline-block;
-    margin-left: 5px;
-    border-style: solid;
-    border-color: #464646;
-    border-width: 1px;
 }

@@ -2050,8 +2050,8 @@ async function initialize_server_components() {
                         if(opts.chat_perm == "INHERIT") opts.chat_perm = client.chat_permission;
                         if(opts.chat_perm == 1) if(!(client.is_member || client.is_owner)) return;
                         if(opts.chat_perm == 2) if(!client.is_owner) return;
-                        if(client.chat_blocks && client.chat_blocks.indexOf(opts.clientId) > -1 ||
-                            (client.chat_blocks.indexOf("*") > -1) && opts.clientId != 0) return;
+                        if(client.chat_blocks && (client.chat_blocks.indexOf(opts.clientId) > -1 ||
+                            ((client.chat_blocks.indexOf("*") > -1) && opts.clientId != 0))) return;
                     }
                     client.send(data);
                 }
@@ -2544,22 +2544,23 @@ function TerminalMessage(cWidth, cHeight) {
 
 var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 function encodeCharProt(array) {
+    var arrayCom = array.slice(0);
 	// convert array from writability-format to base64-format
-	for(var c = 0; c < array.length; c++) {
-		switch(array[c]) {
-			case null: array[c] = 0; continue;
-			case 0: array[c] = 1; continue;
-			case 1: array[c] = 2; continue;
-			case 2: array[c] = 3; continue;
+	for(var c = 0; c < arrayCom.length; c++) {
+		switch(arrayCom[c]) {
+			case null: arrayCom[c] = 0; continue;
+			case 0: arrayCom[c] = 1; continue;
+			case 1: arrayCom[c] = 2; continue;
+			case 2: arrayCom[c] = 3; continue;
 		}
 	}
 	var str = "@";
 	var bytes = Math.ceil(128 / 3)
 	for(var i = 0; i < bytes; i++) {
 		var idx = i * 3;
-		var char1 = ((4*4)*array[idx + 0]);
-		var char2 = ((4)*array[idx + 1])
-		var char3 = ((1)*array[idx + 2])
+		var char1 = ((4*4)*arrayCom[idx + 0]);
+		var char2 = ((4)*arrayCom[idx + 1])
+		var char3 = ((1)*arrayCom[idx + 2])
 		if(idx + 1 > 127) char2 = 0;
 		if(idx + 2 > 127) char3 = 0;
 		var code = char1 + char2 + char3;
