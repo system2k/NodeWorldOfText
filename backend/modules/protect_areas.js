@@ -53,4 +53,8 @@ module.exports = async function(data, vars) {
         user, world, is_member, is_owner,
         type, precise, protect_type
     });
+
+    var resp = await tile_database.editResponse(call_id);
+
+    return resp;
 }

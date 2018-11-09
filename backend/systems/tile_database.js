@@ -60,8 +60,8 @@ function write_edits(tileX, tileY, edit, tile, t, tileUpdates, world_id, editLog
 
     var char_writability = t.charProt[offset];
 
-    // repeated again to make sure
-    if(!cids[call_id]) cids[call_id] = [[], {}];
+    // call-id template (for char edits)
+    cids[call_id][0] = [[], {}];
 
     // permission checking - compute the writability of the cell, accounting for tile and world writing permissions
     if(char_writability == null) char_writability = tile ? tile.writability : null;
@@ -69,22 +69,22 @@ function write_edits(tileX, tileY, edit, tile, t, tileUpdates, world_id, editLog
 
     // tile is owner-only, but user is not owner
     if(char_writability == 2 && !is_owner) {
-        cids[call_id][1][editId] = "NO_TILE_PERM";
+        cids[call_id][0][1][editId] = "NO_TILE_PERM";
         return;
     }
     // tile is member-only, but user is not member (nor owner)
     if(char_writability == 1 && !is_owner && !is_member) {
-        cids[call_id][1][editId] = "NO_TILE_PERM";
+        cids[call_id][0][1][editId] = "NO_TILE_PERM";
         return;
     }
 
     // this edit request is only allowed to write on public areas
     if(public_only && char_writability != 0) {
-        cids[call_id][1][editId] = "NO_TILE_PERM";
+        cids[call_id][0][1][editId] = "NO_TILE_PERM";
         return;
     }
 
-    cids[call_id][0].push(editId);
+    cids[call_id][0][0].push(editId);
 
     t.tile_data = insert_char_at_index(t.tile_data, char, offset);
 
@@ -203,7 +203,8 @@ function write_link(tileX, tileY, edit, tile, t, tileUpdates, world_id) {
     }
 
     if(!can_link) {
-        return [true, "PERM"];
+        cids[call_id][0] = [true, "PERM"];
+        return;
     }
 
     if(!tile_props.cell_props) tile_props.cell_props = {};
@@ -235,6 +236,8 @@ function write_link(tileX, tileY, edit, tile, t, tileUpdates, world_id) {
     upd[0] = t.tile_data;
     upd[1] = t.properties;
     upd[2] = t.writability;
+
+    cids[call_id][0] = [false, true];
 }
 
 function protect_area(tileX, tileY, edit, tile, t, tileUpdates, world_id) {
@@ -280,7 +283,8 @@ function protect_area(tileX, tileY, edit, tile, t, tileUpdates, world_id) {
         world.feature_membertiles_addremove && writability < 2);
 
     if(!(can_owner || can_member)) {
-        return [true, "PERM"];
+        cids[call_id][0] = [true, "PERM"];
+        return;
     }
 
     var new_writability;
@@ -375,6 +379,8 @@ function protect_area(tileX, tileY, edit, tile, t, tileUpdates, world_id) {
     upd[0] = t.tile_data;
     upd[1] = t.properties;
     upd[2] = t.writability;
+
+    cids[call_id][0] = [false, true];
 }
 
 var nextEdits = {};
@@ -462,7 +468,6 @@ async function flushQueue() {
             if(writabilityChanged) {
                 await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?, ?)",
                     [world_id, t.tile_data, tileY, tileX, JSON.stringify(t.properties), t.writability, Date.now()]);
-                
             } else {
                 await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, null, ?)",
                     [world_id, t.tile_data, tileY, tileX, JSON.stringify(t.properties), Date.now()]);
@@ -550,11 +555,12 @@ async function flushQueue() {
 
     for(var i in cids) {
         var call = cids[i];
-        var func = call[2];
-        var applied = call[3];
+        var retData = call[0];
+        var func = call[1];
+        var applied = call[2];
         if(!applied) continue; // if these call ids were added during the database write, don't discard
         if(func) {
-            func([call[0], call[1]]);
+            func(retData);
         }
         delete cids[i];
     }
@@ -610,7 +616,7 @@ module.exports.write = function(call_id, type, data) {
 }
 
 module.exports.reserveCallId = function(id) {
-    if(!cids[id]) cids[id] = [[], {}, null, false];
+    if(!cids[id]) cids[id] = [null, null, false];
 }
 
 var current_call_id = 0;

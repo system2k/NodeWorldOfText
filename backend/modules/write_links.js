@@ -65,4 +65,8 @@ module.exports = async function(data, vars) {
         user, world, is_member, is_owner,
         type, url, link_tileX, link_tileY
     });
+
+    var resp = await tile_database.editResponse(call_id);
+
+    return resp;
 }
