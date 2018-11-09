@@ -388,7 +388,7 @@ var editsAvailableInQueue = false;
 
 async function flushQueue() {
     for(var i in cids) {
-        cids[i][3] = true;
+        cids[i][2] = true;
     }
 
     var tileUpdates = {};
@@ -591,7 +591,7 @@ async function writeCycle() {
 module.exports.editResponse = async function(id) {
     return new Promise(function(res) {
         if(cids[id]) {
-            cids[id][2] = res;
+            cids[id][1] = res;
         } else {
             console.log("An error occured while sending back an edit response");
         }
