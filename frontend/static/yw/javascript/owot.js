@@ -56,14 +56,15 @@ var useHighlight           = true; // highlight new edits
 var highlightLimit         = 10;
 var ansiBlockFill          = true; // fill certain ansi block characters
 var colorizeLinks          = true;
-var brBlockFill           = false;
+var brBlockFill            = false;
 var tileFetchOffsetX       = 0; // offset added to tile fetching and sending coordinates
 var tileFetchOffsetY       = 0;
 var defaultChatColor       = null; // 24-bit Uint
 var ignoreCanvasContext    = true; // ignore canvas context menu when right clicking
 var elementSnapApprox      = 10;
-var combiningCharsEnabled   = true;
-var surrogateCharsEnabled   = true;
+var combiningCharsEnabled  = true;
+var surrogateCharsEnabled  = true;
+var mSpecRendering         = true;
 
 var clientOnload = [];
 window.addEventListener("load", function() {
@@ -2526,9 +2527,12 @@ function renderTile(tileX, tileY, redraw) {
                     textRender.fillRect(x * cellW + Math.trunc(cellW / 2), y * cellH, Math.trunc(cellW / 2), cellH);
                 } else {
                     // finally, render the text
-                    if(char.length > 1) textRender.font = specialCharFont;
+                    var mSpec = (char.charCodeAt(1) == 822) && mSpecRendering;
+                    if(char.length > 1 && !mSpec) textRender.font = specialCharFont;
+                    if(mSpec) char = char.replace(String.fromCharCode(822), "");
                     textRender.fillText(char, x * cellW + XPadding, y * cellH + textYOffset)
-                    if(char.length > 1) textRender.font = font;
+                    if(char.length > 1 && !mSpec) textRender.font = font;
+                    if(mSpec) textRender.fillRect(x * cellW, y * cellH + cellH - 9 * zoom, cellW, zoom);
                 }
             }
         }
