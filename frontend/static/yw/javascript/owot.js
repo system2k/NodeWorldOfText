@@ -552,7 +552,7 @@ function keydown_tileProtectAuto(e) {
             }
 
             if(idx >= keys.length) return;
-            setTimeout(step, 20);
+            setTimeout(step, 10);
         }
         step();
 
@@ -667,7 +667,7 @@ function keydown_linkAuto(e) {
             renderTile(tileX, tileY, true);
 
             if(idx >= keys.length) return;
-            setTimeout(step, 20);
+            setTimeout(step, 10);
         }
         step();
     } else {

@@ -2097,7 +2097,7 @@ async function initialize_server_components() {
             handle_error(e);
         }
 
-        var req_per_second = 133;
+        var req_per_second = 256;
         var reqs_second = 0; // requests received at current second
         var current_second = Math.floor(Date.now() / 1000);
         function can_process_req() { // limit requests per second
