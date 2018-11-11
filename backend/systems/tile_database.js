@@ -383,6 +383,26 @@ function protect_area(tileX, tileY, edit, tile, t, tileUpdates, world_id) {
     cids[call_id][0] = [false, true];
 }
 
+// administrator function for resetting a tile
+function clear_tile(tileX, tileY, t, tileUpdates, world_id) {
+    for(var i in t.properties) {
+        delete t.properties[i];
+    }
+    t.tile_data = " ".repeat(128);
+
+    if(!tileUpdates[world_id]) {
+        tileUpdates[world_id] = {};
+    }
+    if(!tileUpdates[world_id][tileY + "," + tileX]) {
+        tileUpdates[world_id][tileY + "," + tileX] = ["", {}, null];
+    }
+
+    var upd = tileUpdates[world_id][tileY + "," + tileX];
+    upd[0] = t.tile_data;
+    upd[1] = t.properties;
+    upd[2] = t.writability;
+}
+
 var nextEdits = {};
 var editsAvailableInQueue = false;
 
@@ -401,6 +421,7 @@ async function flushQueue() {
         var tileX = parseInt(pos[1]);
         var tileY = parseInt(pos[0]);
         var world_id = parseInt(pos[2]);
+        var createUndefTile = false; // if the tile does not exist, create it
 
         var tile = await db.get("SELECT * FROM tile WHERE tileX=? AND tileY=? and world_id=?", [tileX, tileY, world_id]);
         var t = {
@@ -443,14 +464,21 @@ async function flushQueue() {
 
             var eType = edit[1];
 
+            // createUndefTile must be set to true in edits that require tiles to be created
             if(eType == type.write) {
                 write_edits(tileX, tileY, edit, tile, t, tileUpdates, world_id, editLog);
+                createUndefTile = true;
             }
             if(eType == type.link) {
                 write_link(tileX, tileY, edit, tile, t, tileUpdates, world_id);
+                createUndefTile = true;
             }
             if(eType == type.protect) {
                 protect_area(tileX, tileY, edit, tile, t, tileUpdates, world_id);
+                createUndefTile = true;
+            }
+            if(eType == type.clear) {
+                clear_tile(tileX, tileY, t, tileUpdates, world_id);
             }
         }
 
@@ -464,7 +492,7 @@ async function flushQueue() {
                 await db.run("UPDATE tile SET (content, properties)=(?, ?) WHERE id=?",
                     [t.tile_data, JSON.stringify(t.properties), tile.id]);
             }
-        } else { // tile doesn't exist, insert
+        } else if(createUndefTile) { // tile doesn't exist, insert
             if(writabilityChanged) {
                 await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?, ?)",
                     [world_id, t.tile_data, tileY, tileX, JSON.stringify(t.properties), t.writability, Date.now()]);
@@ -627,7 +655,8 @@ module.exports.newCallId = function() {
 var type = {
     write: 0,
     link: 1,
-    protect: 2
+    protect: 2,
+    clear: 3
 }
 
 module.exports.type = type;
