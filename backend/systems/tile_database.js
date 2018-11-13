@@ -11,7 +11,7 @@ var fixColors;
 var get_bypass_key;
 var encodeCharProt;
 
-// Animation Feature Password
+// Tile Animation Password
 //let's leave this as just a feature for who knows this secret top top secret
 var NOT_SO_SECRET = "@^&$%!#*%^#*)~@$^*#!)~*%38259`25equfahgrqieavkj4bh8ofweieagrHG*FNV#@#OIFENUOGIVEOSFKNL<CDOLFKEWNSCOIEAFM:COGPEWWRG>BVPZL:MBGOEWSV";
 
@@ -35,33 +35,29 @@ module.exports.main = function(vars) {
 }
 
 // caller ids. this returns information to a request that uploaded the edits to the server
-var cids = {}; // [accepted[], rejected{}]
+var cids = {}; // [return_data, callback_function, is_processed]
 
-function write_edits(tileX, tileY, edit, tile, t, tileUpdates, world_id, editLog) {
-    var call_id = edit[0];
-    var data = edit[2];
+function write_edits(tile, t, accepted, rejected, edit, data, editLog) {
+    var tileY = edit[0];
+    var tileX = edit[1];
+    var charY = edit[2];
+    var charX = edit[3];
+    var time = edit[4];
+    var char = edit[5];
+    var editId = edit[6];
+    var color = edit[7];
+    var animation = edit[8];
 
     var world = data.world;
     var user = data.user;
-    var time = data.time;
-    var editId = data.editId;
-    var animation = data.animation;
     var public_only = data.public_only;
     var can_color_text = data.can_color_text;
     var no_log_edits = data.no_log_edits;
     var is_owner = data.is_owner;
     var is_member = data.is_member;
-    var char = data.char;
-    var color = data.color;
-    var charX = data.charX;
-    var charY = data.charY;
 
     var offset = charY * 16 + charX;
-
     var char_writability = t.charProt[offset];
-
-    // call-id template (for char edits)
-    cids[call_id][0] = [[], {}];
 
     // permission checking - compute the writability of the cell, accounting for tile and world writing permissions
     if(char_writability == null) char_writability = tile ? tile.writability : null;
@@ -69,22 +65,22 @@ function write_edits(tileX, tileY, edit, tile, t, tileUpdates, world_id, editLog
 
     // tile is owner-only, but user is not owner
     if(char_writability == 2 && !is_owner) {
-        cids[call_id][0][1][editId] = "NO_TILE_PERM";
+        rejected[editId] = "NO_TILE_PERM";
         return;
     }
     // tile is member-only, but user is not member (nor owner)
     if(char_writability == 1 && !is_owner && !is_member) {
-        cids[call_id][0][1][editId] = "NO_TILE_PERM";
+        rejected[editId] = "NO_TILE_PERM";
         return;
     }
 
     // this edit request is only allowed to write on public areas
     if(public_only && char_writability != 0) {
-        cids[call_id][0][1][editId] = "NO_TILE_PERM";
+        rejected[editId] = "NO_TILE_PERM";
         return;
     }
 
-    cids[call_id][0][0].push(editId);
+    accepted.push(editId);
 
     t.tile_data = insert_char_at_index(t.tile_data, char, offset);
 
@@ -145,36 +141,23 @@ function write_edits(tileX, tileY, edit, tile, t, tileUpdates, world_id, editLog
         }
     }
 
-    if(!tileUpdates[world_id]) {
-        tileUpdates[world_id] = {};
-    }
-    if(!tileUpdates[world_id][tileY + "," + tileX]) {
-        tileUpdates[world_id][tileY + "," + tileX] = ["", {}, null];
-    }
-
-    var upd = tileUpdates[world_id][tileY + "," + tileX];
-    upd[0] = t.tile_data;
-    upd[1] = t.properties;
-    upd[2] = t.writability;
-
     if(!no_log_edits) {
-        var ar = [tileY, tileX, charY, charX, 0 /*time*/, char, editId];
+        var ar = [tileY, tileX, charY, charX, time, char, editId];
         if(color) ar.push(color);
         if(incAnimationEditLog) { // if animation is passed in edit
-            if(!color) ar.push(0); // keep elements aligned
+            if(ar.length == 7) ar.push(0); // keep elements aligned
             ar.push(animation)
         }
 
-        editLog.push([time, ar, 0, world.id]);
+        editLog.push(ar);
     }
 }
 
-function write_link(tileX, tileY, edit, tile, t, tileUpdates, world_id) {
-    var call_id = edit[0];
-    var data = edit[2];
-
+function write_link(call_id, tile, t, data) {
     var world = data.world;
     var user = data.user;
+    var tileX = data.tileX;
+    var tileY = data.tileY;
     var charX = data.charX;
     var charY = data.charY;
     var is_member = data.is_member;
@@ -184,7 +167,9 @@ function write_link(tileX, tileY, edit, tile, t, tileUpdates, world_id) {
     var link_tileY = data.link_tileY;
     var url = data.url;
 
-    // at this stage, it is assumed that the user can link
+    var world_id = world.id;
+
+    // at this stage, it is assumed that the user has permission to link (on allowed areas)
     var can_link = true;
 
     var tile_props = t.properties;
@@ -225,25 +210,10 @@ function write_link(tileX, tileY, edit, tile, t, tileUpdates, world_id) {
         }
     }
 
-    if(!tileUpdates[world_id]) {
-        tileUpdates[world_id] = {};
-    }
-    if(!tileUpdates[world_id][tileY + "," + tileX]) {
-        tileUpdates[world_id][tileY + "," + tileX] = ["", {}, null];
-    }
-
-    var upd = tileUpdates[world_id][tileY + "," + tileX];
-    upd[0] = t.tile_data;
-    upd[1] = t.properties;
-    upd[2] = t.writability;
-
     cids[call_id][0] = [false, true];
 }
 
-function protect_area(tileX, tileY, edit, tile, t, tileUpdates, world_id) {
-    var call_id = edit[0];
-    var data = edit[2];
-
+function protect_area(call_id, tile, t, data) {
     var world = data.world;
     var user = data.user;
     var charX = data.charX;
@@ -253,6 +223,8 @@ function protect_area(tileX, tileY, edit, tile, t, tileUpdates, world_id) {
     var type = data.type;
     var precise = data.precise;
     var protect_type = data.protect_type;
+    
+    var world_id = world.id;
 
     var properties = t.properties;
     var charProt = t.charProt;
@@ -368,67 +340,23 @@ function protect_area(tileX, tileY, edit, tile, t, tileUpdates, world_id) {
 
     t.writability = new_writability;
 
-    if(!tileUpdates[world_id]) {
-        tileUpdates[world_id] = {};
-    }
-    if(!tileUpdates[world_id][tileY + "," + tileX]) {
-        tileUpdates[world_id][tileY + "," + tileX] = ["", {}, null];
-    }
-
-    var upd = tileUpdates[world_id][tileY + "," + tileX];
-    upd[0] = t.tile_data;
-    upd[1] = t.properties;
-    upd[2] = t.writability;
-
     cids[call_id][0] = [false, true];
 }
 
-// administrator function for resetting a tile
-function clear_tile(tileX, tileY, t, tileUpdates, world_id) {
-    for(var i in t.properties) {
-        delete t.properties[i];
-    }
-    t.tile_data = " ".repeat(128);
+async function loadTile(tileCache, world_id, tileX, tileY) {
+    var tileUID = world_id + "," + tileY + "," + tileX;
 
-    if(!tileUpdates[world_id]) {
-        tileUpdates[world_id] = {};
-    }
-    if(!tileUpdates[world_id][tileY + "," + tileX]) {
-        tileUpdates[world_id][tileY + "," + tileX] = ["", {}, null];
-    }
-
-    var upd = tileUpdates[world_id][tileY + "," + tileX];
-    upd[0] = t.tile_data;
-    upd[1] = t.properties;
-    upd[2] = t.writability;
-}
-
-var nextEdits = {};
-var editsAvailableInQueue = false;
-
-async function flushQueue() {
-    for(var i in cids) {
-        cids[i][2] = true;
-    }
-
-    var tileUpdates = {};
-
-    var nextEditsCpy = nextEdits;
-    nextEdits = {};
-    var editLog = [];
-    for(var i in nextEditsCpy) {
-        var pos = i.split(",");
-        var tileX = parseInt(pos[1]);
-        var tileY = parseInt(pos[0]);
-        var world_id = parseInt(pos[2]);
-        var createUndefTile = false; // if the tile does not exist, create it
-
+    if(tileUID in tileCache) {
+        return tileCache[tileUID];
+    } else {
         var tile = await db.get("SELECT * FROM tile WHERE tileX=? AND tileY=? and world_id=?", [tileX, tileY, world_id]);
         var t = {
             charProt: null,
             properties: null,
             tile_data: null,
-            writability: null
+            writability: null,
+            oldWritability: null,
+            createUndefTile: false
         }
         if(tile) {
             t.properties = JSON.parse(tile.properties);
@@ -451,38 +379,187 @@ async function flushQueue() {
             t.tile_data = " ".repeat(128);
             t.writability = null;
         }
+        t.oldWRitability = t.writability;
+        tileCache[tileUID] = [tile, t];
+        return tileCache[tileUID];
+    }
+}
 
-        // some write functions may change the writability. this is the old writability for reference when updating the tile
-        var oldWritability = t.writability;
-
-        var edits = nextEditsCpy[i];
-
-        // assumes it receives an edit for a single character. multi-character edits are
-        // partitioned automatically in a different procedure
-        for(var e = 0; e < edits.length; e++) {
-            var edit = edits[e];
-
-            var eType = edit[1];
-
-            // createUndefTile must be set to true in edits that require tiles to be created
-            if(eType == type.write) {
-                write_edits(tileX, tileY, edit, tile, t, tileUpdates, world_id, editLog);
-                createUndefTile = true;
-            }
-            if(eType == type.link) {
-                write_link(tileX, tileY, edit, tile, t, tileUpdates, world_id);
-                createUndefTile = true;
-            }
-            if(eType == type.protect) {
-                protect_area(tileX, tileY, edit, tile, t, tileUpdates, world_id);
-                createUndefTile = true;
-            }
-            if(eType == type.clear) {
-                clear_tile(tileX, tileY, t, tileUpdates, world_id);
+function prepareTileUpdate(updatedTiles, tileX, tileY, t) {
+    if(!updatedTiles[tileY + "," + tileX]) {
+        updatedTiles[tileY + "," + tileX] = {
+            content: t.tile_data,
+            properties: {
+                cell_props: t.properties.cell_props,
+                color: t.properties.color,
+                char: t.properties.char,
+                writability: t.writability
             }
         }
+    } else {
+        var uTile = updatedTiles[tileY + "," + tileX];
+        uTile.content = t.tile_data;
+        var props = uTile.properties;
+        props.cell_props = t.properties.cell_props;
+        props.color = t.properties.color;
+        props.char = t.properties.char;
+        props.writability = t.writability;
+    }
+}
 
-        var writabilityChanged = oldWritability != t.writability;
+var queue = [];
+async function flushQueue() {
+    for(var i in cids) {
+        cids[i][2] = true;
+    }
+
+    var queueLength = queue.length;
+
+    var tileCache = {};
+
+    for(var i = 0; i < queueLength; i++) {
+        var operation = queue[0];
+        queue.shift();
+        
+        var call_id = operation[0];
+        var type = operation[1];
+        var data = operation[2];
+
+        var date = data.date;
+        var user = data.user;
+        var world = data.world;
+        var channel = data.channel;
+        var no_log_edits = data.no_log_edits;
+
+        var updatedTiles = {};
+        var updatedTilesBroadcast = false;
+
+        if(type == types.write) {
+            var tile_edits = data.tile_edits;
+
+            var accepted = [];
+            var rejected = {};
+            var editLog = [];
+
+            for(var e = 0; e < tile_edits.length; e++) {
+                var edit = tile_edits[e];
+                
+                var tileY = edit[0];
+                var tileX = edit[1];
+
+                var tileUID = world.id + "," + tileY + "," + tileX;
+
+                var tData = tileCache[tileUID] || await loadTile(tileCache, world.id, tileX, tileY);
+                var tile = tData[0]; // tile Database object
+                var t = tData[1]; // data processed from tile database object
+
+                write_edits(tile, t, accepted, rejected, edit, data, editLog);
+                t.createUndefTile = true;
+
+                // send tile update to the client
+                prepareTileUpdate(updatedTiles, tileX, tileY, t);
+                updatedTilesBroadcast = true;
+            }
+
+            cids[call_id][0] = [accepted, rejected];
+
+            if(!no_log_edits && editLog.length) {
+                var editTileGroups = {};
+                for(var d = 0; d < editLog.length; d++) {
+                    var tileX = editLog[d][1];
+                    var tileY = editLog[d][0];
+                    var key = tileY + "," + tileX;
+                    if(!editTileGroups[key]) editTileGroups[key] = [];
+                    editTileGroups[key].push(editLog[d]);
+                }
+                for(var yx in editTileGroups) {
+                    var posyx = yx.split(",");
+                    var tileX = parseInt(posyx[1]);
+                    var tileY = parseInt(posyx[0]);
+                    var tileEdits = editTileGroups[yx];
+                    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)", // log the edit
+                        [0, world.id, tileY, tileX, date, JSON.stringify(tileEdits)]);
+                }
+            }
+        }
+        if(type == types.link) {
+            var tileY = data.tileY;
+            var tileX = data.tileX;
+
+            var tileUID = world.id + "," + tileY + "," + tileX;
+
+            var tData = tileCache[tileUID] || await loadTile(tileCache, world.id, tileX, tileY);
+            var tile = tData[0]; // tile Database object
+            var t = tData[1]; // data processed from tile database object
+            write_link(call_id, tile, t, data);
+            t.createUndefTile = true;
+
+            prepareTileUpdate(updatedTiles, tileX, tileY, t);
+            updatedTilesBroadcast = true;
+        }
+        if(type == types.protect) {
+            var tileY = data.tileY;
+            var tileX = data.tileX;
+
+            var tileUID = world.id + "," + tileY + "," + tileX;
+
+            var tData = tileCache[tileUID] || await loadTile(tileCache, world.id, tileX, tileY);
+            var tile = tData[0]; // tile Database object
+            var t = tData[1]; // data processed from tile database object
+            protect_area(call_id, tile, t, data);
+            t.createUndefTile = true;
+
+            prepareTileUpdate(updatedTiles, tileX, tileY, t);
+            updatedTilesBroadcast = true;
+        }
+        if(type == types.clear) {
+            var tileY = data.tileY;
+            var tileX = data.tileX;
+            
+            var tData = tileCache[tileUID] || await loadTile(tileCache, world.id, tileX, tileY);
+            var tile = tData[0]; // tile Database object
+            var t = tData[1]; // data processed from tile database object
+
+            for(var f in t.properties) {
+                delete t.properties[f];
+            }
+            t.tile_data = " ".repeat(128);
+
+            prepareTileUpdate(updatedTiles, tileX, tileY, t);
+            updatedTilesBroadcast = true;
+
+            await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)", // log the edit
+                [user.id, world.id, tileY, tileX, date, "@{\"kind\":\"tile_clear\"}"]);
+        }
+
+        if(updatedTilesBroadcast) {
+            wss.clients.forEach(function(client) {
+                if(client.world_id == world.id && client.readyState == WebSocket.OPEN) {
+                    try {
+                        client.send(JSON.stringify({
+                            channel,
+                            kind: "tileUpdate",
+                            source: "write",
+                            tiles: updatedTiles
+                        }))
+                    } catch(e) {
+                        handle_error(e);
+                    }
+                }
+            })
+        }
+    }
+
+    // apply the changes to the database
+    for(var wyx in tileCache) {
+        var UID = wyx.split(",");
+        var world_id = parseInt(UID[0]);
+        var tileY = parseInt(UID[1]);
+        var tileX = parseInt(UID[2]);
+        var tile = tileCache[wyx][0];
+        var t = tileCache[wyx][1];
+
+        var writabilityChanged = (t.writability != t.oldWritability);
 
         if(tile) { // tile exists, update
             if(writabilityChanged) {
@@ -492,7 +569,7 @@ async function flushQueue() {
                 await db.run("UPDATE tile SET (content, properties)=(?, ?) WHERE id=?",
                     [t.tile_data, JSON.stringify(t.properties), tile.id]);
             }
-        } else if(createUndefTile) { // tile doesn't exist, insert
+        } else if(t.createUndefTile) { // tile doesn't exist, insert
             if(writabilityChanged) {
                 await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?, ?)",
                     [world_id, t.tile_data, tileY, tileX, JSON.stringify(t.properties), t.writability, Date.now()]);
@@ -501,84 +578,6 @@ async function flushQueue() {
                     [world_id, t.tile_data, tileY, tileX, JSON.stringify(t.properties), Date.now()]);
             }
         }
-    }
-
-    editLog.sort(function(a, b) {
-        return a[0] - b[0];
-    })
-
-    var currentUser = null;
-    var currentWorld = null;
-    var currentTileX = null;
-    var currentTileY = null;
-    var currentEdits = [];
-    // insert edits at the correct order in the correct group
-    for(var i = 0; i < editLog.length; i++) {
-        var time = editLog[i][0];
-        var edit = editLog[i][1];
-        var tileX = edit[1];
-        var tileY = edit[0];
-        var charX = edit[3];
-        var charY = edit[2];
-        var user = editLog[i][2];
-        var world = editLog[i][3];
-        // this is the initial edit
-        if(currentWorld == null) {
-            currentUser = user;
-            currentWorld = world;
-            currentTileX = tileX;
-            currentTileY = tileY;
-        }
-        // different group, adjust
-        if(currentUser != user || currentWorld != world || currentTileX != tileX || currentTileY != tileY) {
-            if(currentEdits) {
-                await writeEditDatabase(currentEdits, tileX, tileY, user, world, time);
-            }
-            currentEdits = [];
-            currentEdits.push(edit);
-            currentUser = user;
-            currentWorld = world;
-            currentTileX = tileX;
-            currentTileY = tileY;
-        } else {
-            currentEdits.push(edit);
-        }
-        // reached the end and there's pending edits
-        if(i >= editLog.length - 1 && currentEdits) {
-            await writeEditDatabase(currentEdits, tileX, tileY, user, world, time);
-        }
-    }
-
-    for(var w_id in tileUpdates) {
-        var world_upd = tileUpdates[w_id];
-
-        var tupd = {};
-
-        for(var t_coord in world_upd) {
-            var tile = world_upd[t_coord];
-
-            tupd[t_coord] = {
-                content: tile[0],
-                properties: Object.assign(tile[1], {
-                    writability: tile[2]
-                })
-            }
-        }
-
-        wss.clients.forEach(function(client) {
-            if(client.world_id == w_id && client.readyState == WebSocket.OPEN) {
-                try {
-                    client.send(JSON.stringify({
-                        channel: "",
-                        kind: "tileUpdate",
-                        source: "write",
-                        tiles: tupd
-                    }))
-                } catch(e) {
-                    handle_error(e);
-                }
-            }
-        })
     }
 
     for(var i in cids) {
@@ -594,15 +593,9 @@ async function flushQueue() {
     }
 }
 
-async function writeEditDatabase(edits, tileX, tileY, user_id, world_id, time) {
-    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)", // log the edit
-        [user_id, world_id, tileY, tileX, time, JSON.stringify(edits)])
-}
-
 var cycleTimeout = Math.floor(1000 / 60);
 async function writeCycle() {
-    if(editsAvailableInQueue) {
-        editsAvailableInQueue = false;
+    if(queue.length) {
         await g_transaction.begin();
         try {
             await flushQueue();
@@ -627,20 +620,7 @@ module.exports.editResponse = async function(id) {
 }
 
 module.exports.write = function(call_id, type, data) {
-    var tileX = data.tileX;
-    var tileY = data.tileY;
-    var world_id = data.world.id;
-
-    var key = tileY + "," + tileX + "," + world_id;
-
-    var queue = nextEdits[key];
-    if(!queue) {
-        nextEdits[key] = [];
-        queue = nextEdits[key];
-    }
-
     queue.push([call_id, type, data]);
-    editsAvailableInQueue = true;
 }
 
 module.exports.reserveCallId = function(id) {
@@ -652,11 +632,11 @@ module.exports.newCallId = function() {
     return current_call_id++;
 }
 
-var type = {
+var types = {
     write: 0,
     link: 1,
     protect: 2,
     clear: 3
 }
 
-module.exports.type = type;
+module.exports.types = types;

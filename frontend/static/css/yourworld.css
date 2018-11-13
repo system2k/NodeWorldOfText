@@ -241,7 +241,7 @@ a:visited {
 }
 .unread {
     color: red;
-    font-size: 11px;
+    font-size: 15px;
 }
 #chat_window {
     position: absolute;

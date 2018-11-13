@@ -60,7 +60,7 @@ module.exports = async function(data, vars) {
     var call_id = tile_database.newCallId();
     tile_database.reserveCallId(call_id);
 
-    tile_database.write(call_id, tile_database.type.link, {
+    tile_database.write(call_id, tile_database.types.link, {
         tileX, tileY, charX, charY,
         user, world, is_member, is_owner,
         type, url, link_tileX, link_tileY

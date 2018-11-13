@@ -35,11 +35,12 @@ function getWndHeight() {
 var nextObjId              = 1; // next edit ID
 var width                  = getWndWidth();
 var height                 = getWndHeight();
-var positionX              = 0; // position in client in pixels
+var positionX              = 0; // client position in pixels
 var positionY              = 0;
 var gridEnabled            = false;
 var subgridEnabled         = true; // character-level grid
 var linksEnabled           = true;
+var linksRendered          = true;
 var colorsEnabled          = true;
 var backgroundEnabled      = true; // if any
 var zoomRatio              = window.devicePixelRatio; // browser's zoom ratio
@@ -48,9 +49,6 @@ var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
 var zoom                   = decimal(100); // zoom value
 var images                 = {}; // { name: [data RGBA, width, height] }
 var js_alert_active        = false; // js alert window open
-var images_to_load         = {
-    unloaded: "/static/unloaded.png"
-}
 var worldFocused           = false;
 var useHighlight           = true; // highlight new edits
 var highlightLimit         = 10;
@@ -62,9 +60,13 @@ var tileFetchOffsetY       = 0;
 var defaultChatColor       = null; // 24-bit Uint
 var ignoreCanvasContext    = true; // ignore canvas context menu when right clicking
 var elementSnapApprox      = 10;
+var mSpecRendering         = true;
 var combiningCharsEnabled  = true;
 var surrogateCharsEnabled  = true;
-var mSpecRendering         = true;
+
+var images_to_load         = {
+    unloaded: "/static/unloaded.png"
+}
 
 var clientOnload = [];
 window.addEventListener("load", function() {
@@ -202,7 +204,7 @@ for(var i in images_to_load) { // add blank image object so that client knows it
 var img_load_keys = Object.keys(images_to_load);
 
 var imgToArrayCanvas = document.createElement("canvas");
-var backImg = imgToArrayCanvas.getContext("2d");
+var backImg = imgToArrayCanvas.getContext("2d"); // temporary canvas used to pull data from images
 
 var loadImageElm;
 var img_load_index = 0;
@@ -212,13 +214,16 @@ function loadImgPixelData(callback) {
     loadImageElm.src = images_to_load[img_key];
     var error = false;
     loadImageElm.onload = function() {
-        if(!error) { // error occured, don't process
+        if(!error) {
             var width = loadImageElm.width;
             var height = loadImageElm.height;
             imgToArrayCanvas.width = width;
             imgToArrayCanvas.height = height;
             backImg.drawImage(loadImageElm, 0, 0);
             images[img_key] = [backImg.getImageData(0, 0, width, height).data, width, height];
+        } else {
+            // failed to load. use gray color
+            images[img_key] = [new Uint8ClampedArray([192]), 1, 1];
         }
         img_load_index++;
         if(img_load_index >= img_load_keys.length) {
@@ -226,7 +231,7 @@ function loadImgPixelData(callback) {
             renderTiles();
             callback();
         } else {
-            // keep loading
+            // continue loading
             loadImgPixelData(callback);
         }
     }
@@ -492,7 +497,7 @@ document.addEventListener("mousemove", mousemove_tileProtectAuto)
 
 function keydown_tileProtectAuto(e) {
     if(!worldFocused) return;
-    if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to protect tiles
+    if(getKeyCode(e) == 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to protect tiles
         if(e.ctrlKey) e.preventDefault();
         var selected = tileProtectAuto.selected;
         var types = ["owner-only", "member-only", "public"];
@@ -613,7 +618,7 @@ document.addEventListener("mousemove", mousemove_linkAuto)
 
 function keydown_linkAuto(e) {
     if(!worldFocused) return;
-    if(e.keyCode === 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to add links
+    if(getKeyCode(e) == 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to add links
         if(e.ctrlKey) e.preventDefault();
         var selected = linkAuto.selected;
         var keys = Object.keys(selected);
@@ -735,12 +740,13 @@ function getCharColor(tileX, tileY, charX, charY) {
 document.addEventListener("keydown", function(e) {
     if(!worldFocused) return;
     // 67 = c, 77 = m
-    if(!e.ctrlKey || (e.keyCode != 67 && e.keyCode != 77)) return;
+    var keyCode = getKeyCode(e);
+    if(!e.ctrlKey || (keyCode != 67 && keyCode != 77)) return;
     textInput.value = "";
 	// ctrl + c to copy characters where the text cursor is,
 	// ctrl + m to copy characters where the mouse cursor is
 	var pos_ref = cursorCoords
-	if(e.keyCode == 77) { // copy where mouse cursor is
+	if(keyCode == 77) { // copy where mouse cursor is
 		pos_ref = currentPosition
 	}
 	if(!pos_ref) return;
@@ -755,7 +761,7 @@ document.addEventListener("keydown", function(e) {
 // color picker
 document.addEventListener("keydown", function(e) {
     if(!worldFocused) return;
-    if(!(e.altKey && e.keyCode == 67)) return; // if not alt + c, return
+    if(!(e.altKey && getKeyCode(e) == 67)) return; // if not alt + c, return
     textInput.value = "";
     // alt + c to use color of text cell (where mouse cursor is) as main color
     var pos = currentPosition;
@@ -1441,7 +1447,7 @@ var char_input_check = setInterval(function() {
 
 document.onkeydown = function(e) {
     if(!worldFocused) return;
-    var key = e.keyCode;
+    var key = getKeyCode(e);
     if(w._state.uiModal) return;
     if(document.activeElement == chatbar) return;
     if(document.activeElement != textInput) textInput.focus();
@@ -1671,8 +1677,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             linkElm.title = "Link to URL " + URL_Link;
             linkElm.href = URL_Link;
             var linkProtocol = linkElm.protocol;
-            var isJSLink = link[0].js; // server's checking of js links
-            if(linkProtocol == "javascript:" || isJSLink) {
+            if(linkProtocol == "javascript:") {
                 URL_Link = "javascript:runJsLink(\"" + escapeQuote(URL_Link) + "\");"
                 linkElm.href = URL_Link;
             } else {
@@ -2058,6 +2063,7 @@ function newColorArray() {
     return ar;
 }
 
+// cache for individual tile pixel data
 var tilePixelCache = {};
 
 var world_writability = state.worldModel.writability;
@@ -2089,6 +2095,7 @@ function highlight(positions) {
 }
 
 var flashAnimateInterval = setInterval(function() {
+    if(!highlightCount) return;
     var tileGroup = {}; // tiles to re-render after highlight
     for(var tile in highlightFlash) {
         for(var charY in highlightFlash[tile]) {
@@ -2344,7 +2351,7 @@ function renderTile(tileX, tileY, redraw) {
     // fill tile background color
     ctx.fillRect(offsetX, offsetY, tileW, tileH);
 
-    // precise tile protection
+    // render char protections
     if(tile.properties.char && !tile.backgroundColor) {
         function plotCharProt(x, y, writability) {
             if(writability == null) return;
@@ -2361,7 +2368,7 @@ function renderTile(tileX, tileY, redraw) {
         }
     }
 
-    // draw cursor
+    // render cursor
     if(cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
         var charX = cursorCoords[2];
         var charY = cursorCoords[3];
@@ -2372,9 +2379,9 @@ function renderTile(tileX, tileY, redraw) {
     var highlight = highlightFlash[str];
     if(!highlight) highlight = {};
 
+    // render edit highlight animation
     for(var y = 0; y < tileR; y++) {
         for(var x = 0; x < tileC; x++) {
-            // highlight flash animation
             if(highlight[y]) {
                 if(highlight[y][x] !== void 0) {
                     ctx.fillStyle = "rgb(255,255," + highlight[y][x][1] + ")";
@@ -2385,7 +2392,6 @@ function renderTile(tileX, tileY, redraw) {
     }
 
     function drawGrid(canv, isTileCanvas) {
-        // draw the grid
         if(gridEnabled) {
             var thisOffsetX = offsetX;
             var thisOffsetY = offsetY;
@@ -2399,8 +2405,8 @@ function renderTile(tileX, tileY, redraw) {
                 canv.fillStyle = "#B9B9B9";
                 for(var x = 1; x < tileC; x++) {
                     for(var y = 1; y < tileR; y++) {
-                        canv.fillRect(thisOffsetX, thisOffsetY + tileH - zoom - (y*cellH), tileW, zoom);
-                        canv.fillRect(thisOffsetX + tileW - zoom - (x*cellW), thisOffsetY, zoom, tileH);
+                        canv.fillRect(thisOffsetX, thisOffsetY + tileH - zoom - (y * cellH), tileW, zoom);
+                        canv.fillRect(thisOffsetX + tileW - zoom - (x * cellW), thisOffsetY, zoom, tileH);
                     }
                 }
             }
@@ -2424,7 +2430,7 @@ function renderTile(tileX, tileY, redraw) {
         textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
         return;
     }
-    // been drawn at least once?
+    // tile has been drawn at least once
     tile.been_drawn = true;
 
     // tile is being redrawn via boolean (draw next time renderer is called), so set it back to false
@@ -2473,15 +2479,17 @@ function renderTile(tileX, tileY, redraw) {
             var isLink = false;
 
             // check if this char is a link
-            if(props[y]) {
-                if(props[y][x]) {
-                    var link = props[y][x].link;
-                    if(link) {
-                        isLink = true;
-                        if(link.type == "url") {
-                            linkColor = "#0000FF"; // green
-                        } else if(link.type == "coord") {
-                            linkColor = "#008000"; // blue
+            if(linksRendered) {
+                if(props[y]) {
+                    if(props[y][x]) {
+                        var link = props[y][x].link;
+                        if(link) {
+                            isLink = true;
+                            if(link.type == "url") {
+                                linkColor = "#0000FF"; // green
+                            } else if(link.type == "coord") {
+                                linkColor = "#008000"; // blue
+                            }
                         }
                     }
                 }
@@ -2504,7 +2512,7 @@ function renderTile(tileX, tileY, redraw) {
                 textRender.fillRect(x * cellW, (y * cellH + textYOffset + zoom), cellW, zoom)
             }
             if(char != "\u0020" && char != "\u00a0") { // ignore whitespace characters
-                if(cCode >= 0x2800 && cCode <= 0x28FF && brBlockFill) {
+                if(cCode >= 0x2800 && cCode <= 0x28FF && brBlockFill) { // render braille chars as rectangles
                     var dimX = cellW / 2;
                     var dimY = cellH / 4;
                     if((cCode >> 0) & 1) textRender.fillRect(x * cellW, y * cellH, dimX, dimY);
@@ -2525,19 +2533,17 @@ function renderTile(tileX, tileY, redraw) {
                     textRender.fillRect(x * cellW, y * cellH, Math.trunc(cellW / 2), cellH);
                 } else if(char == "\u2590" && ansiBlockFill) { // ▐ right half block
                     textRender.fillRect(x * cellW + Math.trunc(cellW / 2), y * cellH, Math.trunc(cellW / 2), cellH);
-                } else {
-                    // finally, render the text
+                } else { // character rendering
                     var mSpec = (char.charCodeAt(1) == 822) && mSpecRendering;
                     if(char.length > 1 && !mSpec) textRender.font = specialCharFont;
                     if(mSpec) char = char.replace(String.fromCharCode(822), "");
-                    textRender.fillText(char, x * cellW + XPadding, y * cellH + textYOffset)
+                    textRender.fillText(char, x * cellW + XPadding, y * cellH + textYOffset); // render text
                     if(char.length > 1 && !mSpec) textRender.font = font;
                     if(mSpec) textRender.fillRect(x * cellW, y * cellH + cellH - 9 * zoom, cellW, zoom);
                 }
             }
         }
     }
-
     drawGrid(textRender, true);
 
     // add image to main canvas
@@ -3016,15 +3022,15 @@ function ReconnectingWebSocket(url) {
     function connect() {
         self.socket = new WebSocket(url);
         self.socket.onclose = function(r) {
-            self.onclose(r);
+            if(self.onclose) self.onclose(r);
             if(closed) return;
-            connect();
+            setTimeout(connect, 1000);
         }
         self.socket.onopen = function(e) {
             self.socket.onmessage = self.onmessage;
             self.socket.onerror = self.onerror;
             self.socket.binaryType = self.binaryType;
-            self.onopen(e);
+            if(self.onopen) self.onopen(e);
         }
     }
     connect();

@@ -48,7 +48,7 @@ module.exports = async function(data, vars) {
     var call_id = tile_database.newCallId();
     tile_database.reserveCallId(call_id);
 
-    tile_database.write(call_id, tile_database.type.protect, {
+    tile_database.write(call_id, tile_database.types.protect, {
         tileX, tileY, charX, charY,
         user, world, is_member, is_owner,
         type, precise, protect_type

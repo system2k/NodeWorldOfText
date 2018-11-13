@@ -349,7 +349,7 @@ function create_date(time) {
 	var year = date.getUTCFullYear();
 	str += year + " "
 	
-	var hour = date.getUTCHours() + 1;
+	var hour = date.getUTCHours();
 	var ampm = " AM"
 	if(hour >= 12) {
 		ampm = " PM"

@@ -6,6 +6,7 @@ module.exports = async function(data, vars) {
     var get_bypass_key = vars.get_bypass_key;
     var tile_database = vars.tile_database;
     var fixColors = vars.fixColors;
+    var channel = vars.channel;
 
     var bypass_key = get_bypass_key();
     // the retrieval of the key failed (aka "undefined"). change to a value that cannot be compared to
@@ -66,6 +67,9 @@ module.exports = async function(data, vars) {
     var call_id = tile_database.newCallId();
 
     tile_database.reserveCallId(call_id);
+
+    var DateNow = Date.now();
+    var tile_edits = [];
 
     for(var i in tiles) {
         var incomingEdits = tiles[i];
@@ -133,28 +137,20 @@ module.exports = async function(data, vars) {
             }
         }
 
-        var DateNow = Date.now();
-        // send to tile database manager
         for(var e = 0; e < changes.length; e++) {
             var change = changes[e];
-            
-            var tileY = change[0];
-            var tileX = change[1];
-            var charY = change[2];
-            var charX = change[3];
-            var time = DateNow;
-            var char = change[5];
-            var editId = change[6];
-            var color = change[7];
-            var animation = change[8];
-
-            tile_database.write(call_id, tile_database.type.write, {
-                tileX, tileY, charX, charY, char, color,
-                time, editId, animation, user, world, is_owner, is_member,
-                can_color_text, public_only, no_log_edits
-            });
+            tile_edits.push(change);
         }
     }
+
+    // send to tile database manager
+    tile_database.write(call_id, tile_database.types.write, {
+        date: DateNow,
+        tile_edits,
+        user, world, is_owner, is_member,
+        can_color_text, public_only, no_log_edits,
+        channel
+    });
 
     var resp = await tile_database.editResponse(call_id);
 

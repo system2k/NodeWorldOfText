@@ -11,7 +11,8 @@ module.exports = async function(ws, data, send, vars) {
     var tileX = san_nbr(data.tileX);
     var tileY = san_nbr(data.tileY);
 
-    tile_database.write(null, tile_database.type.clear, {
-        tileX, tileY, user, world
+    tile_database.write(null, tile_database.types.clear, {
+        tileX, tileY, user, world,
+        date: Date.now()
     });
 }
