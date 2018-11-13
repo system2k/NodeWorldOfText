@@ -349,7 +349,7 @@ async function loadTile(tileCache, world_id, tileX, tileY) {
     if(tileUID in tileCache) {
         return tileCache[tileUID];
     } else {
-        var tile = await db.get("SELECT * FROM tile WHERE tileX=? AND tileY=? and world_id=?", [tileX, tileY, world_id]);
+        var tile = await db.get("SELECT * FROM tile WHERE tileX=? AND tileY=? AND world_id=?", [tileX, tileY, world_id]);
         var t = {
             charProt: null,
             properties: null,
