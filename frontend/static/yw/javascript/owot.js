@@ -2868,12 +2868,8 @@ function renderTiles(redraw) {
         renderTile(tileX, tileY);
     }
 
-    for(var i = 0; i < event_tilesRendered.length; i++) event_tilesRendered[i]();
+    if(regionCoordA && regionCoordB) w.callEvent("tilesRendered");
 }
-
-event_tilesRendered.push(function() {
-    if(regionCoordA && regionCoordB) w.regionSelect.setSelection(regionCoordA, regionCoordB);
-})
 
 function protectPrecisionOption(option) { // 0 being tile and 1 being char
     protectPrecision = option;
@@ -3188,7 +3184,7 @@ var w = {
     moveCursor: moveCursor,
     fetchUpdates: getAndFetchTiles,
     acceptOwnEdits: false,
-    getTileVisibility: function() { // emulate YWOT's getTileVisibility (unused here)
+    getTileVisibility: function() {
         var minVisY = (-positionY - Math.trunc(height / 2)) / tileH;
         var minVisX = (-positionX - Math.trunc(width / 2)) / tileW;
         var numDown = height / tileH;
@@ -3213,10 +3209,29 @@ var w = {
         send: api_chat_send
     },
     on: function(type, call) {
+        if(typeof call != "function") {
+            throw "Callback is not a function";
+        }
         if(!OWOT.events[type]) {
             OWOT.events[type] = [];
         }
         OWOT.events[type].push(call);
+    },
+    off: function(type, call) {
+        if(!OWOT.events[type]) return;
+        while(true) {
+            var idx = OWOT.events[type].indexOf(call);
+            if(idx == -1) break;
+            OWOT.events[type].splice(idx, 1);
+        }
+    },
+    callEvent: function(type, data) {
+        var evt = OWOT.events[type];
+        if(!evt) return;
+        for(var e = 0; e < evt.length; e++) {
+            var func = evt[e];
+            func(data);
+        }
     },
     broadcastCommand: function(data) {
         /*
@@ -3239,7 +3254,7 @@ var w = {
         */
         w.socket.send(JSON.stringify({
             kind: "cmd",
-            data: data // max len of 2048
+            data: data
         }))
     },
     jquery: function(callback) {
@@ -3341,6 +3356,10 @@ w._state.uiModal = false; // is the UI open? (coord, url, go to coord)
 buildMenu();
 w.clipboard.init();
 w.regionSelect.init();
+
+w.on("tilesRendered", function() {
+    w.regionSelect.setSelection(regionCoordA, regionCoordB);
+})
 
 var simplemodal_onopen = function() {
     return w._state.uiModal = true;
@@ -3627,24 +3646,19 @@ var ws_functions = {
     },
     chat: function(data) {
         if(data.channel == w.socketChannel) return;
-        var evt = OWOT.events["chat"];
-        if(!evt) return;
-        for(var e = 0; e < evt.length; e++) {
-            var func = evt[e];
-            var type = chatType(data.registered, data.nickname, data.realUsername);
-            func({
-                location: data.location,
-                id: data.id,
-                type: type,
-                nickname: data.nickname,
-                message: data.message,
-                realUsername: data.realUsername,
-                op: data.op,
-                admin: data.admin,
-                staff: data.staff,
-                color: data.color
-            });
-        }
+        var type = chatType(data.registered, data.nickname, data.realUsername);
+        OWOT.callEvent("chat", {
+            location: data.location,
+            id: data.id,
+            type: type,
+            nickname: data.nickname,
+            message: data.message,
+            realUsername: data.realUsername,
+            op: data.op,
+            admin: data.admin,
+            staff: data.staff,
+            color: data.color
+        });
     },
     user_count: function(data) {
         var count = data.count;

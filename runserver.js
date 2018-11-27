@@ -63,19 +63,19 @@ var intv = {}; // intervals and timeouts
 
 var args = process.argv;
 args.forEach(function(a) {
-	if(a == "--test-server") {
+    if(a == "--test-server") {
         console.log("\x1b[32;1mThis is a test server\x1b[0m")
-		isTestServer = true;
-		serverPort = settings.test_port;
-		serverDB = settings.TEST_DATABASE_PATH;
+        isTestServer = true;
+        serverPort = settings.test_port;
+        serverDB = settings.TEST_DATABASE_PATH;
         chatDB = settings.TEST_CHAT_HISTORY_PATH;
         settings.LOG_PATH = settings.TEST_LOG_PATH;
         settings.ZIP_LOG_PATH = settings.TEST_ZIP_LOG_PATH;
         settings.UNCAUGHT_PATH = settings.TEST_UNCAUGHT_PATH;
         settings.REQ_LOG_PATH = settings.TEST_REQ_LOG_PATH;
         settings.CHAT_LOG_PATH = settings.TEST_CHAT_LOG_PATH;
-		return;
-	}
+        return;
+    }
 });
 
 const log_error = function(err) {
@@ -751,95 +751,95 @@ function split_limit(str, char, limit) {
 
 function parseCookie(input) {
     if(!input) input = "";
-	var out = {};
-	
-	var mode = 0; // 0 = key, 1 = value
-	var buffer_k = ""; // key
-	var buffer_v = ""; // value
-	
-	for(var i = 0; i < input.length; i++) {
-		var chr = input.charAt(i);
-		
-		var sSkip = false; // jump over char buffer
-        
+    var out = {};
+
+    var mode = 0; // 0 = key, 1 = value
+    var buffer_k = ""; // key
+    var buffer_v = ""; // value
+
+    for(var i = 0; i < input.length; i++) {
+        var chr = input.charAt(i);
+
+        var sSkip = false; // jump over char buffer
+
         // check for value assignments
-		if(chr == "=" && mode == 0) {
-			mode = 1;
-			sSkip = true;
-		}
-		
-		// char buffer
-		if(chr != ";" && !sSkip) {
-			if(mode == 0) {
-				buffer_k += chr;
-			}
-			if(mode == 1) {
-				buffer_v += chr;
-			}
-		}
-        
+        if(chr == "=" && mode == 0) {
+            mode = 1;
+            sSkip = true;
+        }
+
+        // char buffer
+        if(chr != ";" && !sSkip) {
+            if(mode == 0) {
+                buffer_k += chr;
+            }
+            if(mode == 1) {
+                buffer_v += chr;
+            }
+        }
+
         // check ending of each key/value
-		if(chr == ";" || i == input.length - 1) {
-			mode = 0;
-			
-			// trim whitespaces from beginning and end
-			buffer_k = buffer_k.trim();
-			buffer_v = buffer_v.trim();
-			
-			var valid = true;
-            
+        if(chr == ";" || i == input.length - 1) {
+            mode = 0;
+
+            // trim whitespaces from beginning and end
+            buffer_k = buffer_k.trim();
+            buffer_v = buffer_v.trim();
+
+            var valid = true;
+
             // ignore empty sets
-			if(buffer_k == "" && buffer_v == "") {
-				valid = false;
-			}
-			
-			if(valid) {
+            if(buffer_k == "" && buffer_v == "") {
+                valid = false;
+            }
+
+            if(valid) {
                 // strip quotes (if any)
-				if(buffer_k.charAt(0) == "\"" && buffer_k.charAt(buffer_k.length - 1) == "\"") buffer_k = buffer_k.slice(1, -1);
-				if(buffer_v.charAt(0) == "\"" && buffer_v.charAt(buffer_v.length - 1) == "\"") buffer_v = buffer_v.slice(1, -1);
-                
+                if(buffer_k.charAt(0) == "\"" && buffer_k.charAt(buffer_k.length - 1) == "\"") buffer_k = buffer_k.slice(1, -1);
+                if(buffer_v.charAt(0) == "\"" && buffer_v.charAt(buffer_v.length - 1) == "\"") buffer_v = buffer_v.slice(1, -1);
+
                 // invalid escape sequences can cause errors
-				try {
-					buffer_k = decodeURIComponent(buffer_k);
-				} catch(e){};
-				try {
-					buffer_v = decodeURIComponent(buffer_v);
-				} catch(e){};
-                
+                try {
+                    buffer_k = decodeURIComponent(buffer_k);
+                } catch(e){};
+                try {
+                    buffer_v = decodeURIComponent(buffer_v);
+                } catch(e){};
+
                 // no overrides from sets with the same key
-				if(!(buffer_k in out)) out[buffer_k] = buffer_v;
-			}
-			
-			buffer_k = "";
-			buffer_v = "";
-		}
-	}
-	
-	return out;
+                if(!(buffer_k in out)) out[buffer_k] = buffer_v;
+            }
+
+            buffer_k = "";
+            buffer_v = "";
+        }
+    }
+
+    return out;
 }
 
 // make sure filenames don't contain invalid sequences
 var filename_sanitize = (function() {
-	var illegalRe = /[\/\?<>\\:\*\|":]/g;
-	var controlRe = /[\x00-\x1f\x80-\x9f]/g;
-	var reservedRe = /^\.+$/;
-	var windowsReservedRe = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
-	var windowsTrailingRe = /[\. ]+$/;
+    var illegalRe = /[\/\?<>\\:\*\|":]/g;
+    var controlRe = /[\x00-\x1f\x80-\x9f]/g;
+    var reservedRe = /^\.+$/;
+    var windowsReservedRe = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
+    var windowsTrailingRe = /[\. ]+$/;
 
-	function sanitize(input, replacement) {
-		var sanitized = input
-			.replace(illegalRe, replacement)
-			.replace(controlRe, replacement)
-			.replace(reservedRe, replacement)
-			.replace(windowsReservedRe, replacement)
-			.replace(windowsTrailingRe, replacement);
-		return sanitized;
-	}
+    function sanitize(input, replacement) {
+        var sanitized = input
+            .replace(illegalRe, replacement)
+            .replace(controlRe, replacement)
+            .replace(reservedRe, replacement)
+            .replace(windowsReservedRe, replacement)
+            .replace(windowsTrailingRe, replacement);
+        return sanitized;
+    }
 
-	return function(input) {
-		var replacement = "_";
-		return sanitize(input, replacement);
-	}
+    return function(input) {
+        var replacement = "_";
+        return sanitize(input, replacement);
+    }
 })()
 
 // transfer all values from one object to a main object containing all imports
@@ -2555,61 +2555,61 @@ function TerminalMessage(cWidth, cHeight) {
 var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 function encodeCharProt(array) {
     var arrayCom = array.slice(0);
-	// convert array from writability-format to base64-format
-	for(var c = 0; c < arrayCom.length; c++) {
-		switch(arrayCom[c]) {
-			case null: arrayCom[c] = 0; continue;
-			case 0: arrayCom[c] = 1; continue;
-			case 1: arrayCom[c] = 2; continue;
-			case 2: arrayCom[c] = 3; continue;
-		}
-	}
-	var str = "@";
-	var bytes = Math.ceil(128 / 3)
-	for(var i = 0; i < bytes; i++) {
-		var idx = i * 3;
-		var char1 = ((4*4)*arrayCom[idx + 0]);
-		var char2 = ((4)*arrayCom[idx + 1])
-		var char3 = ((1)*arrayCom[idx + 2])
-		if(idx + 1 > 127) char2 = 0;
-		if(idx + 2 > 127) char3 = 0;
-		var code = char1 + char2 + char3;
-		str += base64table.charAt(code)
-	}
-	return str;
+    // convert array from writability-format to base64-format
+    for(var c = 0; c < arrayCom.length; c++) {
+        switch(arrayCom[c]) {
+            case null: arrayCom[c] = 0; continue;
+            case 0: arrayCom[c] = 1; continue;
+            case 1: arrayCom[c] = 2; continue;
+            case 2: arrayCom[c] = 3; continue;
+        }
+    }
+    var str = "@";
+    var bytes = Math.ceil(128 / 3);
+    for(var i = 0; i < bytes; i++) {
+        var idx = i * 3;
+        var char1 = ((4*4)*arrayCom[idx + 0]);
+        var char2 = ((4)*arrayCom[idx + 1]);
+        var char3 = ((1)*arrayCom[idx + 2]);
+        if(idx + 1 > 127) char2 = 0;
+        if(idx + 2 > 127) char3 = 0;
+        var code = char1 + char2 + char3;
+        str += base64table.charAt(code);
+    }
+    return str;
 }
 
 function decodeCharProt(str) {
-	var res = new Array(128).fill(0);
-	str = str.substr(1);
-	for(var i = 0; i < str.length; i++) {
-		var code = base64table.indexOf(str.charAt(i));
-		var char1 = Math.trunc(code / (4*4) % 4);
-		var char2 = Math.trunc(code / (4) % 4);
-		var char3 = Math.trunc(code / (1) % 4);
-		res[i*3 + 0] = char1;
-		if(i*3 + 1 > 127) break;
-		res[i*3 + 1] = char2;
-		if(i*3 + 2 > 127) break;
-		res[i*3 + 2] = char3;
-	}
-	// convert from base64-format to writability-format
-	for(var c = 0; c < res.length; c++) {
-		switch(res[c]) {
-			case 0: res[c] = null; continue;
-			case 1: res[c] = 0; continue;
-			case 2: res[c] = 1; continue;
-			case 3: res[c] = 2; continue;
-		}
-	}
-	return res;
+    var res = new Array(128).fill(0);
+    str = str.substr(1);
+    for(var i = 0; i < str.length; i++) {
+        var code = base64table.indexOf(str.charAt(i));
+        var char1 = Math.trunc(code / (4*4) % 4);
+        var char2 = Math.trunc(code / (4) % 4);
+        var char3 = Math.trunc(code / (1) % 4);
+        res[i*3 + 0] = char1;
+        if(i*3 + 1 > 127) break;
+        res[i*3 + 1] = char2;
+        if(i*3 + 2 > 127) break;
+        res[i*3 + 2] = char3;
+    }
+    // convert from base64-format to writability-format
+    for(var c = 0; c < res.length; c++) {
+        switch(res[c]) {
+            case 0: res[c] = null; continue;
+            case 1: res[c] = 0; continue;
+            case 2: res[c] = 1; continue;
+            case 3: res[c] = 2; continue;
+        }
+    }
+    return res;
 }
 /*
-	Writability format (tiles and chars):
-		null: The parent's writability
-		0: public
-		1: members
-		2: owners
+    Writability format (tiles and chars):
+        null: The parent's writability
+        0: public
+        1: members
+        2: owners
 */
 
 // split a string properly with characters containing surrogates and combining characters
@@ -2619,7 +2619,7 @@ function advancedSplit(str) {
     if(data == null) return [];
     for(var i = 0; i < data.length; i++) {
         // contains surrogates without second character?
-		// This invalid character would not have been added to the string anyway
+        // This invalid character would not have been added to the string anyway
         if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
             data.splice(i, 1)
         }
@@ -2628,63 +2628,63 @@ function advancedSplit(str) {
         data[i] = data[i].slice(0, 16); // limit of 16 combining characters
     }
     // if a part contains a single nul character, make the entire part nul
-	for(var i = 0; i < data.length; i++) {
+    for(var i = 0; i < data.length; i++) {
         var chr = data[i];
-		for(var x = 0; x < chr.length; x++) {
-			if(chr[x] == "\0") {
-				data[i] = "\0";
-				break;
-			}
-		}
+        for(var x = 0; x < chr.length; x++) {
+            if(chr[x] == "\0") {
+                data[i] = "\0";
+                break;
+            }
+        }
     }
     return data;
 }
 
 function insert_char_at_index(string, char, index) {
-	string += "";
-	char += "";
-	string = advancedSplit(string);
-	var stringPrev = string.slice(0);
-	char = advancedSplit(char);
-	if(char.length == 0) return string.join("");
-	if(char.length > 1) char = char.slice(0, 1);
-	char = char[0];
-	
-	if(char == "\0") return string.join("");
-	
-	var c1 = /([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])/g
+    string += "";
+    char += "";
+    string = advancedSplit(string);
+    var stringPrev = string.slice(0);
+    char = advancedSplit(char);
+    if(char.length == 0) return string.join("");
+    if(char.length > 1) char = char.slice(0, 1);
+    char = char[0];
+    
+    if(char == "\0") return string.join("");
+    
+    var c1 = /([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])/g;
 
-	var c2 = /([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+)/g
+    var c2 = /([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+)/g;
 
-	var ex1 = char.match(c1)
-	var ex2 = char.match(c2)
+    var ex1 = char.match(c1);
+    var ex2 = char.match(c2);
 
-	if(ex2 && !ex1) { // combining char without the first char?
-		char = "@"
-	}
-	
-	string[index] = char;
-	
-	string = string.join("");
-	
-	string = advancedSplit(string);
-	
-	for(var i = 0; i < 128; i++) {
-		var char1 = stringPrev[i];
-		var char2 = string[i];
-		
-		if(i == index) continue;
-		if(char1 != char2) {
-			stringPrev[index] = "!";
-			string = stringPrev;
-		}
-	}
-	
-	// make sure content is exactly 128
+    if(ex2 && !ex1) { // combining char without the first char?
+        char = "@";
+    }
+    
+    string[index] = char;
+    
+    string = string.join("");
+    
+    string = advancedSplit(string);
+    
+    for(var i = 0; i < 128; i++) {
+        var char1 = stringPrev[i];
+        var char2 = string[i];
+        
+        if(i == index) continue;
+        if(char1 != char2) {
+            stringPrev[index] = "!";
+            string = stringPrev;
+        }
+    }
+    
+    // make sure content is exactly 128
     if(string.length > 128) string = string.slice(0, 128);
     if(string.length < 128) string = string.concat(Array(128).fill(" ")).slice(0, 128);
-	
-	return string.join("");
+    
+    return string.join("");
 }
 
 function handle_error(e) {
@@ -2719,15 +2719,15 @@ function sanitize_color(col) {
 }
 
 function fixColors(colors) {
-	if(Array.isArray(colors)) {
-		colors = colors.slice(0, 128);
-		for(var g = 0; g < colors.length; g++) {
-			colors[g] = sanitize_color(colors[g]);
-		}
-	} else {
-		colors = sanitize_color(colors);
-	}
-	return colors;
+    if(Array.isArray(colors)) {
+        colors = colors.slice(0, 128);
+        for(var g = 0; g < colors.length; g++) {
+            colors[g] = sanitize_color(colors[g]);
+        }
+    } else {
+        colors = sanitize_color(colors);
+    }
+    return colors;
 }
 
 var worldViews = {};
