@@ -1,0 +1,12 @@
+Faster Database
+
+currently, sqlite is not good enough to store tile data. it is probably slow for the job.
+a custom database format will be written that will store data for tiles.
+it will run using node-gyp. the data will be stored in a single file and will
+act similarly like a file system using sectors. the dynamic sizes of the tiles
+will be a tricky problem to solve. each tile will contain their id, world id, coordinates,
+data, properties, and a few other things that are currently stored in the current sqlite
+tables. the database will be responsible for caching some tiles to prevent overloading of
+the harddrive. the database will primarily be stored in the utf16 format. the main area
+of the front page may be cached permanently for speedups. the database must use journaling
+to prevent corruptions and must use tests.

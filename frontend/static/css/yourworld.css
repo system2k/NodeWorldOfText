@@ -241,6 +241,9 @@ a:visited {
 }
 .unread {
     color: red;
+    font-size: 11px;
+}
+#total_unread {
     font-size: 15px;
 }
 #chat_window {
@@ -346,4 +349,24 @@ a:visited {
     text-decoration: underline;
     top: 205px;
     left: 50px;
+}
+.region_selection {
+    position: absolute;
+    background-color: rgba(0, 0, 255, 0.1);
+    border: 1px solid black;
+    pointer-events: none;
+}
+#area_results {
+    width: 100%;
+    height: 200px;
+    white-space: pre;
+    overflow: auto;
+    overflow-x: scroll;
+}
+#area_cancel {
+    position: absolute;
+    right: 0px;
+    bottom: 0px;
+    margin-right: 8px;
+    margin-bottom: 8px;
 }

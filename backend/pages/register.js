@@ -1,3 +1,5 @@
+var emailFormatRegex = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+
 module.exports.GET = async function(req, serve, vars, params) {
     var HTML = vars.HTML;
     var user = vars.user;
@@ -31,7 +33,7 @@ module.exports.POST = async function(req, serve, vars) {
     var handle_error = vars.handle_error;
 
     if(post_data.csrfmiddlewaretoken != user.csrftoken) { // csrftokens not matching?
-        serve();
+        return serve();
     }
 
     var username = post_data.username;
@@ -45,42 +47,42 @@ module.exports.POST = async function(req, serve, vars) {
     var form_password2_errors = [];
 
     if(password1 != password2) {
-        form_password2_errors.push("Passwords do not match")
+        form_password2_errors.push("Passwords do not match");
     } else if(password1.length > 128) {
-        form_password1_errors.push("The password is too long. It must be 128 characters or less")
+        form_password1_errors.push("The password is too long. It must be 128 characters or less");
     } else if(password1.length < 5) {
-        form_password1_errors.push("The password is too short. It must be 5 characters or more")
+        form_password1_errors.push("The password is too short. It must be 5 characters or more");
     }
 
     if(password1 == "") {
-        form_password1_errors.push("Password cannot be blank")
+        form_password1_errors.push("Password cannot be blank");
     }
 
     if(username.length > 30) {
-        form_username_errors.push("The username must be 30 characters or less")
+        form_username_errors.push("The username must be 30 characters or less.");
     } else if(username.length < 1) {
-        form_username_errors.push("The username is too short")
-    } else if(!username.match(/^(\w*)$/g)) {
-        form_username_errors.push("The username must contain the following characters: a-z A-Z 0-9 _")
+        form_username_errors.push("The username is too short.");
+    } else if(!username.match(/^([\w\.\-]*)$/g)) {
+        form_username_errors.push("The username must contain the following characters: a-z A-Z 0-9 _ . -");
     }
     
     if(email.length > 75) {
         form_email_errors.push("The email must be 75 characters or less")
-    } else if(!email.match(/^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/) && email != "") {
-        form_email_errors.push("Invalid email address")
+    } else if(!email.match(emailFormatRegex) && email != "") {
+        form_email_errors.push("Invalid email address.");
     }
 
     var reg = await db.get("SELECT username FROM auth_user WHERE username=? COLLATE NOCASE",
         username);
 
     if(reg) {
-        form_username_errors.push("The user already exists")
+        form_username_errors.push("The user already exists.");
     }
 
-    if(form_username_errors.length   > 0 || // is there a better way to format this?
-        form_email_errors.length     > 0 ||
-        form_password1_errors.length > 0 ||
-        form_password2_errors.length > 0) {
+    if(form_username_errors.length  ||
+       form_email_errors.length     ||
+       form_password1_errors.length ||
+       form_password2_errors.length) {
          return await dispage("register", {
              form_username_errors,
              form_email_errors,
@@ -96,21 +98,21 @@ module.exports.POST = async function(req, serve, vars) {
     var date = Date.now();
     var password_hash = encryptHash(password1);
     var ins = await db.run("INSERT INTO auth_user VALUES(null, ?, ?, ?, 0, 0, ?, ?)",
-        [username, email, password_hash, date, date])
+        [username, email, password_hash, date, date]);
     var user_id = ins.lastID;
 
-    var token = crypto.randomBytes(20).toString("hex")
+    var token = crypto.randomBytes(20).toString("hex");
 
     if(email) {
         await db.run("INSERT INTO registration_registrationprofile VALUES(null, ?, ?)",
-            [user_id, token])
+            [user_id, token]);
 
         var subject = template_data["registration/activation_email_subject.txt"]();
         try {
             var email_send = await send_email(email, subject, template_data["registration/activation_email.txt"]({
                 website,
                 reg_key: "accounts/activate/" + token + "/"
-            }))
+            }));
         } catch(e) {
             handle_error(e);
             return await dispage("register", {
@@ -119,9 +121,9 @@ module.exports.POST = async function(req, serve, vars) {
         }
 
         if(email_send === false) {
-            form_email_errors.push("The email system appears to be down. Try not using an email or wait until it's fixed")
+            form_email_errors.push("The verification email cannot be sent. Try registering without an email.");
         } else if(email_send == "error") {
-            form_email_errors.push("An error occured while sending an email to this address")
+            form_email_errors.push("Invalid email address.");
         }
 
         if(form_email_errors.length > 0) {
@@ -141,6 +143,6 @@ module.exports.POST = async function(req, serve, vars) {
             username: username,
             password: password1,
             registered: true
-        }, req, serve, vars, "POST")
+        }, req, serve, vars, "POST");
     }
 }

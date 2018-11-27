@@ -17,6 +17,12 @@ function init_dom() {
     coord_Y.innerText = "0";
     coord_X.innerText = "0";
 }
+function getWndWidth() {
+    return document.body.clientWidth;
+}
+function getWndHeight() {
+    return document.body.clientHeight;
+}
 function decimal(percentage) {
     return percentage / 100;
 }
@@ -25,16 +31,16 @@ function deviceRatio() {
     if(!ratio) ratio = 1;
     return ratio;
 }
-function getWndWidth() {
-    return document.body.clientWidth;
-}
-function getWndHeight() {
-    return document.body.clientHeight;
-}
 
-var nextObjId              = 1; // next edit ID
-var width                  = getWndWidth();
-var height                 = getWndHeight();
+var nextObjId       = 1; // next edit ID
+var width           = getWndWidth();
+var height          = getWndHeight();
+var js_alert_active = false; // js alert window open
+var worldFocused    = false;
+var regionSelected  = false;
+var regionCoordA    = null;
+var regionCoordB    = null;
+
 var positionX              = 0; // client position in pixels
 var positionY              = 0;
 var gridEnabled            = false;
@@ -47,9 +53,8 @@ var zoomRatio              = window.devicePixelRatio; // browser's zoom ratio
 var protectPrecision       = 0; // 0 being tile and 1 being char
 var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
 var zoom                   = decimal(100); // zoom value
+var unloadTilesAuto        = true;
 var images                 = {}; // { name: [data RGBA, width, height] }
-var js_alert_active        = false; // js alert window open
-var worldFocused           = false;
 var useHighlight           = true; // highlight new edits
 var highlightLimit         = 10;
 var ansiBlockFill          = true; // fill certain ansi block characters
@@ -63,9 +68,29 @@ var elementSnapApprox      = 10;
 var mSpecRendering         = true;
 var combiningCharsEnabled  = true;
 var surrogateCharsEnabled  = true;
+var defaultCoordLinkColor  = "#008000";
+var defaultURLLinkColor    = "#0000FF";
 
 var images_to_load         = {
     unloaded: "/static/unloaded.png"
+}
+
+var keyConfig = {
+    reset: "ESC",
+    copyColor: "ALT+C",
+    copyCharacterText: "CTRL+C",
+    copyCharacterMouse: "CTRL+M",
+    sidewaysScroll: "SHIFT",
+    tab: "TAB",
+    autoSelect: "CTRL",
+    autoApply: ["CTRL+S", "ALT+S"],
+    autoDeselect: "SHIFT",
+    erase: "BACKSPACE",
+    cursorUp: "UP",
+    cursorDown: "DOWN",
+    cursorLeft: "LEFT",
+    cursorRight: "RIGHT",
+    copyRegion: "SHIFT+ALT"
 }
 
 var clientOnload = [];
@@ -73,7 +98,7 @@ window.addEventListener("load", function() {
     for(var i = 0; i < clientOnload.length; i++) clientOnload[i]();
 })
 
-function byId(a){
+function byId(a) {
     return document.getElementById(a);
 }
 
@@ -187,14 +212,6 @@ function storeNickname() {
 
 getStoredNickname();
 
-// certain scripts may need JQuery
-function installJQuery(callback) {
-	var script = document.createElement("script");
-	script.src = "/static/lib/jquery-1.7.min.js";
-	document.body.appendChild(script)
-	script.onload = callback;
-}
-
 if(state.background) { // add the background image (if it already exists)
     images_to_load.background = state.background;
 }
@@ -248,6 +265,51 @@ function beginLoadingOWOT() {
     });
 }
 beginLoadingOWOT();
+
+function keydown_regionSelect(e) {
+    if(!checkKeyPress(e, keyConfig.copyRegion) || w.isSelecting) return;
+    w.isSelecting = true;
+    owot.style.cursor = "cell";
+}
+document.addEventListener("keydown", keydown_regionSelect);
+
+function handleRegionSelection() {
+    regionSelected = true;
+    w.regionSelect.setSelection(regionCoordA, regionCoordB);
+    var coordA = regionCoordA.slice(0);
+    var coordB = regionCoordB.slice(0);
+    orderRangeABCoords(coordA, coordB);
+    var regWidth = (coordB[0] - coordA[0]) * tileC + coordB[2] - coordA[2] + 1;
+    var regHeight = (coordB[1] - coordA[1]) * tileR + coordB[3] - coordA[3] + 1;
+    var tileX = coordA[0];
+    var tileY = coordA[1];
+    var charX = coordA[2];
+    var charY = coordA[3];
+    var reg = "";
+    var colors = [];
+    for(var y = 0; y < regHeight; y++) {
+        if(y != 0) {
+            reg += "\n";
+        }
+        for(var x = 0; x < regWidth; x++) {
+            reg += getChar(tileX, tileY, charX, charY);
+            colors.push(getCharColor(tileX, tileY, charX, charY));
+            charX++;
+            if(charX >= tileC) {
+                charX = 0;
+                tileX++;
+            }
+        }
+        tileX = coordA[0];
+        charX = coordA[2];
+        charY++;
+        if(charY >= tileR) {
+            charY = 0;
+            tileY++;
+        }
+    }
+    w._ui.selectionModal.open(reg, colors);
+}
 
 if(state.userModel.is_staff) {
     chatbar.removeAttribute("maxLength");
@@ -350,31 +412,6 @@ function changeZoom(percentage) {
     positionX = Math.trunc(positionX); // remove decimals
     positionY = Math.trunc(positionY);
     renderTiles();
-}
-
-function generateAlertFavicon() {
-    var mainFavIcon = document.getElementById("mainFavIcon");
-    var img = imageLoader.res.favicon;
-    var microCanvas = document.createElement("canvas");
-
-    microCanvas.width = 32;
-    microCanvas.height = 32;
-    var fico = microCanvas.getContext("2d");
-    fico.drawImage(img, 0, 0);
-    
-    fico.beginPath();
-    fico.arc(21, 21, 9, 0, 2 * Math.PI);
-	fico.strokeStyle = "#FF2222";
-    fico.stroke();
-
-	fico.fillStyle = "#DD0000";
-	fico.fill();
-	
-	fico.fillStyle = "#FFFFFF";
-	fico.font = "bold 20px Arial";
-	fico.fillText("8", 15, 28);
-
-    mainFavIcon.href = microCanvas.toDataURL();
 }
 
 function browserZoomAdjust(initial) {
@@ -497,12 +534,12 @@ document.addEventListener("mousemove", mousemove_tileProtectAuto)
 
 function keydown_tileProtectAuto(e) {
     if(!worldFocused) return;
-    if(getKeyCode(e) == 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to protect tiles
-        if(e.ctrlKey) e.preventDefault();
+    if(checkKeyPress(e, keyConfig.autoApply)) { // Alt/Ctrl + S to protect tiles
         var selected = tileProtectAuto.selected;
         var types = ["owner-only", "member-only", "public"];
         var keys = Object.keys(selected);
         if(keys.length == 0) return;
+        if(e.ctrlKey) e.preventDefault();
         autoTotal += keys.length;
         updateAutoProg();
 
@@ -562,17 +599,11 @@ function keydown_tileProtectAuto(e) {
         step();
 
     } else {
-        tileProtectAuto.ctrlDown = e.ctrlKey;
-        tileProtectAuto.shiftDown = e.shiftKey;
+        tileProtectAuto.ctrlDown = checkKeyPress(e, keyConfig.autoSelect);
+        tileProtectAuto.shiftDown = checkKeyPress(e, keyConfig.autoDeselect);
     }
 }
 document.body.addEventListener("keydown", keydown_tileProtectAuto)
-
-function keyup_tileProtectAuto(e) {
-    tileProtectAuto.ctrlDown = e.ctrlKey;
-    tileProtectAuto.shiftDown = e.shiftKey;
-}
-document.body.addEventListener("keyup", keyup_tileProtectAuto)
 
 // Fast linking
 function mousemove_linkAuto() {
@@ -618,11 +649,11 @@ document.addEventListener("mousemove", mousemove_linkAuto)
 
 function keydown_linkAuto(e) {
     if(!worldFocused) return;
-    if(getKeyCode(e) == 83 && (e.altKey || e.ctrlKey)) { // Alt/Ctrl + S to add links
-        if(e.ctrlKey) e.preventDefault();
+    if(checkKeyPress(e, keyConfig.autoApply)) { // Alt/Ctrl + S to add links
         var selected = linkAuto.selected;
         var keys = Object.keys(selected);
         if(keys.length == 0) return;
+        if(e.ctrlKey) e.preventDefault();
         autoTotal += keys.length;
         updateAutoProg();
 
@@ -676,17 +707,21 @@ function keydown_linkAuto(e) {
         }
         step();
     } else {
-        linkAuto.ctrlDown = e.ctrlKey;
-        linkAuto.shiftDown = e.shiftKey;
+        linkAuto.ctrlDown = checkKeyPress(e, keyConfig.autoSelect);
+        linkAuto.shiftDown = checkKeyPress(e, keyConfig.autoDeselect);
     }
 }
 document.body.addEventListener("keydown", keydown_linkAuto)
 
-function keyup_linkAuto(e) {
-    linkAuto.ctrlDown = e.ctrlKey;
-    linkAuto.shiftDown = e.shiftKey;
+function onKeyUp(e) {
+    var sel = checkKeyPress(e, keyConfig.autoSelect);
+    var des = checkKeyPress(e, keyConfig.autoDeselect);
+    linkAuto.ctrlDown = sel;
+    linkAuto.shiftDown = des;
+    tileProtectAuto.ctrlDown = sel;
+    tileProtectAuto.shiftDown = des;
 }
-document.body.addEventListener("keyup", keyup_linkAuto)
+document.body.addEventListener("keyup", onKeyUp)
 
 // adjust canvas width, canvas display width, and variable width to
 // disobey the browser zoom so that the custom zoom can be used
@@ -699,7 +734,7 @@ function adjust_scaling_DOM(ratio) {
     // make size of canvas the size of the inner browser screen-size
     owot.width = Math.round(window_width * ratio);
     owot.height = Math.round(window_height * ratio);
-    // make the display size the suze of the viewport
+    // make the display size the size of the viewport
     owot.style.width = window_width + "px";
     owot.style.height = window_height + "px";
     // comments above apply below
@@ -732,22 +767,23 @@ function getChar(tileX, tileY, charX, charY) {
 function getCharColor(tileX, tileY, charX, charY) {
     var tile = tiles[tileY + "," + tileX];
     if(!tile) return 0;
-    if(!tile.properties.color) return;
+    if(!tile.properties.color) return 0;
 	return tile.properties.color[charY * tileC + charX];
 }
 
 // copy individual chars
 document.addEventListener("keydown", function(e) {
+    if(w._state.uiModal) return;
     if(!worldFocused) return;
-    // 67 = c, 77 = m
-    var keyCode = getKeyCode(e);
-    if(!e.ctrlKey || (keyCode != 67 && keyCode != 77)) return;
+    var textCursorCopy = checkKeyPress(e, keyConfig.copyCharacterText);
+    var mouseCursorCopy = checkKeyPress(e, keyConfig.copyCharacterMouse);
+    if(!textCursorCopy && !mouseCursorCopy) return;
     textInput.value = "";
 	// ctrl + c to copy characters where the text cursor is,
 	// ctrl + m to copy characters where the mouse cursor is
-	var pos_ref = cursorCoords
-	if(keyCode == 77) { // copy where mouse cursor is
-		pos_ref = currentPosition
+	var pos_ref = cursorCoords;
+	if(mouseCursorCopy) { // copy where mouse cursor is
+		pos_ref = currentPosition;
 	}
 	if(!pos_ref) return;
 	var tileX = pos_ref[0];
@@ -755,13 +791,13 @@ document.addEventListener("keydown", function(e) {
 	var charX = pos_ref[2];
 	var charY = pos_ref[3];
 	var char = getChar(tileX, tileY, charX, charY)
-    prompt("Copy the character below:", char);
+    w.clipboard.copy(char);
 })
 
 // color picker
 document.addEventListener("keydown", function(e) {
     if(!worldFocused) return;
-    if(!(e.altKey && getKeyCode(e) == 67)) return; // if not alt + c, return
+    if(!checkKeyPress(e, keyConfig.copyColor)) return;
     textInput.value = "";
     // alt + c to use color of text cell (where mouse cursor is) as main color
     var pos = currentPosition;
@@ -925,6 +961,24 @@ function stopLinkUI() {
     renderTile(tileX, tileY, true);
 }
 
+function stopSelectionUI() {
+    if(!lastSelectionHover) return;
+    if(!w.isSelecting) return;
+    w.isSelecting = false;
+    owot.style.cursor = "text";
+    var tileX = lastSelectionHover[0];
+    var tileY = lastSelectionHover[1];
+    var charX = lastSelectionHover[2];
+    var charY = lastSelectionHover[3];
+    // remove highlight
+    uncolorChar(tileX, tileY, charX, charY);
+    renderTile(tileX, tileY, true);
+    regionSelected = false;
+    regionCoordA = null;
+    regionCoordB = null;
+    w.regionSelect.hide();
+}
+
 function removeTileProtectHighlight() {
     if(!lastTileHover) return;
     var precision = lastTileHover[0];
@@ -1034,8 +1088,8 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
         worldFocused = true;
     }
 
-    var pageX = Math.trunc(e.pageX*zoomRatio);
-    var pageY = Math.trunc(e.pageY*zoomRatio);
+    var pageX = Math.trunc(e.pageX * zoomRatio);
+    var pageY = Math.trunc(e.pageY * zoomRatio);
     if(arg_pageX != void 0) pageX = arg_pageX;
     if(arg_pageY != void 0) pageY = arg_pageY;
     if(target != owot && target != linkDiv) {
@@ -1058,6 +1112,12 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
     }
     if(w.isProtecting) {
         doProtect();
+    }
+    if(w.isSelecting) {
+        regionCoordA = currentPosition;
+        w.regionSelect.show();
+        w.regionSelect.setSelection(regionCoordA, regionCoordA);
+        return;
     }
     owot.style.cursor = "move";
 }
@@ -1178,6 +1238,13 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
         return;
     }
 
+    if(w.isSelecting) {
+        regionCoordB = currentPosition;
+        handleRegionSelection();
+        stopSelectionUI();
+        return;
+    }
+
     // set cursor
     var pos = getTileCoordsFromMouseCoords(pageX, pageY, true);
     if(tiles[pos[1] + "," + pos[0]] !== void 0) {
@@ -1230,7 +1297,7 @@ var combiningRegex = new RegExp(combiningRegexStr, "g");
 var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\n|\\r", "g");
 
 // Split a string properly with surrogates and combining characters in mind
-function advancedSplit(str) {
+function advancedSplit(str, noSurrog, noComb) {
     str += "";
     // look for surrogate pairs first. then look for combining characters. finally, look for the rest
 	var data = str.match(splitRegex)
@@ -1240,10 +1307,10 @@ function advancedSplit(str) {
         if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
             data.splice(i, 1)
         }
-        if(!surrogateCharsEnabled && data[i].match(surrogateRegex)) {
+        if((!surrogateCharsEnabled || noSurrog) && data[i].match(surrogateRegex)) {
             data[i] = "?";
         }
-        if(!combiningCharsEnabled && data[i].match(combiningRegex)) {
+        if((!combiningCharsEnabled || noComb) && data[i].match(combiningRegex)) {
             data[i] = data[i].charAt(0);
         }
     }
@@ -1266,17 +1333,24 @@ var blankColor = (function() {
 
 var writeBuffer = [];
 
-var writeInterval = setInterval(function() {
-    if(writeBuffer.length == 0) return;
+function flushWrites() {
     var data = {
         kind: "write",
-        // get copy of buffer
-        edits: writeBuffer.slice(0)
+        edits: writeBuffer
     };
+    w.socket.send(JSON.stringify(data));
     // clear buffer
     writeBuffer.splice(0);
-    w.socket.send(JSON.stringify(data));
+}
+
+var writeInterval = setInterval(function() {
+    if(!writeBuffer.length) return;
+    flushWrites()
 }, 1000)
+
+window.onbeforeunload = function() {
+    if(writeBuffer.length) flushWrites();
+}
 
 function moveCursor(direction, do_not_change_enter_x) {
     if(!cursorCoords) return;
@@ -1314,7 +1388,9 @@ function moveCursor(direction, do_not_change_enter_x) {
     renderCursor(cSCopy);
 }
 
-function writeChar(char, doNotMoveCursor) {
+function writeChar(char, doNotMoveCursor, temp_color) {
+    var charColor = temp_color || YourWorld.Color;
+    if(temp_color == 0) charColor = 0;
     var cursor = cursorCoords;
     if(!cursor && (char == "\n" || char == "\r")) {
         cursor = cursorCoordsCurrent;
@@ -1379,7 +1455,7 @@ function writeChar(char, doNotMoveCursor) {
         }
         // change color
         if(Permissions.can_color_text(state.userModel, state.worldModel)) {
-            color[charY * tileC + charX] = YourWorld.Color;
+            color[charY * tileC + charX] = charColor;
             tiles[tileY + "," + tileX].properties.color = color;
         }
 
@@ -1400,13 +1476,89 @@ function writeChar(char, doNotMoveCursor) {
             editArray[0] += tileFetchOffsetY;
             editArray[1] += tileFetchOffsetX;
         }
-        if(YourWorld.Color && Permissions.can_color_text(state.userModel, state.worldModel)) {
-            editArray.push(YourWorld.Color);
+        if(charColor && Permissions.can_color_text(state.userModel, state.worldModel)) {
+            editArray.push(charColor);
         }
         tellEdit.push([tileX, tileY, charX, charY, nextObjId]);
         writeBuffer.push(editArray);
         nextObjId++;
     }
+}
+
+function spaceTrim(str_array, left, right, gaps, secondary_array) {
+    // secondary_array is an optional argument where elements are trimmed in parallel with str_array
+    var marginLeft = 0;
+    var marginRight = 0;
+    var countL = left;
+    var countR = right;
+    for(var i = 0; i < str_array.length; i++) {
+        var idxL = i;
+        var idxR = str_array.length - 1 - i;
+        if(str_array[idxL] == " " && countL) {
+            marginLeft++;
+        } else {
+            countL = false;
+        }
+        if(str_array[idxR] == " " && countR) {
+            marginRight++;
+        } else {
+            countR = false;
+        }
+        if(!countL && !countR) break;
+    }
+    if(marginLeft) {
+        str_array.splice(0, marginLeft);
+        if(secondary_array) secondary_array.splice(0, marginLeft);
+    }
+    if(marginRight) {
+        str_array.splice(str_array.length - marginRight);
+        if(secondary_array) secondary_array.splice(secondary_array.length - marginRight);
+    }
+    if(gaps) {
+        var spaceFreq = 0;
+        for(var i = 0; i < str_array.length; i++) {
+            var chr = str_array[i];
+            if(chr == " ") {
+                spaceFreq++;
+            } else {
+                spaceFreq = 0;
+            }
+            if(spaceFreq > 1) {
+                str_array.splice(i, 1);
+                if(secondary_array) secondary_array.splice(i, 1);
+                i--;
+            }
+        }
+    }
+    return str_array;
+}
+
+function convertToDate(epoch) {
+    var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    var str = "";
+    var date = new Date(epoch);
+    var month = date.getMonth();
+    var day = date.getDate();
+    var year = date.getFullYear();
+    var hour = date.getHours();
+    var minute = date.getMinutes();
+
+    str += year + " " + months[month] + " " + day + " ";
+
+    var per = "AM";
+    if(hour >= 12) {
+        per = "PM";
+    }
+    if(hour > 12) {
+        hour = hour - 12;
+    }
+    if(hour == 0) {
+        hour = 12;
+    }
+    str += hour + ":" + ("0" + minute).slice(-2) + " " + per;
+
+    return str;
 }
 
 // write characters inputted
@@ -1420,20 +1572,45 @@ var char_input_check = setInterval(function() {
     value = value.replace(/\r/g, "\n");
     value = advancedSplit(value);
     var index = 1;
-    writeChar(value[0]);
+    if(value[0] == "\x1b") {
+        index--;
+    } else {
+        writeChar(value[0]);
+    }
     if(value.length == 1) {
         textInput.value = "";
         return
     };
-    if (Permissions.can_paste(state.userModel, state.worldModel)) {
+    if(Permissions.can_paste(state.userModel, state.worldModel)) {
         write_busy = true;
-        // pasting feature
+        clearInterval(pasteInterval);
+        var hex = "ABCDEF";
+        var pasteColor = YourWorld.Color;
         pasteInterval = setInterval(function() {
-            var res = writeChar(value[index]);
-            if(res === null) { // write failed
-                return; // keep waiting until tile loads
+            var chr = value[index];
+            // colored paste
+            if(chr == "\x1b") {
+                var hCode = value[index + 1];
+                var cCol = "";
+                if(hCode == "x") {
+                    cCol = "000000";
+                    index += 2;
+                } else {
+                    var code = hex.indexOf(hCode);
+                    if(code > -1) {
+                        cCol = value.slice(index + 2, index + 2 + code + 1).join("");
+                        index += code + 1;
+                    }
+                    index += 2;
+                }
+                pasteColor = parseInt(cCol, 16);
+            } else {
+                var res = writeChar(chr, false, pasteColor);
+                if(res === null) { // write failed
+                    return; // keep waiting until tile loads
+                }
+                index++;
             }
-            index++
             if(index >= value.length) {
                 textInput.value = "";
                 clearInterval(pasteInterval);
@@ -1455,34 +1632,33 @@ document.onkeydown = function(e) {
     clearInterval(pasteInterval);
     write_busy = false;
 
-    switch(key) {
-        case 38:
-            moveCursor("up");
-            break;
-        case 40:
-            moveCursor("down");
-            break;
-        case 37:
-            moveCursor("left");
-            break;
-        case 39:
-            moveCursor("right");
-            break;
-        case 9: // tab
-            for(var i = 0; i < 4; i++) writeChar(" ");
-            e.preventDefault();
-            break;
-        case 8: // backspace
-            moveCursor("left", true);
-            writeChar(" ", true);
-            break;
-        case 27: // esc
-            stopLinkUI();
-            stopTileUI();
-            removeCursor();
-            tileProtectAuto.active = false;
-            linkAuto.active = false;
-            break;
+    if(checkKeyPress(e, keyConfig.cursorUp)) { // arrow up
+        moveCursor("up");
+    }
+    if(checkKeyPress(e, keyConfig.cursorDown)) { // arrow down
+        moveCursor("down");
+    }
+    if(checkKeyPress(e, keyConfig.cursorLeft)) { // arrow left
+        moveCursor("left");
+    }
+    if(checkKeyPress(e, keyConfig.cursorRight)) { // arrow right
+        moveCursor("right");
+    }
+    if(checkKeyPress(e, keyConfig.reset)) { // esc
+        stopLinkUI();
+        stopTileUI();
+        stopSelectionUI();
+        removeCursor();
+        tileProtectAuto.active = false;
+        linkAuto.active = false;
+    }
+    if(checkKeyPress(e, keyConfig.erase)) { // erase character
+        moveCursor("left", true);
+        writeChar(" ", true);
+    }
+    if(checkKeyPress(e, keyConfig.tab)) { // tab
+        for(var i = 0; i < 4; i++) writeChar(" ");
+        e.preventDefault();
     }
 }
 
@@ -1662,7 +1838,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 
     if(e.target != owot && e.target != linkDiv) return;
     var link = is_link(tileX, tileY, charX, charY);
-    if(link && linksEnabled) {
+    if(link && linksEnabled && !w.isSelecting) {
         var pos = tileAndCharsToWindowCoords(tileX, tileY, charX, charY);
         linkElm.style.left = (pos[0] - linkMargin) + "px";
         linkElm.style.top = (pos[1] - linkMargin) + "px";
@@ -1696,6 +1872,30 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
         linkElm.style.top = "-1000px";
         linkElm.style.left = "-1000px";
         linkElm.hidden = true;
+    }
+
+    // region selecting
+    if(w.isSelecting) {
+        if(lastSelectionHover) {
+            var tileX = lastSelectionHover[0];
+            var tileY = lastSelectionHover[1];
+            var charX = lastSelectionHover[2];
+            var charY = lastSelectionHover[3];
+            uncolorChar(tileX, tileY, charX, charY);
+            renderTile(tileX, tileY, true);
+        }
+        lastSelectionHover = currentPosition;
+        var newTileX = currentPosition[0];
+        var newTileY = currentPosition[1];
+        var newCharX = currentPosition[2];
+        var newCharY = currentPosition[3];
+        if(tiles[newTileY + "," + newTileX]) {
+            colorChar(newTileX, newTileY, newCharX, newCharY, "#9999e6", true);
+            // re-render tile
+            renderTile(newTileX, newTileY, true);
+        }
+        regionCoordB = currentPosition;
+        if(regionCoordA && regionCoordB) w.regionSelect.setSelection(regionCoordA, regionCoordB);
     }
 
     // url/coordinate linking
@@ -1759,7 +1959,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
     // if dragging beyond window, stop
     if(pageX >= width || pageY >= height || pageX < 0 || pageY < 0) stopDragging();
 
-    if(!isDragging) return;
+    if(!isDragging || w.isSelecting) return;
 
     positionX = dragPosX + (pageX - dragStartX);
     positionY = dragPosY + (pageY - dragStartY);
@@ -1784,6 +1984,7 @@ function touch_pagePos(e) {
 }
 
 document.addEventListener("wheel", function(e) {
+    if(w._state.uiModal) return;
     // if focused on chat, don't scroll world
     if(closest(e.target, getChatfield())) return;
     if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
@@ -1793,7 +1994,7 @@ document.addEventListener("wheel", function(e) {
         deltaX = 0;
         deltaY = (deltaY / Math.abs(deltaY)) * 100;
     }
-    if(e.shiftKey) { // if shift, scroll sideways
+    if(checkKeyPress(e, keyConfig.sidewaysScroll)) { // if shift, scroll sideways
         deltaX = deltaY;
         deltaY = 0;
     }
@@ -1801,6 +2002,62 @@ document.addEventListener("wheel", function(e) {
     positionX -= deltaX;
     renderTiles();
 })
+
+function checkKeyPress(e, combination) {
+    // if combination arg is an array of combinations
+    if(typeof combination == "object") {
+        var res = false;
+        for(var i = 0; i < combination.length; i++) {
+            res = res || checkKeyPress(e, combination[i]);
+        }
+        return res;
+    }
+    combination = combination.split("+");
+    var map = {
+        ctrl: false,
+        shift: false,
+        alt: false,
+        key: ""
+    }
+    for(var i = 0; i < combination.length; i++) {
+        var key = combination[i];
+        switch(key) {
+            case "CTRL": map.ctrl = true; break;
+            case "SHIFT": map.shift = true; break;
+            case "ALT": map.alt = true; break;
+
+            case "ESC": map.key = "Escape"; break;
+            case "TAB": map.key = "Tab"; break;
+            case "SPACE": map.key = " "; break;
+            case "PAGEUP": map.key = "PageUp"; break;
+            case "PAGEDOWN": map.key = "PageDown"; break;
+            case "UP": map.key = "ArrowUp"; break;
+            case "DOWN": map.key = "ArrowDown"; break;
+            case "LEFT": map.key = "ArrowLeft"; break;
+            case "RIGHT": map.key = "ArrowRight"; break;
+            case "CAPS": map.key = "CapsLock"; break;
+            case "END": map.key = "End"; break;
+            case "HOME": map.key = "Home"; break;
+            case "INSERT": map.key = "Insert"; break;
+            case "DELETE": map.key = "Delete"; break;
+            case "PLUS": map.key = "+"; break;
+            case "MINUS": map.key = "-"; break;
+            case "ENTER": map.key = "Enter"; break;
+            case "BACKSPACE": map.key = "Backspace"; break;
+            default: map.key = key;
+        }
+    }
+    if(map.ctrl != e.ctrlKey) return false;
+    if(map.shift != e.shiftKey) return false;
+    if(map.alt != e.altKey) return false;
+    var eKey = e.key;
+    // key must not be Ctrl/Shift/Alt because it's already stored in a boolean
+    if(eKey == "Control") eKey = "";
+    if(eKey == "Shift") eKey = "";
+    if(eKey == "Alt") eKey = "";
+    if(eKey != void 0) if(map.key.toUpperCase() != eKey.toUpperCase()) return false;
+    return true;
+}
 
 /*
     === cutRanges ===
@@ -2267,29 +2524,57 @@ var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678
 		2: owners
 */
 function decodeCharProt(str) {
-	var res = new Array(128).fill(0);
-	str = str.substr(1);
-	for(var i = 0; i < str.length; i++) {
-		var code = base64table.indexOf(str.charAt(i));
-		var char1 = Math.trunc(code / (4*4) % 4);
-		var char2 = Math.trunc(code / (4) % 4);
-		var char3 = Math.trunc(code / (1) % 4);
-		res[i*3 + 0] = char1;
-		if(i*3 + 1 > 127) break;
-		res[i*3 + 1] = char2;
-		if(i*3 + 2 > 127) break;
-		res[i*3 + 2] = char3;
-	}
-	// convert from base64-format to writability-format
-	for(var c = 0; c < res.length; c++) {
-		switch(res[c]) {
-			case 0: res[c] = null; continue;
-			case 1: res[c] = 0; continue;
-			case 2: res[c] = 1; continue;
-			case 3: res[c] = 2; continue;
-		}
-	}
-	return res;
+    if(str.charAt(0) != "@") {
+        console.error("Unrecognized char-protection format");
+        return;
+    }
+    var res = new Array(128).fill(0);
+    str = str.substr(1);
+    for(var i = 0; i < str.length; i++) {
+        var code = base64table.indexOf(str.charAt(i));
+        var char1 = Math.trunc(code / (4*4) % 4);
+        var char2 = Math.trunc(code / (4) % 4);
+        var char3 = Math.trunc(code / (1) % 4);
+        res[i*3 + 0] = char1;
+        if(i*3 + 1 > 127) break;
+        res[i*3 + 1] = char2;
+        if(i*3 + 2 > 127) break;
+        res[i*3 + 2] = char3;
+    }
+    // convert from base64-format to writability-format
+    for(var c = 0; c < res.length; c++) {
+        switch(res[c]) {
+            case 0: res[c] = null; continue;
+            case 1: res[c] = 0; continue;
+            case 2: res[c] = 1; continue;
+            case 3: res[c] = 2; continue;
+        }
+    }
+    return res;
+}
+function encodeCharProt(array) {
+    // convert array from writability-format to base64-format
+    for(var c = 0; c < array.length; c++) {
+        switch(array[c]) {
+            case null: array[c] = 0; continue;
+            case 0: array[c] = 1; continue;
+            case 1: array[c] = 2; continue;
+            case 2: array[c] = 3; continue;
+        }
+    }
+    var str = "@";
+    var bytes = Math.ceil(128 / 3)
+    for(var i = 0; i < bytes; i++) {
+        var idx = i * 3;
+        var char1 = ((4*4)*array[idx + 0]);
+        var char2 = ((4)*array[idx + 1])
+        var char3 = ((1)*array[idx + 2])
+        if(idx + 1 > 127) char2 = 0;
+        if(idx + 2 > 127) char3 = 0;
+        var code = char1 + char2 + char3;
+        str += base64table.charAt(code)
+    }
+    return str;
 }
 
 function renderTile(tileX, tileY, redraw) {
@@ -2486,9 +2771,9 @@ function renderTile(tileX, tileY, redraw) {
                         if(link) {
                             isLink = true;
                             if(link.type == "url") {
-                                linkColor = "#0000FF"; // green
+                                linkColor = defaultURLLinkColor;
                             } else if(link.type == "coord") {
-                                linkColor = "#008000"; // blue
+                                linkColor = defaultCoordLinkColor;
                             }
                         }
                     }
@@ -2551,6 +2836,8 @@ function renderTile(tileX, tileY, redraw) {
     textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
 }
 
+var event_tilesRendered = [];
+
 function renderTiles(redraw) {
     // update coordinate display
     var tileCoordX = Math.floor(-positionX / tileW);
@@ -2580,7 +2867,13 @@ function renderTiles(redraw) {
         var tileY = visibleTiles[i][1];
         renderTile(tileX, tileY);
     }
+
+    for(var i = 0; i < event_tilesRendered.length; i++) event_tilesRendered[i]();
 }
+
+event_tilesRendered.push(function() {
+    if(regionCoordA && regionCoordB) w.regionSelect.setSelection(regionCoordA, regionCoordB);
+})
 
 function protectPrecisionOption(option) { // 0 being tile and 1 being char
     protectPrecision = option;
@@ -2677,22 +2970,59 @@ document.onselectstart = function(e) {
     }
     return w._state.uiModal;
 }
+
+function orderRangeABCoords(coordA, coordB) {
+    var tmp;
+    if(coordA[0] > coordB[0]) {
+        // swap X coords
+        tmp = coordA[0];
+        coordA[0] = coordB[0];
+        coordB[0] = tmp;
+        tmp = coordA[2];
+        coordA[2] = coordB[2];
+        coordB[2] = tmp;
+    } else if(coordA[0] == coordB[0] && coordA[2] > coordB[2]) {
+        // swap X char coords
+        tmp = coordA[2];
+        coordA[2] = coordB[2];
+        coordB[2] = tmp;
+    }
+    if(coordA[1] > coordB[1]) {
+        // swap Y coords
+        tmp = coordA[1];
+        coordA[1] = coordB[1];
+        coordB[1] = tmp;
+        tmp = coordA[3];
+        coordA[3] = coordB[3];
+        coordB[3] = tmp;
+    } else if(coordA[1] == coordB[1] && coordA[3] > coordB[3]) {
+        // swap Y char coords
+        tmp = coordA[3];
+        coordA[3] = coordB[3];
+        coordB[3] = tmp;
+    }
+}
+
 // [tileX, tileY, charX, charY]
 var lastLinkHover = null;
 // [type, tileX, tileY, (charX, charY)]
 var lastTileHover = null;
+// [tileX, tileY, charX, charY]
+var lastSelectionHover = null;
 
 var w = {
     userCount: -1,
     clientId: -1,
     isLinking: false,
     isProtecting: false,
+    isSelecting: false,
     url_input: "",
     coord_input_x: 0,
     coord_input_y: 0,
     link_input_type: 0, // 0 = link, 1 = coord,
     protect_type: null, // null = unprotect, 0 = public, 1 = member, 2 = owner
     protect_bg: "",
+    pMod: false,
     _state: state,
     _ui: {
         announce: announce,
@@ -2701,7 +3031,65 @@ var w = {
 		coordinateInputModal: new CoordinateInputModal(),
 		scrolling: null,
 		urlInputModal: new URLInputModal(),
-		colorInputModal: new ColorInputModal()
+        colorInputModal: new ColorInputModal(),
+        selectionModal: new SelectionModal()
+    },
+    clipboard: {
+        textarea: null,
+        init: function() {
+            var area = document.createElement("textarea");
+            area.value = ""
+            area.style.width = "1px";
+            area.style.height = "1px";
+            area.style.position = "absolute";
+            area.style.left = "-1000px";
+            document.body.appendChild(area);
+            w.clipboard.textarea = area;
+        },
+        copy: function(string) {
+            w.clipboard.textarea.value = string;
+            w.clipboard.textarea.select();
+            document.execCommand("copy");
+            w.clipboard.textarea.value = "";
+        }
+    },
+    regionSelect: {
+        selection: null,
+        init: function() {
+            var div = document.createElement("div");
+            div.className = "region_selection";
+            div.style.display = "none";
+            document.body.appendChild(div);
+            w.regionSelect.selection = div;
+        },
+        setSelection: function(start, end) {
+            var coordA = start.slice(0);
+            var coordB = end.slice(0);
+            orderRangeABCoords(coordA, coordB);
+            var tileX1 = coordA[0];
+            var tileY1 = coordA[1];
+            var charX1 = coordA[2];
+            var charY1 = coordA[3];
+            var tileX2 = coordB[0];
+            var tileY2 = coordB[1];
+            var charX2 = coordB[2];
+            var charY2 = coordB[3];
+            var pxCoordA = tileAndCharsToWindowCoords(tileX1, tileY1, charX1, charY1);
+            var pxCoordB = tileAndCharsToWindowCoords(tileX2, tileY2, charX2, charY2);
+            var regWidth = pxCoordB[0] - pxCoordA[0] + Math.trunc(cellW) - 2;
+            var regHeight = pxCoordB[1] - pxCoordA[1] + Math.trunc(cellH) - 2;
+            var sel = w.regionSelect.selection;
+            sel.style.width = regWidth + "px";
+            sel.style.height = regHeight + "px";
+            sel.style.top = pxCoordA[1] + "px";
+            sel.style.left = pxCoordA[0] + "px";
+        },
+        show: function() {
+            w.regionSelect.selection.style.display = "";
+        },
+        hide: function() {
+            w.regionSelect.selection.style.display = "none";
+        }
     },
     color: function() {
         w._ui.colorInputModal.open(function(color) {
@@ -2854,6 +3242,12 @@ var w = {
             data: data // max len of 2048
         }))
     },
+    jquery: function(callback) {
+        var script = document.createElement("script");
+        script.src = "/static/lib/jquery-1.7.min.js";
+        document.body.appendChild(script)
+        script.onload = callback;
+    },
     redraw: function() {
         // redraw all tiles, clearing the cahe
         renderTiles(true);
@@ -2907,6 +3301,22 @@ var w = {
         w.enableCombining(1);
         w.enableColors(1);
         w.redraw();
+    },
+    night: function(ignoreUnloadedPattern) {
+        styles.member = "#111";
+        styles.owner = "#222";
+        styles.public = "#000";
+        styles.text = "#FFF";
+        if(images.unloaded && !ignoreUnloadedPattern && !w.pMod) {
+            var data = images.unloaded[0];
+            for(var i = 0; i < data.length; i += 4) {
+                data[i] = 255 - data[i];
+                data[i + 1] = 255 - data[i + 1];
+                data[i + 2] = 255 - data[i + 2];
+            }
+            w.pMod = true;
+        }
+        w.redraw();
     }
 }
 
@@ -2929,6 +3339,8 @@ w._state.goToCoord = {};
 w._state.uiModal = false; // is the UI open? (coord, url, go to coord)
 
 buildMenu();
+w.clipboard.init();
+w.regionSelect.init();
 
 var simplemodal_onopen = function() {
     return w._state.uiModal = true;
@@ -3073,7 +3485,7 @@ var ws_functions = {
         if(zoom < 0.5) { // zoomed out too far? make sure tiles don't constantly unload
             tileLim = 10000;
         }
-        if(Object.keys(tiles).length >= tileLim) {
+        if(Object.keys(tiles).length >= tileLim && unloadTilesAuto) {
             clearTiles()
         }
     },
@@ -3199,7 +3611,7 @@ var ws_functions = {
             var clientReceived = Date.now();
             // serverPingTime is from chat.js
             var pingMs = clientReceived - serverPingTime;
-            addChat(null, 0, "user", "[ Server ]", "Ping: " + pingMs + " MS", "Server");
+            addChat(null, 0, "user", "[ Server ]", "Ping: " + pingMs + " MS", "Server", false, false, false, null, clientReceived);
             return;
         }
     },
@@ -3249,13 +3661,13 @@ var ws_functions = {
             var chat = global_prev[g];
             var type = chatType(chat.registered, chat.nickname, chat.realUsername);
             addChat(chat.location, chat.id, type, chat.nickname,
-                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color);
+                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color, chat.date);
         }
         for(var p = 0; p < page_prev.length; p++) {
             var chat = page_prev[p];
             var type = chatType(chat.registered, chat.nickname, chat.realUsername);
             addChat(chat.location, chat.id, type, chat.nickname,
-                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color);
+                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color, chat.date);
         }
     }
 };

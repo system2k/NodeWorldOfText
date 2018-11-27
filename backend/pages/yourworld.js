@@ -74,7 +74,8 @@ module.exports.GET = async function(req, serve, vars, params) {
                 minX: query_data.min_tileX,
                 maxY: query_data.max_tileY,
                 maxX: query_data.max_tileX
-            }]
+            }],
+            utf16static: query_data.utf16static
         }, vars)
         serve(JSON.stringify(tiles), null, {
             mime: "text/plain; charset=utf-8"

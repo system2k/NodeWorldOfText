@@ -59,6 +59,26 @@
                 </div>
             </div>
         </div>
+        <div id="area_panel" class="simplemodal-container" style="position: fixed; z-index: 1002; display: none;">
+            <a class="modalCloseImg simplemodal-close" title="Close"></a>
+            <div tabindex="-1" class="simplemodal-wrap" style="height: 100%; outline: 0px; width: 100%;">
+                <div id="area_modal" class="simplemodal-data">
+                    <button id="area_copy" style="margin-bottom: 1px;">Copy to Clipboard</button>
+                    <textarea id="area_results"></textarea>
+                    <span id="area_cancel" class="simplemodal-close simplemodal-closelink">Close</span>
+                    <div>
+                        <input type="checkbox" id="area_cbox_color"> Copy colors<br>
+                        <input type="checkbox" id="area_cbox_tleft"> Trim left<br>
+                        <input type="checkbox" id="area_cbox_tright"> Trim right<br>
+                        <input type="checkbox" id="area_cbox_tempty"> Trim empty lines<br>
+                        <input type="checkbox" id="area_cbox_rgap"> Remove gaps<br>
+                        <input type="checkbox" id="area_cbox_rlnbrk"> Remove line breaks<br>
+                        <input type="checkbox" id="area_cbox_rsurrog"> Remove surrogates<br>
+                        <input type="checkbox" id="area_cbox_rcomb"> Remove combining chars<br>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div id="url_input_panel" class="simplemodal-container" style="position: fixed; z-index: 1002; display: none;">
             <a class="modalCloseImg simplemodal-close" title="Close"></a>
             <div tabindex="-1" class="simplemodal-wrap" style="height: 100%; outline: 0px; width: 100%;">

@@ -9,19 +9,19 @@ var chatWriteHistoryMax = 100; // maximum size of chat write history length
 var chatWriteHistoryIdx = -1; // location in chat write history
 var serverPingTime      = 0;
 
-var chat_window = document.getElementById("chat_window");
-var chat_open = document.getElementById("chat_open");
-var chatsend = document.getElementById("chatsend");
-var chatbar = document.getElementById("chatbar");
-var chat_close = document.getElementById("chat_close");
-var page_chatfield = document.getElementById("page_chatfield");
+var chat_window      = document.getElementById("chat_window");
+var chat_open        = document.getElementById("chat_open");
+var chatsend         = document.getElementById("chatsend");
+var chatbar          = document.getElementById("chatbar");
+var chat_close       = document.getElementById("chat_close");
+var page_chatfield   = document.getElementById("page_chatfield");
 var global_chatfield = document.getElementById("global_chatfield");
-var chat_page_tab = document.getElementById("chat_page_tab");
-var chat_global_tab = document.getElementById("chat_global_tab");
-var usr_online = document.getElementById("usr_online");
-var total_unread = document.getElementById("total_unread");
-var page_unread = document.getElementById("page_unread");
-var global_unread = document.getElementById("global_unread");
+var chat_page_tab    = document.getElementById("chat_page_tab");
+var chat_global_tab  = document.getElementById("chat_global_tab");
+var usr_online       = document.getElementById("usr_online");
+var total_unread     = document.getElementById("total_unread");
+var page_unread      = document.getElementById("page_unread");
+var global_unread    = document.getElementById("global_unread");
 
 var canChat = Permissions.can_chat(state.userModel, state.worldModel);
 if(!canChat) { // can't chat, adjust the chat window for it
@@ -98,7 +98,7 @@ function api_chat_send(message, opts) {
     }
 
     if(!isCommand) addChat(location, id, type, nickname,
-                            message, username, op, admin, staff, chatColor);
+                            message, username, op, admin, staff, chatColor, Date.now());
 };
 
 var client_commands = {
@@ -117,7 +117,7 @@ var client_commands = {
         } else {
             nickChangeMsg = "Removed nickname";
         }
-        addChat(null, 0, "user", "[ Server ]", nickChangeMsg, "Server");
+        addChat(null, 0, "user", "[ Server ]", nickChangeMsg, "Server", false, false, false, null, Date.now());
     },
     ping: function() {
         serverPingTime = Date.now();
@@ -140,7 +140,7 @@ var client_commands = {
         updateScaleConsts();
         for(var i in tilePixelCache) delete tilePixelCache[i];
         renderTiles(true);
-        addChat(null, 0, "user", "[ Server ]", "Changed grid size to " + width + "x" + height, "Server");
+        addChat(null, 0, "user", "[ Server ]", "Changed grid size to " + width + "x" + height, "Server", false, false, false, null, Date.now());
     },
     color: function(args) {
         var color = args[0];
@@ -149,7 +149,7 @@ var client_commands = {
         if(!color) color = 0;
         YourWorld.Color = parseInt(color, 16);
         if(isNaN(color)) color = 0;
-        addChat(null, 0, "user", "[ Server ]", "Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase(), "Server");
+        addChat(null, 0, "user", "[ Server ]", "Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase(), "Server", false, false, false, null, Date.now());
     },
     chatcolor: function(args) {
         var color = args[0];
@@ -158,7 +158,7 @@ var client_commands = {
         if(!color) color = 0;
         defaultChatColor = parseInt(color, 16);
         if(isNaN(color)) color = 0;
-        addChat(null, 0, "user", "[ Server ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(), "Server");
+        addChat(null, 0, "user", "[ Server ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(), "Server", false, false, false, null, Date.now());
     },
     warp: function(args) {
         var address = args[0];
@@ -172,7 +172,7 @@ var client_commands = {
         createSocket();
         clearTiles(true);
         clearInterval(fetchInterval);
-        addChat(null, 0, "user", "[ Server ]", "Switching to world: \"" + address + "\"", "Server");
+        addChat(null, 0, "user", "[ Server ]", "Switching to world: \"" + address + "\"", "Server", false, false, false, null, Date.now());
     },
     warpserver: function(args) {
         var address = args[0];
@@ -187,7 +187,7 @@ var client_commands = {
         createSocket();
         clearTiles(true);
         clearInterval(fetchInterval);
-        addChat(null, 0, "user", "[ Server ]", "Switching to server: " + ws_path, "Server");
+        addChat(null, 0, "user", "[ Server ]", "Switching to server: " + ws_path, "Server", false, false, false, null, Date.now());
     }
 }
 
@@ -233,7 +233,7 @@ function event_on_chat(data) {
     }
     updateUnread()
     addChat(data.location, data.id, data.type,
-        data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color);
+        data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, Date.now());
 }
 
 chatsend.addEventListener("click", function() {
@@ -337,11 +337,13 @@ chat_global_tab.addEventListener("click", function() {
     * "anon"      :: unregistered
     * "user_nick" :: registered renamed nick
 */
-function addChat(chatfield, id, type, nickname, message, realUsername, op, admin, staff, color) {
+function addChat(chatfield, id, type, nickname, message, realUsername, op, admin, staff, color, date) {
     if(!nickname) nickname = "";
     if(!message) message = ""; // Should this even happen?
     if(!realUsername) realUsername = "";
     if(!color) color = assignColor(nickname);
+    var dateStr = "";
+    if(date) dateStr = convertToDate(date);
     var field;
     if(chatfield == "page") {
         field = document.getElementById("page_chatfield");
@@ -354,20 +356,29 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     var hasTagDom = op || admin || staff;
 
     var tagDom;
+    var nickTitle = [];
+
+    if(type == "user" || type == "user_nick") {
+        nickTitle.push("ID " + id);
+    }
+
     if(hasTagDom) {
         tagDom = document.createElement("span");
         if(op) {
             tagDom.innerText = "(OP) ";
             tagDom.style.color = "#0033cc";
             tagDom.style.fontWeight = "bold";
+            nickTitle.push("Operator");
         } else if(admin) {
             tagDom.innerText = "(A) ";
             tagDom.style.color = "#FF0000";
             tagDom.style.fontWeight = "bold";
+            nickTitle.push("Administrator");
         } else if(staff) {
             tagDom.innerText = "(M) ";
             tagDom.style.color = "#009933";
             tagDom.style.fontWeight = "bold";
+            nickTitle.push("Staff");
         }
     }
 
@@ -378,8 +389,8 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 
     if(type == "user") {
         nickDom.style.color = color;
-        nickDom.href = "javascript:alert(\"Registered; " + realUsername + "\")"
         nickDom.style.fontWeight = "bold";
+        nickDom.style.pointerEvents = "default";
         if(state.userModel.is_operator) idTag = "[" + id + "]";
     }
     if(type == "anon_nick") {
@@ -390,7 +401,8 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     }
     if(type == "user_nick") {
         nickDom.style.color = color;
-        nickDom.href = "javascript:alert(\"Registered; " + realUsername + "\")"
+        nickDom.href = "javascript:alert(\"Username [" + realUsername + "]\")"
+        nickTitle.push("Username \"" + realUsername + "\"");
         if(state.userModel.is_operator) idTag = "[*" + id + "]";
     }
 
@@ -407,7 +419,10 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 
     nickname = idTag + nickname;
 
+    if(dateStr) nickTitle.push("(" + dateStr + ")");
+
     nickDom.innerHTML = nickname + ":";
+    if(nickTitle.length) nickDom.title = nickTitle.join("; ");
 
     var msgDom = document.createElement("span");
     msgDom.innerHTML = "&nbsp;" + message;

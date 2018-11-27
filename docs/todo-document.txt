@@ -97,5 +97,6 @@ TODO:
 - combining emoji characters and other complicated unicode standard features
 - a toggle to turn all emojis into a question mark
 - garbage-collect world data objects (objects that store temporary information like a list of clients)
-- automatic rediraction to https
-- option to limit world size, if it's a good idea
+- automatic redirection to https
+- option to limit world size
+- cache user sessions to speed up page load times

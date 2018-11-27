@@ -139,9 +139,10 @@ module.exports.POST = async function(req, serve, vars) {
     var decodeCharProt = vars.decodeCharProt;
     var encodeCharProt = vars.encodeCharProt;
     var clearChatlog = vars.clearChatlog;
+    var tile_database = vars.tile_database;
 
     if(!user.authenticated) {
-        serve();
+        return serve();
     }
 
     var world_name = get_third(path, "accounts", "configure")
@@ -196,7 +197,7 @@ module.exports.POST = async function(req, serve, vars) {
         for(var key in post_data) {
             if(key.startsWith("remove_")) to_remove = key;
         }
-        var username_to_remove = to_remove.substr("remove_".length)
+        var username_to_remove = to_remove.substr("remove_".length);
         await db.run("DELETE FROM whitelist WHERE user_id=(SELECT id FROM auth_user WHERE username=? COLLATE NOCASE) AND world_id=?", [username_to_remove, world.id])
     } else if(post_data.form == "features") {
         var go_to_coord = validatePerms(post_data.go_to_coord);
@@ -218,7 +219,7 @@ module.exports.POST = async function(req, serve, vars) {
         properties.color_text = color_text;
 
         await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link,properties)=(?,?,?,?,?,?) WHERE id=?",
-            [go_to_coord, membertiles_addremove, paste, coord_link, url_link, JSON.stringify(properties), world.id])
+            [go_to_coord, membertiles_addremove, paste, coord_link, url_link, JSON.stringify(properties), world.id]);
     } else if(post_data.form == "style") {
         var color = validateCSS(post_data.color);
         var cursor_color = validateCSS(post_data.cursor_color);
@@ -230,7 +231,7 @@ module.exports.POST = async function(req, serve, vars) {
         properties.custom_menu_color = menu_color;
 
         await db.run("UPDATE world SET (custom_bg,custom_cursor,custom_guest_cursor,custom_color,custom_tile_owner,custom_tile_member,properties)=(?,?,?,?,?,?,?) WHERE id=?",
-            [bg, cursor_color, cursor_guest_color, color, owner_color, member_color, JSON.stringify(properties), world.id])
+            [bg, cursor_color, cursor_guest_color, color, owner_color, member_color, JSON.stringify(properties), world.id]);
         
         ws_broadcast({
             kind: "colors",
@@ -297,88 +298,30 @@ module.exports.POST = async function(req, serve, vars) {
         }
         if(properties_updated) {
             await db.run("UPDATE world SET properties=? WHERE id=?",
-                [JSON.stringify(properties), world.id])
+                [JSON.stringify(properties), world.id]);
         }
     } else if(post_data.form == "action") {
-        // the special features (unclaim, clear worlds)
-
-        var mode = post_data.mode;
-        if(post_data.unclaim == "") {
+        if("unclaim" in post_data) {
             await db.run("UPDATE world SET owner_id=null WHERE id=?", world.id);
             return serve(null, null, {
                 redirect: "/accounts/profile/"
             });
-        } else if(post_data.clear_public == "") {
-            var chunkSize = 2048;
-            var idx = 0;
-            await transaction.begin();
-            while(true) {
-                var data = await db.all("SELECT * FROM tile WHERE world_id=? LIMIT ?,?",
-                    [world.id, idx * chunkSize, chunkSize]);
-                if(!data || data.length == 0) {
-                    break;
-                }
-                for(var d = 0; d < data.length; d++) {
-                    var tile = data[d];
-                    var properties = JSON.parse(tile.properties);
-                    // this tile contains precise char data
-                    if(properties.char) {
-                        var charData = decodeCharProt(properties.char);
-                        var content = advancedSplit(tile.content);
-                        var hasUpdated = false;
-                        for(var r = 0; r < charData.length; r++) {
-                            var char = charData[r];
-                            var charX = r % 16;
-                            var charY = Math.floor(r / 16);
-                            var charWritability = char;
-                            if(charWritability == null) charWritability = tile.writability;
-                            if(charWritability == null) charWritability = world.writability;
-                            if(char == 0 || charWritability == 0) {
-                                hasUpdated = true;
-                                content[r] = " ";
-                                if(properties.cell_props) {
-                                    if(properties.cell_props[charY]) {
-                                        if(properties.cell_props[charY][charX]) {
-                                            properties.cell_props[charY][charX] = {};
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        // update tile if a char has been updated
-                        if(hasUpdated) {
-                            content = content.join("");
-                            properties.char = encodeCharProt(charData);
-                            properties = JSON.stringify(properties);
-                            await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE id=?",
-                                [content, properties, tile.id]);
-                        }
-                    } else {
-                        if(tile.writability == 0) {
-                            await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE id=?",
-                                [" ".repeat(128), "{}", tile.id]);
-                        } else if(tile.writability == null && world.writability == 0) {
-                            // delete default tiles that are public too (null = default protection)
-                            await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE id=?",
-                                [" ".repeat(128), "{}", tile.id]);
-                        }
-                    }
-                }
-                idx++;
+        } else if("clear_public" in post_data) {
+            var tileCount = await db.get("SELECT count(id) as cnt FROM tile WHERE world_id=?", world.id);
+            // tile limit of 30000
+            if(tileCount <= 30000) {
+                tile_database.write(null, tile_database.types.publicclear, {
+                    date: Date.now(),
+                    world,
+                    user
+                });
             }
-            await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
-                [user.id, world.id, 0, 0, Date.now(), "@" + JSON.stringify({
-                    kind: "clear_public"
-                })]);
-            await transaction.end();
-        } else if(post_data.clear_all == "") {
+        } else if("clear_all" in post_data) {
             // small command, big impact
             await db.run("DELETE FROM tile WHERE world_id=?", world.id);
             await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
-                [user.id, world.id, 0, 0, Date.now(), "@" + JSON.stringify({
-                    kind: "clear_all"
-                })]);
-        } else if(post_data.clear_chat_hist == "") {
+                [user.id, world.id, 0, 0, Date.now(), "@{\"kind\":\"clear_all\"}"]);
+        } else if("clear_chat_hist" in post_data) {
             clearChatlog(world.id);
         }
     }

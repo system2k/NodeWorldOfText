@@ -468,11 +468,11 @@ const encryptHash = function(pass, salt) {
 };
 
 const checkHash = function(hash, pass) {
-	if(typeof hash !== "string") return false;
-	hash = hash.split("$");
-	if(hash.length !== 3) return false;
-	if(typeof pass !== "string") return false;
-	return encryptHash(pass, hash[1]) === hash.join("$");
+    if(typeof pass !== "string") return false;
+    if(typeof hash !== "string") return false;
+    hash = hash.split("$");
+    if(hash.length !== 3) return false;
+    return encryptHash(pass, hash[1]) === hash.join("$");
 };
 
 // just to make things easier
@@ -1735,6 +1735,7 @@ async function retrieveChatHistory(world_id) {
         }
         for(var a = 0; a < world_chats.length; a++) {
             var row = JSON.parse(world_chats[a].data);
+            row.date = world_chats[a].date;
             chat_cache[world_id].data.push(row)
         }
     }
@@ -1756,6 +1757,9 @@ async function add_to_chatlog(chatData, world_id) {
         location = "global"
     }
 
+    var date = Date.now();
+    chatData.date = date;
+
     var history = await retrieveChatHistory(world_id);
 
     history.push(chatData);
@@ -1764,9 +1768,9 @@ async function add_to_chatlog(chatData, world_id) {
     }
 
     if(location == "page") {
-        world_chat_additions.push([chatData, world_id]);
+        world_chat_additions.push([chatData, world_id, date]);
     } else if(location == "global") {
-        global_chat_additions.push(chatData);
+        global_chat_additions.push([chatData, date]);
     }
 }
 
@@ -1808,6 +1812,7 @@ async function doUpdateChatLogData() {
         var row = copy_world_chat_additions[i];
         var chatData = row[0];
         var worldId = row[1];
+        var date = row[2];
         var worldName = await db.get("SELECT name FROM world WHERE id=?", worldId);
         if(!worldName) continue;
         worldName = worldName.name;
@@ -1826,14 +1831,16 @@ async function doUpdateChatLogData() {
             def_channel = def_channel.channel_id;
         }
         await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
-            [Date.now(), def_channel, JSON.stringify(chatData)])
+            [date, def_channel, JSON.stringify(chatData)])
     }
 
     for(var i = 0; i < copy_global_chat_additions.length; i++) {
         var row = copy_global_chat_additions[i];
+        var data = row[0];
+        var date = row[1];
         var global_channel = (await db_ch.get("SELECT id FROM channels WHERE name='global'")).id;
         await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
-            [Date.now(), global_channel, JSON.stringify(row)])
+            [date, global_channel, JSON.stringify(data)])
     }
 
     await db_ch.run("COMMIT")
@@ -2096,7 +2103,10 @@ async function initialize_server_components() {
             ws.ipReal = error_ip;
             handle_error(e);
         }
-
+        /*
+            TODO: Limit requests based on packet type.
+            The server will not handle 1-GB-per-second write packets from a single client
+        */
         var req_per_second = 256;
         var reqs_second = 0; // requests received at current second
         var current_second = Math.floor(Date.now() / 1000);
@@ -2833,6 +2843,9 @@ function stopServer() {
 
         server.close();
         wss.close();
+
+        database.close();
+        chat_history.close();
 
         var count = process._getActiveHandles().length;
         console.log("Stopped server with " + count + " handles remaining.");

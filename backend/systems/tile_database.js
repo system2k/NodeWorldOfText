@@ -10,9 +10,9 @@ var san_nbr;
 var fixColors;
 var get_bypass_key;
 var encodeCharProt;
+var advancedSplit;
 
 // Tile Animation Password
-//let's leave this as just a feature for who knows this secret top top secret
 var NOT_SO_SECRET = "@^&$%!#*%^#*)~@$^*#!)~*%38259`25equfahgrqieavkj4bh8ofweieagrHG*FNV#@#OIFENUOGIVEOSFKNL<CDOLFKEWNSCOIEAFM:COGPEWWRG>BVPZL:MBGOEWSV";
 
 module.exports.main = function(vars) {
@@ -28,14 +28,44 @@ module.exports.main = function(vars) {
     fixColors = vars.fixColors;
     get_bypass_key = vars.get_bypass_key;
     encodeCharProt = vars.encodeCharProt;
+    advancedSplit = vars.advancedSplit;
 
     NOT_SO_SECRET += get_bypass_key();
 
     writeCycle();
+
+    intv.clear_tdb_ratelims = setInterval(function() {
+        var now = Date.now();
+        for(var i in ratelimits) {
+            var keys = ratelimits[i];
+            for(var x in keys) {
+                if(keys[x] <= now) {
+                    delete keys[x];
+                }
+            }
+        }
+    }, 1000 * 60 * 5);
 }
 
 // caller ids. this returns information to a request that uploaded the edits to the server
 var cids = {}; // [return_data, callback_function, is_processed]
+
+var ratelimits = {};
+function set_ratelimit(type, key, duration) {
+    if(!ratelimits[type]) ratelimits[type] = {};
+    var now = Date.now();
+    ratelimits[type][key] = now + duration;
+}
+function check_ratelimit(type, key) {
+    var now = Date.now();
+    if(!ratelimits[type]) return false;
+    if(!ratelimits[type][key]) return false;
+    if(ratelimits[type][key] <= now) {
+        delete ratelimits[type][key];
+        return false;
+    }
+    return true;
+}
 
 function write_edits(tile, t, accepted, rejected, edit, data, editLog) {
     var tileY = edit[0];
@@ -531,6 +561,72 @@ async function flushQueue() {
             await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)", // log the edit
                 [user.id, world.id, tileY, tileX, date, "@{\"kind\":\"tile_clear\"}"]);
         }
+        if(type == types.publicclear) {
+            if(!user.superuser) {
+                if(check_ratelimit("publicclear", world.id)) return;
+                set_ratelimit("publicclear", world.id, 1000 * 60 * 2);
+            }
+
+            var chunkSize = 2048;
+            var idx = 0;
+
+            await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+                [user.id, world.id, 0, 0, Date.now(), "@{\"kind\":\"clear_public\"}"]);
+
+            while(true) {
+                var data = await db.all("SELECT * FROM tile WHERE world_id=? LIMIT ?,?",
+                    [world.id, idx * chunkSize, chunkSize]);
+                if(!data || data.length == 0) {
+                    break;
+                }
+                for(var d = 0; d < data.length; d++) {
+                    var tile = data[d];
+                    var properties = JSON.parse(tile.properties);
+                    // this tile contains precise char data
+                    if(properties.char) {
+                        var charData = decodeCharProt(properties.char);
+                        var content = advancedSplit(tile.content);
+                        var hasUpdated = false;
+                        for(var r = 0; r < charData.length; r++) {
+                            var char = charData[r];
+                            var charX = r % 16;
+                            var charY = Math.floor(r / 16);
+                            var charWritability = char;
+                            if(charWritability == null) charWritability = tile.writability;
+                            if(charWritability == null) charWritability = world.writability;
+                            if(char == 0 || charWritability == 0) {
+                                hasUpdated = true;
+                                content[r] = " ";
+                                if(properties.cell_props) {
+                                    if(properties.cell_props[charY]) {
+                                        if(properties.cell_props[charY][charX]) {
+                                            properties.cell_props[charY][charX] = {};
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // update tile if a char has been updated
+                        if(hasUpdated) {
+                            content = content.join("");
+                            properties = JSON.stringify(properties);
+                            await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE id=?",
+                                [content, properties, tile.id]);
+                        }
+                    } else {
+                        if(tile.writability == 0) {
+                            await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE id=?",
+                                [" ".repeat(128), "{}", tile.id]);
+                        } else if(tile.writability == null && world.writability == 0) {
+                            // delete default tiles that are public too (null = default protection)
+                            await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE id=?",
+                                [" ".repeat(128), "{}", tile.id]);
+                        }
+                    }
+                }
+                idx++;
+            }
+        }
 
         if(updatedTilesBroadcast) {
             wss.clients.forEach(function(client) {
@@ -636,7 +732,8 @@ var types = {
     write: 0,
     link: 1,
     protect: 2,
-    clear: 3
+    clear: 3,
+    publicclear: 4
 }
 
 module.exports.types = types;

@@ -20,6 +20,34 @@ function generateDiag(text, tileX, tileY) {
     };
 }
 
+var surrogateRegexStr = "([\\uD800-\\uDBFF][\\uDC00-\\uDFFF])";
+var surrogateRegex = new RegExp(surrogateRegexStr, "g");
+var combiningRegexStr = "(([\\0-\\u02FF\\u0370-\\u1DBF\\u1E00-\\u20CF\\u2100-\\uD7FF\\uDC00-\\uFE1F\\uFE30-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF])([\\u0300-\\u036F\\u1DC0-\\u1DFF\\u20D0-\\u20FF\\uFE20-\\uFE2F]+))";
+var combiningRegex = new RegExp(combiningRegexStr, "g");
+var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\n|\\r", "g");
+function advancedSplit(str, noSurrog, noComb) {
+    str += "";
+    // look for surrogate pairs first. then look for combining characters. finally, look for the rest
+	var data = str.match(splitRegex)
+    if(data == null) return [];
+    for(var i = 0; i < data.length; i++) {
+        // contains surrogates without second character?
+        if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
+            data.splice(i, 1)
+        }
+        if(noSurrog && data[i].match(surrogateRegex)) {
+            data[i] = "?";
+        }
+        if(noComb && data[i].match(combiningRegex)) {
+            data[i] = data[i].charAt(0);
+        }
+    }
+	return data;
+}
+function filterUTF16Static(str) {
+    return advancedSplit(str, true, true).join("");
+}
+
 module.exports = async function(data, vars) {
     var db = vars.db;
     var user = vars.user;
@@ -35,6 +63,7 @@ module.exports = async function(data, vars) {
 
     var len = data.fetchRectangles.length
     if(len >= fetchRectLimit) len = fetchRectLimit;
+    var utf16static = data.utf16static;
     for(var i = 0; i < len; i++) {
         var rect = data.fetchRectangles[i];
         var minY = san_nbr(rect.minY)
@@ -68,7 +97,7 @@ module.exports = async function(data, vars) {
                 if(editCount >= editLimit) {
                     e_str = "There are too many edits in this world. | ";
                 }
-                for (var ty in YTileRange) { // fill in null values
+                for (var ty in YTileRange) {
                     for (var tx in XTileRange) {
                         var tileX = XTileRange[tx];
                         var tileY = YTileRange[ty];
@@ -128,8 +157,10 @@ module.exports = async function(data, vars) {
             await db.each("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?", 
                 [world.id, minY, minX, maxY, maxX], function(data) {
                 var properties = JSON.parse(data.properties);
+                var content = data.content;
+                if(utf16static) content = filterUTF16Static(content);
                 tiles[data.tileY + "," + data.tileX] = {
-                    content: data.content,
+                    content,
                     properties: Object.assign(properties, {
                         writability: data.writability
                     })
