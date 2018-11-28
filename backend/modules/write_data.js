@@ -21,7 +21,6 @@ module.exports = async function(data, vars) {
     if(user.superuser) {
         edits_limit = 1280;
     }
-    var tileLoadLimit = 200; // how many tiles can be loaded from the database as a result of this edit
 
     var worldProps = JSON.parse(world.properties);
 
@@ -40,7 +39,6 @@ module.exports = async function(data, vars) {
     if(!Array.isArray(edits)) return;
     
     var total_edits = 0;
-    var total_tiles = 0;
     var tiles = {};
     // organize edits into tile coordinates
     for(var i = 0; i < edits.length; i++) {
@@ -55,9 +53,7 @@ module.exports = async function(data, vars) {
         segment[1] = san_nbr(segment[1]);
 
         if (!tiles[segment[0] + "," + segment[1]]) {
-            if(total_tiles >= tileLoadLimit) break; // tile limit reached
             tiles[segment[0] + "," + segment[1]] = [];
-            total_tiles++;
         }
         segment[5] = segment[5].replace(/\n/g, " ");
         segment[5] = segment[5].replace(/\r/g, " ");

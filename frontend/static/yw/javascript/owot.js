@@ -2836,8 +2836,6 @@ function renderTile(tileX, tileY, redraw) {
     textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
 }
 
-var event_tilesRendered = [];
-
 function renderTiles(redraw) {
     // update coordinate display
     var tileCoordX = Math.floor(-positionX / tileW);
@@ -2868,7 +2866,7 @@ function renderTiles(redraw) {
         renderTile(tileX, tileY);
     }
 
-    if(regionCoordA && regionCoordB) w.callEvent("tilesRendered");
+    w.callEvent("tilesRendered");
 }
 
 function protectPrecisionOption(option) { // 0 being tile and 1 being char
@@ -3358,7 +3356,7 @@ w.clipboard.init();
 w.regionSelect.init();
 
 w.on("tilesRendered", function() {
-    w.regionSelect.setSelection(regionCoordA, regionCoordB);
+    if(regionCoordA && regionCoordB) w.regionSelect.setSelection(regionCoordA, regionCoordB);
 })
 
 var simplemodal_onopen = function() {
@@ -3683,5 +3681,8 @@ var ws_functions = {
             addChat(chat.location, chat.id, type, chat.nickname,
                 chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color, chat.date);
         }
+    },
+    cmd: function(data) {
+        w.callEvent("cmd", data);
     }
 };

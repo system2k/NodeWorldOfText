@@ -2180,7 +2180,7 @@ async function initialize_server_components() {
 
             var cookies = parseCookie(req.headers.cookie);
             var user = await get_user_info(cookies, true)
-            var channel = new_token(16);
+            var channel = new_token(7);
             var vars = objIncludes(global_data, {
                 user,
                 channel
