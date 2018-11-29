@@ -882,7 +882,8 @@ function ajaxRequest(settings) {
     if(settings.type == "GET" && formData) {
         settings.url += "?" + formData;
     }
-    req.open(settings.type, settings.url, true);
+    var async = !!settings.async;
+    req.open(settings.type, settings.url, !async);
     req.onload = function() {
         if(req.status >= 200 && req.status < 400) {
             if(settings.done) {
@@ -3256,10 +3257,25 @@ var w = {
         }))
     },
     jquery: function(callback) {
+        if(window.jQuery) return;
+        var jqueryURL = "/static/lib/jquery-1.7.min.js";
         var script = document.createElement("script");
-        script.src = "/static/lib/jquery-1.7.min.js";
-        document.body.appendChild(script)
-        script.onload = callback;
+        if(callback === true) {
+            // synchronous
+            ajaxRequest({
+                type: "GET",
+                url: jqueryURL,
+                async: true,
+                done: function(e) {
+                    script.innerText = e;
+                    document.head.appendChild(script);
+                }
+            })
+        } else {
+            script.src = jqueryURL;
+            document.head.appendChild(script);
+            script.onload = callback;
+        }
     },
     redraw: function() {
         // redraw all tiles, clearing the cahe
