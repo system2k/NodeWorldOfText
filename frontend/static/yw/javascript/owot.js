@@ -90,7 +90,7 @@ var keyConfig = {
     cursorDown: "DOWN",
     cursorLeft: "LEFT",
     cursorRight: "RIGHT",
-    copyRegion: "SHIFT+ALT"
+    copyRegion: "ALT+G"
 }
 
 var clientOnload = [];
