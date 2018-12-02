@@ -1851,7 +1851,6 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
         linkElm.rel = "";
         if(link[0].type == "url") {
             var URL_Link = link[0].url;
-            linkElm.title = "Link to URL " + URL_Link;
             linkElm.href = URL_Link;
             var linkProtocol = linkElm.protocol;
             if(linkProtocol == "javascript:") {
@@ -1860,6 +1859,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             } else {
                 linkElm.rel = "noopener noreferrer";
             }
+            linkElm.title = "Link to URL " + linkElm.href;
         } else if(link[0].type == "coord") {
             var pos = link[0].link_tileX + "," + link[0].link_tileY;
             linkElm.title = "Link to coordinates " + pos;
