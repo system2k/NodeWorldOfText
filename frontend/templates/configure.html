@@ -312,10 +312,10 @@
 					Name of this world:
 					<input name="new_world_name" value="{{ world }}">
 				</p>
-				{% if user.staff %}
+				{% if user.superuser %}
 					<p>
-						Christmas tree background
-						<input name="admin_background" type="checkbox"{%if admin_background%} checked{%endif%}>
+						Current Background:
+						<input name="world_background" value="{{ background_path }}">
 					</p>
 				{% endif %}
 				<a href="javascript: showAdvancedMisc();">Advanced...</a>

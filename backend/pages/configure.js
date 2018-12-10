@@ -117,7 +117,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         no_log_edits: !!properties.no_log_edits,
         half_chars:   !!properties.half_chars,
 
-        admin_background: properties.background == "/static/misc/images/christmas/blank_tree.png"
+        background_path: properties.background ? properties.background : ""
     };
 
     serve(HTML("configure.html", data));
@@ -246,8 +246,7 @@ module.exports.POST = async function(req, serve, vars) {
         }, world.name)
     } else if(post_data.form == "misc") {
         var properties_updated = false;
-        // pumpkin background unchecked? remove it
-        if(!("admin_background" in post_data)) {
+        if(!post_data.world_background && user.superuser) {
             properties_updated = true;
             delete properties.background;
         }
@@ -280,8 +279,8 @@ module.exports.POST = async function(req, serve, vars) {
                 new_world_name = validate.new_name;
             }
 
-        } else if("admin_background" in post_data) {
-            properties.background = "/static/misc/images/christmas/blank_tree.png";
+        } else if(post_data.world_background && user.superuser) {
+            properties.background = post_data.world_background;
             properties_updated = true;
         } else if("nsfw_page" in post_data) {
             properties.page_is_nsfw = true;

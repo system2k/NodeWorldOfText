@@ -53,6 +53,7 @@ const settings = require(SETTINGS_PATH);
 var serverPort = settings.port;
 var serverDB = settings.DATABASE_PATH;
 var chatDB = settings.CHAT_HISTORY_PATH;
+var imageDB = settings.IMAGES_PATH;
 
 Error.stackTraceLimit = Infinity;
 if(!global.AsyncFunction) var AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
@@ -69,6 +70,7 @@ args.forEach(function(a) {
         serverPort = settings.test_port;
         serverDB = settings.TEST_DATABASE_PATH;
         chatDB = settings.TEST_CHAT_HISTORY_PATH;
+        imageDB = settings.TEST_IMAGES_PATH;
         settings.LOG_PATH = settings.TEST_LOG_PATH;
         settings.ZIP_LOG_PATH = settings.TEST_ZIP_LOG_PATH;
         settings.UNCAUGHT_PATH = settings.TEST_UNCAUGHT_PATH;
@@ -101,6 +103,7 @@ if(!fs.existsSync(settings.bypass_key)) {
 
 const database = new sql.Database(serverDB);
 const chat_history = new sql.Database(chatDB);
+const image_db = new sql.Database(imageDB);
 
 function trimHTML(html) {
     // ensure all lines are \r\n instead of just \n (consistent)
@@ -282,6 +285,7 @@ function asyncDbSystem(database) {
 
 const db = asyncDbSystem(database);
 const db_ch = asyncDbSystem(chat_history);
+const db_img = asyncDbSystem(image_db);
 
 var transporter;
 var email_available = true;
@@ -394,6 +398,7 @@ var bypass_key_cache = "";
 async function initialize_server() {
     console.log("Starting server...");
     await init_chat_history();
+    await init_image_database();
     if(!await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='server_info'")) {
         // table to inform that the server is initialized
         await db.run("CREATE TABLE 'server_info' (name TEXT, value TEXT)");
@@ -617,8 +622,8 @@ var Decade = 315360345600;
 var ms = { Second, Minute, Hour, Day, Week, Month, Year, Decade };
 
 var url_regexp = [ // regexp , function/redirect to , options
-    ["^favicon\.ico[\\/]?$", "/static/favicon.png"],
-    ["^robots.txt[\\/]?$", "/static/robots.txt"],
+    ["^favicon\.ico[\\/]?$", "/static/favicon.png", { no_login: true }],
+    ["^robots.txt[\\/]?$", "/static/robots.txt", { no_login: true }],
     ["^home[\\/]?$", pages.home],
     ["^accounts/login[\\/]?", pages.login],
     ["^accounts/logout[\\/]?", pages.logout],
@@ -648,13 +653,15 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^accounts/download/$", pages.accounts_download], // for front page downloading
     ["^accounts/download/(.*)/$", pages.accounts_download],
     ["^world_style[\\/]?$", pages.world_style],
-    ["^other/random_color[\\/]?$", pages.random_color],
+    ["^other/random_color[\\/]?$", pages.random_color, { no_login: true }],
     ["^accounts/password_change[\\/]?$", pages.password_change],
     ["^accounts/password_change/done[\\/]?$", pages.password_change_done],
     ["^administrator/users/by_username/(.*)[\\/]?$", pages.administrator_users_by_username],
     ["^administrator/users/by_id/(.*)[\\/]?$", pages.administrator_users_by_id],
     ["^accounts/nsfw/(.*)[\\/]?$", pages.accounts_nsfw],
     ["^administrator/world_restore[\\/]?$", pages.administrator_world_restore],
+    ["^administrator/backgrounds[\\/]?$", pages.administrator_backgrounds, { binary_post_data: true }],
+    ["^other/backgrounds/(.*)[\\/]?$", pages.load_backgrounds, { no_login: true }],
     ["^([\\w\\/\\.\\-\\~]*)$", pages.yourworld, { remove_end_slash: true }]
 ]
 
@@ -855,16 +862,31 @@ function objIncludes(defaultObj, include) {
 }
 
 // wait for the client to upload form data to the server
-function wait_response_data(req, dispatch) {
-    var queryData = "";
+function wait_response_data(req, dispatch, binary_post_data) {
+    var queryData;
+    if(binary_post_data) {
+        queryData = Buffer.from([]);
+    } else {
+        queryData = "";
+    }
     var error = false;
     return new Promise(function(resolve) {
         req.on("data", function(data) {
             if(error) return;
             try {
-                queryData += data;
-                if (queryData.length > 250000) {
-                    queryData = "";
+                if(data.length <= 250000) {
+                    if(binary_post_data) {
+                        queryData = Buffer.concat([queryData, data]);
+                    } else {
+                        queryData += data;
+                    }
+                }
+                if (queryData.length > 1000000) {
+                    if(binary_post_data) {
+                        queryData = Buffer.from([]);
+                    } else {
+                        queryData = "";
+                    }
                     dispatch("Payload too large", 413)
                     error = true
                     resolve(null);
@@ -876,7 +898,11 @@ function wait_response_data(req, dispatch) {
         req.on("end", function() {
             if(error) return;
             try {
-                resolve(querystring.parse(queryData, null, null, { maxKeys: 256 }))
+                if(binary_post_data) {
+                    resolve(queryData);
+                } else {
+                    resolve(querystring.parse(queryData, null, null, { maxKeys: 256 }));
+                }
             } catch(e) {
                 resolve(null);
             }
@@ -1378,7 +1404,7 @@ async function process_request(req, res, current_req_id) {
                     return;
                 }
                 if(method == "POST") {
-                    var dat = await wait_response_data(req, dispatch)
+                    var dat = await wait_response_data(req, dispatch, options.binary_post_data)
                     if(!dat) {
                         return;
                     }
@@ -1401,7 +1427,7 @@ async function process_request(req, res, current_req_id) {
                     /*if(data.csrftoken) {
                         csrf_tokens[data.csrftoken] = 1;
                     }*/
-                    return trimHTML(template_data[path](data));
+                    return template_data[path](data);
                 }
                 vars = objIncludes(global_data, { // extra information
                     cookies,
@@ -1652,6 +1678,12 @@ async function init_chat_history() {
     }
 
     updateChatLogData();
+}
+
+async function init_image_database() {
+    if(!await db_img.get("SELECT name FROM sqlite_master WHERE type='table' AND name='images'")) {
+        await db_img.run("CREATE TABLE 'images' (id INTEGER NOT NULL PRIMARY KEY, name TEXT, date_created INTEGER, mime TEXT, data BLOB)");
+    }
 }
 
 var chat_cache = {};
@@ -2735,6 +2767,7 @@ var worldViews = {};
 var global_data = {
     template_data,
     db,
+    db_img,
     dispage,
     ms,
     cookie_expire,

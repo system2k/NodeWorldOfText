@@ -58,7 +58,7 @@
             com.innerText = "Restoring is in progress...";
 
             var xhr = new XMLHttpRequest();
-            xhr.open("post", "/administrator/world_restore/", true);
+            xhr.open("POST", "/administrator/world_restore/", true);
 
             xhr.onload = function(res, b) {
                 var res = xhr.responseText;
