@@ -306,7 +306,9 @@ module.exports.POST = async function(req, serve, vars) {
                 redirect: "/accounts/profile/"
             });
         } else if("clear_public" in post_data) {
-            var tileCount = await db.get("SELECT count(id) as cnt FROM tile WHERE world_id=?", world.id);
+            var tileCount = await db.get("SELECT count(id) AS cnt FROM tile WHERE world_id=?", world.id);
+            if(!tileCount) return;
+            tileCount = tileCount.cnt;
             // tile limit of 30000
             if(tileCount <= 30000) {
                 tile_database.write(null, tile_database.types.publicclear, {

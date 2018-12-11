@@ -2795,20 +2795,20 @@ function renderTile(tileX, tileY, redraw) {
 
             // underline link
             if(isLink) {
-                textRender.fillRect(x * cellW, (y * cellH + textYOffset + zoom), cellW, zoom)
+                textRender.fillRect(x * cellW, y * cellH + textYOffset + zoom, cellW, zoom);
             }
             if(char != "\u0020" && char != "\u00a0") { // ignore whitespace characters
                 if(cCode >= 0x2800 && cCode <= 0x28FF && brBlockFill) { // render braille chars as rectangles
                     var dimX = cellW / 2;
                     var dimY = cellH / 4;
-                    if((cCode >> 0) & 1) textRender.fillRect(x * cellW, y * cellH, dimX, dimY);
-                    if((cCode >> 3) & 1) textRender.fillRect(x * cellW + dimX, y * cellH, dimX, dimY);
-                    if((cCode >> 1) & 1) textRender.fillRect(x * cellW, y * cellH + dimY, dimX, dimY);
-                    if((cCode >> 4) & 1) textRender.fillRect(x * cellW + dimX, y * cellH + dimY, dimX, dimY);
-                    if((cCode >> 2) & 1) textRender.fillRect(x * cellW, y * cellH + dimY * 2, dimX, dimY);
-                    if((cCode >> 5) & 1) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 2, dimX, dimY);
-                    if((cCode >> 6) & 1) textRender.fillRect(x * cellW, y * cellH + dimY * 3, dimX, dimY);
-                    if((cCode >> 7) & 1) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 3, dimX, dimY);
+                    if(cCode & 1) textRender.fillRect(x * cellW, y * cellH, dimX, dimY);
+                    if(cCode & 8) textRender.fillRect(x * cellW + dimX, y * cellH, dimX, dimY);
+                    if(cCode & 2) textRender.fillRect(x * cellW, y * cellH + dimY, dimX, dimY);
+                    if(cCode & 16) textRender.fillRect(x * cellW + dimX, y * cellH + dimY, dimX, dimY);
+                    if(cCode & 4) textRender.fillRect(x * cellW, y * cellH + dimY * 2, dimX, dimY);
+                    if(cCode & 32) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 2, dimX, dimY);
+                    if(cCode & 64) textRender.fillRect(x * cellW, y * cellH + dimY * 3, dimX, dimY);
+                    if(cCode & 128) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 3, dimX, dimY);
                 } else if(char == "\u2588" && ansiBlockFill) { // █ full block
                     textRender.fillRect(x * cellW, y * cellH, cellW, cellH);
                 } else if(char == "\u2580" && ansiBlockFill) { // ▀ top half block
