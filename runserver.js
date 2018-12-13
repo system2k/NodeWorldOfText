@@ -392,6 +392,11 @@ function san_nbr(x) {
     return x;
 }
 
+var valid_methods = ["GET", "POST", "HEAD", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"];
+function valid_method(mtd) {
+    return valid_methods.indexOf(mtd) > -1;
+}
+
 var announcement_cache = "";
 var bypass_key_cache = "";
 
@@ -690,7 +695,7 @@ function get_fourth(url, first, second, third) {
     ("POST" is only needed if you need to post something. otherwise, don't include anything)
 */
 async function dispage(page, params, req, serve, vars, method) {
-    if(!method) {
+    if(!method || !validMethod(method)) {
         method = "GET";
     }
     method = method.toUpperCase();
@@ -1442,16 +1447,16 @@ async function process_request(req, res, current_req_id) {
                     HTML
                 })
                 vars_joined = true;
-                if(row[1][method]) {
+                if(row[1][method] && valid_method(method)) {
                     // Return the page
-                    await row[1][method](req, dispatch, vars, {})
+                    await row[1][method](req, dispatch, vars, {});
                 } else {
-                    dispatch("Method " + method + " not allowed.", 405)
+                    dispatch("Method " + method + " not allowed.", 405);
                 }
             } else if(typeof row[1] == "string") { // it's a path and must be redirected to
                 dispatch(null, null, { redirect: row[1] })
             } else {
-                found_url = false; // nevermind, it's not found because the type is invalid
+                found_url = false; // it's not found because the type is invalid
             }
             break;
         }
@@ -1473,12 +1478,12 @@ async function process_request(req, res, current_req_id) {
 	}
 
     if(!vars_joined) {
-        vars = objIncludes(global_data, vars)
-        vars_joined = true
+        vars = objIncludes(global_data, vars);
+        vars_joined = true;
     }
 
     if(!found_url || !request_resolved) {
-        return dispage("404", null, req, dispatch, vars)
+        return dispage("404", null, req, dispatch, vars);
     }
 }
 
@@ -2072,8 +2077,8 @@ async function initialize_server_components() {
     wss = new WebSocket.Server({ server });
     global_data.wss = wss;
 
-    sysLoad();
-    sintLoad();
+    await sysLoad();
+    await sintLoad();
 
     initPingAuto();
 
@@ -2765,6 +2770,9 @@ function fixColors(colors) {
 var worldViews = {};
 
 var global_data = {
+    announcement: function() { return announcement_cache },
+    get_bypass_key: function() { return bypass_key_cache },
+    add_background_cache: pages.load_backgrounds.add_cache,
     template_data,
     db,
     db_img,
@@ -2792,7 +2800,6 @@ var global_data = {
     tile_coord,
     modules,
     plural,
-    announcement: function() { return announcement_cache },
     announce: MODIFY_ANNOUNCEMENT,
     uptime,
     validate_claim_worldname,
@@ -2811,7 +2818,6 @@ var global_data = {
     retrieveChatHistory,
     client_ips,
     modify_bypass_key,
-    get_bypass_key: function() { return bypass_key_cache },
     trimHTML,
     tile_database: systems.tile_database,
     g_transaction: transaction_obj(-1),
@@ -2822,20 +2828,20 @@ var global_data = {
     worldViews
 }
 
-function sysLoad() {
+async function sysLoad() {
     // initialize variables in the systems
     for(var i in systems) {
         var sys = systems[i];
-        sys.main(global_data);
+        await sys.main(global_data);
     }
 }
 
-function sintLoad() {
+async function sintLoad() {
     // if page modules contain a startup function, run it
     for(var i in pages) {
         var mod = pages[i];
         if(mod.startup_internal) {
-            mod.startup_internal(global_data);
+            await mod.startup_internal(global_data);
         }
     }
 }

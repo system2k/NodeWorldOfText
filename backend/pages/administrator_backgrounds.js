@@ -21,6 +21,7 @@ module.exports.POST = async function(req, serve, vars) {
     var db_img = vars.db_img;
     var post_data = vars.post_data;
     var user = vars.user;
+    var add_background_cache = vars.add_background_cache;
 
     if(!user.superuser) return;
 
@@ -48,6 +49,7 @@ module.exports.POST = async function(req, serve, vars) {
         mime = "image/jpeg";
     }
     
+    add_background_cache(name, data, mime);
     await db_img.run("INSERT INTO images VALUES(null, ?, ?, ?, ?)", [name, Date.now(), mime, data]);
 
     serve("DONE");
