@@ -230,7 +230,7 @@ function event_on_chat(data) {
     }
     updateUnread()
     addChat(data.location, data.id, data.type,
-        data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, Date.now());
+        data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, Date.now(), data.dataObj);
 }
 
 chatsend.addEventListener("click", function() {
@@ -334,7 +334,8 @@ chat_global_tab.addEventListener("click", function() {
     * "anon"      :: unregistered
     * "user_nick" :: registered renamed nick
 */
-function addChat(chatfield, id, type, nickname, message, realUsername, op, admin, staff, color, date) {
+function addChat(chatfield, id, type, nickname, message, realUsername, op, admin, staff, color, date, dataObj) {
+    if(!dataObj) dataObj = {};
     if(!nickname) nickname = "";
     if(!message) message = "";
     if(!realUsername) realUsername = "";
@@ -354,7 +355,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     if(!op) nickname = html_tag_esc(nickname);
 
      // do not give the tag to [ Server ]
-    var hasTagDom = (op || admin || staff) && !(!id && op);
+    var hasTagDom = (op || admin || staff || dataObj.rankName) && !(!id && op);
 
     var tagDom;
     var nickTitle = [];
@@ -380,6 +381,11 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
             tagDom.style.color = "#009933";
             tagDom.style.fontWeight = "bold";
             nickTitle.push("Staff");
+        } else if(dataObj.rankName) {
+            tagDom.innerText = "(" + dataObj.rankName + ") ";
+            tagDom.style.color = dataObj.rankColor;
+            tagDom.style.fontWeight = "bold";
+            nickTitle.push(dataObj.rankName);
         }
     }
 

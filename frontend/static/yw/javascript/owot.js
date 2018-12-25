@@ -3677,7 +3677,8 @@ var ws_functions = {
             op: data.op,
             admin: data.admin,
             staff: data.staff,
-            color: data.color
+            color: data.color,
+            dataObj: data
         });
     },
     user_count: function(data) {
@@ -3695,13 +3696,13 @@ var ws_functions = {
             var chat = global_prev[g];
             var type = chatType(chat.registered, chat.nickname, chat.realUsername);
             addChat(chat.location, chat.id, type, chat.nickname,
-                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color, chat.date);
+                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color, chat.date, chat);
         }
         for(var p = 0; p < page_prev.length; p++) {
             var chat = page_prev[p];
             var type = chatType(chat.registered, chat.nickname, chat.realUsername);
             addChat(chat.location, chat.id, type, chat.nickname,
-                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color, chat.date);
+                chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color, chat.date, chat);
         }
     },
     cmd: function(data) {

@@ -472,6 +472,7 @@ async function initialize_ranks_db() {
         await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["rank_next_level", 4]);
     }
     var ranks = await db_misc.all("SELECT * FROM ranks");
+    var user_ranks = await db_misc.all("SELECT * FROM user_ranks");
     ranks_cache.ids = [];
     for(var i = 0; i < ranks.length; i++) {
         var rank = ranks[i];
@@ -490,6 +491,10 @@ async function initialize_ranks_db() {
         ranks_cache.ids.push(id);
     }
     ranks_cache.count = ranks.length;
+    for(var i = 0; i < user_ranks.length; i++) {
+        var ur = user_ranks[i];
+        ranks_cache.users[ur.userid] = ur.rank;
+    }
 }
 
 prompt.message   = ""; // do not display "prompt" before each question
@@ -760,7 +765,7 @@ function get_fourth(url, first, second, third) {
     ("POST" is only needed if you need to post something. otherwise, don't include anything)
 */
 async function dispage(page, params, req, serve, vars, method) {
-    if(!method || !validMethod(method)) {
+    if(!method || !valid_method(method)) {
         method = "GET";
     }
     method = method.toUpperCase();

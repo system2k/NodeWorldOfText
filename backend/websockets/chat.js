@@ -46,6 +46,7 @@ module.exports = async function(ws, data, send, vars) {
     var NCaseCompare = vars.NCaseCompare;
     var client_ips = vars.client_ips;
     var uptime = vars.uptime;
+    var ranks_cache = vars.ranks_cache;
 
     var ipHeaderAddr = ws.ipHeaderAddr;
 
@@ -319,6 +320,12 @@ module.exports = async function(ws, data, send, vars) {
         color: data.color
     };
 
+    if(user.authenticated && user.id in ranks_cache.users) {
+        var rank = ranks_cache[ranks_cache.users[user.id]];
+        chatData.rankName = rank.name;
+        chatData.rankColor = rank.chat_color;
+    }
+
     var isCommand = false;
     if(msg.startsWith("/")) {
         isCommand = true;
@@ -335,7 +342,7 @@ module.exports = async function(ws, data, send, vars) {
     var websocketChatData = Object.assign({
         kind: "chat",
         channel: vars.channel
-    }, chatData)
+    }, chatData);
 
     var chatOpts = {
         // Global and Page updates should not appear in worlds with chat disabled
@@ -346,9 +353,9 @@ module.exports = async function(ws, data, send, vars) {
 
     if(!isCommand) {
         if(data.location == "page") {
-            broadcast(websocketChatData, chatOpts)
+            broadcast(websocketChatData, chatOpts);
         } else if(data.location == "global") {
-            ws_broadcast(websocketChatData, void 0, chatOpts)
+            ws_broadcast(websocketChatData, void 0, chatOpts);
         }
     }
 }
