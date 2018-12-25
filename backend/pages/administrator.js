@@ -11,7 +11,7 @@ module.exports.GET = async function(req, serve, vars, params) {
 
     // not a superuser...
     if(!user.superuser) {
-        return await dispage("404", null, req, serve, vars)
+        return await dispage("404", null, req, serve, vars);
     }
 
     var client_num = 0;

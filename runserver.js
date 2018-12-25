@@ -461,10 +461,13 @@ async function initialize_misc_db() {
     }
 }
 
-var ranks_cache = {};
+var ranks_cache = {
+    users: {}
+};
 async function initialize_ranks_db() {
     if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='ranks'")) {
         await db_misc.run("CREATE TABLE 'ranks' (id INTEGER, level INTEGER, name TEXT, props TEXT)");
+        await db_misc.run("CREATE TABLE 'user_ranks' (userid INTEGER, rank INTEGER)");
         await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["max_rank_id", 0]);
         await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["rank_next_level", 4]);
     }
@@ -728,6 +731,7 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^administrator/backgrounds[\\/]?$", pages.administrator_backgrounds, { binary_post_data: true }],
     ["^administrator/manage_ranks[\\/]?$", pages.administrator_manage_ranks],
     ["^other/backgrounds/(.*)[\\/]?$", pages.load_backgrounds, { no_login: true }],
+    ["^administrator/set_custom_rank/(.*)/$", pages.administrator_set_custom_rank],
     ["^([\\w\\/\\.\\-\\~]*)$", pages.yourworld, { remove_end_slash: true }]
 ]
 

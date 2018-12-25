@@ -11,7 +11,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var dispage = vars.dispage;
     var ranks_cache = vars.ranks_cache;
 
-    if(!user.operator) {
+    if(!user.superuser) {
         return await dispage("404", null, req, serve, vars);
     }
 
@@ -44,7 +44,7 @@ module.exports.POST = async function(req, serve, vars) {
     var db_misc = vars.db_misc;
     var ranks_cache = vars.ranks_cache;
 
-    if(!user.operator) return;
+    if(!user.superuser) return;
 
     var action = post_data.action;
 

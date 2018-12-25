@@ -135,7 +135,19 @@
 			var xhr = new XMLHttpRequest();
 			xhr.open("POST", "/administrator/manage_ranks/", true);
 			xhr.onload = function(res) {
-				console.log(xhr.responseText)
+				isUpdating = false;
+				var stat = xhr.responseText;
+				rank_upd_status.style.color = "red";
+				if(stat == "PARAM") {
+					rank_upd_status.innerText = "Invalid parameters.";
+				} else if(stat == "ORDER_RACE") {
+					rank_upd_status.innerText = "Ranks were added or deleted while modifying the ranks. Please try again.";
+				} else if(stat == "ACTION") {
+					rank_upd_status.innerText = "Invalid action type.";
+				} else {
+					rank_upd_status.style.color = "";
+					rank_upd_status.innerText = "Updated ranks successfully.";
+				}
 			}
 			xhr.send("action=update&order=" + encodeURIComponent(JSON.stringify(ordering)) + "&ranks=" + encodeURIComponent(JSON.stringify(ranks)));
 		}
@@ -158,7 +170,10 @@
 			isAdding = true;
 			var newName = new_rank_name.value;
 			var newCC = new_rank_cc.value;
-			console.log(newName, newCC)
+			if(!newName) {
+				isAdding = false;
+				return;
+			}
 			rank_add_status.style.display = "";
 			rank_add_status.style.color = "";
 			rank_add_status.innerText = "Adding rank...";
@@ -166,7 +181,19 @@
 			var xhr = new XMLHttpRequest();
 			xhr.open("POST", "/administrator/manage_ranks/", true);
 			xhr.onload = function(res) {
-				console.log(xhr.responseText)
+				isAdding = false;
+				var stat = xhr.responseText;
+				new_rank_name.value = "";
+				new_rank_cc.value = "";
+				rank_add_status.style.color = "red";
+				if(stat == "CRITICAL") {
+					rank_add_status.innerText = "An internal server error occured while trying to add this rank.";
+				} else if(stat == "ACTION") {
+					rank_add_status.innerText = "Invalid action type.";
+				} else {
+					rank_add_status.style.color = "";
+					rank_add_status.innerText = "Added rank successfully.";
+				}
 			}
 			xhr.send("action=add&name=" + encodeURIComponent(newName) + "&cc=" + encodeURIComponent(newCC));
 		}

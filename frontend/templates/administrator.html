@@ -30,6 +30,10 @@
             window.location.pathname = "/administrator/users/by_id/" + user_info_by_id.value + "/";
             return false;
         }
+        function goto_custom_rank_usr() {
+            window.location.pathname = "/administrator/set_custom_rank/" + custom_rank_username_config.value + "/";
+            return false;
+        }
         onload = function() {
             autocomplete({
                 element: document.getElementById("username_config"),
@@ -115,6 +119,16 @@
                 </li>
                 {% endfor %}
             </ul>
+        </div>
+    </div>
+    <div class="content_set">
+        <div class="content_set_title">Set Custom Rank</div>
+        <div class="content_set_content">
+            <form onsubmit="return goto_custom_rank_usr();">
+                User name: 
+                <input type="text" name="username" id="custom_rank_username_config" value="">
+                <input type="submit" value="Modify">
+            </form>
         </div>
     </div>
     <div class="content_set">
