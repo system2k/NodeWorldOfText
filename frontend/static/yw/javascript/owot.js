@@ -86,10 +86,10 @@ var keyConfig = {
     autoApply: ["CTRL+S", "ALT+S"],
     autoDeselect: "SHIFT",
     erase: "BACKSPACE",
-    cursorUp: "UP",
-    cursorDown: "DOWN",
-    cursorLeft: "LEFT",
-    cursorRight: "RIGHT",
+    cursorUp: "UP+*",
+    cursorDown: "DOWN+*",
+    cursorLeft: "LEFT+*",
+    cursorRight: "RIGHT+*",
     copyRegion: "ALT+G"
 }
 
@@ -2018,6 +2018,7 @@ function checkKeyPress(e, combination) {
         ctrl: false,
         shift: false,
         alt: false,
+        anyCSA: false, // does not check for ctrl/shift/alt
         key: ""
     }
     for(var i = 0; i < combination.length; i++) {
@@ -2026,6 +2027,7 @@ function checkKeyPress(e, combination) {
             case "CTRL": map.ctrl = true; break;
             case "SHIFT": map.shift = true; break;
             case "ALT": map.alt = true; break;
+            case "*": map.anyCSA = true; break;
 
             case "ESC": map.key = "Escape"; break;
             case "TAB": map.key = "Tab"; break;
@@ -2048,9 +2050,15 @@ function checkKeyPress(e, combination) {
             default: map.key = key;
         }
     }
-    if(map.ctrl != e.ctrlKey) return false;
-    if(map.shift != e.shiftKey) return false;
-    if(map.alt != e.altKey) return false;
+    if(!map.anyCSA) {
+        if(map.ctrl != e.ctrlKey) return false;
+        if(map.shift != e.shiftKey) return false;
+        if(map.alt != e.altKey) return false;
+    }
+    if(e.keyCode == 37) e.key = "ArrowLeft";
+    if(e.keyCode == 38) e.key = "ArrowUp";
+    if(e.keyCode == 39) e.key = "ArrowRight";
+    if(e.keyCode == 40) e.key = "ArrowDown";
     var eKey = e.key;
     // key must not be Ctrl/Shift/Alt because it's already stored in a boolean
     if(eKey == "Control") eKey = "";
