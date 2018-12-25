@@ -3,11 +3,11 @@
     "version": "1.0.0",
     "description": "OurWorldOfText server",
     "dependencies": {
-        "adm-zip": "^0.4.11",
-        "nodemailer": "^4.6.8",
-        "sqlite3": "^4.0.2",
+        "adm-zip": "^0.4.13",
+        "nodemailer": "^4.7.0",
+        "sqlite3": "^4.0.4",
         "swig": "^1.4.2",
-        "ws": "^6.0.0"
+        "ws": "^6.1.2"
     },
     "scripts": {
         "start": "node runserver.js",

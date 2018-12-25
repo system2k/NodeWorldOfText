@@ -54,6 +54,7 @@ var serverPort = settings.port;
 var serverDB = settings.DATABASE_PATH;
 var chatDB = settings.CHAT_HISTORY_PATH;
 var imageDB = settings.IMAGES_PATH;
+var miscDB = settings.MISC_PATH;
 
 Error.stackTraceLimit = Infinity;
 if(!global.AsyncFunction) var AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
@@ -71,11 +72,12 @@ args.forEach(function(a) {
         serverDB = settings.TEST_DATABASE_PATH;
         chatDB = settings.TEST_CHAT_HISTORY_PATH;
         imageDB = settings.TEST_IMAGES_PATH;
+        miscDB = settings.TEST_MISC_PATH;
         settings.LOG_PATH = settings.TEST_LOG_PATH;
         settings.ZIP_LOG_PATH = settings.TEST_ZIP_LOG_PATH;
         settings.UNCAUGHT_PATH = settings.TEST_UNCAUGHT_PATH;
         settings.REQ_LOG_PATH = settings.TEST_REQ_LOG_PATH;
-        settings.CHAT_LOG_PATH = settings.TEST_CHAT_LOG_PATH;
+        settings.MISC_PATH = settings.TEST_MISC_PATH;
         return;
     }
 });
@@ -104,6 +106,7 @@ if(!fs.existsSync(settings.bypass_key)) {
 const database = new sql.Database(serverDB);
 const chat_history = new sql.Database(chatDB);
 const image_db = new sql.Database(imageDB);
+const misc_db = new sql.Database(miscDB);
 
 function trimHTML(html) {
     // ensure all lines are \r\n instead of just \n (consistent)
@@ -140,6 +143,9 @@ function load_static() {
 
     console.log("Loading HTML templates...");
     dump_dir(template_data, templates_path, "", true);
+
+    // clear swig's cache
+    swig.invalidateCache();
 
     console.log("Compiling HTML templates...");
     for(var i in template_data) {
@@ -189,6 +195,7 @@ function asyncDbSystem(database) {
     const db = {
         // gets data from the database (only 1 row at a time)
         get: async function(command, params) {
+            if(isStopping) return;
             if(params == void 0 || params == null) params = []
             return new Promise(function(r, rej) {
                 database.get(command, params, function(err, res) {
@@ -204,6 +211,7 @@ function asyncDbSystem(database) {
         },
         // runs a command (insert, update, etc...) and might return "lastID" if needed
         run: async function(command, params) {
+            if(isStopping) return;
             if(params == void 0 || params == null) params = []
             var err = false
             return new Promise(function(r, rej) {
@@ -223,6 +231,7 @@ function asyncDbSystem(database) {
         },
         // gets multiple rows in one command
         all: async function(command, params) {
+            if(isStopping) return;
             if(params == void 0 || params == null) params = []
             return new Promise(function(r, rej) {
                 database.all(command, params, function(err, res) {
@@ -238,6 +247,7 @@ function asyncDbSystem(database) {
         },
         // get multiple rows but execute a function for every row
         each: async function(command, params, callbacks) {
+            if(isStopping) return;
             if(typeof params == "function") {
                 callbacks = params
                 params = []
@@ -267,6 +277,7 @@ function asyncDbSystem(database) {
         // like run, but executes the command as a SQL file
         // (no comments allowed, and must be semicolon seperated)
         exec: async function(command) {
+            if(isStopping) return;
             return new Promise(function(r, rej) {
                 database.exec(command, function(err) {
                     if(err) {
@@ -286,6 +297,7 @@ function asyncDbSystem(database) {
 const db = asyncDbSystem(database);
 const db_ch = asyncDbSystem(chat_history);
 const db_img = asyncDbSystem(image_db);
+const db_misc = asyncDbSystem(misc_db);
 
 var transporter;
 var email_available = true;
@@ -426,7 +438,13 @@ async function initialize_server() {
     if(!init) {
         start_server();
     }
-}
+};
+
+function sendProcMsg(msg) {
+    if(process.send) {
+        process.send(msg);
+    }
+};
 
 (async function() {
     try {
@@ -435,11 +453,45 @@ async function initialize_server() {
         console.log("An error occured during the initialization process:");
         console.log(e)
     }
-})()
+})();
 
-prompt.message      = ""; // do not display "prompt" before each question
-prompt.delimiter    = ""; // do not display ":" after "prompt"
-prompt.colors       = false; // disable dark gray color in a black console
+async function initialize_misc_db() {
+    if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='properties'")) {
+        await db_misc.run("CREATE TABLE 'properties' (key BLOB, value BLOB)");
+    }
+}
+
+var ranks_cache = {};
+async function initialize_ranks_db() {
+    if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='ranks'")) {
+        await db_misc.run("CREATE TABLE 'ranks' (id INTEGER, level INTEGER, name TEXT, props TEXT)");
+        await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["max_rank_id", 0]);
+        await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["rank_next_level", 4]);
+    }
+    var ranks = await db_misc.all("SELECT * FROM ranks");
+    ranks_cache.ids = [];
+    for(var i = 0; i < ranks.length; i++) {
+        var rank = ranks[i];
+        
+        var id = rank.id;
+        var level = rank.level;
+        var name = rank.name;
+        var props = JSON.parse(rank.props);
+
+        ranks_cache[id] = {
+            id,
+            level,
+            name,
+            chat_color: props.chat_color
+        }
+        ranks_cache.ids.push(id);
+    }
+    ranks_cache.count = ranks.length;
+}
+
+prompt.message   = ""; // do not display "prompt" before each question
+prompt.delimiter = ""; // do not display ":" after "prompt"
+prompt.colors    = false; // disable dark gray color in a black console
 
 var prompt_account_properties = {
     properties: {
@@ -588,6 +640,14 @@ function command_prompt() {
         if(code == "stop") {
             return stopServer();
         }
+        if(code == "res") {
+            return stopServer(true);
+        }
+        if(code == "sta") {
+            load_static();
+            command_prompt();
+            return;
+        }
         try {
             console.dir(eval(code), { colors: true });
         } catch(e) {
@@ -666,6 +726,7 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^accounts/nsfw/(.*)[\\/]?$", pages.accounts_nsfw],
     ["^administrator/world_restore[\\/]?$", pages.administrator_world_restore],
     ["^administrator/backgrounds[\\/]?$", pages.administrator_backgrounds, { binary_post_data: true }],
+    ["^administrator/manage_ranks[\\/]?$", pages.administrator_manage_ranks],
     ["^other/backgrounds/(.*)[\\/]?$", pages.load_backgrounds, { no_login: true }],
     ["^([\\w\\/\\.\\-\\~]*)$", pages.yourworld, { remove_end_slash: true }]
 ]
@@ -1181,9 +1242,13 @@ function transaction_obj(id) {
 }
 
 process.on("uncaughtException", function(e) {
-    fs.writeFileSync(settings.UNCAUGHT_PATH, JSON.stringify(process_error_arg(e)));
+    try {
+        err = JSON.stringify(process_error_arg(e));
+        err = "TIME: " + Date.now() + "\r\n" + err + "\r\n" + "-".repeat(20) + "\r\n\r\n\r\n";
+        fs.appendFileSync(settings.UNCAUGHT_PATH, err);
+    } catch(e) {};
     console.log("Uncaught error:", e);
-    process.exit();
+    process.exit(-1);
 });
 
 var start_time = Date.now();
@@ -1280,6 +1345,7 @@ function compareNoCase(str1, str2) {
 var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
 
 async function process_request(req, res, current_req_id) {
+    if(isStopping) return;
     var hostname = req.headers.host;
     if(!hostname) hostname = "www.ourworldoftext.com";
     hostname = hostname.slice(0, 1000);
@@ -1638,50 +1704,9 @@ async function init_chat_history() {
         await db_ch.run("CREATE TABLE channels (id integer NOT NULL PRIMARY KEY, name integer, properties text, description text, date_created integer, world_id integer)")
         await db_ch.run("CREATE TABLE entries (id integer NOT NULL PRIMARY KEY, date integer, channel integer, data text)")
         await db_ch.run("CREATE TABLE default_channels (channel_id integer, world_id integer)")
-        var rowid = await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
-            ["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0])
-        var global_id = rowid.lastID;
-        // if a chat log with an old format exists
-        if(fs.existsSync(settings.CHAT_LOG_PATH)) {
-            var chatlogFile = fs.readFileSync(settings.CHAT_LOG_PATH, "utf8");
-            chatlogFile = JSON.parse(chatlogFile);
-            var global = chatlogFile.global_chatlog;
-            var world = chatlogFile.world_chatlog;
-            
-            await db_ch.run("BEGIN TRANSACTION")
-            // begin copying global chats
-            for(var i = 0; i < global.length; i++) {
-                var rowStr = JSON.stringify(global[i]);
-                await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
-                    [Date.now(), global_id, rowStr])
-            }
-            // begin copying world chats
-            for(var i in world) {
-                var worldId = (await db.get("SELECT id FROM world WHERE name=? COLLATE NOCASE", i))
-                if(!worldId) continue;
-                worldId = worldId.id;
-                var channelDesc = "Channel - \"" + i + "\"";
-                if(!i) { // No name? It's the front page
-                    channelDesc = "Front page channel"
-                }
-                // channel names start with _ (underscore)
-                var world_channel = await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
-                    ["_" + i, "{}", channelDesc, Date.now(), worldId])
-                var chats = world[i];
-                // copy each chat into the channel for the world
-                for(var c = 0; c < chats.length; c++) {
-                    var rowStr = JSON.stringify(chats[c]);
-                    await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
-                        [Date.now(), world_channel.lastID, rowStr])
-                }
-                // mark this channel as the default for the world
-                await db_ch.run("INSERT INTO default_channels VALUES(?, ?)",
-                    [world_channel.lastID, worldId])
-            }
-            await db_ch.run("COMMIT")
-        }
+        await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
+            ["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0]);
     }
-
     updateChatLogData();
 }
 
@@ -2080,6 +2105,9 @@ async function initialize_server_components() {
     await sysLoad();
     await sintLoad();
 
+    await initialize_misc_db();
+    await initialize_ranks_db();
+
     initPingAuto();
 
     ws_broadcast = function(data, world, opts) {
@@ -2122,6 +2150,7 @@ async function initialize_server_components() {
     global_data.tile_signal_update = tile_signal_update;
 
     wss.on("connection", async function (ws, req) {
+        if(isStopping) return;
         var ipHeaderAddr = "Unknown"
         try {
             var rnd = Math.floor(Math.random() * 1E4);
@@ -2776,6 +2805,7 @@ var global_data = {
     template_data,
     db,
     db_img,
+    db_misc,
     dispage,
     ms,
     cookie_expire,
@@ -2825,7 +2855,8 @@ var global_data = {
     WebSocket,
     fixColors,
     sanitize_color,
-    worldViews
+    worldViews,
+    ranks_cache
 }
 
 async function sysLoad() {
@@ -2853,7 +2884,10 @@ function stopPrompt() {
 
 // stops server (for upgrades/maintenance) without crashing everything
 // This lets node terminate the program when all handles are complete
-function stopServer() {
+var isStopping = false;
+function stopServer(restart) {
+    if(isStopping) return;
+    isStopping = true;
     console.log("\x1b[32mStopping server...\x1b[0m");
     (async function() {
         stopPrompt();
@@ -2885,8 +2919,15 @@ function stopServer() {
 
         database.close();
         chat_history.close();
+        image_db.close();
+        misc_db.close();
 
         var count = process._getActiveHandles().length;
         console.log("Stopped server with " + count + " handles remaining.");
+        if(restart) {
+            sendProcMsg("RESTART");
+        } else {
+            sendProcMsg("EXIT");
+        }
     })();
 }

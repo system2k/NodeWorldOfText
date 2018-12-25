@@ -91,12 +91,6 @@ function api_chat_send(message, opts) {
     var admin = opts.admin || state.userModel.is_superuser;
     var staff = opts.staff || state.userModel.is_staff;
 
-    if(!op) {
-        message = message.replace(/\&/g, "&amp;");
-        message = message.replace(/\</g, "&lt;");
-        message = message.replace(/\>/g, "&gt;");
-    }
-
     if(!isCommand) addChat(location, id, type, nickname,
                             message, username, op, admin, staff, chatColor, Date.now());
 };
@@ -188,6 +182,9 @@ var client_commands = {
         clearTiles(true);
         clearInterval(fetchInterval);
         addChat(null, 0, "user", "[ Server ]", "Switching to server: " + ws_path, "Server", false, false, false, null, Date.now());
+    },
+    night: function() {
+        w.night();
     }
 }
 
@@ -339,7 +336,7 @@ chat_global_tab.addEventListener("click", function() {
 */
 function addChat(chatfield, id, type, nickname, message, realUsername, op, admin, staff, color, date) {
     if(!nickname) nickname = "";
-    if(!message) message = ""; // Should this even happen?
+    if(!message) message = "";
     if(!realUsername) realUsername = "";
     if(!color) color = assignColor(nickname);
     var dateStr = "";
@@ -353,7 +350,11 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
         field = getChatfield();
     }
 
-    var hasTagDom = op || admin || staff;
+    if(!op) message = html_tag_esc(message);
+    if(!op) nickname = html_tag_esc(nickname);
+
+     // do not give the tag to [ Server ]
+    var hasTagDom = (op || admin || staff) && !(!id && op);
 
     var tagDom;
     var nickTitle = [];

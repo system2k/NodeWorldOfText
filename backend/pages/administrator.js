@@ -7,6 +7,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var uptime = vars.uptime;
     var wss = vars.wss;
     var get_bypass_key = vars.get_bypass_key;
+    var ranks_cache = vars.ranks_cache;
 
     // not a superuser...
     if(!user.superuser) {
@@ -18,6 +19,25 @@ module.exports.GET = async function(req, serve, vars, params) {
         client_num++;
     })
 
+    var custom_ranks = [
+        { level: 0, name: "Default" },
+        { level: 1, name: "Staff" },
+        { level: 2, name: "Superuser" },
+        { level: 3, name: "Operator" }
+    ];
+    var custom_count = ranks_cache.count;
+    var custom_ids = ranks_cache.ids;
+    for(var i = 0; i < custom_count; i++) {
+        var level = i + 4;
+        for(var x = 0; x < custom_ids.length; x++) {
+            var cid = custom_ids[x];
+            if(ranks_cache[cid].level == level) {
+                custom_ranks.push({ level, name: ranks_cache[cid].name });
+                break;
+            }
+        }
+    }
+
     var data = {
         user_ranks: await db.all("SELECT * FROM auth_user WHERE level > 0 ORDER BY level DESC"),
         announcement: announcement(),
@@ -26,7 +46,8 @@ module.exports.GET = async function(req, serve, vars, params) {
         uptime: uptime(),
         machine_uptime: uptime(process.hrtime()[0] * 1000),
         client_num,
-        bypass_key: get_bypass_key()
+        bypass_key: get_bypass_key(),
+        custom_ranks
     }
 
     serve(HTML("administrator.html", data));

@@ -1,53 +1,29 @@
-TODO:
-
-- toggle cursor visible for client or others
-- change cursor color for others
-- enable or disable cursor in world config
-- multi-colored member zones
 - script manager scripts stored in localstorage
 - cursor coords in coords bar
-- unregister username
 - change world's font
 - accept/deny membership requests (blocking included)
-- " add a setting: "Allow others to view the history of the world" "
+- make time machine easier to use, with a toggle to make it publicly accessible or not
 - Binary format
-- Refactoring the frontend code : Will it ever be done?
+- better frontend code
 - Make it usable on phones
-- UI layout
-- Different member categories
-- don't use javascript to make the hover color change in the nav, use css :hover
-- make menu wider by doing width: 150px; in #nav {...
-- the ability to ban
 - erase spam from chat
 - tile caching in backend to prevent overloading
-- when loading color from localstorage, change value in color pciker
 - option to enable or disable javascript links
-- pressing tab to advance the cursor 4 chars
-- look into the fail-safe transaction function - it could be broken
 - large scale erasing
-- pausing on idle; toggle on menu
-- broadcastCommand binary (accept arrays at the moment)
 - (worlds) change title of page
 - (worlds) change favicon to characters
 - when updating world settings, update settings cache in all clients too
 - combine sql queries on fetch requests with multiple ranges
-- Websockets disconnect every minute unless ping requests are sent (JSON)
-- race condition error with visitor counter
-- combine edits requests while a tile is locked
 - worlds in the /w/ or /-/ namespace will not be claimable, but worlds can be generated on that namespace like normal worlds
 - list of clients on world pages
 - split fetch requests if requesting too many tiles
 - do not receive write updates from far places
-- select region to copy
 - better crsftoken and csrfmiddlewaretoken utilization
 - option to expand buffer size of tiles (rendering on client)
-- when clearing public areas, don't allow multiple instances of clearances
 - rate limit chat based on ip connections [partially implemented, but bad ip system]
 - fix edit signal duplication checking / bulking
 - rate limit if sending way too many edits (probably to the point of server slowing down)
-- disabling (in options) rendering block characters as a square instead of character
 - limit cache invalidation of tiles (on the client) if too many are loaded. the client may fetch tiles 3 times per second if it's out of control
-- refactor chat backend file
 - when the socket disconnects as tiles were being fetched, they will never be fetched and will remain as dead tiles
 - admin clearing tools: filter by area protection, url/coord links, etc...
 - links inside telledit
@@ -57,43 +33,34 @@ TODO:
 - garbage collect chat ip limitter object
 - rendering in a webworker
 - smooth zooming on mobile
-- zero width emoji joining and stylizing. example: ":man:‍:computer:" (should be one character)
+- unicode 14 standard (combining emoji chars, styles, etc.)
 - ourworldoftext.com email domain, if possible at all
-- if it's not problematic, restart the server (automatically) if it crashes
-- transaction system race condition with write requests (edits can end a transaction while a request started it). probably need a central queue
-- /warp to a world on the same socket connection
-- Content-Type
-- initial typing on the edgy browser will not work unless clicking several times
+- restart the server (automatically) if it crashes
+- better Content-Type information
+- initial typing on the edge browser will not work unless clicking several times
 - DOM rendering mode
-- after midnight (12:00 AM), make the theme of a certain page black with blue neon. not sure which page. not sure why.
-- if possible, test cases
 - when warping to a different world or server, transistions. random one every time. sliding, 3d effects, etc.
 - password recovery via email
-- prevent receival of updates from areas far from where the client currently is
 - logging thousands of errors in a short time will make the server non-responsive due to blocking I/O
 - setting to disable chat completely
 - invalid world color syntax causes graphical glitches
 - warning when clicking on urls
-- easy way to not click on urls
 - when zoomed out, client is slow
-- a new chrome update took away the good parts of the client. it kept the bad parts and made it slower. the result is the aftermath of a bad chrome update. too many tile drawcalls slow it down
+- reduced calls for drawImage on tiles
 - multiple custom user roles
-- limit 3 combining chars in chat thing
+- limited combining characters in the chat
 - world owners can delete individual messages in chatbox. admins can delete from global
 - chatbar <input> not stopping if limit exceeds
-- keep up with the times. http2 (and ssl on the server's side (not cloudflare's))
-- just update the node version already
+- http2 (and ssl on the server's side (not cloudflare's), and redirection to https)
 - menu too big? some scrollbar if longer than screen height
-- as part of the library reduction movement, de-librarifying the color picker (probably pick between simuations of edge/firefox/chrome/osx color pickers) (due to license of jscolor)
-- also no need for ws library. refactor the removal of jquery in autocomplete library
 - 95% of the homepage css is junk css.
 - no redirects on favicon, etc
 - language settings?
 - easy modding of client
-- performance critical sections in rust (experiment) js just doesn't do some things fast enough
-- combining emoji characters and other complicated unicode standard features
-- a toggle to turn all emojis into a question mark
+- a more memory-efficient server
 - garbage-collect world data objects (objects that store temporary information like a list of clients)
-- automatic redirection to https
 - option to limit world size
 - cache user sessions to speed up page load times
+- uploading custom CSS for a world
+- if you hover over the menu and wait until it finishes expanding, it briefly becomes 5 pixels taller, then becomes normal
+- rate limit fetch requests

@@ -32,3 +32,15 @@ function getKeyCode(e) {
 	if(e.code != void 0) return keyCodeTbl[e.code.toUpperCase()];
 	return 0;
 }
+
+function html_tag_esc(str, non_breaking_space) {
+    str = str.replace(/\&/g, "&amp;");
+    str = str.replace(/\"/g, "&quot;");
+    str = str.replace(/\'/g, "&#39;");
+    if(non_breaking_space) { // replace spaces with non-breaking space html tags
+        str = str.replace(/\u0020/g, "&nbsp;");
+    }
+    str = str.replace(/\</g, "&lt;");
+    str = str.replace(/\>/g, "&gt;");
+    return str;
+}

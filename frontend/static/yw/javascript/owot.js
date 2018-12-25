@@ -240,7 +240,7 @@ function loadImgPixelData(callback) {
             images[img_key] = [backImg.getImageData(0, 0, width, height).data, width, height];
         } else {
             // failed to load. use gray color
-            images[img_key] = [new Uint8ClampedArray([192]), 1, 1];
+            images[img_key] = [new Uint8ClampedArray([221, 221, 221, 255]), 1, 1];
         }
         img_load_index++;
         if(img_load_index >= img_load_keys.length) {
@@ -2472,6 +2472,10 @@ function generateBackgroundPixels(tileX, tileY, image, returnCanvas) {
     if(!image) { // image doesn't exist, return as how it is
         return imgData;
     }
+    var invert = false;
+    if(image == images.unloaded && w.nightMode == 1) {
+        invert = true;
+    }
     var fromData = image[0]; // pixel data (RGBA)
     var img_width = image[1];
     var img_height = image[2];
@@ -2488,10 +2492,19 @@ function generateBackgroundPixels(tileX, tileY, image, returnCanvas) {
             posY = posY - Math.floor(posY / img_height) * img_height;
             var index = (posY * img_width + posX) * 4;
             var destIndex = (y * tileWidth + x) * 4;
-            imgData.data[destIndex + 0] = fromData[index + 0];
-            imgData.data[destIndex + 1] = fromData[index + 1];
-            imgData.data[destIndex + 2] = fromData[index + 2];
-            imgData.data[destIndex + 3] = fromData[index + 3];
+            var R = fromData[index + 0];
+            var G = fromData[index + 1];
+            var B = fromData[index + 2];
+            var A = fromData[index + 3];
+            if(invert) {
+                R = 255 - R;
+                G = 255 - G;
+                B = 255 - B;
+            }
+            imgData.data[destIndex + 0] = R;
+            imgData.data[destIndex + 1] = G;
+            imgData.data[destIndex + 2] = B;
+            imgData.data[destIndex + 3] = A;
         }
     }
     if(returnCanvas) { // return canvas version of background
@@ -3017,7 +3030,7 @@ var w = {
     link_input_type: 0, // 0 = link, 1 = coord,
     protect_type: null, // null = unprotect, 0 = public, 1 = member, 2 = owner
     protect_bg: "",
-    pMod: false,
+    nightMode: 0, // 0 = normal, 1 = night, 2 = night with normal background patterns
     _state: state,
     _ui: {
         announce: announce,
@@ -3336,15 +3349,8 @@ var w = {
         styles.owner = "#222";
         styles.public = "#000";
         styles.text = "#FFF";
-        if(images.unloaded && !ignoreUnloadedPattern && !w.pMod) {
-            var data = images.unloaded[0];
-            for(var i = 0; i < data.length; i += 4) {
-                data[i] = 255 - data[i];
-                data[i + 1] = 255 - data[i + 1];
-                data[i + 2] = 255 - data[i + 2];
-            }
-            w.pMod = true;
-        }
+        w.nightMode = 1;
+        if(ignoreUnloadedPattern) w.nightMode = 2;
         w.redraw();
     }
 }

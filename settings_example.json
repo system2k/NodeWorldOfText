@@ -18,6 +18,9 @@
 
     "IMAGES_PATH": "../data/images.sqlite",
     "TEST_IMAGES_PATH": "../data/test/images_test.sqlite",
+
+    "MISC_PATH": "../data/misc.sqlite",
+    "TEST_MISC_PATH": "../data/test/misc_test.sqlite",
 	
     "LOG_PATH": "../data/nwot_log.log",
     "TEST_LOG_PATH": "../data/test/test_nwot_log.log",
@@ -30,9 +33,6 @@
 	
     "REQ_LOG_PATH": "../data/reqs.err",
     "TEST_REQ_LOG_PATH": "../data/test/test_reqs.err",
-	
-    "CHAT_LOG_PATH": "../data/chat_log.json",
-    "TEST_CHAT_LOG_PATH": "../data/test/test_chat_log.json",
 	
     "CHAT_HISTORY_PATH": "../data/chat_history.sqlite",
     "TEST_CHAT_HISTORY_PATH": "../data/test/test_chat_history.sqlite",

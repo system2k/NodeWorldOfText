@@ -57,13 +57,17 @@ module.exports = async function(ws, data, send, vars) {
     // sends `[ Server ]: <message>` in chat.
     function serverChatResponse(message, location) {
         send({
-            kind: "chat",
             nickname: "[ Server ]",
             realUsername: "[ Server ]",
             id: 0,
             message: message,
             registered: true,
-            location: location
+            location: location,
+            op: true,
+            admin: true,
+            staff: true,
+            color: "",
+            kind: "chat"
         })
     }
     
@@ -153,7 +157,8 @@ module.exports = async function(ws, data, send, vars) {
         [0, "block", ["id"], "block chats from this client"],
         /* [0, "invisible", ["on/off"], "make this client invisible to others"] */
         [0, "color", ["color code"], "change current color for this client"], // client-side
-        [0, "chatcolor", ["color code"], "change only the chat color"] // client-side
+        [0, "chatcolor", ["color code"], "change only the chat color"], // client-side
+        [0, "night", null, "enable night mode"] // client-side
         /* [0, "option", null, "reserved for future use"] */
     ]
 
@@ -297,15 +302,15 @@ module.exports = async function(ws, data, send, vars) {
                 await com.logout();
                 return;
             default:
-                serverChatResponse("Invalid command: " + html_tag_esc(msg));
+                serverChatResponse("Invalid command: " + msg);
         }
     }
 
     var chatData = {
-        nickname: user.operator ? nick : html_tag_esc(nick),
+        nickname: nick,
         realUsername: user.username,
         id: clientId,
-        message: user.operator ? msg : html_tag_esc(msg),
+        message: msg,
         registered: user.authenticated,
         location: data.location,
         op: user.operator,

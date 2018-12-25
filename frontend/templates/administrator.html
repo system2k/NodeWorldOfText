@@ -92,7 +92,7 @@
         </div>
     {% endif %}
     <div class="content_set">
-        <div class="content_set_title">All Users with a High Rank</div>
+        <div class="content_set_title">User Ranks</div>
         <div class="content_set_content">
             <ul>
                 {% for user_rank in user_ranks %}
@@ -115,6 +115,28 @@
                 </li>
                 {% endfor %}
             </ul>
+        </div>
+    </div>
+    <div class="content_set">
+        <div class="content_set_title">All Ranks</div>
+        <div class="content_set_content">
+            {% if user.operator %}
+            <a href="/administrator/manage_ranks">Manage Ranks</a><br>
+            {% endif %}
+            <table style="table-layout: fixed; display: table-cell;">
+                <tbody>
+                    {% for rank in custom_ranks %}
+                    <tr>
+                        <td style="font-weight: bold; width: auto;">
+                            {{rank.level}}:
+                        </td>
+                        <td>
+                            {{rank.name}}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 

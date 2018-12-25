@@ -253,122 +253,95 @@ function protect_area(call_id, tile, t, data) {
     var type = data.type;
     var precise = data.precise;
     var protect_type = data.protect_type;
-    
+
     var world_id = world.id;
 
     var properties = t.properties;
     var charProt = t.charProt;
 
-    var writability = null; // current writability of the target (tile or char)
+    var tile_writability = tile ? tile.writability : world.writability;
+    if(tile_writability == null) tile_writability = world.writability;
 
-    if(tile) {
-        if(precise) {
-            var code = charProt[charY * 16 + charX];
-            if(code == null) {
-                writability = tile.writability
-                if(writability == null) {
-                    writability = world.writability;
-                }
-            } else {
-                writability = code;
-            }
-        } else {
-            writability = tile.writability;
-        }
-    } else {
-        writability = world.writability;
-    }
-    // this 'writability' variable cannot be null, only 0-2
-
-    var can_owner = is_owner;
-    var can_member = is_owner || (is_member &&
-        world.feature_membertiles_addremove && writability < 2);
-
-    if(!(can_owner || can_member)) {
-        cids[call_id][0] = [true, "PERM"];
-        return;
-    }
-
-    var new_writability;
-    if(precise) {
-        new_writability = tile ? tile.writability : null;
-    } else {
-        if(can_owner) {
-            new_writability = protect_type;
-        } else if(can_member && protect_type < 2) {
-            new_writability = protect_type;
-        } else {
-            new_writability = tile ? tile.writability : null;
-        }
-    }
+    var has_modified = false;
 
     if(precise) {
         var idx = charY * 16 + charX;
         var char_writability = charProt[idx];
-        if(char_writability == null) char_writability = writability;
-
-        var char_can_member = can_owner || (can_member && char_writability != 2);
-
-        if(protect_type == 2 && can_owner) {
+        if(char_writability == null) char_writability = tile_writability;
+        var area_perm = is_owner || (is_member && char_writability < 2);
+        if(protect_type == 2 && area_perm && is_owner) {
             charProt[idx] = 2;
+            has_modified = true;
         }
-        if(protect_type == 1 && char_can_member) {
+        if(protect_type == 1 && area_perm && is_member) {
             charProt[idx] = 1;
+            has_modified = true;
         }
-        if(protect_type == 0 && char_can_member) {
+        if(protect_type == 0 && area_perm && is_member) {
             charProt[idx] = 0;
+            has_modified = true;
         }
-        if(protect_type == null && char_can_member) {
+        if(protect_type == null && area_perm && is_member) {
             charProt[idx] = null;
+            has_modified = true;
         }
+        properties.char = encodeCharProt(charProt);
     } else {
+        var full_protection_complete = true;
         for(var i = 0; i < 128; i++) {
             var char_writability = charProt[i];
-            if(char_writability == null) char_writability = writability;
-
-            var char_can_member = can_owner || (can_member && char_writability != 2);
-
-            if(protect_type == 2 && can_owner) {
-                charProt[i] = 2;
+            if(char_writability == null) char_writability = tile_writability;
+            var area_perm = is_owner || (is_member && char_writability < 2);
+            if(protect_type == 2) {
+                if(area_perm && is_owner) {
+                    charProt[i] = 2;
+                    has_modified = true;
+                } else {
+                    full_protection_complete = false;
+                }
             }
-            if(protect_type == 1 && char_can_member) {
-                charProt[i] = 1;
+            if(protect_type == 1) {
+                if(area_perm && is_member) {
+                    charProt[i] = 1;
+                    has_modified = true;
+                } else {
+                    full_protection_complete = false;
+                }
             }
-            if(protect_type == 0 && char_can_member) {
-                charProt[i] = 0;
+            if(protect_type == 0) {
+                if(area_perm && is_member) {
+                    charProt[i] = 0;
+                    has_modified = true;
+                } else {
+                    full_protection_complete = false;
+                }
             }
-            if(protect_type == null && char_can_member) {
+            if(protect_type == null) {
+                if(area_perm && is_member) {
+                    charProt[i] = null;
+                    has_modified = true;
+                } else {
+                    full_protection_complete = false;
+                }
+            }
+        }
+        if(full_protection_complete) {
+            // user can change protection of all chars in the tile, so change the protection of the tile itself
+            for(var i = 0; i < charProt.length; i++) {
                 charProt[i] = null;
             }
+            delete properties.char;
+            t.writability = protect_type;
+        } else {
+            properties.char = encodeCharProt(charProt);
         }
     }
 
-    // if entire array is the same, simplify it
-    var mainWritability = -1;
-    var consistent = true;
-    for(var i = 0; i < 128; i++) {
-        var writ = charProt[i];
-        if(mainWritability == -1) {
-            mainWritability = writ;
-            continue;
-        }
-        if(mainWritability != writ) {
-            consistent = false;
-            break;
-        };
+    // no permission to modify
+    if(!has_modified) {
+        cids[call_id][0] = [true, "PERM"];
+        return;
     }
-
-    if(consistent) {
-        // don't include null, because a protection will be cancelled out if the tile is full-null
-        if(mainWritability != null) {
-            new_writability = mainWritability;
-        }
-        delete properties.char;
-    } else {
-        properties.char = encodeCharProt(charProt);
-    }
-
-    t.writability = new_writability;
 
     cids[call_id][0] = [false, true];
 }
@@ -409,7 +382,7 @@ async function loadTile(tileCache, world_id, tileX, tileY) {
             t.tile_data = " ".repeat(128);
             t.writability = null;
         }
-        t.oldWRitability = t.writability;
+        t.oldWritability = t.writability;
         tileCache[tileUID] = [tile, t];
         return tileCache[tileUID];
     }
