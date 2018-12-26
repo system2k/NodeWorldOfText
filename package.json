@@ -10,9 +10,9 @@
         "ws": "^6.1.2"
     },
     "scripts": {
-        "start": "node runserver.js",
-        "tst": "node --expose-gc runserver.js --test-server",
-        "dbg": "node --trace-warnings --stack-trace-limit=1024 runserver.js --test-server"
+        "start": "node main.js",
+        "tst": "node --expose-gc main.js --test-server",
+        "dbg": "node --trace-warnings --stack-trace-limit=1024 --expose-gc main.js --test-server"
     },
     "private": true
 }
