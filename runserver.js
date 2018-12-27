@@ -8,6 +8,7 @@
 
 console.log("\x1b[36;1mStarting up...\x1b[0m");
 
+const chat_mgr    = require("./backend/utils/chat_mgr.js");
 const crypto      = require("crypto");
 const dump_dir    = require("./backend/dump_dir");
 const fs          = require("fs");
@@ -26,35 +27,42 @@ const utils       = require("./backend/utils/utils.js");
 const WebSocket   = require("ws");
 const zip         = require("adm-zip");
 
-var trimHTML = utils.trimHTML;
-var create_date = utils.create_date;
-var san_nbr = utils.san_nbr;
-var toUpper = utils.toUpper;
-var NCaseCompare = utils.NCaseCompare;
-var split_limit = utils.split_limit;
-var get_third = utils.get_third;
-var get_fourth = utils.get_fourth;
-var removeLastSlash = utils.removeLastSlash;
-var parseCookie = utils.parseCookie;
-var ar_str_trim = utils.ar_str_trim;
-var ar_str_decodeURI = utils.ar_str_decodeURI;
-var filename_sanitize = utils.filename_sanitize;
-var cookie_expire = utils.cookie_expire;
-var encode_base64 = utils.encode_base64;
-var decode_base64 = utils.decode_base64;
-var process_error_arg = utils.process_error_arg;
-var tile_coord = utils.tile_coord;
-var uptime = utils.uptime;
-var compareNoCase = utils.compareNoCase;
+var trimHTML             = utils.trimHTML;
+var create_date          = utils.create_date;
+var san_nbr              = utils.san_nbr;
+var toUpper              = utils.toUpper;
+var NCaseCompare         = utils.NCaseCompare;
+var split_limit          = utils.split_limit;
+var get_third            = utils.get_third;
+var get_fourth           = utils.get_fourth;
+var removeLastSlash      = utils.removeLastSlash;
+var parseCookie          = utils.parseCookie;
+var ar_str_trim          = utils.ar_str_trim;
+var ar_str_decodeURI     = utils.ar_str_decodeURI;
+var filename_sanitize    = utils.filename_sanitize;
+var cookie_expire        = utils.cookie_expire;
+var encode_base64        = utils.encode_base64;
+var decode_base64        = utils.decode_base64;
+var process_error_arg    = utils.process_error_arg;
+var tile_coord           = utils.tile_coord;
+var uptime               = utils.uptime;
+var compareNoCase        = utils.compareNoCase;
 var resembles_int_number = utils.resembles_int_number;
-var TerminalMessage = utils.TerminalMessage;
-var encodeCharProt = utils.encodeCharProt;
-var decodeCharProt = utils.decodeCharProt;
-var advancedSplit = utils.advancedSplit;
+var TerminalMessage      = utils.TerminalMessage;
+var encodeCharProt       = utils.encodeCharProt;
+var decodeCharProt       = utils.decodeCharProt;
+var advancedSplit        = utils.advancedSplit;
 var insert_char_at_index = utils.insert_char_at_index;
-var html_tag_esc = utils.html_tag_esc;
-var sanitize_color = utils.sanitize_color;
-var fixColors = utils.fixColors;
+var html_tag_esc         = utils.html_tag_esc;
+var sanitize_color       = utils.sanitize_color;
+var fixColors            = utils.fixColors;
+
+var prepare_chat_db     = chat_mgr.prepare_chat_db;
+var init_chat_history   = chat_mgr.init_chat_history;
+var retrieveChatHistory = chat_mgr.retrieveChatHistory;
+var add_to_chatlog      = chat_mgr.add_to_chatlog;
+var clearChatlog        = chat_mgr.clearChatlog;
+var updateChatLogData   = chat_mgr.updateChatLogData;
 
 console.log("Loaded libs");
 
@@ -77,6 +85,14 @@ if(!fs.existsSync(SETTINGS_PATH)) {
     console.log("Created the settings file at [" + SETTINGS_PATH + "]. You must configure the settings file and then start the server back up again.");
     console.log("Full path of settings: " + path.resolve(SETTINGS_PATH));
     process.exit();
+}
+
+function handle_error(e) {
+    var str = JSON.stringify(process_error_arg(e));
+    log_error(str);
+    if(isTestServer) {
+        console.log("Error:", str)
+    }
 }
 
 const settings = require(SETTINGS_PATH);
@@ -315,6 +331,8 @@ const db = asyncDbSystem(database);
 const db_ch = asyncDbSystem(chat_history);
 const db_img = asyncDbSystem(image_db);
 const db_misc = asyncDbSystem(misc_db);
+
+prepare_chat_db({ db, db_ch, intv, handle_error });
 
 var transporter;
 var email_available = true;
@@ -1266,7 +1284,7 @@ async function MODIFY_ANNOUNCEMENT(text) {
     if(!element) {
         await db.run("INSERT INTO server_info values('announcement', ?)", text);
     } else {
-        await db.run("UPDATE server_info SET value=? WHERE name='announcement'", text)
+        await db.run("UPDATE server_info SET value=? WHERE name='announcement'", text);
     }
     ws_broadcast({
         kind: "announcement",
@@ -1313,7 +1331,7 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
             return {
                 error: true,
                 message: "Segments cannot be blank (make sure name does not end in /)"
-            }
+            };
         }
         // make sure segment is valid
         var claimMainPage = (worldname[i] == "" && worldname.length == 1 && user.superuser); // if superusers claim the front page
@@ -1321,7 +1339,7 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
             return {
                 error: true,
                 message: "Invalid world name. Contains invalid characters. Must contain either letters, numbers, or _. It can be seperated by /"
-            }
+            };
         }
     }
 
@@ -1336,12 +1354,12 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
                     return {
                         rename: true,
                         new_name: valid_world_name
-                    }
+                    };
                 } else {
                     return {
                         error: true,
                         message: "World already exists, cannot rename to it"
-                    }
+                    };
                 }
             }
             return {
@@ -1352,7 +1370,7 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
             return {
                 error: true,
                 message: "World already has an owner"
-            }
+            };
         }
     } else { // world with /'s
         // make sure first segment is a world owned by the user
@@ -1399,236 +1417,13 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
     }
 }
 
-async function init_chat_history() {
-    if(!await db_ch.get("SELECT name FROM sqlite_master WHERE type='table' AND name='ch_info'")) {
-        await db_ch.run("CREATE TABLE 'ch_info' (name TEXT, value TEXT)");
-    }
-    if(!await db_ch.get("SELECT value FROM ch_info WHERE name='initialized'")) {
-        await db_ch.run("INSERT INTO ch_info VALUES('initialized', 'true')");
-        await db_ch.run("CREATE TABLE channels (id integer NOT NULL PRIMARY KEY, name integer, properties text, description text, date_created integer, world_id integer)")
-        await db_ch.run("CREATE TABLE entries (id integer NOT NULL PRIMARY KEY, date integer, channel integer, data text)")
-        await db_ch.run("CREATE TABLE default_channels (channel_id integer, world_id integer)")
-        await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
-            ["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0]);
-    }
-    updateChatLogData();
-}
-
 async function init_image_database() {
     if(!await db_img.get("SELECT name FROM sqlite_master WHERE type='table' AND name='images'")) {
         await db_img.run("CREATE TABLE 'images' (id INTEGER NOT NULL PRIMARY KEY, name TEXT, date_created INTEGER, mime TEXT, data BLOB)");
     }
 }
 
-var chat_cache = {};
-
-function queue_chat_cache(world_id) {
-    return new Promise(function(res) {
-        chat_cache[world_id].queue.push(function(data) {
-            res(data);
-        })
-    })
-}
-
-// safely delete the chat cache to free up memory
-function invalidate_chat_cache(world_id) {
-    var cache = chat_cache[world_id];
-    if(!cache) return;
-
-    // do not clear caches that are already being loaded
-    if(!cache.loaded) return;
-
-    // if chat entries are not added to the database, do not clear the cache
-    if(world_id == 0) { // global channel
-        if(global_chat_additions.length) return;
-    } else { // world channel
-        if(world_chat_additions[world_id]) return;
-    }
-
-    cache.queue.splice(0);
-    cache.data.splice(0);
-    cache.loaded = false;
-
-    delete chat_cache[world_id];
-}
-
-// every 5 minutes, clear the chat cache
-intv.invalidate_chat_cache = setInterval(function() {
-    for(var i in chat_cache) {
-        invalidate_chat_cache(i);
-    }
-}, Minute * 5)
-
-// Retrieves the chat history of a specific channel instead of loading the entire database into memory
-// The global channel is retrieved by using world id 0
-// includes a race condition resolving system
-async function retrieveChatHistory(world_id) {
-    // no cache has been started
-    if(!(world_id in chat_cache)) {
-        chat_cache[world_id] = {queue: [], data: [], loaded: false};
-    } else if(!chat_cache[world_id].loaded) {
-        // a cache is in progress but not loaded yet
-        return await queue_chat_cache(world_id);
-    }
-
-    // data for this channel is already fully loaded and cached
-    if(world_id in chat_cache && chat_cache[world_id].loaded) return chat_cache[world_id].data;
-
-    var default_channel;
-    if(world_id != 0) { // not global channel (world channels)
-        default_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", world_id);
-        if(default_channel) {
-            default_channel = default_channel.channel_id;
-        } else {
-            default_channel = 0;
-        }
-    } else { // global channel
-        default_channel = await db_ch.get("SELECT id FROM channels WHERE world_id=0");
-        if(default_channel) {
-            default_channel = default_channel.id;
-        } else {
-            default_channel = 0;
-        }
-    }
-    // add data if the channel exists. otherwise it's empty
-    if(default_channel) {
-        var world_chats;
-        if(chatIsCleared[world_id]) {
-            // the channel is being cleared. return a blank history
-            world_chats = [];
-        } else {
-            world_chats = await db_ch.all("SELECT * FROM (SELECT * FROM entries WHERE channel=? ORDER BY id DESC LIMIT 100) ORDER BY id ASC", default_channel);
-        }
-        for(var a = 0; a < world_chats.length; a++) {
-            var row = JSON.parse(world_chats[a].data);
-            row.date = world_chats[a].date;
-            chat_cache[world_id].data.push(row)
-        }
-    }
-    chat_cache[world_id].loaded = true;
-
-    // other calls to this function requested the same chat history while is was being fetched.
-    // send the complete data to those calls
-    var queue = chat_cache[world_id].queue;
-    for(var i = 0; i < queue.length; i++) {
-        queue[i](chat_cache[world_id].data);
-    }
-
-    return chat_cache[world_id].data;
-}
-
-async function add_to_chatlog(chatData, world_id) {
-    var location = "page"
-    if(world_id == 0) {
-        location = "global"
-    }
-
-    var date = Date.now();
-    chatData.date = date;
-
-    var history = await retrieveChatHistory(world_id);
-
-    history.push(chatData);
-    if(history.length > 100) {
-        history.shift();
-    }
-
-    if(location == "page") {
-        world_chat_additions.push([chatData, world_id, date]);
-    } else if(location == "global") {
-        global_chat_additions.push([chatData, date]);
-    }
-}
-
 var worldData = {};
-var chatIsCleared = {};
-
-var global_chat_additions = [];
-var world_chat_additions = [];
-
-function clearChatlog(world_id) {
-    // clear from cache if it exists
-    if(chat_cache[world_id] && chat_cache[world_id].loaded) {
-        chat_cache[world_id].data.splice(0);
-    }
-    // queue to be cleared
-    chatIsCleared[world_id] = true;
-}
-
-async function doUpdateChatLogData() {
-    var copy_global_chat_additions = global_chat_additions.slice(0);
-    var copy_world_chat_additions = world_chat_additions.slice(0);
-    var copy_chatIsCleared = Object.assign(chatIsCleared, {})
-
-    global_chat_additions = [];
-    world_chat_additions = [];
-    chatIsCleared = {};
-
-    await db_ch.run("BEGIN TRANSACTION")
-
-    for(var i in copy_chatIsCleared) {
-        var worldId = i;
-        var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId)
-        if(!def_channel) continue;
-        def_channel = def_channel.channel_id
-        await db_ch.run("DELETE FROM entries WHERE channel=?", def_channel)
-    }
-
-    for(var i = 0; i < copy_world_chat_additions.length; i++) {
-        var row = copy_world_chat_additions[i];
-        var chatData = row[0];
-        var worldId = row[1];
-        var date = row[2];
-        var worldName = await db.get("SELECT name FROM world WHERE id=?", worldId);
-        if(!worldName) continue;
-        worldName = worldName.name;
-        var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId)
-        if(!def_channel) {
-            var channelDesc = "Channel - \"" + worldName + "\"";
-            if(!worldName) { // "" = front page
-                channelDesc = "Front page channel"
-            }
-            var world_channel = await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
-                ["_" + worldName, "{}", channelDesc, Date.now(), worldId])
-            var new_def_channel = await db_ch.run("INSERT INTO default_channels VALUES(?, ?)",
-                [world_channel.lastID, worldId])
-            def_channel = world_channel.lastID;
-        } else {
-            def_channel = def_channel.channel_id;
-        }
-        await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
-            [date, def_channel, JSON.stringify(chatData)])
-    }
-
-    for(var i = 0; i < copy_global_chat_additions.length; i++) {
-        var row = copy_global_chat_additions[i];
-        var data = row[0];
-        var date = row[1];
-        var global_channel = (await db_ch.get("SELECT id FROM channels WHERE name='global'")).id;
-        await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
-            [date, global_channel, JSON.stringify(data)])
-    }
-
-    await db_ch.run("COMMIT")
-}
-
-async function updateChatLogData(no_timeout) {
-    if(!(global_chat_additions.length > 0 ||
-          world_chat_additions.length > 0 ||
-          Object.keys(chatIsCleared).length > 0)) {
-        if(!no_timeout) intv.updateChatLogData = setTimeout(updateChatLogData, 1000);
-        return;
-    }
-
-    try {
-        await doUpdateChatLogData();
-    } catch(e) {
-        handle_error(e);
-    }
-
-    if(!no_timeout) intv.updateChatLogData = setTimeout(updateChatLogData, 5000);
-}
-
 function getWorldData(world) {
     var ref = world.toLowerCase();
 
@@ -2097,14 +1892,6 @@ function start_server() {
             console.log(e);
         }
     })();
-}
-
-function handle_error(e) {
-    var str = JSON.stringify(process_error_arg(e));
-    log_error(str);
-    if(isTestServer) {
-        console.log("Error:", str)
-    }
 }
 
 var worldViews = {};
