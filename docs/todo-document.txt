@@ -35,7 +35,6 @@
 - smooth zooming on mobile
 - unicode 14 standard (combining emoji chars, styles, etc.)
 - ourworldoftext.com email domain, if possible at all
-- restart the server (automatically) if it crashes
 - better Content-Type information
 - initial typing on the edge browser will not work unless clicking several times
 - DOM rendering mode
