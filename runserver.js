@@ -84,6 +84,7 @@ if(!fs.existsSync(SETTINGS_PATH)) {
     fs.writeFileSync(SETTINGS_PATH, fs.readFileSync("./settings_example.json"));
     console.log("Created the settings file at [" + SETTINGS_PATH + "]. You must configure the settings file and then start the server back up again.");
     console.log("Full path of settings: " + path.resolve(SETTINGS_PATH));
+    sendProcMsg("EXIT");
     process.exit();
 }
 
@@ -228,7 +229,6 @@ function asyncDbSystem(database) {
     const db = {
         // gets data from the database (only 1 row at a time)
         get: async function(command, params) {
-            if(isStopping) return;
             if(params == void 0 || params == null) params = []
             return new Promise(function(r, rej) {
                 database.get(command, params, function(err, res) {
@@ -244,7 +244,6 @@ function asyncDbSystem(database) {
         },
         // runs a command (insert, update, etc...) and might return "lastID" if needed
         run: async function(command, params) {
-            if(isStopping) return;
             if(params == void 0 || params == null) params = [];
             var err = false;
             return new Promise(function(r, rej) {
@@ -264,7 +263,6 @@ function asyncDbSystem(database) {
         },
         // gets multiple rows in one command
         all: async function(command, params) {
-            if(isStopping) return;
             if(params == void 0 || params == null) params = [];
             return new Promise(function(r, rej) {
                 database.all(command, params, function(err, res) {
@@ -280,7 +278,6 @@ function asyncDbSystem(database) {
         },
         // get multiple rows but execute a function for every row
         each: async function(command, params, callbacks) {
-            if(isStopping) return;
             if(typeof params == "function") {
                 callbacks = params;
                 params = [];
@@ -310,7 +307,6 @@ function asyncDbSystem(database) {
         // like run, but executes the command as a SQL file
         // (no comments allowed, and must be semicolon seperated)
         exec: async function(command) {
-            if(isStopping) return;
             return new Promise(function(r, rej) {
                 database.exec(command, function(err) {
                     if(err) {
