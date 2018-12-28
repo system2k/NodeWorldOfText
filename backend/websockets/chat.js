@@ -69,7 +69,7 @@ module.exports = async function(ws, data, send, vars) {
             staff: true,
             color: "",
             kind: "chat"
-        })
+        });
     }
     
     var can_chat = false;
@@ -80,7 +80,7 @@ module.exports = async function(ws, data, send, vars) {
     if(!(data.location == "global" || data.location == "page")) data.location = "page";
 
     if(data.location == "page" && !can_chat) {
-        serverChatResponse("You do not have permission to chat here", "page")
+        serverChatResponse("You do not have permission to chat here", "page");
         return;
     }
 
@@ -89,9 +89,9 @@ module.exports = async function(ws, data, send, vars) {
         nick = data.nickname + "";
     }
     if(!user.staff) {
-        nick = nick.slice(0, 20)
+        nick = nick.slice(0, 20);
     } else {
-        nick = nick.slice(0, 3030)
+        nick = nick.slice(0, 3030);
     }
 
     var msg = "";
@@ -161,7 +161,7 @@ module.exports = async function(ws, data, send, vars) {
         [0, "chatcolor", ["color code"], "change only the chat color"], // client-side
         [0, "night", null, "enable night mode"] // client-side
         /* [0, "option", null, "reserved for future use"] */
-    ]
+    ];
 
     function generate_command_list() {
         var list = [];
@@ -176,14 +176,14 @@ module.exports = async function(ws, data, send, vars) {
 
         // sort the command list
         list.sort(function(v1, v2) {
-            return v1[1].localeCompare(v2[1], "en", { sensitivity: "base" })
-        })
+            return v1[1].localeCompare(v2[1], "en", { sensitivity: "base" });
+        });
 
         var html = "";
 
-        html += "Command list:<br>"
+        html += "Command list:<br>";
 
-        html += "<div style=\"background-color: #dadada; font-family: monospace;\">"
+        html += "<div style=\"background-color: #dadada; font-family: monospace;\">";
 
         for(var i = 0; i < list.length; i++) {
             var row = list[i];
@@ -192,32 +192,32 @@ module.exports = async function(ws, data, send, vars) {
             var desc = row[3];
 
             // display arguments for this command
-            var arg_desc = ""
+            var arg_desc = "";
             if(args) {
-                arg_desc += html_tag_esc("<")
+                arg_desc += html_tag_esc("<");
                 for(var v = 0; v < args.length; v++) {
                     var arg = args[v];
-                    arg_desc += "<span style=\"font-style: italic\">" + arg + "</span>"
+                    arg_desc += "<span style=\"font-style: italic\">" + arg + "</span>";
                     if(v != args.length - 1) {
-                        arg_desc += ", "
+                        arg_desc += ", ";
                     }
                 }
-                arg_desc += html_tag_esc(">")
+                arg_desc += html_tag_esc(">");
             }
 
-            command = "<span style=\"color: #00006f\">" + html_tag_esc(command) + "</span>"
+            command = "<span style=\"color: #00006f\">" + html_tag_esc(command) + "</span>";
 
-            var help_row = html_tag_esc("-> /") + command + " " + arg_desc + " :: " + html_tag_esc(desc)
+            var help_row = html_tag_esc("-> /") + command + " " + arg_desc + " :: " + html_tag_esc(desc);
 
             // alternating stripes
             if(i % 2 == 1) {
-                help_row = "<div style=\"background-color: #c3c3c3\">" + help_row + "</div>"
+                help_row = "<div style=\"background-color: #c3c3c3\">" + help_row + "</div>";
             }
 
             html += help_row;
         }
 
-        html += "</div>"
+        html += "</div>";
 
         return html;
     }
@@ -279,7 +279,7 @@ module.exports = async function(ws, data, send, vars) {
 
     // This is a command
     if(msg[0] == "/") {
-        var args = msg.toLowerCase().substr(1).split(" ")
+        var args = msg.toLowerCase().substr(1).split(" ");
         var command = args[0];
 
         var operator  = user.operator;
@@ -349,7 +349,7 @@ module.exports = async function(ws, data, send, vars) {
         chat_perm,
         isChat: true,
         clientId
-    }
+    };
 
     if(!isCommand) {
         if(data.location == "page") {

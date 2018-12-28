@@ -311,10 +311,6 @@ function handleRegionSelection() {
     w._ui.selectionModal.open(reg, colors);
 }
 
-if(state.userModel.is_staff) {
-    chatbar.removeAttribute("maxLength");
-}
-
 var defaultSizes = {
     // in pixels
     cellW: 10,
@@ -1663,17 +1659,17 @@ document.onkeydown = function(e) {
     }
 }
 
-var colors = ["#660066", "#003366", "#ff9900", "#ff0066", "#003300", "#ff0000", "#3a3a3a", "#006666", "#3399ff", "#3333ff", "#000000"]
+var colors = ["#660066", "#003366", "#ff9900", "#ff0066", "#003300", "#ff0000", "#3a3a3a", "#006666", "#3399ff", "#3333ff", "#000000"];
 function assignColor(username) {
 	username = username.toUpperCase();
-	var colLen = colors.length
-	var usrLen = username.length
+	var colLen = colors.length;
+	var usrLen = username.length;
 	var avg = 0;
 	for(var i = 0; i < usrLen; i++) {
 		var chr = username.charCodeAt(i);
-		avg += (chr * chr | (i * chr) % 628) * (i << chr) + (chr*(i + 19 + (chr % 56))*chr)
+		avg += (chr * chr | (i * chr) % 628) * (i << chr) + (chr*(i + 19 + (chr % 56))*chr);
 	}
-	return colors[(Math.abs(avg | 0)) % colLen]
+	return colors[(Math.abs(avg | 0)) % colLen];
 }
 
 function getTileCoordsFromMouseCoords(x, y, ignoreZoomRatio) {
@@ -1713,7 +1709,7 @@ function getRange(x1, y1, x2, y2) {
         y2 = tmp;
     }
 
-    assert(intmax([x1, y1, x2, y2]), "Ranges too large")
+    assert(intmax([x1, y1, x2, y2]), "Ranges too large");
 
     var coords = [];
     for(var y = y1; y <= y2; y++) {
@@ -1792,7 +1788,7 @@ function confirmRunJsLink(data, confirmWarning) {
     if(!doRun) return closeJSAlert();
     var link = document.createElement("a");
     link.href = data;
-    link.click()
+    link.click();
     closeJSAlert();
 }
 
@@ -1825,7 +1821,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
     var pageY = e.pageY * zoomRatio;
     if(arg_pageX != void 0) pageX = arg_pageX;
     if(arg_pageY != void 0) pageY = arg_pageY;
-    var coords = getTileCoordsFromMouseCoords(pageX, pageY, true)
+    var coords = getTileCoordsFromMouseCoords(pageX, pageY, true);
     currentPosition = coords;
     currentPositionInitted = true;
     var tileX = coords[0];
@@ -1854,7 +1850,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             linkElm.href = URL_Link;
             var linkProtocol = linkElm.protocol;
             if(linkProtocol == "javascript:") {
-                URL_Link = "javascript:runJsLink(\"" + escapeQuote(URL_Link) + "\");"
+                URL_Link = "javascript:runJsLink(\"" + escapeQuote(URL_Link) + "\");";
                 linkElm.href = URL_Link;
             } else {
                 linkElm.rel = "noopener noreferrer";
@@ -1865,7 +1861,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             linkElm.title = "Link to coordinates " + pos;
             linkElm.href = "javascript:void(0);";
             linkElm.onclick = function() {
-                w.doGoToCoord(link[0].link_tileY, link[0].link_tileX)
+                w.doGoToCoord(link[0].link_tileY, link[0].link_tileX);
             }
             linkElm.target = "";
         }
@@ -1951,7 +1947,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             }
         } else if(protectPrecision == 1) {
             if(tiles[newTileY + "," + newTileX]) {
-                colorChar(newTileX, newTileY, newCharX, newCharY, w.protect_bg)
+                colorChar(newTileX, newTileY, newCharX, newCharY, w.protect_bg);
                 renderTile(newTileX, newTileY, true);
             }
         }
@@ -2020,7 +2016,7 @@ function checkKeyPress(e, combination) {
         alt: false,
         anyCSA: false, // does not check for ctrl/shift/alt
         key: ""
-    }
+    };
     for(var i = 0; i < combination.length; i++) {
         var key = combination[i];
         switch(key) {

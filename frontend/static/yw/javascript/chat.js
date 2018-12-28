@@ -23,6 +23,12 @@ var total_unread     = document.getElementById("total_unread");
 var page_unread      = document.getElementById("page_unread");
 var global_unread    = document.getElementById("global_unread");
 
+if(state.userModel.is_staff) {
+    chatbar.maxLength = 3030;
+} else {
+    chatbar.maxLength = 400;
+}
+
 var canChat = Permissions.can_chat(state.userModel, state.worldModel);
 if(!canChat) { // can't chat, adjust the chat window for it
     selectedChatTab = 1;
@@ -38,7 +44,7 @@ function api_chat_send(message, opts) {
     var nick = opts.nick || YourWorld.Nickname;
     var location = opts.location ? opts.location : (selectedChatTab == 0 ? "page" : "global");
 
-    var msgLim = state.userModel.is_staff ? Infinity : 400;
+    var msgLim = state.userModel.is_staff ? 3030 : 400;
 
     message = message.slice(0, msgLim).trim();
     chatWriteHistory.push(message);
