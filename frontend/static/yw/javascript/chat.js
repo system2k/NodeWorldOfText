@@ -366,7 +366,12 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 
     if(hasTagDom) {
         tagDom = document.createElement("span");
-        if(op) {
+        if(dataObj.rankName) {
+            tagDom.innerText = "(" + dataObj.rankName + ") ";
+            tagDom.style.color = dataObj.rankColor;
+            tagDom.style.fontWeight = "bold";
+            nickTitle.push(dataObj.rankName);
+        } else if(op) {
             tagDom.innerText = "(OP) ";
             tagDom.style.color = "#0033cc";
             tagDom.style.fontWeight = "bold";
@@ -381,11 +386,6 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
             tagDom.style.color = "#009933";
             tagDom.style.fontWeight = "bold";
             nickTitle.push("Staff");
-        } else if(dataObj.rankName) {
-            tagDom.innerText = "(" + dataObj.rankName + ") ";
-            tagDom.style.color = dataObj.rankColor;
-            tagDom.style.fontWeight = "bold";
-            nickTitle.push(dataObj.rankName);
         }
     }
 

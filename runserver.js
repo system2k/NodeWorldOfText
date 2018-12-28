@@ -1549,6 +1549,7 @@ function initPingAuto() {
     }, 1000 * 30)
 }
 
+var wss;
 async function initialize_server_components() {
     await (async function() {
         announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
@@ -1576,11 +1577,11 @@ async function initialize_server_components() {
         var tmg = new TerminalMessage(cWidth, cHeight);
 
         tmg.setSquare(0, 0, 25, cHeight - 1, "bright_cyan");
-        tmg.setText("OWOT Server is running", 2, 1, "bright_white")
-        tmg.setText("Address:", 2, 2, "bright_white")
-        tmg.setText(addr.address + "", 4, 3, "cyan")
-        tmg.setText("Port:", 2, 4, "bright_white")
-        tmg.setText(addr.port + "", 4, 5, "cyan")
+        tmg.setText("OWOT Server is running", 2, 1, "bright_white");
+        tmg.setText("Address:", 2, 2, "bright_white");
+        tmg.setText(addr.address + "", 4, 3, "cyan");
+        tmg.setText("Port:", 2, 4, "bright_white");
+        tmg.setText(addr.port + "", 4, 5, "cyan");
 
         console.log(tmg.render());
 
@@ -1601,7 +1602,7 @@ async function initialize_server_components() {
 
     ws_broadcast = function(data, world, opts) {
         if(!opts) opts = {};
-        data = JSON.stringify(data)
+        data = JSON.stringify(data);
         wss.clients.forEach(function each(client) {
             try {
                 if(client.readyState == WebSocket.OPEN &&
@@ -1632,257 +1633,257 @@ async function initialize_server_components() {
                     properties: Object.assign(properties, { writability })
                 }
             }
-        }, world)
+        }, world);
     };
 
     global_data.ws_broadcast = ws_broadcast;
     global_data.tile_signal_update = tile_signal_update;
 
-    wss.on("connection", async function (ws, req) {
-        if(isStopping) return;
-        var ipHeaderAddr = "Unknown"
-        try {
-            var rnd = Math.floor(Math.random() * 1E4);
-            var forwd = req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"];
-            var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
-            if(!forwd) forwd = "None;" + rnd;
-            if(!realIp) realIp = "None;" + rnd;
-            ipHeaderAddr = forwd + " & " + realIp;
-            ws.ipHeaderAddr = ipHeaderAddr;
-            ws.ipFwd = forwd;
-            ws.ipReal = realIp;
-        } catch(e) {
-            var error_ip = "ErrC" + Math.floor(Math.random() * 1E4);
-            ws.ipHeaderAddr = error_ip;
-            ws.ipFwd = error_ip;
-            ws.ipReal = error_ip;
-            handle_error(e);
-        }
-        /*
-            TODO: Limit requests based on packet type.
-            The server will not handle 1-GB-per-second write packets from a single client
-        */
-        var req_per_second = 256;
-        var reqs_second = 0; // requests received at current second
-        var current_second = Math.floor(Date.now() / 1000);
-        function can_process_req() { // limit requests per second
-            var compare_second = Math.floor(Date.now() / 1000);
-            reqs_second++;
-            if(compare_second == current_second) {
-                if(reqs_second >= req_per_second) {
-                    return false;
-                } else {
-                    return true;
-                }
-            } else {
-                reqs_second = 0;
-                current_second = compare_second;
-                return true;
-            }
-        }
-        try {
-            // must be at the top before any async calls (errors would occur before this event declaration)
-            ws.on("error", function(err) {
-                handle_error(JSON.stringify(process_error_arg(err)));
-            });
-            var pre_queue = [];
-            // adds data to a queue. this must be before any async calls and the message event
-            function onMessage(msg) {
-                pre_queue.push(msg);
-            }
-            ws.on("message", function(msg) {
-                if(!can_process_req()) return;
-                onMessage(msg);
-            });
-            var status, clientId = void 0;
-            ws.on("close", function() {
-                if(status && clientId != void 0) {
-                    if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
-                        client_ips[status.world.id][clientId][4] = true;
-                        client_ips[status.world.id][clientId][3] = Date.now();
-                    }
-                }
-            });
-            var location = url.parse(req.url).pathname;
-            var world_name;
-            function send_ws(data) {
-                if(ws.readyState === WebSocket.OPEN) {
-                    try {
-                        ws.send(data) // not protected by callbacks
-                    } catch(e) {
-                        handle_error(e);
-                    };
-                }
-            }
-            if(location.match(/(\/ws\/$)/)) {
-                world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
-            } else if(location === "/ws/r_u_alive/") {
-                send_ws('"sure m8"');
-                onMessage = function() {
-                    send_ws('"yes im still alive"');
-                };
-                delete pre_queue;
-                return;
-            } else {
-                send_ws(JSON.stringify({
-                    kind: "error",
-                    message: "Invalid address"
-                }));
-                return ws.close();
-            }
-            
-            ws.world_name = world_name;
-
-            var cookies = parseCookie(req.headers.cookie);
-            var user = await get_user_info(cookies, true)
-            var channel = new_token(7);
-            var vars = objIncludes(global_data, {
-                user,
-                channel
-            })
-
-            status = await websockets.Main(ws, world_name, vars);
-
-            ws.world_id = status.world.id;
-
-            if(typeof status == "string") {
-                send_ws(JSON.stringify({
-                    kind: "error",
-                    message: status
-                }));
-                return ws.close();
-            }
-            vars.world = status.world;
-            vars.timemachine = status.timemachine
-
-            var properties = JSON.parse(status.world.properties);
-            var chat_permission = properties.chat_permission;
-            if(!chat_permission) chat_permission = 0;
-            ws.chat_permission = chat_permission;
-
-            var can_chat = chat_permission == 0 || (chat_permission == 1 && status.permission.member) || (chat_permission == 2 && status.permission.owner);
-
-            var initial_user_count;
-            if(can_chat) {
-                initial_user_count = getUserCountFromWorld(world_name);
-            }
-
-            user.stats = status.permission;
-
-            ws.is_member = user.stats.member;
-            ws.is_owner = user.stats.owner;
-
-            clientId = generateClientId(world_name);
-
-            if(!client_ips[status.world.id]) {
-                client_ips[status.world.id] = {};
-            }
-            client_ips[status.world.id][clientId] = [ws._socket.remoteAddress, ws._socket.address(), ws.ipHeaderAddr, -1, false];
-
-            ws.clientId = clientId;
-            ws.chat_blocks = [];
-
-            var sentClientId = clientId;
-            if(!can_chat) sentClientId = -1;
-            send_ws(JSON.stringify({
-                kind: "channel",
-                sender: channel,
-                id: sentClientId,
-                initial_user_count
-            }))
-            onMessage = async function(msg) {
-                if(!can_process_req()) return;
-                try {
-                    if(!(typeof msg == "string" || typeof msg == "object")) {
-                        return;
-                    }
-                    if(!(msg.constructor == Buffer || msg.constructor == String)) {
-                        return send_ws(JSON.stringify({
-                            kind: "error",
-                            message: "Invalid socket type"
-                        }))
-                    }
-                    if(msg.constructor == Buffer) { // buffers not supported at the moment
-                        return;
-                    }
-                } catch(e) {
-                    handle_error(e);
-                    return;
-                }
-                req_id++;
-                var current_req_id = req_id;
-                try {
-                    // This is a ping
-                    if(msg.startsWith("2::")) {
-                        var args = msg.substr(3);
-                        var res = {
-                            kind: "ping",
-                            result: "pong"
-                        }
-                        if(args == "@") {
-                            res.time = true;
-                        }
-                        return send_ws(JSON.stringify(res));
-                    }
-                    // Parse request. If failed, return a "418" message
-                    try {
-                        msg = JSON.parse(msg);
-                    } catch(e) {
-                        send_ws(JSON.stringify({
-                            kind: "error",
-                            message: "418 I'm a Teapot"
-                        }))
-                        return ws.close()
-                    }
-                    if(!msg || msg.constructor != Object) {
-                        send_ws(JSON.stringify({
-                            kind: "error",
-                            message: "Invalid_Type"
-                        }))
-                        return;
-                    }
-                    var kind = msg.kind;
-                    // Begin calling a websocket function for the necessary request
-                    if(websockets[kind]) {
-                        function send(msg) {
-                            msg.kind = kind
-                            send_ws(JSON.stringify(msg))
-                        }
-                        function broadcast(data, opts) {
-                            data.source = kind;
-                            ws_broadcast(data, world_name, opts);
-                        }
-                        var res = await websockets[kind](ws, msg, send, objIncludes(vars, {
-                            transaction: transaction_obj(current_req_id),
-                            broadcast,
-                            clientId
-                        }))
-                        if(typeof res == "string") {
-                            send_ws(JSON.stringify({
-                                kind: "error",
-                                message: res
-                            }));
-                        }
-                    }
-                } catch(e) {
-                    handle_error(e);
-                }
-            }
-            // Some messages might have been received before the socket finished opening
-            if(pre_queue.length > 0) {
-                for(var p = 0; p < pre_queue.length; p++) {
-                    onMessage(pre_queue[p]);
-                    pre_queue.splice(p, 1)
-                    p--;
-                }
-            }
-        } catch(e) {
-            handle_error(e);
-        }
-    })
+    wss.on("connection", manageWebsocketConnection);
 }
 
-var wss;
+async function manageWebsocketConnection(ws, req) {
+    if(isStopping) return;
+    var ipHeaderAddr = "Unknown";
+    try {
+        var rnd = Math.floor(Math.random() * 1E4);
+        var forwd = req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"];
+        var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
+        if(!forwd) forwd = "None;" + rnd;
+        if(!realIp) realIp = "None;" + rnd;
+        ipHeaderAddr = forwd + " & " + realIp;
+        ws.ipHeaderAddr = ipHeaderAddr;
+        ws.ipFwd = forwd;
+        ws.ipReal = realIp;
+    } catch(e) {
+        var error_ip = "ErrC" + Math.floor(Math.random() * 1E4);
+        ws.ipHeaderAddr = error_ip;
+        ws.ipFwd = error_ip;
+        ws.ipReal = error_ip;
+        handle_error(e);
+    }
+    /*
+        TODO: Limit requests based on packet type.
+    */
+    var req_per_second = 256;
+    var reqs_second = 0; // requests received at current second
+    var current_second = Math.floor(Date.now() / 1000);
+    function can_process_req() { // limit requests per second
+        var compare_second = Math.floor(Date.now() / 1000);
+        reqs_second++;
+        if(compare_second == current_second) {
+            if(reqs_second >= req_per_second) {
+                return false;
+            } else {
+                return true;
+            }
+        } else {
+            reqs_second = 0;
+            current_second = compare_second;
+            return true;
+        }
+    }
+    try {
+        // must be at the top before any async calls (errors would occur before this event declaration)
+        ws.on("error", function(err) {
+            handle_error(JSON.stringify(process_error_arg(err)));
+        });
+        var pre_queue = [];
+        // adds data to a queue. this must be before any async calls and the message event
+        function onMessage(msg) {
+            pre_queue.push(msg);
+        }
+        ws.on("message", function(msg) {
+            if(!can_process_req()) return;
+            onMessage(msg);
+        });
+        var status, clientId = void 0;
+        ws.on("close", function() {
+            if(status && clientId != void 0) {
+                if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
+                    client_ips[status.world.id][clientId][4] = true;
+                    client_ips[status.world.id][clientId][3] = Date.now();
+                }
+            }
+        });
+        var location = url.parse(req.url).pathname;
+        var world_name;
+        function send_ws(data) {
+            if(ws.readyState === WebSocket.OPEN) {
+                try {
+                    ws.send(data); // not protected by callbacks
+                } catch(e) {
+                    handle_error(e);
+                };
+            }
+        }
+        if(location.match(/(\/ws\/$)/)) {
+            world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
+        } else if(location === "/ws/r_u_alive/") {
+            send_ws('"sure m8"');
+            onMessage = function() {
+                send_ws('"yes im still alive"');
+            };
+            delete pre_queue;
+            return;
+        } else {
+            send_ws(JSON.stringify({
+                kind: "error",
+                message: "Invalid address"
+            }));
+            return ws.close();
+        }
+        
+        ws.world_name = world_name;
+
+        var cookies = parseCookie(req.headers.cookie);
+        var user = await get_user_info(cookies, true);
+        var channel = new_token(7);
+        var vars = objIncludes(global_data, {
+            user,
+            channel
+        });
+
+        status = await websockets.Main(ws, world_name, vars);
+
+        ws.world_id = status.world.id;
+
+        if(typeof status == "string") {
+            send_ws(JSON.stringify({
+                kind: "error",
+                message: status
+            }));
+            return ws.close();
+        }
+        vars.world = status.world;
+        vars.timemachine = status.timemachine;
+
+        var properties = JSON.parse(status.world.properties);
+        var chat_permission = properties.chat_permission;
+        if(!chat_permission) chat_permission = 0;
+        ws.chat_permission = chat_permission;
+
+        var can_chat = chat_permission == 0 || (chat_permission == 1 && status.permission.member) || (chat_permission == 2 && status.permission.owner);
+
+        var initial_user_count;
+        if(can_chat) {
+            initial_user_count = getUserCountFromWorld(world_name);
+        }
+
+        user.stats = status.permission;
+
+        ws.is_member = user.stats.member;
+        ws.is_owner = user.stats.owner;
+
+        clientId = generateClientId(world_name);
+
+        if(!client_ips[status.world.id]) {
+            client_ips[status.world.id] = {};
+        }
+        client_ips[status.world.id][clientId] = [ws._socket.remoteAddress, ws._socket.address(), ws.ipHeaderAddr, -1, false];
+
+        ws.clientId = clientId;
+        ws.chat_blocks = [];
+
+        var sentClientId = clientId;
+        if(!can_chat) sentClientId = -1;
+        send_ws(JSON.stringify({
+            kind: "channel",
+            sender: channel,
+            id: sentClientId,
+            initial_user_count
+        }));
+        onMessage = async function(msg) {
+            if(!can_process_req()) return;
+            try {
+                if(!(typeof msg == "string" || typeof msg == "object")) {
+                    return;
+                }
+                if(!(msg.constructor == Buffer || msg.constructor == String)) {
+                    return send_ws(JSON.stringify({
+                        kind: "error",
+                        message: "Invalid socket type"
+                    }))
+                }
+                if(msg.constructor == Buffer) { // buffers not supported at the moment
+                    return;
+                }
+            } catch(e) {
+                handle_error(e);
+                return;
+            }
+            req_id++;
+            var current_req_id = req_id;
+            try {
+                // This is a ping
+                if(msg.startsWith("2::")) {
+                    var args = msg.substr(3);
+                    var res = {
+                        kind: "ping",
+                        result: "pong"
+                    }
+                    if(args == "@") {
+                        res.time = true;
+                    }
+                    return send_ws(JSON.stringify(res));
+                }
+                // Parse request. If failed, return a "418" message
+                try {
+                    msg = JSON.parse(msg);
+                } catch(e) {
+                    send_ws(JSON.stringify({
+                        kind: "error",
+                        message: "418 I'm a Teapot"
+                    }));
+                    return ws.close();
+                }
+                if(!msg || msg.constructor != Object) {
+                    send_ws(JSON.stringify({
+                        kind: "error",
+                        message: "Invalid_Type"
+                    }));
+                    return;
+                }
+                var kind = msg.kind;
+                // Begin calling a websocket function for the necessary request
+                if(websockets[kind]) {
+                    function send(msg) {
+                        msg.kind = kind;
+                        send_ws(JSON.stringify(msg));
+                    }
+                    function broadcast(data, opts) {
+                        data.source = kind;
+                        ws_broadcast(data, world_name, opts);
+                    }
+                    var res = await websockets[kind](ws, msg, send, objIncludes(vars, {
+                        transaction: transaction_obj(current_req_id),
+                        broadcast,
+                        clientId
+                    }));
+                    if(typeof res == "string") {
+                        send_ws(JSON.stringify({
+                            kind: "error",
+                            message: res
+                        }));
+                    }
+                }
+            } catch(e) {
+                handle_error(e);
+            }
+        }
+        // Some messages might have been received before the socket finished opening
+        if(pre_queue.length > 0) {
+            for(var p = 0; p < pre_queue.length; p++) {
+                onMessage(pre_queue[p]);
+                pre_queue.splice(p, 1);
+                p--;
+            }
+        }
+    } catch(e) {
+        handle_error(e);
+    }
+}
+
 function start_server() {
     (async function() {
         try {
