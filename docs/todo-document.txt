@@ -61,5 +61,4 @@
 - option to limit world size
 - cache user sessions to speed up page load times
 - uploading custom CSS for a world
-- if you hover over the menu and wait until it finishes expanding, it briefly becomes 5 pixels taller, then becomes normal
 - rate limit fetch requests

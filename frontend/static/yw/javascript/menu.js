@@ -118,6 +118,7 @@ var menuAnimationActive = false;
 function slideElement(direction, element, speed) {
 	if(menuAnimationActive) return;
 	var interval = 13;
+	var menuMargin = 2;
 
 	if(menuAnimationState == "up" && direction == "up") return;
 	if(menuAnimationState == "down" && direction == "down") return;
@@ -130,7 +131,7 @@ function slideElement(direction, element, speed) {
 	element.style.marginBottom = "0px";
 
 	element.style.display = "block";
-	var destHeight = element.offsetHeight;
+	var destHeight = element.offsetHeight - menuMargin * 2;
 	if(direction == "down") element.style.height = "0px";
 
 	var start = Date.now();
@@ -162,11 +163,11 @@ function slideElement(direction, element, speed) {
 		var multiply = easeOutQuad(duration, 0, 1, speed);
 
 		var currentHeight = multiply * destHeight;
-		var currentPadding = multiply * 2;
-	
+		var currentPadding = multiply * menuMargin;
+
 		if(direction == "up") {
 			currentHeight = destHeight - currentHeight;
-			currentPadding = 2 - currentPadding;
+			currentPadding = menuMargin - currentPadding;
 		}
 
 		element.style.height = currentHeight + "px";
