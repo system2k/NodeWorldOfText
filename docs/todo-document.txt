@@ -29,7 +29,6 @@
 - links inside telledit
 - dos the owot test server to test for dos vunerabilities
 - 1 canvas instead of 2
-- test for open html sockets on server exit
 - garbage collect chat ip limitter object
 - rendering in a webworker
 - smooth zooming on mobile
@@ -49,7 +48,6 @@
 - multiple custom user roles
 - limited combining characters in the chat
 - world owners can delete individual messages in chatbox. admins can delete from global
-- chatbar <input> not stopping if limit exceeds
 - http2 (and ssl on the server's side (not cloudflare's), and redirection to https)
 - menu too big? some scrollbar if longer than screen height
 - 95% of the homepage css is junk css.

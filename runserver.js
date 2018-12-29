@@ -2017,7 +2017,38 @@ function stopServer(restart) {
         image_db.close();
         misc_db.close();
 
-        var count = process._getActiveHandles().length;
+        var handles = process._getActiveHandles();
+
+        for(var i = 0; i < handles.length; i++) {
+            var handle = handles[i];
+            var cons = "";
+            if(handle && handle.constructor && handle.constructor.name) cons = handle.constructor.name;
+            if(cons) {
+                if(cons == "WriteStream") {
+                    process.stdout.write("- Write stream, FD: " + handle.fd + "\n");
+                } else if(cons == "Server") {
+                    process.stdout.write("- Server, Key: " + handle._connectionKey + ", Connections: " + handle._connections + "\n");
+                } else if(cons == "Socket") {
+                    process.stdout.write("- Socket, ");
+                    if(handle._peername) {
+                        process.stdout.write("Address: [" + handle._peername.address + "]:" + handle._peername.port + ", IP type: " + handle._peername.family);
+                    } else {
+                        if(handle.parser && handle.parser.constructor && handle.parser.constructor.name == "HTTPParser") {
+                            process.stdout.write("HTTP");
+                        } else {
+                            process.stdout.write("Unknown");
+                        }
+                    }
+                    process.stdout.write("\n");
+                } else {
+                    process.stdout.write("- Other, Type: " + cons + "\n");
+                }
+            } else {
+                console.log("- Unknown handle, Typeof " + (typeof handle));
+            }
+        }
+
+        var count = handles.length;
         console.log("Stopped server with " + count + " handles remaining.");
         if(restart) {
             sendProcMsg("RESTART");
