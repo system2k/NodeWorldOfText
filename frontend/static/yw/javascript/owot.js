@@ -934,7 +934,7 @@ function begin() {
             createSocket();
         },
         error: function() {
-            console.warn("An error occured while loading the world style");
+            console.warn("An error occurred while loading the world style");
             styles = defaultStyles();
             menu_color(styles.menu);
             writability_styles = [styles.public, styles.member, styles.owner];

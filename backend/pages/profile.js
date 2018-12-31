@@ -98,7 +98,7 @@ module.exports.POST = async function(req, serve, vars) {
     if(post_data.form == "claim") {
         var worldname = post_data.worldname + "";
         var validate = await validate_claim_worldname(worldname, vars);
-        if(validate.error) { // an error occured while claiming
+        if(validate.error) { // an error occurred while claiming
             return await dispage("profile", {
                 message: validate.message
             }, req, serve, vars)

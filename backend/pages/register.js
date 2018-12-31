@@ -116,7 +116,7 @@ module.exports.POST = async function(req, serve, vars) {
         } catch(e) {
             handle_error(e);
             return await dispage("register", {
-                form_email_errors: ["An internal error occured while sending the verification email"]
+                form_email_errors: ["An internal error occurred while sending the verification email"]
             }, req, serve, vars);
         }
 

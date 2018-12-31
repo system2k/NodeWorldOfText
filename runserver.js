@@ -92,7 +92,7 @@ function handle_error(e) {
     var str = JSON.stringify(process_error_arg(e));
     log_error(str);
     if(isTestServer) {
-        console.log("Error:", str)
+        console.log("Error:", str);
     }
 }
 
@@ -305,7 +305,7 @@ function asyncDbSystem(database) {
             })
         },
         // like run, but executes the command as a SQL file
-        // (no comments allowed, and must be semicolon seperated)
+        // (no comments allowed, and must be semicolon separated)
         exec: async function(command) {
             return new Promise(function(r, rej) {
                 database.exec(command, function(err) {
@@ -428,7 +428,7 @@ function sendProcMsg(msg) {
     try {
         await initialize_server();
     } catch(e) {
-        console.log("An error occured during the initialization process:");
+        console.log("An error occurred during the initialization process:");
         console.log(e);
     }
 })();
@@ -903,6 +903,18 @@ function plural(int, plEnding) {
     return p;
 }
 
+function is_unclaimable_worldname(world) {
+    if(!world) return false;
+    world = world.split("/");
+    if(world.length < 2) return false;
+    if(!(world[0] == "w" || world[0] == "W")) return false;
+    for(var i = 0; i < world.length; i++) {
+        var seg = world[i];
+        if(!seg.match(/^([\w\.\-]*)$/g) || !seg) return false;
+    }
+    return true;
+}
+
 async function world_get_or_create(name, do_not_create, force_create) {
     name += "";
     if(typeof name != "string") name = "";
@@ -911,7 +923,7 @@ async function world_get_or_create(name, do_not_create, force_create) {
     }
     var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
     if(!world) { // world doesn't exist, create it
-        if((name.match(/^([\w\.\-]*)$/g) && !do_not_create) || force_create) {
+        if(((name.match(/^([\w\.\-]*)$/g) || is_unclaimable_worldname(name)) && !do_not_create) || force_create) {
             var date = Date.now();
             var rw = await db.run("INSERT INTO world VALUES(null, ?, null, ?, 2, 0, 0, 0, 0, '', '', '', '', '', '', 0, 0, '{}')",
                 [name, date]);
@@ -1052,7 +1064,7 @@ var server = https_reference.createServer(options, async function(req, res) {
         try {
             err500Temp = template_data["500.html"]()
         } catch(e) {
-            err500Temp = "An error has occured while displaying the 500 internal server error page";
+            err500Temp = "An error has occurred while displaying the 500 internal server error page";
             handle_error(e);
         }
         res.end(err500Temp);
@@ -1207,7 +1219,7 @@ async function process_request(req, res, current_req_id) {
                 // return compiled HTML pages
                 function HTML(path, data) {
                     if(!template_data[path]) { // template not found
-                        return "An unexpected error occured while generating this page"
+                        return "An unexpected error occurred while generating this page"
                     }
                     if(!data) {
                         data = {};
@@ -1251,7 +1263,7 @@ async function process_request(req, res, current_req_id) {
 	if(!vars.HTML) {
 		vars.HTML = function (path, data) {
 			if(!template_data[path]) { // template not found
-				return "An unexpected error occured while generating this page"
+				return "An unexpected error occurred while generating this page"
 			}
 			if(!data) {
 				data = {};
@@ -1312,18 +1324,18 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
         return {
             error: true,
             message: "Worldname cannot be blank"
-        }
+        };
     }
     if(worldname.length > 10000) {
         return {
             error: true,
-            message: "Error while claiming this world"
-        }
+            message: "An error occurred while claiming this world"
+        };
     }
     worldname = worldname.split("/");
     for(var i in worldname) {
-        // make sure there is no blank segment (superusers bypass this)
-        if(worldname[i] == "" && !user.superuser) {
+        // make sure there is no blank segment
+        if(worldname[i] == "") {
             return {
                 error: true,
                 message: "Segments cannot be blank (make sure name does not end in /)"
@@ -1334,7 +1346,7 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
         if(!(worldname[i].match(/^([\w\.\-]*)$/g) && (worldname[i].length > 0 || claimMainPage))) {
             return {
                 error: true,
-                message: "Invalid world name. Contains invalid characters. Must contain either letters, numbers, or _. It can be seperated by /"
+                message: "Invalid world name. Contains invalid characters. Must contain either letters, numbers, or _. It can be separated by /"
             };
         }
     }
@@ -1371,24 +1383,30 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
     } else { // world with /'s
         // make sure first segment is a world owned by the user
         var base_worldname = worldname[0];
+        if(base_worldname == "w" || base_worldname == "W") {
+            return {
+                error: true,
+                message: "You do not own the base world in the path"
+            };
+        }
         var base_world = await world_get_or_create(base_worldname, true);
         // world does not exist nor is owned by the user
         if(!base_world || (base_world && base_world.owner_id != user.id)) {
             return {
                 error: true,
                 message: "You do not own the base world in the path"
-            }
+            };
         }
         worldname = worldname.join("/");
         // create world, except if user is trying to rename
-        var claimedSubworld = await world_get_or_create(worldname, rename_casing, (true && !rename_casing));
+        var claimedSubworld = await world_get_or_create(worldname, rename_casing, !rename_casing);
         // only renaming the casing
         if(rename_casing && claimedSubworld) {
             if(claimedSubworld.id == world_id) {
                 return {
                     rename: true,
                     new_name: valid_world_name
-                }
+                };
             }
         }
         // does not exist
@@ -1396,14 +1414,14 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
             return {
                 rename: true,
                 new_name: valid_world_name
-            }
+            };
         }
         // already owned (Unless owner renames it)
         if(claimedSubworld.owner_id != null && !(rename_casing && claimedSubworld.id == world_id)) {
             return {
                 error: true,
                 message: "You already own this subdirectory world"
-            }
+            };
         }
         // subworld is created, now claim it
         return {
@@ -1885,7 +1903,7 @@ function start_server() {
         try {
             await initialize_server_components();
         } catch(e) {
-            console.log("An error occured during component initialization");
+            console.log("An error occurred during component initialization");
             console.log(e);
         }
     })();

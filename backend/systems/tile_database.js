@@ -683,7 +683,7 @@ module.exports.editResponse = async function(id) {
         if(cids[id]) {
             cids[id][1] = res;
         } else {
-            console.log("An error occured while sending back an edit response");
+            console.log("An error occurred while sending back an edit response");
         }
     })
 }

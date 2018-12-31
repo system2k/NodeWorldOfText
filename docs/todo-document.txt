@@ -14,7 +14,6 @@
 - (worlds) change favicon to characters
 - when updating world settings, update settings cache in all clients too
 - combine sql queries on fetch requests with multiple ranges
-- worlds in the /w/ or /-/ namespace will not be claimable, but worlds can be generated on that namespace like normal worlds
 - list of clients on world pages
 - split fetch requests if requesting too many tiles
 - do not receive write updates from far places
@@ -51,7 +50,6 @@
 - http2 (and ssl on the server's side (not cloudflare's), and redirection to https)
 - menu too big? some scrollbar if longer than screen height
 - 95% of the homepage css is junk css.
-- no redirects on favicon, etc
 - language settings?
 - easy modding of client
 - a more memory-efficient server
