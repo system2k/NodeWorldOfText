@@ -318,12 +318,13 @@
 						<input name="world_background" value="{{ background_path }}">
 					</p>
 				{% endif %}
-				<a href="javascript: showAdvancedMisc();">Advanced...</a>
+				<a href="javascript: showAdvancedMisc();" style="display: block; margin-bottom: 7px;">Advanced...</a>
 				<div id="advanced" style="display: none;">
 					<p>
 						Use square characters
 						<input name="square_chars" type="checkbox"{%if square_chars%} checked{%endif%}>
-					</p><p>
+					</p>
+					<p>
 						Use 10x20 characters
 						<input name="half_chars" type="checkbox"{%if half_chars%} checked{%endif%}>
 					</p>
@@ -335,8 +336,11 @@
 						Do not log edits
 						<input name="no_log_edits" type="checkbox"{%if no_log_edits%} checked{%endif%}>
 					</p>
+					<p>
+						Meta Description:
+						<br><textarea name="meta_desc" style="width: 400px; height: 32px;" maxlength="600">{% if meta_desc %}{{meta_desc}}{% endif %}</textarea>
+					</p>
 				</div>
-				<br>
 				<input type="hidden" name="form" value="misc">
 				<input type="submit" value="Submit">
 			</form>

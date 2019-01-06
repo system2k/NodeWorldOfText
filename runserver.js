@@ -701,6 +701,7 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^administrator/manage_ranks[\\/]?$", pages.administrator_manage_ranks],
     ["^other/backgrounds/(.*)[\\/]?$", pages.load_backgrounds, { no_login: true }],
     ["^administrator/set_custom_rank/(.*)/$", pages.administrator_set_custom_rank],
+    ["^other/chat/(.*)[\\/]?$", pages.other_chat],
     ["^([\\w\\/\\.\\-\\~]*)$", pages.yourworld, { remove_end_slash: true }]
 ];
 
@@ -1105,7 +1106,11 @@ async function process_request(req, res, current_req_id) {
     }
     try {
         URL = decodeURIComponent(URL);
-    } catch (e) {}
+    } catch (e) {};
+
+    if(sub.length == 1 && compareNoCase(sub[0], "chat") && URL != "favicon.ico") {
+        URL = "other/chat/" + URL;
+    }
 
     var request_resolved = false;
 
@@ -1123,7 +1128,7 @@ async function process_request(req, res, current_req_id) {
             redirect: url to redirect to
             download_file: force browser to download this file as .txt. specifies its name
         } (all optional)*/
-        var info = {}
+        var info = {};
         if(!params) {
             params = {};
         }
@@ -1146,7 +1151,7 @@ async function process_request(req, res, current_req_id) {
                 if(!status_code) {
                     status_code = 302;
                 }
-                info.Location = params.redirect
+                info.Location = params.redirect;
             }
         }
         if(params.mime) {
@@ -1159,8 +1164,8 @@ async function process_request(req, res, current_req_id) {
         if(!data) {
             data = "";
         }
-        res.write(data, "utf8")
-        res.end()
+        res.write(data, "utf8");
+        res.end();
     }
 
     var vars = {};

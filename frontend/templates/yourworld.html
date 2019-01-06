@@ -5,10 +5,8 @@
         <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
         <link rel="shortcut icon" type="image/png" href="/static/favicon.png">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="description" content="An infinite grid of text editable by anyone. This is like YourWorldOfText, but with more features.">
-        {% for script in user.scripts %}
-            <script src="/script_manager/view/{{ script.name }}/"></script>
-        {% endfor %}
+        {% if meta_desc %}<meta name="description" content="{{meta_desc}}">{% else %}<meta name="description" content="An infinite grid of text editable by anyone. This is like YourWorldOfText, but with more features.">{% endif %}
+        {% for script in user.scripts %}<script src="/script_manager/view/{{ script.name }}/"></script>{% endfor %}
         <link type="text/css" rel="stylesheet" href="/static/css/yourworld.css">
     </head>
     <body>
@@ -184,9 +182,7 @@
         </div>
 
         <script src="/static/yw/javascript/polyfills.js"></script>
-        {% if nsfw %}
-            <script src="/static/yw/javascript/nsfw.js"></script>
-        {% endif %}
+        {% if nsfw %}<script src="/static/yw/javascript/nsfw.js"></script>{% endif %}
         <script src="/static/lib/jscolor.min.js"></script>
         <script src="/static/yw/javascript/Modals.js"></script>
         <script src="/static/yw/javascript/menu.js"></script>
@@ -194,8 +190,6 @@
         <script src="/static/yw/javascript/permissions.js"></script>
         <script src="/static/yw/javascript/chat.js"></script>
         <script src="/static/yw/javascript/owot.js"></script>
-        {% if user.superuser %}
-            <script src="/static/yw/javascript/adminWorldUI.js"></script>
-        {% endif %}
+        {% if user.superuser %}<script src="/static/yw/javascript/adminWorldUI.js"></script>{% endif %}
     </body>
 </html>

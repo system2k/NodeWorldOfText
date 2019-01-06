@@ -66,31 +66,31 @@ module.exports = async function(data, vars) {
     var utf16static = data.utf16static;
     for(var i = 0; i < len; i++) {
         var rect = data.fetchRectangles[i];
-        var minY = san_nbr(rect.minY)
-        var minX = san_nbr(rect.minX)
-        var maxY = san_nbr(rect.maxY)
-        var maxX = san_nbr(rect.maxX)
+        var minY = san_nbr(rect.minY);
+        var minX = san_nbr(rect.minX);
+        var maxY = san_nbr(rect.maxY);
+        var maxX = san_nbr(rect.maxX);
 
         if(!(minY <= maxY && minX <= maxX)) {
-            return "Invalid range"
+            return "Invalid range";
         }
         if(!((maxY - minY) * (maxX - minX) <= 2000)) {
-            return "Too many tiles"
+            return "Too many tiles";
         }
         var YTileRange = xrange(minY, maxY + 1);
         var XTileRange = xrange(minX, maxX + 1);
         for (var ty in YTileRange) { // fill in null values
             for (var tx in XTileRange) {
-                tiles[YTileRange[ty] + "," + XTileRange[tx]] = null
+                tiles[YTileRange[ty] + "," + XTileRange[tx]] = null;
             }
         }
         if(timemachine.active) {
-            var dr1 = await db.get("select time from edit where world_id=? limit 1",
+            var dr1 = await db.get("SELECT time FROM edit WHERE world_id=? LIMIT 1",
                 world.id);
-            var dr2 = await db.get("select time from edit where world_id=? order by id desc limit 1",
+            var dr2 = await db.get("SELECT time FROM edit WHERE world_id=? ORDER BY id DESC LIMIT 1",
                 world.id);
-            var editCount = await db.get("SELECT count(*) as CNT FROM edit WHERE world_id=?", world.id);
-            editCount = editCount.CNT;
+            var editCount = await db.get("SELECT count(id) AS cnt FROM edit WHERE world_id=?", world.id);
+            editCount = editCount.cnt;
             if((!dr1 || !dr2) || editCount >= editLimit) {
                 // diagonal text...
                 var e_str = "Cannot view timemachine: There are no edits yet. | ";
@@ -116,7 +116,7 @@ module.exports = async function(data, vars) {
             } else {
                 var range = dr2 - dr1;
                 var div = range / 1000000;
-                time = Math.floor(div * timemachine.time) + dr1
+                time = Math.floor(div * timemachine.time) + dr1;
             }
 
             await db.each("SELECT * FROM edit WHERE world_id=? AND time <= ? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?",
@@ -146,7 +146,7 @@ module.exports = async function(data, vars) {
                         tile_r.properties.color[index_r] = color;
                     }
                 }
-            })
+            });
 
             for(var z in tiles) {
                 if(tiles[z]) {
@@ -164,8 +164,8 @@ module.exports = async function(data, vars) {
                     properties: Object.assign(properties, {
                         writability: data.writability
                     })
-                }
-            })
+                };
+            });
         }
     }
 

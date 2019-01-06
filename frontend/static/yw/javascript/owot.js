@@ -754,6 +754,13 @@ window.addEventListener("resize", function(e) {
 browserZoomAdjust(true);
 
 function getChar(tileX, tileY, charX, charY) {
+    if(tileX == void 0 && tileY == void 0 && charX == void 0 && charY == void 0) {
+        if(!cursorCoords) return -1;
+        tileX = cursorCoords[0];
+        tileY = cursorCoords[1];
+        charX = cursorCoords[2];
+        charY = cursorCoords[3];
+    }
 	var tile = tiles[tileY + "," + tileX];
 	if(!tile) return " ";
 	var content = advancedSplit(tile.content);
@@ -761,10 +768,61 @@ function getChar(tileX, tileY, charX, charY) {
 }
 
 function getCharColor(tileX, tileY, charX, charY) {
+    if(tileX == void 0 && tileY == void 0 && charX == void 0 && charY == void 0) {
+        if(!cursorCoords) return -1;
+        tileX = cursorCoords[0];
+        tileY = cursorCoords[1];
+        charX = cursorCoords[2];
+        charY = cursorCoords[3];
+    }
     var tile = tiles[tileY + "," + tileX];
     if(!tile) return 0;
     if(!tile.properties.color) return 0;
 	return tile.properties.color[charY * tileC + charX];
+}
+
+function getCharProtection(tileX, tileY, charX, charY) {
+    if(tileX == void 0 && tileY == void 0 && charX == void 0 && charY == void 0) {
+        if(!cursorCoords) return -1;
+        tileX = cursorCoords[0];
+        tileY = cursorCoords[1];
+        charX = cursorCoords[2];
+        charY = cursorCoords[3];
+    }
+    var tile = tiles[tileY + "," + tileX];
+    if(!tile) return state.worldModel.writability;
+    var prot = tile.properties.writability;
+    if(tile.properties && tile.properties.char) {
+        prot = tile.properties.char[charY * tileC + charX];
+        // null indicates that it inherits writability from its parent
+        if(prot == null) prot = tile.properties.writability;
+    }
+    if(prot == null) prot = state.worldModel.writability;
+    return prot;
+}
+
+function getCharInfo(tileX, tileY, charX, charY) {
+    if(tileX == void 0 && tileY == void 0 && charX == void 0 && charY == void 0) {
+        if(!cursorCoords) return -1;
+        tileX = cursorCoords[0];
+        tileY = cursorCoords[1];
+        charX = cursorCoords[2];
+        charY = cursorCoords[3];
+    }
+    return {
+        loaded: !!tiles[tileY + "," + tileX],
+        char: getChar(tileX, tileY, charX, charY),
+        color: getCharColor(tileX, tileY, charX, charY),
+        protection: getCharProtection(tileX, tileY, charX, charY)
+    }
+}
+
+function getCharInfoXY(x, y) {
+    var tileX = Math.floor(x / tileC);
+    var tileY = Math.floor(y / tileR);
+    var charX = x - tileX * tileC;
+    var charY = y - tileY * tileR;
+    return getCharInfo(tileX, tileY, charX, charY);
 }
 
 // copy individual chars

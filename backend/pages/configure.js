@@ -117,7 +117,8 @@ module.exports.GET = async function(req, serve, vars, params) {
         no_log_edits: !!properties.no_log_edits,
         half_chars:   !!properties.half_chars,
 
-        background_path: properties.background ? properties.background : ""
+        background_path: properties.background ? properties.background : "",
+        meta_desc: properties.meta_desc
     };
 
     serve(HTML("configure.html", data));
@@ -145,17 +146,17 @@ module.exports.POST = async function(req, serve, vars) {
         return serve();
     }
 
-    var world_name = get_third(path, "accounts", "configure")
+    var world_name = get_third(path, "accounts", "configure");
 
-    var world = await world_get_or_create(world_name)
+    var world = await world_get_or_create(world_name);
     if(!world) {
-        return await dispage("404", null, req, serve, vars)
+        return await dispage("404", null, req, serve, vars);
     }
 
     world_name = world.name;
 
     if(world.owner_id != user.id && !user.superuser) {
-        return serve("Access denied", 403)
+        return serve("Access denied", 403);
     }
 
     var properties = JSON.parse(world.properties);
@@ -166,39 +167,39 @@ module.exports.POST = async function(req, serve, vars) {
         var date = Date.now();
         var adduser = await db.get("SELECT * from auth_user WHERE username=? COLLATE NOCASE", username);
         if(!adduser) {
-            return await dispage("configure", { message: "User not found" }, req, serve, vars)
+            return await dispage("configure", { message: "User not found" }, req, serve, vars);
         }
         if(adduser.id == world.owner_id) {
             return await dispage("configure", {
                 message: "User is already the owner of \"" + world_name + "\""
-            }, req, serve, vars)
+            }, req, serve, vars);
         }
         var whitelist = await db.get("SELECT * FROM whitelist WHERE user_id=? AND world_id=?",
-            [adduser.id, world.id])
+            [adduser.id, world.id]);
         if(whitelist) {
             return await dispage("configure", {
                 message: "User is already part of this world"
-            }, req, serve, vars)
+            }, req, serve, vars);
         }
 
-        await db.run("INSERT into whitelist VALUES(null, (SELECT id FROM auth_user WHERE username=? COLLATE NOCASE), ?, ?)", [username, world.id, date])
+        await db.run("INSERT into whitelist VALUES(null, (SELECT id FROM auth_user WHERE username=? COLLATE NOCASE), ?, ?)", [username, world.id, date]);
 
         return await dispage("configure", {
             message: adduser.username + " is now a member of the \"" + world_name + "\" world"
-        }, req, serve, vars)
+        }, req, serve, vars);
     } else if(post_data.form == "access_perm") { // access_perm
         var readability = validatePerms(post_data.readability);
         var writability = validatePerms(post_data.writability);
 
         await db.run("UPDATE world SET (readability,writability)=(?,?) WHERE id=?",
-            [readability, writability, world.id])
+            [readability, writability, world.id]);
     } else if(post_data.form == "remove_member") {
         var to_remove;
         for(var key in post_data) {
             if(key.startsWith("remove_")) to_remove = key;
         }
         var username_to_remove = to_remove.substr("remove_".length);
-        await db.run("DELETE FROM whitelist WHERE user_id=(SELECT id FROM auth_user WHERE username=? COLLATE NOCASE) AND world_id=?", [username_to_remove, world.id])
+        await db.run("DELETE FROM whitelist WHERE user_id=(SELECT id FROM auth_user WHERE username=? COLLATE NOCASE) AND world_id=?", [username_to_remove, world.id]);
     } else if(post_data.form == "features") {
         var go_to_coord = validatePerms(post_data.go_to_coord);
         var coord_link = validatePerms(post_data.coord_link);
@@ -243,7 +244,7 @@ module.exports.POST = async function(req, serve, vars) {
                 owner_area: owner_color || "#ddd",
                 menu: menu_color || "#e5e5ff"
             }
-        }, world.name)
+        }, world.name);
     } else if(post_data.form == "misc") {
         var properties_updated = false;
         if(!post_data.world_background && user.superuser) {
@@ -266,35 +267,58 @@ module.exports.POST = async function(req, serve, vars) {
             properties_updated = true;
             delete properties.half_chars;
         }
+        if(!post_data.meta_desc) {
+            properties_updated = true;
+            delete properties.meta_desc;
+        }
         var new_name = post_data.new_world_name + "";
         if(new_name && new_name != world.name) { // changing world name
             var validate = await validate_claim_worldname(new_name, vars, true, world.id);
             if(validate.error) { // error with renaming
                 return await dispage("configure", {
                     misc_message: validate.message
-                }, req, serve, vars)
+                }, req, serve, vars);
             }
             if(validate.rename) {
                 await db.run("UPDATE world SET name=? WHERE id=?", [validate.new_name, world.id]);
                 new_world_name = validate.new_name;
             }
-
-        } else if(post_data.world_background && user.superuser) {
+        }
+        if(post_data.world_background && user.superuser) {
             properties.background = post_data.world_background;
             properties_updated = true;
-        } else if("nsfw_page" in post_data) {
+        }
+        if("nsfw_page" in post_data) {
             properties.page_is_nsfw = true;
             properties_updated = true;
-        } else if("square_chars" in post_data) {
+        }
+        if("square_chars" in post_data) {
             properties.square_chars = true;
             properties_updated = true;
-        } else if("no_log_edits" in post_data) {
+        }
+        if("no_log_edits" in post_data) {
             properties.no_log_edits = true;
             properties_updated = true;
-        } else if("half_chars" in post_data) {
+        }
+        if("half_chars" in post_data) {
             properties.half_chars = true;
             properties_updated = true;
         }
+        if(post_data.meta_desc) {
+            var mdesc = post_data.meta_desc;
+            if(typeof mdesc != "string") mdesc = "";
+            mdesc = mdesc.trim();
+            mdesc = mdesc.slice(0, 600);
+            mdesc = mdesc.replace(/\r\n/g, "\n");
+            mdesc = mdesc.replace(/\n/g, " ");
+            if(!mdesc) {
+                delete properties.meta_desc;
+            } else {
+                properties.meta_desc = mdesc;
+            }
+            properties_updated = true;
+        }
+
         if(properties_updated) {
             await db.run("UPDATE world SET properties=? WHERE id=?",
                 [JSON.stringify(properties), world.id]);

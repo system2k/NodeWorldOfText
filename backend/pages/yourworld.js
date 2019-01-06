@@ -148,7 +148,8 @@ module.exports.GET = async function(req, serve, vars, params) {
             state: JSON.stringify(state),
             world,
             page_title,
-            nsfw: world_properties.page_is_nsfw
+            nsfw: world_properties.page_is_nsfw,
+            meta_desc: world_properties.meta_desc
         }
         serve(HTML("yourworld.html", data), null, {
             mime: "text/html; charset=utf-8"
