@@ -144,12 +144,16 @@ module.exports.GET = async function(req, serve, vars, params) {
         if(world.name) {
             page_title = "/" + world.name;
         }
+        var meta_desc = world_properties.meta_desc;
+        if(!world.name) {
+            meta_desc = "";
+        }
         var data = {
             state: JSON.stringify(state),
             world,
             page_title,
             nsfw: world_properties.page_is_nsfw,
-            meta_desc: world_properties.meta_desc
+            meta_desc
         }
         serve(HTML("yourworld.html", data), null, {
             mime: "text/html; charset=utf-8"
