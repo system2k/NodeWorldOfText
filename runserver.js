@@ -1449,26 +1449,30 @@ function getWorldData(world) {
     if(worldData[ref]) return worldData[ref];
 
     worldData[ref] = {
-        client_ids: {},
         id_overflow_int: 10000,
         user_count: 1
     }
 
     return worldData[ref];
 }
-function generateClientId(world) {
+function generateClientId(world, world_id) {
     var worldObj = getWorldData(world);
 
-    var client_ids = worldObj.client_ids;
+    var rand_ids = client_ips[world_id];
+    if(!rand_ids) rand_ids = {};
 
     // attempt to get a random id
 	for(var i = 0; i < 64; i++) {
-		var inclusive_id = Math.floor(Math.random() * ((9999 - 1000) + 1)) + 1000;
-		if(!client_ids[inclusive_id]) return inclusive_id;
+		var inclusive_id = Math.floor(Math.random() * ((9999 - 1) + 1)) + 1;
+		if(!rand_ids[inclusive_id]) {
+            return inclusive_id;
+        }
 	}
 	// attempt to enumerate if it failed
-	for(var i = 1000; i <= 9999; i++) {
-		if(!client_ids[i]) return i;
+	for(var i = 1; i <= 9999; i++) {
+		if(!rand_ids[i]) {
+            return i;
+        }
     }
     return worldObj.id_overflow_int++;
 }
@@ -1489,7 +1493,7 @@ function topActiveWorlds(number) {
     for(var i in worldData) {
         var cnt = getUserCountFromWorld(i);
         if(cnt == 0) continue;
-        clientNumbers.push([cnt, i])
+        clientNumbers.push([cnt, i]);
     }
     clientNumbers.sort(function(int1, int2) {
         return int2[0] - int1[0];
@@ -1794,7 +1798,7 @@ async function manageWebsocketConnection(ws, req) {
         ws.is_member = user.stats.member;
         ws.is_owner = user.stats.owner;
 
-        clientId = generateClientId(world_name);
+        clientId = generateClientId(world_name, status.world.id);
 
         if(!client_ips[status.world.id]) {
             client_ips[status.world.id] = {};
@@ -1822,7 +1826,7 @@ async function manageWebsocketConnection(ws, req) {
                     return send_ws(JSON.stringify({
                         kind: "error",
                         message: "Invalid socket type"
-                    }))
+                    }));
                 }
                 if(msg.constructor == Buffer) { // buffers not supported at the moment
                     return;
@@ -2034,11 +2038,6 @@ function stopServer(restart) {
 
         server.close();
         wss.close();
-
-        database.close();
-        chat_history.close();
-        image_db.close();
-        misc_db.close();
 
         var handles = process._getActiveHandles();
 

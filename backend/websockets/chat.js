@@ -1,7 +1,7 @@
 function sanitizeColor(col) {
     var masks = ["#XXXXXX", "#XXX"];
 
-    var hex_set = "0123456789abcdefABCDEF"
+    var hex_set = "0123456789abcdefABCDEF";
     
     for(var m = 0; m < masks.length; m++) {
         var mask = masks[m];
