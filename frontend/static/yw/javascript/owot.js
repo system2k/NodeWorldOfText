@@ -810,7 +810,7 @@ function getCharInfo(tileX, tileY, charX, charY) {
         charY = cursorCoords[3];
     }
     return {
-        loaded: !!tiles[tileY + "," + tileX],
+        loaded: isTileLoaded(tileY + "," + tileX),
         char: getChar(tileX, tileY, charX, charY),
         color: getCharColor(tileX, tileY, charX, charY),
         protection: getCharProtection(tileX, tileY, charX, charY)
@@ -2590,6 +2590,11 @@ function isTileVisible(tileX, tileY) {
     return true
 }
 
+function isTileLoaded(tileX, tileY) {
+    var str = tileY + "," + tileX;
+    return tiles[str] && tiles[str].initted;
+}
+
 var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /*
@@ -2662,7 +2667,7 @@ function renderTile(tileX, tileY, redraw) {
     var offsetY = tileY * tileH + Math.trunc(height / 2) + positionY;
 
     // unloaded tiles
-    if(!tiles[str] || (tiles[str] && !tiles[str].initted)) {
+    if(!isTileLoaded(tileX, tileY)) {
         // unloaded tile background is already drawn
         if(tilePixelCache[str]) {
             textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
@@ -2857,6 +2862,7 @@ function renderTile(tileX, tileY, redraw) {
             }
             if(!char) char = " ";
             var cCode = char.charCodeAt(0);
+            if(char == "\x1A") char = "\u2588";
 
             // if text has no color, use default text color. otherwise, colorize it
             if(color == 0 || !colorsEnabled || (isLink && !colorizeLinks)) {
@@ -2942,7 +2948,7 @@ function renderTiles(redraw) {
         renderTile(tileX, tileY);
     }
 
-    w.callEvent("tilesRendered");
+    w.emit("tilesRendered");
 }
 
 function protectPrecisionOption(option) { // 0 being tile and 1 being char
@@ -3299,7 +3305,7 @@ var w = {
             OWOT.events[type].splice(idx, 1);
         }
     },
-    callEvent: function(type, data) {
+    emit: function(type, data) {
         var evt = OWOT.events[type];
         if(!evt) return;
         for(var e = 0; e < evt.length; e++) {
@@ -3697,7 +3703,7 @@ var ws_functions = {
         w.socketChannel = data.sender;
         w.clientId = data.id;
         w.userCount = data.initial_user_count;
-        updateUsrCount();
+        updateUserCount();
     },
     announcement: function(data) {
         if(data.text) {
@@ -3729,7 +3735,7 @@ var ws_functions = {
     chat: function(data) {
         if(data.channel == w.socketChannel) return;
         var type = chatType(data.registered, data.nickname, data.realUsername);
-        OWOT.callEvent("chat", {
+        OWOT.emit("chat", {
             location: data.location,
             id: data.id,
             type: type,
@@ -3746,7 +3752,7 @@ var ws_functions = {
     user_count: function(data) {
         var count = data.count;
         w.userCount = count;
-        updateUsrCount();
+        updateUserCount();
     },
     chathistory: function(data) {
         if(data.error) {
@@ -3768,6 +3774,6 @@ var ws_functions = {
         }
     },
     cmd: function(data) {
-        w.callEvent("cmd", data);
+        w.emit("cmd", data);
     }
 };

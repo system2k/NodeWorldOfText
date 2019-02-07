@@ -470,7 +470,7 @@ function getChatfield(elm) {
     }
 }
 
-function updateUsrCount() {
+function updateUserCount() {
     var count = w.userCount;
     if(count == void 0) {
         usr_online.innerText = "";

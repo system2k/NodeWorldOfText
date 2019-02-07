@@ -58,3 +58,5 @@
 - cache user sessions to speed up page load times
 - uploading custom CSS for a world
 - rate limit fetch requests
+- superuser feature: option to disable saving new edits to the database, and to allow a range of tiles to have their edits saved in-memory
+- 2-factor authentication

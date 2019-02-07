@@ -1340,7 +1340,7 @@ async function validate_claim_worldname(worldname, vars, rename_casing, world_id
     worldname = worldname.split("/");
     for(var i in worldname) {
         // make sure there is no blank segment
-        if(worldname[i] == "") {
+        if(worldname[i] == "" && !user.superuser) {
             return {
                 error: true,
                 message: "Segments cannot be blank (make sure name does not end in /)"
@@ -1516,7 +1516,7 @@ function broadcastUserCount() {
             }, user_world, {
                 isChat: true,
                 clientId: 0,
-                chat_perm: "INHERIT"
+                chat_perm: -1 // cached
             });
         }
     }
@@ -1631,8 +1631,7 @@ async function initialize_server_components() {
                 if(client.readyState == WebSocket.OPEN &&
                 world == void 0 || NCaseCompare(client.world_name, world)) {
                     if(opts.isChat) {
-                        // when Inherited, it refers to the client's cached settings to avoid constant db lookups
-                        if(opts.chat_perm == "INHERIT") opts.chat_perm = client.chat_permission;
+                        if(opts.chat_perm == -1) opts.chat_perm = client.chat_permission;
                         if(opts.chat_perm == 1) if(!(client.is_member || client.is_owner)) return;
                         if(opts.chat_perm == 2) if(!client.is_owner) return;
                         if(client.chat_blocks && (client.chat_blocks.indexOf(opts.clientId) > -1 ||
