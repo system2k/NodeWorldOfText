@@ -35,13 +35,14 @@ module.exports.POST = async function(req, serve, vars) {
         name += String.fromCharCode(byte);
     }
     if(!name) return serve("NO_NAME");
+    var namelen = name.length;
 
     var ex = await db_img.get("SELECT id FROM images WHERE name=?", name);
     if(ex) return serve("NAME");
 
-    var is_png = post_data[1 + len];
-    var is_jpg = post_data[2 + len];
-    var data = post_data.slice(3 + len);
+    var is_png = post_data[1 + namelen];
+    var is_jpg = post_data[2 + namelen];
+    var data = post_data.slice(3 + namelen);
     var mime = "application/octet-stream";
     if(is_png) {
         mime = "image/png";

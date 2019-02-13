@@ -134,7 +134,7 @@
 			}
 			var xhr = new XMLHttpRequest();
 			xhr.open("POST", "/administrator/backgrounds/", true);
-			xhr.onload = function(res) {
+			xhr.onload = function() {
 				server_pending.style.display = "none";
 				img_name.value = "";
 				is_uploading = false;

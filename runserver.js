@@ -15,7 +15,6 @@ const fs          = require("fs");
 const http        = require("http");
 const https       = require("https");
 const isIP        = require("net").isIP;
-const mime        = require("./backend/mime.js");
 const nodemailer  = require("nodemailer");
 const path        = require("path");
 const prompt      = require("./lib/prompt/prompt");
@@ -103,6 +102,9 @@ var serverDB = settings.DATABASE_PATH;
 var chatDB = settings.CHAT_HISTORY_PATH;
 var imageDB = settings.IMAGES_PATH;
 var miscDB = settings.MISC_PATH;
+var filesPath = settings.FILES_PATH;
+var staticFilesRaw = settings.STATIC_FILES_RAW;
+var staticFilesIdx = settings.STATIC_FILES_IDX;
 
 Error.stackTraceLimit = Infinity;
 if(!global.AsyncFunction) var AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
@@ -149,6 +151,57 @@ if(!fs.existsSync(settings.bypass_key)) {
         rand += key[Math.floor(Math.random() * 16)];
     }
     fs.writeFileSync(settings.bypass_key, rand);
+}
+
+if(!fs.existsSync(filesPath)) fs.mkdirSync(filesPath, 0o777);
+if(!fs.existsSync(staticFilesRaw)) fs.writeFileSync(staticFilesRaw, "");
+if(!fs.existsSync(staticFilesIdx)) fs.writeFileSync(staticFilesIdx, "");
+
+var read_staticRaw = fs.openSync(staticFilesRaw);
+var write_staticRaw = fs.createWriteStream(staticFilesRaw, { flags: "a" });
+var read_staticIdx = fs.openSync(staticFilesIdx);
+var write_staticIdx = fs.createWriteStream(staticFilesIdx, { flags: "a" });
+
+var staticRaw_size = fs.statSync(staticFilesRaw).size;
+var staticIdx_size = fs.statSync(staticFilesIdx).size;
+
+async function staticRaw_append(data) {
+    return new Promise(function(res) {
+        write_staticRaw.write(data, function() {
+            var start = staticRaw_size;
+            staticRaw_size += data.length;
+            res(start);
+        })
+    })
+}
+
+async function staticIdx_append(data) {
+    return new Promise(function(res) {
+        write_staticIdx.write(data, function() {
+            var index = staticIdx_size / 9;
+            staticIdx_size += 9;
+            res(index + 1);
+        })
+    })
+}
+
+async function static_retrieve(id) {
+    id--;
+    if(id < 0 || id >= staticIdx_size / 9) return null;
+    return new Promise(function(res) {
+        var pos = Buffer.alloc(9);
+        fs.read(read_staticIdx, pos, 0, 9, id * 9, function() {
+            var start = pos[0] + pos[1] * 256 + pos[2] * 65536 + pos[3] * 16777216;
+            var len = pos[4] + pos[5] * 256 + pos[6] * 65536 + pos[7] * 16777216;
+            if(len > 50000000) {
+                return res(null);
+            }
+            var data = Buffer.alloc(len);
+            fs.read(read_staticRaw, data, 0, len, start, function() {
+                res(data);
+            });
+        });
+    })
 }
 
 const database = new sql.Database(serverDB);
@@ -698,10 +751,18 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^accounts/nsfw/(.*)[\\/]?$", pages.accounts_nsfw],
     ["^administrator/world_restore[\\/]?$", pages.administrator_world_restore],
     ["^administrator/backgrounds[\\/]?$", pages.administrator_backgrounds, { binary_post_data: true }],
+    ["^administrator/files[\\/]?$", pages.administrator_files, { binary_post_data: true }],
     ["^administrator/manage_ranks[\\/]?$", pages.administrator_manage_ranks],
     ["^other/backgrounds/(.*)[\\/]?$", pages.load_backgrounds, { no_login: true }],
     ["^administrator/set_custom_rank/(.*)/$", pages.administrator_set_custom_rank],
     ["^other/chat/(.*)[\\/]?$", pages.other_chat],
+    ["^other/test/(.*)[\\/]?$", pages.other_test, { no_login: true }],
+    ["^other/forums/(.*)[\\/]?$", pages.other_forums, { no_login: true }],
+    ["^other/serverrequeststatus/(.*)[\\/]?$", pages.other_serverrequeststatus, { no_login: true }],
+    ["^other/info/(.*)[\\/]?$", pages.other_info, { no_login: true }],
+    ["^other/cd/(.*)[\\/]?$", pages.other_cd, { no_login: true }],
+    ["^static/(.*)[\\/]?$", pages.static, { no_login: true }],
+    ["^static\\?file=(.*)[\\/]?$", pages.static, { no_login: true, check_query: true }],
     ["^([\\w\\/\\.\\-\\~]*)$", pages.yourworld, { remove_end_slash: true }]
 ];
 
@@ -727,25 +788,6 @@ async function dispage(page, params, req, serve, vars, method) {
     await pages[page][method](req, serve, vars, params);
 }
 
-var static_file_returner = {};
-static_file_returner.GET = function(req, serve) {
-    var parse = url.parse(req.url).pathname.substr(1);
-    parse = removeLastSlash(parse);
-    var mime_type = mime(parse.replace(/.*[\.\/\\]/, "").toLowerCase());
-    if(parse in static_data) {
-        serve(static_data[parse], 200, { mime: mime_type });
-    } else {
-        serve("<html><h1>404</h1>Static item not found</html>", 404);
-    }
-}
-
-// push static file urls to regexp array
-var static_regexp = [];
-for (var i in static_data) {
-    static_regexp.push(["^" + i + "[\\/]?$", static_file_returner, { no_login: true }]);
-}
-url_regexp = static_regexp.concat(url_regexp);
-
 // transfer all values from one object to a main object containing all imports
 function objIncludes(defaultObj, include) {
     var new_obj = {};
@@ -759,7 +801,9 @@ function objIncludes(defaultObj, include) {
 }
 
 // wait for the client to upload form data to the server
-function wait_response_data(req, dispatch, binary_post_data) {
+function wait_response_data(req, dispatch, binary_post_data, raise_limit) {
+    var sizeLimit = 1000000;
+    if(raise_limit) sizeLimit = 100000000;
     var queryData;
     if(binary_post_data) {
         queryData = Buffer.from([]);
@@ -771,14 +815,14 @@ function wait_response_data(req, dispatch, binary_post_data) {
         req.on("data", function(data) {
             if(error) return;
             try {
-                if(data.length <= 250000) {
+                if(data.length <= 250000) { // limit of individual packets
                     if(binary_post_data) {
                         queryData = Buffer.concat([queryData, data]);
                     } else {
                         queryData += data;
                     }
                 }
-                if (queryData.length > 1000000) {
+                if (queryData.length > sizeLimit) { // hard limit
                     if(binary_post_data) {
                         queryData = Buffer.from([]);
                     } else {
@@ -1075,6 +1119,8 @@ var server = https_reference.createServer(options, async function(req, res) {
 
 var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
 
+var valid_subdomains = ["test", "forums", "serverrequeststatus", "info", "chat", "cd", "random_color", "backgrounds"];
+
 async function process_request(req, res, current_req_id) {
     if(isStopping) return;
     var hostname = req.headers.host;
@@ -1083,34 +1129,20 @@ async function process_request(req, res, current_req_id) {
 	var offset = 2;
     var subdomains = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
     var sub = subdomains.slice(offset);
-    if(sub.length == 1 && compareNoCase(sub[0], "test")) {
-        res.write("OWOT subdomain testing <test.hostname.tld>");
-        return res.end();
-    }
-    if(sub.length == 1 && compareNoCase(sub[0], "forums")) {
-        res.write("<html><h1>Test page</h1></html>");
-        return res.end();
-    }
-    if(sub.length == 1 && compareNoCase(sub[0], "serverrequeststatus")) {
-        res.write("{}");
-        return res.end();
-    }
-    if(sub.length == 1 && compareNoCase(sub[0], "info")) {
-        res.write("<html><h1>Info</h1></html>");
-        return res.end();
+    for(var i = 0; i < sub.length; i++) sub[i]= sub[i].toLowerCase();
+
+    var URLparse = url.parse(req.url);
+    var URL = URLparse.pathname;
+    if(URL.charAt(0) == "/") { URL = URL.substr(1); }
+    try { URL = decodeURIComponent(URL); } catch (e) {};
+
+    if(sub.length == 1 && valid_subdomains.indexOf(sub[0]) > -1) {
+        URL = "other/" + sub[0] + "/" + URL;
     }
 
-    var URL = url.parse(req.url).pathname;
-    if(URL.charAt(0) == "/") {
-        URL = URL.substr(1);
-    }
-    try {
-        URL = decodeURIComponent(URL);
-    } catch (e) {};
-
-    if(sub.length == 1 && compareNoCase(sub[0], "chat") && URL != "favicon.ico") {
-        URL = "other/chat/" + URL;
-    }
+    var fullPath = URLparse.path;
+    if(fullPath.charAt(0) == "/") { fullPath = fullPath.substr(1); }
+    try { fullPath = decodeURIComponent(fullPath); } catch (e) {};
 
     var request_resolved = false;
 
@@ -1157,6 +1189,11 @@ async function process_request(req, res, current_req_id) {
         if(params.mime) {
             info["Content-Type"] = params.mime;
         }
+        if(params.headers) {
+            for(var i in params.headers) {
+                info[i] = params.headers[i];
+            }
+        }
         if(!status_code) {
             status_code = 200;
         }
@@ -1176,7 +1213,13 @@ async function process_request(req, res, current_req_id) {
         var row = url_regexp[i];
         var options = row[2];
         if(!options) options = {};
-        if(URL.match(row[0])) {
+        var matchCheck;
+        if(options.check_query) {
+            matchCheck = fullPath.match(row[0]);
+        } else {
+            matchCheck = URL.match(row[0]);
+        }
+        if(matchCheck) {
             found_url = true;
             if(typeof row[1] == "object") {
                 var no_login = options.no_login;
@@ -1193,7 +1236,7 @@ async function process_request(req, res, current_req_id) {
                     if(!cookies.csrftoken) {
                         var token = new_token(32)
                         var date = Date.now();
-                        include_cookies.push("csrftoken=" + token + "; expires=" + cookie_expire(date + Year) + "; path=/;")
+                        include_cookies.push("csrftoken=" + token + "; expires=" + cookie_expire(date + Year) + "; path=/;");
                         user.csrftoken = token;
                     } else {
                         user.csrftoken = cookies.csrftoken;
@@ -1203,14 +1246,14 @@ async function process_request(req, res, current_req_id) {
                 function redirect(path) {
                     dispatch(null, null, {
                         redirect: path
-                    })
+                    });
                     redirected = true;
                 }
                 if(redirected) {
                     return;
                 }
                 if(method == "POST") {
-                    var dat = await wait_response_data(req, dispatch, options.binary_post_data)
+                    var dat = await wait_response_data(req, dispatch, options.binary_post_data, user.superuser);
                     if(!dat) {
                         return;
                     }
@@ -1768,6 +1811,10 @@ async function manageWebsocketConnection(ws, req) {
 
         status = await websockets.Main(ws, world_name, vars);
 
+        if(typeof status == "string") { // error
+            return ws.close();
+        }
+
         ws.world_id = status.world.id;
 
         if(typeof status == "string") {
@@ -1977,7 +2024,11 @@ var global_data = {
     fixColors,
     sanitize_color,
     worldViews,
-    ranks_cache
+    ranks_cache,
+    static_data,
+    staticRaw_append,
+    staticIdx_append,
+    static_retrieve
 }
 
 async function sysLoad() {

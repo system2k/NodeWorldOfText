@@ -59,6 +59,7 @@ module.exports.POST = async function(req, serve, vars) {
     var post_data = vars.post_data;
     var announce = vars.announce;
     var db = vars.db;
+    var db_misc = vars.db_misc;
     var modify_bypass_key = vars.modify_bypass_key;
 
     if(!user.superuser) {
@@ -70,7 +71,7 @@ module.exports.POST = async function(req, serve, vars) {
         modify_bypass_key(new_bypass_key);
         return await dispage("administrator", {
             cons_update_msg: "Bypass key updated successfully"
-        }, req, serve, vars)
+        }, req, serve, vars);
     }
     if("announcement" in post_data) {
         var new_announcement = post_data.announcement;
@@ -90,6 +91,6 @@ module.exports.POST = async function(req, serve, vars) {
     
         return await dispage("administrator", {
             announcement_update_msg: "Announcement updated"
-        }, req, serve, vars)
+        }, req, serve, vars);
     }
 }

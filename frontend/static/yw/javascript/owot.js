@@ -118,6 +118,7 @@ var nav_elm = byId("nav");
 var coords = byId("coords");
 var chat_window = byId("chat_window");
 var confirm_js = byId("confirm_js");
+var confirm_js_code = byId("confirm_js_code");
 
 var jscolorInput;
 clientOnload.push(function() {
@@ -3041,7 +3042,7 @@ function buildMenu() {
 
 document.onselectstart = function(e) {
     var target = e.target;
-    if(closest(target, getChatfield()) || target == chatbar) {
+    if(closest(target, getChatfield()) || target == chatbar || closest(target, confirm_js_code)) {
         return true;
     }
     return w._state.uiModal;
@@ -3099,6 +3100,7 @@ var w = {
     protect_type: null, // null = unprotect, 0 = public, 1 = member, 2 = owner
     protect_bg: "",
     nightMode: 0, // 0 = normal, 1 = night, 2 = night with normal background patterns
+    input: textInput,
     _state: state,
     _ui: {
         announce: announce,

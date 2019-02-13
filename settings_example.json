@@ -12,7 +12,11 @@
     "test_port": 9090,
 	
     "error_log": true,
-	
+    
+    "FILES_PATH": "../data/files",
+    "STATIC_FILES_RAW": "../data/static_files_raw.dat",
+    "STATIC_FILES_IDX": "../data/static_files_idx.dat",
+
     "DATABASE_PATH": "../data/nwot.sqlite",
     "TEST_DATABASE_PATH": "../data/test/nwot_test.sqlite",
 

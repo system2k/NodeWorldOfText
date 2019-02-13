@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}
+	Files | Our World of Text
+{% endblock %}
+
+{% block header %}
+	<h1>Files</h1>
+	<span><a href="/administrator/">« Back to Admin Panel</a></span>
+{% endblock %}
+
+{% block content %}
+	<div class="content_set">
+		<div class="content_set_title">Upload Files</div>
+		<div class="content_set_content">
+			<div>
+				<label>File Name: </label><input id="file_name" maxlength="256">
+                <input type="file" id="file_input">
+                <button style="float: right;" onclick="upload_file();">Upload</button>
+                <br> <br>
+			</div>
+			<div style="display: none;" id="server_success_pan"><span id="server_success"></span><br><a id="server_result"></a></div>
+			<span style="display: none;" id="server_pending">Uploading...</span>
+		</div>
+	</div>
+	<script>
+		var file_input = document.getElementById("file_input");
+		var file_name = document.getElementById("file_name");
+		var server_success_pan = document.getElementById("server_success_pan");
+		var server_success = document.getElementById("server_success");
+		var server_pending = document.getElementById("server_pending");
+		var server_result = document.getElementById("server_result");
+		var is_uploading = false;
+		var file_data;
+		file_input.onchange = function(e) {
+			if(!file_input.files.length) return;
+			var fReader = new FileReader();
+			fReader.onload = function() {
+				file_data = new Uint8Array(fReader.result);
+				var name = file_input.files[0].name;
+				if(!file_name.value) file_name.value = name;
+			}
+			fReader.readAsArrayBuffer(file_input.files[0]);
+		}
+		function upload_file() {
+			if(!file_data || is_uploading || !file_name.value) return;
+			is_uploading = true;
+			server_success_pan.style.display = "none";
+			server_pending.style.display = "";
+			server_result.style.display = "none";
+			var name = file_name.value;
+			var len = name.length;
+			var file_len = file_data.length;
+			var data = new Uint8Array(1 + len + file_len);
+			data[0] = len;
+			for(var i = 0; i < len; i++) {
+				data[1 + i] = name.charCodeAt(i);
+			}
+			for(var i = 0; i < file_len; i++) {
+				data[1 + len + i] = file_data[i];
+			}
+			var xhr = new XMLHttpRequest();
+			xhr.open("POST", "/administrator/files/", true);
+			xhr.onload = function() {
+				server_pending.style.display = "none";
+				file_name.value = "";
+				is_uploading = false;
+				server_success_pan.style.display = "";
+				server_result.style.display = "";
+				if(xhr.status >= 200 && xhr.status < 400) {
+					var res = xhr.responseText;
+					server_success.innerText = "File \"" + name + "\" uploaded successfully.";
+					server_result.href = "/static?file=" + res;
+					server_result.innerText = "(/static?file=" + res + ")";
+				} else {
+					server_success.innerText = "Error uploading file (" + xhr.status + ").";
+					server_result.href = "";
+					server_result.innerText = "";
+				}
+			}
+			xhr.onerror = function() {
+				server_pending.style.display = "none";
+				file_name.value = "";
+				is_uploading = false;
+				server_success_pan.style.display = "";
+				server_success.innerText = "Error uploading file.";
+				server_result.style.display = "";
+				server_result.href = "";
+				server_result.innerText = "";
+			}
+			xhr.send(data);
+		}
+	</script>
+{% endblock %}
