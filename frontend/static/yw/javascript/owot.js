@@ -70,6 +70,7 @@ var combiningCharsEnabled  = true;
 var surrogateCharsEnabled  = true;
 var defaultCoordLinkColor  = "#008000";
 var defaultURLLinkColor    = "#0000FF";
+var secureJSLink           = true;
 
 var images_to_load         = {
     unloaded: "/static/unloaded.png"
@@ -119,6 +120,7 @@ var coords = byId("coords");
 var chat_window = byId("chat_window");
 var confirm_js = byId("confirm_js");
 var confirm_js_code = byId("confirm_js_code");
+var main_view = byId("main_view");
 
 var jscolorInput;
 clientOnload.push(function() {
@@ -977,6 +979,15 @@ function defaultStyles() {
 
 // begin OWOT's client
 function begin() {
+    try {
+        var coord = window.location.hash.match(/#x:[0-9]*,y:[0-9]*/);
+        if(coord) {
+            coord = window.location.hash.split(/#x:|,y:/).slice(1).map(function(a) {return parseInt(a, 10)});
+            w.doGoToCoord(coord[1], coord[0]);
+        }
+    } catch(e) {
+        console.log(e);
+    }
     // get world style
     ajaxRequest({
         type: "GET",
@@ -1179,13 +1190,13 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
 }
 document.addEventListener("mousedown", function(e) {
     event_mousedown(e);
-})
+});
 document.addEventListener("touchstart", function(e) {
     var pos = touch_pagePos(e);
     touchPosX = pos[0];
     touchPosY = pos[1];
     event_mousedown(e, pos[0], pos[1]);
-})
+}, { passive: false });
 
 // change cursor position
 function renderCursor(coords) {
@@ -1848,11 +1859,19 @@ function confirmRunJsLink(data, confirmWarning) {
     var link = document.createElement("a");
     link.href = data;
     link.click();
+    link.remove();
     closeJSAlert();
 }
 
 function runJsLink(data) {
-    alertJS(data);
+    if(secureJSLink) {
+        alertJS(data);
+    } else {
+        var link = document.createElement("a");
+        link.href = data;
+        link.click();
+        link.remove();
+    }
 }
 
 function escapeQuote(text) { // escapes " and ' and \
@@ -1904,6 +1923,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
         linkElm.href = "";
         linkElm.onclick = null;
         linkElm.rel = "";
+        linkElm.title = "";
         if(link[0].type == "url") {
             var URL_Link = link[0].url;
             linkElm.href = URL_Link;
@@ -1911,13 +1931,20 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             if(linkProtocol == "javascript:") {
                 URL_Link = "javascript:runJsLink(\"" + escapeQuote(URL_Link) + "\");";
                 linkElm.href = URL_Link;
+            } else if(linkProtocol == "com:") {
+                var com = URL_Link.split("com:")[1];
+                if(com == "test") {
+                    URL_Link = "javascript:console.log(\"Test\");";
+                    linkElm.href = URL_Link;
+                }
+                linkElm.title = "com:" + com;
             } else {
                 linkElm.rel = "noopener noreferrer";
             }
-            linkElm.title = "Link to URL " + linkElm.href;
+            if(!linkElm.title) linkElm.title = "Link to URL " + linkElm.href;
         } else if(link[0].type == "coord") {
             var pos = link[0].link_tileX + "," + link[0].link_tileY;
-            linkElm.title = "Link to coordinates " + pos;
+            if(!linkElm.title) linkElm.title = "Link to coordinates " + pos;
             linkElm.href = "javascript:void(0);";
             linkElm.onclick = function() {
                 w.doGoToCoord(link[0].link_tileY, link[0].link_tileX);
@@ -2024,14 +2051,14 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 }
 document.addEventListener("mousemove", function(e) {
     event_mousemove(e);
-})
+});
 document.addEventListener("touchmove", function(e) {
     e.preventDefault();
     var pos = touch_pagePos(e);
     touchPosX = pos[0];
     touchPosY = pos[1];
     event_mousemove(e, pos[0], pos[1]);
-})
+}, { passive: false });
 
 // get position from touch event
 function touch_pagePos(e) {
@@ -3196,7 +3223,7 @@ var w = {
         renderTiles();
     },
     getCenterCoords: function() {
-        return [-positionY / tileH, -positionX / tileW]
+        return [-positionY / tileH, -positionX / tileW];
     },
     doUrlLink: function(url) {
         linkAuto.active = true;
@@ -3315,29 +3342,16 @@ var w = {
             func(data);
         }
     },
+    broadcastReceive: function() {
+        w.socket.send(JSON.stringify({
+            kind: "cmd_opt"
+        }));
+    },
     broadcastCommand: function(data) {
-        /*
-            Clients would receive broadcasted data if they send the following data to the server:
-            {
-                kind: "cmd_opt"
-            }
-            The server will return the following data once mode opt-in is complete:
-            {
-                kind: "cmd_opt",
-                enabled: true
-            }
-            Clients would receive broadcasted data in the following format:
-            {
-                kind: "cmd",
-                data: <utf8 string, maximum length of 2048>,
-                sender: <utf8 string>,
-                source: "cmd"
-            }
-        */
         w.socket.send(JSON.stringify({
             kind: "cmd",
-            data: data
-        }))
+            data: data // maximum length of 2048
+        }));
     },
     jquery: function(callback) {
         if(window.jQuery) return;
@@ -3353,7 +3367,7 @@ var w = {
                     script.innerText = e;
                     document.head.appendChild(script);
                 }
-            })
+            });
         } else {
             script.src = jqueryURL;
             document.head.appendChild(script);
@@ -3422,6 +3436,18 @@ var w = {
         w.nightMode = 1;
         if(ignoreUnloadedPattern) w.nightMode = 2;
         w.redraw();
+    },
+    rotate: function(speed) {
+        if(!speed) speed = 2;
+        var rotation = 0;
+        var rot = setInterval(function() {
+            main_view.style.transform = "perspective(900px) rotateY(" + rotation + "deg)";
+            rotation += speed;
+            if(rotation >= 360) {
+                main_view.style.transform = "";
+                clearInterval(rot);
+            }
+        }, 10);
     }
 }
 

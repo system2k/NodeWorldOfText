@@ -60,3 +60,8 @@
 - rate limit fetch requests
 - superuser feature: option to disable saving new edits to the database, and to allow a range of tiles to have their edits saved in-memory
 - 2-factor authentication
+- world favorites and user profiles with claimed worlds with thumbnail previews of them
+- inbox/direct messaging system. this could be expanded to include guest clients on worlds
+- 3d client (our world of three) as an experiment
+- select an area to move
+- sharing coordinates in chat

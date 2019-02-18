@@ -1,59 +1,39 @@
-body {
-    font-family: Verdana,"Helvetica Neue",Arial,Helvetica,sans-serif;
-}
-
-.container {
+html, body, h1, p {
     margin: 0;
-    display: inline;
-}
-
-ul,ol {
-    padding-left: 1em;
-}
-
-table,td,th {
+    padding: 0;
+    border: 0;
+    font-weight: inherit;
+    font-style: inherit;
+    font-size: 100%;
+    font-family: inherit;
     vertical-align: baseline;
 }
 
 body {
+    font-family: Verdana, "Helvetica Neue", Arial, Helvetica, sans-serif;
+    background-color: #eee;
+    font-size: 75%;
+    line-height: 1.5;
     padding-left: 2em;
-    background: #eee;
+}
+
+.span-14 {
+    width: 550px;
+}
+
+.span-19 {
+    width: 750px;
+}
+
+h1 {
+    font-size: 3em;
+    font-weight: normal;
+    line-height: 1;
+    margin-bottom: 0.5em;
 }
 
 #topbar {
     text-align: right;
-}
-
-#twitter-widget-0 {
-    float: right;
-    margin: 10px;
-}
-
-p {
-    margin-bottom: 1em;
-}
-
-ul {
-    margin-top: .2em;
-}
-
-li {
-    margin-left: 2em;
-}
-
-.text {
-    text-align: left;
-    padding-left: 2em;
-    max-width: 360px;
-}
-
-.date {
-    color: #444;
-    font-size: 80%;
-}
-
-.loading {
-    color: #666;
 }
 
 .content_set {
@@ -84,13 +64,33 @@ li {
     color: #444;
 }
 
-.config_table td {
-    padding-top: 0.5em;
-    padding-bottom: 0.5em;
+ul, ol {
+    padding-left: 1em;
 }
 
-.feature_name {
-    padding-right: 0.5em;
+table, td, th {
+    vertical-align: baseline;
+}
+
+p {
+    margin-bottom: 1em;
+}
+
+ul {
+    margin-top: .2em;
+}
+
+li {
+    margin-left: 2em;
+}
+
+a:focus, a:hover {
+    color: #000;
+}
+
+a {
+    color: #009;
+    text-decoration: underline;
 }
 
 .feature_description {
@@ -100,14 +100,37 @@ li {
     width: 30%;
 }
 
-.message {
-    position: fixed;
-    top: 0;
-    padding: 5px 0px;
-    width: 60%;
-    left: 50%;
-    margin-left: -30%;
-    text-align: center;
-    background: #DDDDDD;
-    color: #333;
+.feature_name {
+    padding-right: 0.5em;
+}
+
+.config_table td {
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+}
+
+input[type=text], input[type=password], input.text, input.title, textarea, select {
+    margin: 0.5em 0;
+}
+
+th, td, caption {
+    padding: 4px 10px 4px 5px;
+}
+
+table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+label {
+    font-weight: bold;
+}
+
+input[type=text], input[type=password], input.text, input.title, textarea, select {
+    background-color: #fff;
+    border: 1px solid #bbb;
+}
+
+ul {
+    margin: 0 1.5em 1.5em 0;
 }

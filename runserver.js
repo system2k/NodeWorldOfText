@@ -204,6 +204,54 @@ async function static_retrieve(id) {
     })
 }
 
+var static_fileData_queue = [];
+var static_fileData_busy = false;
+function static_fileData_flush(forced) {
+    if(static_fileData_busy && !forced) return;
+    static_fileData_busy = true;
+    (async function() {
+        var queueSize = static_fileData_queue.length;
+        try {
+            for(var i = 0; i < queueSize; i++) {
+                var ar = static_fileData_queue[0];
+                static_fileData_queue.shift();
+                var data = ar[0];
+                var res = ar[1];
+
+                var fdLen = data.length;
+                var ptr = await staticRaw_append(data);
+
+                var index = await staticIdx_append(Buffer.from([
+                    ptr & 255,
+                    ptr >> 8 & 255,
+                    ptr >> 16 & 255,
+                    ptr >> 24 & 255,
+                    fdLen & 255,
+                    fdLen >> 8 & 255,
+                    fdLen >> 16 & 255,
+                    fdLen >> 24 & 255,
+                    1]));
+                // [uint32, uint32, uint8] -> [offset, size, publicly accessible]
+                res(index);
+            }
+        } catch(e) {
+            handle_error(e);
+        }
+        if(static_fileData_queue.length) {
+            static_fileData_flush(true);
+        } else {
+            static_fileData_busy = false;
+        }
+    }());
+}
+
+function static_fileData_append(data) {
+    return new Promise(function(res) {
+        static_fileData_queue.push([data, res]);
+        static_fileData_flush();
+    });
+}
+
 const database = new sql.Database(serverDB);
 const chat_history = new sql.Database(chatDB);
 const image_db = new sql.Database(imageDB);
@@ -2028,7 +2076,8 @@ var global_data = {
     static_data,
     staticRaw_append,
     staticIdx_append,
-    static_retrieve
+    static_retrieve,
+    static_fileData_append
 }
 
 async function sysLoad() {

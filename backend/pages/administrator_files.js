@@ -15,8 +15,7 @@ module.exports.GET = async function(req, serve, vars) {
 module.exports.POST = async function(req, serve, vars) {
     var post_data = vars.post_data;
     var user = vars.user;
-    var staticRaw_append = vars.staticRaw_append;
-    var staticIdx_append = vars.staticIdx_append;
+    var static_fileData_append = vars.static_fileData_append;
 
     if(!user.superuser) return;
 
@@ -53,20 +52,8 @@ module.exports.POST = async function(req, serve, vars) {
     headerData[1] = headerLen >> 8 & 255;
 
     var fileData = Buffer.concat([headerData, data]);
-    var fdLen = fileData.length;
-    var ptr = await staticRaw_append(fileData);
 
-    var index = await staticIdx_append(Buffer.from([
-        ptr & 255,
-        ptr >> 8 & 255,
-        ptr >> 16 & 255,
-        ptr >> 24 & 255,
-        fdLen & 255,
-        fdLen >> 8 & 255,
-        fdLen >> 16 & 255,
-        fdLen >> 24 & 255,
-        1]));
-    // [uint32, uint32, uint8] -> [offset, size, publicly accessible]
+    var index = await static_fileData_append(fileData);
 
     serve(index.toString());
 }
