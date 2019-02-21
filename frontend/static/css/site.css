@@ -134,3 +134,9 @@ input[type=text], input[type=password], input.text, input.title, textarea, selec
 ul {
     margin: 0 1.5em 1.5em 0;
 }
+
+.text {
+    text-align: left;
+    padding-left: 2em;
+    max-width: 360px;
+}

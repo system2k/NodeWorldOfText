@@ -129,7 +129,7 @@ clientOnload.push(function() {
         (YourWorld.Color >> 16) & 255, 
         (YourWorld.Color >> 8) & 255, 
          YourWorld.Color & 255);
-})
+});
 
 init_dom();
 
@@ -149,7 +149,7 @@ function draggable_element(dragger, dragged) {
     var clickY = 0;
 
     dragger.addEventListener("mousedown", function(e) {
-        if(e.target != dragged) return;
+        if(e.target != dragger) return;
         elmX = dragged.offsetLeft;
         elmY = dragged.offsetTop;
         elmWidth = dragged.offsetWidth;
@@ -977,17 +977,27 @@ function defaultStyles() {
     };
 }
 
-// begin OWOT's client
-function begin() {
+function manageCoordHash() {
     try {
         var coord = window.location.hash.match(/#x:[0-9]*,y:[0-9]*/);
         if(coord) {
-            coord = window.location.hash.split(/#x:|,y:/).slice(1).map(function(a) {return parseInt(a, 10)});
+            coord = window.location.hash.split(/#x:|,y:/).slice(1).map(function(a) {
+                return parseInt(a, 10);
+            });
             w.doGoToCoord(coord[1], coord[0]);
         }
     } catch(e) {
         console.log(e);
     }
+}
+
+window.onhashchange = function(e) {
+	manageCoordHash();
+}
+
+// begin OWOT's client
+function begin() {
+    manageCoordHash();
     // get world style
     ajaxRequest({
         type: "GET",
@@ -1263,7 +1273,7 @@ function renderCursor(coords) {
         positionY -= cellH - diff;
     }
 
-    if(diff != null && (posXCompare != positionX || posYCompare != positionY)) renderTiles()
+    if(diff != null && (posXCompare != positionX || posYCompare != positionY)) renderTiles();
 }
 
 // remove cursor from view
@@ -1412,7 +1422,11 @@ function flushWrites() {
 
 var writeInterval = setInterval(function() {
     if(!writeBuffer.length) return;
-    flushWrites()
+    try {
+        flushWrites();
+    } catch(e) {
+        console.log(e);
+    }
 }, 1000)
 
 window.onbeforeunload = function() {
@@ -3435,6 +3449,14 @@ var w = {
         styles.text = "#FFF";
         w.nightMode = 1;
         if(ignoreUnloadedPattern) w.nightMode = 2;
+        w.redraw();
+    },
+    day: function() {
+        w.nightMode = 0;
+        styles.member = "#EEE";
+        styles.owner = "#DDD";
+        styles.public = "#FFF";
+        styles.text = "#000";
         w.redraw();
     },
     rotate: function(speed) {

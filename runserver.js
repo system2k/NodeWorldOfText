@@ -434,7 +434,7 @@ prepare_chat_db({ db, db_ch, intv, handle_error });
 var transporter;
 var email_available = true;
 
-function loadEmail() {
+async function loadEmail() {
     try {
         if(isTestServer) throw "This is a test server";
         transporter = nodemailer.createTransport({
@@ -451,7 +451,7 @@ function loadEmail() {
     }
     try {
         if(email_available) {
-            transporter.verify();
+            await transporter.verify();
         }
     } catch(e) {
         handle_error(e);
@@ -462,7 +462,6 @@ function loadEmail() {
         console.log("Logged into email");
     }
 }
-loadEmail();
 
 async function send_email(destination, subject, text) {
     if(!email_available) return false;
@@ -493,6 +492,7 @@ var bypass_key_cache = "";
 
 async function initialize_server() {
     console.log("Starting server...");
+    await loadEmail();
     await init_chat_history();
     await init_image_database();
     if(!await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='server_info'")) {

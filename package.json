@@ -4,7 +4,7 @@
     "description": "OurWorldOfText server",
     "dependencies": {
         "adm-zip": "^0.4.13",
-        "nodemailer": "^4.7.0",
+        "nodemailer": "^5.1.1",
         "sqlite3": "^4.0.4",
         "swig": "^1.4.2",
         "ws": "^6.1.2"

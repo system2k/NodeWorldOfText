@@ -364,7 +364,7 @@ async function loadTile(tileCache, world_id, tileX, tileY) {
         if(tile) {
             t.properties = JSON.parse(tile.properties);
             if(!t.properties.color) {
-                t.properties.color = Array(128).fill(0)
+                t.properties.color = Array(128).fill(0);
             }
             if(t.properties.char) {
                 t.charProt = decodeCharProt(t.properties.char);
@@ -377,7 +377,7 @@ async function loadTile(tileCache, world_id, tileX, tileY) {
             // tile does not exist. this is an empty tile
             t.properties = {
                 color: Array(128).fill(0)
-            }
+            };
             t.charProt = new Array(128).fill(null);
             t.tile_data = " ".repeat(128);
             t.writability = null;
@@ -527,6 +527,7 @@ async function flushQueue() {
                 delete t.properties[f];
             }
             t.tile_data = " ".repeat(128);
+            t.properties.color = Array(128).fill(0);
 
             prepareTileUpdate(updatedTiles, tileX, tileY, t);
             updatedTilesBroadcast = true;
