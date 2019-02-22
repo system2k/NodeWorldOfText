@@ -39,21 +39,21 @@ So i'll open up a terminal and navigate to that directory:
     
 Now i'll use git from the command line (its added to your environment 'path' variable, so its a global command)
     
-    'git clone https://bitbucket.org/SystemTwentyone/nodeworldoftext.git'
+    'git clone https://gitlab.com/System2k/NodeWorldOfText.git'
     
-You'll need to login to bitbucket, because at the time of this writting, the repository is private:
+You'll need to login to GitLab, because at the time of this writting, the repository is private:
 
-A popup window should appear, so enter the email you used to register your bitbucket
+A popup window should appear, so enter the email you used to register your GitLab
 account, and the password you setup also.
 
 - If that window never appeared, or you don't want to use the GUI for some reason (hit exit button), you should see the following in your terminal:
     
     Login failed, use ctrl+c to cancel basic credential prompt.
-    Username for 'https://bitbucket.org':
+    Username for 'https://gitlab.com':
     
 After that, enter your password
     
-    Password for 'https://< your username|email >@bitbucket.org':
+    Password for 'https://< your username|email >@gitlab.com':
     
 And if you've entered correct credentials, and have the permissions necessary,
 you should see the repository cloning via git.
@@ -62,7 +62,7 @@ It will complete somewhat quickly, and say ' done.' when its done.
 Now we'll need to install dependencies!
 In terminal, navigate to the repository we cloned:
     
-    cd C:\Users\Jonathan\Desktop\Projects\Node\nodeworldoftext
+    cd C:\Users\Jonathan\Desktop\Projects\Node\NodeWorldOfText
     
 Now we use Node JS's package manager (came with our fresh install of Node JS)
 to install the dependencies using this command:
@@ -79,7 +79,7 @@ Lets test out the server for fun!
 
 Navigate to the repository
     
-    cd C:\Users\Jonathan\Desktop\Projects\Node\nodeworldoftext
+    cd C:\Users\Jonathan\Desktop\Projects\Node\NodeWorldOfText
     
 Now use 'node' command to start the server using the main script:
     
@@ -111,6 +111,6 @@ Open up your browser and type in
     
 Substituting the port number for whatever your terminal said the port was.
 
-You should see a neato owot client appear just as if you were on ourworldoftext.com!
+You should see a neato OWOT client appear just as if you were on ourworldoftext.com!
 
-If you have any issues, you can try our discord!
+If you have any issues, you can try our Discord!
