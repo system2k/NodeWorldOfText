@@ -813,7 +813,7 @@ function getCharInfo(tileX, tileY, charX, charY) {
         charY = cursorCoords[3];
     }
     return {
-        loaded: isTileLoaded(tileY + "," + tileX),
+        loaded: isTileLoaded(tileX, tileY),
         char: getChar(tileX, tileY, charX, charY),
         color: getCharColor(tileX, tileY, charX, charY),
         protection: getCharProtection(tileX, tileY, charX, charY)
@@ -2634,7 +2634,7 @@ function isTileVisible(tileX, tileY) {
 
 function isTileLoaded(tileX, tileY) {
     var str = tileY + "," + tileX;
-    return tiles[str] && tiles[str].initted;
+    return !!(tiles[str] && tiles[str].initted);
 }
 
 var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

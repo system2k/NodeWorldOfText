@@ -766,15 +766,10 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^favicon\.ico[\\/]?$", "/static/favicon.png", { no_login: true }],
     ["^robots.txt[\\/]?$", "/static/robots.txt", { no_login: true }],
     ["^home[\\/]?$", pages.home],
+
     ["^accounts/login[\\/]?", pages.login],
     ["^accounts/logout[\\/]?", pages.logout],
     ["^accounts/register[\\/]?$", pages.register],
-    ["^ajax/protect[\\/]?$", pages.protect],
-    ["^ajax/unprotect[\\/]?$", pages.unprotect],
-    ["^ajax/protect/char[\\/]?$", pages.protect_char],
-    ["^ajax/unprotect/char[\\/]?$", pages.unprotect_char],
-    ["^ajax/coordlink[\\/]?$", pages.coordlink],
-    ["^ajax/urllink[\\/]?$", pages.urllink],
     ["^accounts/profile[\\/]?$", pages.profile],
     ["^accounts/private[\\/]?$", pages.private],
     ["^accounts/configure[\\/]?$", pages.configure], // for front page configuring
@@ -784,36 +779,50 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^accounts/timemachine/(.*)/$", pages.timemachine],
     ["^accounts/register/complete[\\/]?$", pages.register_complete],
     ["^accounts/activate/(.*)/$", pages.activate],
+    ["^accounts/download/$", pages.accounts_download], // for front page downloading
+    ["^accounts/download/(.*)/$", pages.accounts_download],
+    ["^accounts/password_change[\\/]?$", pages.password_change],
+    ["^accounts/password_change/done[\\/]?$", pages.password_change_done],
+    ["^accounts/nsfw/(.*)[\\/]?$", pages.accounts_nsfw],
+    ["^accounts/tabular[\\/]?$", pages.accounts_tabular],
+
+    ["^ajax/protect[\\/]?$", pages.protect],
+    ["^ajax/unprotect[\\/]?$", pages.unprotect],
+    ["^ajax/protect/char[\\/]?$", pages.protect_char],
+    ["^ajax/unprotect/char[\\/]?$", pages.unprotect_char],
+    ["^ajax/coordlink[\\/]?$", pages.coordlink],
+    ["^ajax/urllink[\\/]?$", pages.urllink],
+    
     ["^administrator/$", pages.administrator],
     ["^administrator/edits/$", pages.administrator_edits], // for front page downloading
     ["^administrator/edits/(.*)/$", pages.administrator_edits],
-    ["^script_manager/$", pages.script_manager],
-    ["^script_manager/edit/(.*)/$", pages.script_edit],
-    ["^script_manager/view/(.*)/$", pages.script_view],
     ["^administrator/user/(.*)/$", pages.administrator_user],
-    ["^accounts/download/$", pages.accounts_download], // for front page downloading
-    ["^accounts/download/(.*)/$", pages.accounts_download],
-    ["^world_style[\\/]?$", pages.world_style],
-    ["^other/random_color[\\/]?$", pages.random_color, { no_login: true }],
-    ["^accounts/password_change[\\/]?$", pages.password_change],
-    ["^accounts/password_change/done[\\/]?$", pages.password_change_done],
     ["^administrator/users/by_username/(.*)[\\/]?$", pages.administrator_users_by_username],
     ["^administrator/users/by_id/(.*)[\\/]?$", pages.administrator_users_by_id],
-    ["^accounts/nsfw/(.*)[\\/]?$", pages.accounts_nsfw],
     ["^administrator/world_restore[\\/]?$", pages.administrator_world_restore],
     ["^administrator/backgrounds[\\/]?$", pages.administrator_backgrounds, { binary_post_data: true }],
     ["^administrator/files[\\/]?$", pages.administrator_files, { binary_post_data: true }],
     ["^administrator/manage_ranks[\\/]?$", pages.administrator_manage_ranks],
-    ["^other/backgrounds/(.*)[\\/]?$", pages.load_backgrounds, { no_login: true }],
     ["^administrator/set_custom_rank/(.*)/$", pages.administrator_set_custom_rank],
+
+    ["^script_manager/$", pages.script_manager],
+    ["^script_manager/edit/(.*)/$", pages.script_edit],
+    ["^script_manager/view/(.*)/$", pages.script_view],
+    
+    ["^world_style[\\/]?$", pages.world_style],
+
+    ["^other/random_color[\\/]?$", pages.random_color, { no_login: true }],
+    ["^other/backgrounds/(.*)[\\/]?$", pages.load_backgrounds, { no_login: true }],
     ["^other/chat/(.*)[\\/]?$", pages.other_chat],
     ["^other/test/(.*)[\\/]?$", pages.other_test, { no_login: true }],
     ["^other/forums/(.*)[\\/]?$", pages.other_forums, { no_login: true }],
     ["^other/serverrequeststatus/(.*)[\\/]?$", pages.other_serverrequeststatus, { no_login: true }],
     ["^other/info/(.*)[\\/]?$", pages.other_info, { no_login: true }],
     ["^other/cd/(.*)[\\/]?$", pages.other_cd, { no_login: true }],
+
     ["^static/(.*)[\\/]?$", pages.static, { no_login: true }],
     ["^static\\?file=(.*)[\\/]?$", pages.static, { no_login: true, check_query: true }],
+
     ["^([\\w\\/\\.\\-\\~]*)$", pages.yourworld, { remove_end_slash: true }]
 ];
 
