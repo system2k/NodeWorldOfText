@@ -34,15 +34,98 @@
             window.location.pathname = "/administrator/set_custom_rank/" + custom_rank_username_config.value + "/";
             return false;
         }
+
+        function manageServerCommand(command) {
+            ajaxRequest({
+                type: "POST",
+                data: {
+                    manage_server: command
+                },
+                url: "/administrator/",
+                done: function(e) {
+                    alert("Command '" + command + "' has been sent to the server with the response '" + e + "'");
+                }
+            });
+        }
+
         onload = function() {
             autocomplete({
                 element: document.getElementById("username_config"),
                 url: "/accounts/member_autocomplete/",
                 delay: 50
             });
+
+            var mgr_restart = document.getElementById("mgr_restart");
+            var mgr_close = document.getElementById("mgr_close");
+            var mgr_maintenance = document.getElementById("mgr_maintenance");
+            mgr_restart.onclick = function() {
+                manageServerCommand("restart");
+            }
+            mgr_close.onclick = function() {
+                manageServerCommand("close");
+            }
+            mgr_maintenance.onclick = function() {
+                manageServerCommand("maintenance");
+            }
+        }
+
+        function ajaxRequest(settings) {
+            var req = new XMLHttpRequest();
+
+            var formData = "";
+            var ampAppend = false;
+            if(settings.data) {
+                for(var i in settings.data) {
+                    if(ampAppend) formData += "&";
+                    ampAppend = true;
+                    formData += encodeURIComponent(i) + "=" + encodeURIComponent(settings.data[i]);
+                }
+            }
+            // append form data to url if this is a GET
+            if(settings.type == "GET" && formData) {
+                settings.url += "?" + formData;
+            }
+            var async = !!settings.async;
+            req.open(settings.type, settings.url, !async);
+            req.onload = function() {
+                if(req.status >= 200 && req.status < 400) {
+                    if(settings.done) {
+                        settings.done(req.responseText, req);
+                    }
+                } else {
+                    if(settings.error) {
+                        settings.error(req);
+                    }
+                }
+            }
+            req.onerror = function() {
+                if(settings.error) {
+                    settings.error(req);
+                }
+            }
+            if(settings.type == "POST") {
+                if(formData) req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                req.send(formData);
+            } else {
+                req.send();
+            }
         }
     </script>
     <link rel="stylesheet" type="text/css" href="/static/css/autocomplete.css">
+    <style>
+        .server_mgr {
+            margin-top: 4px;
+            width: 200px;
+            height: 32px;
+            text-align: left;
+        }
+        .server_mgr_txt {
+            position: relative;
+			left: 4px;
+			top: -5px;
+			font-size: 1.2em;
+        }
+    </style>
 {% endblock %}
 
 {% block header %}
@@ -84,16 +167,16 @@
     </div>
 
     {% if user.operator %}
-        <div class="content_set">
-            <div class="content_set_title">Edit Users</div>
-            <div class="content_set_content">
-                <form onsubmit="return goto_user();">
-                    User name: 
-                    <input type="text" name="username" id="username_config" value="">
-                    <input type="submit" value="Edit">
-                </form>
-            </div>
+    <div class="content_set">
+        <div class="content_set_title">Edit Users</div>
+        <div class="content_set_content">
+            <form onsubmit="return goto_user();">
+                User name: 
+                <input type="text" name="username" id="username_config" value="">
+                <input type="submit" value="Edit">
+            </form>
         </div>
+    </div>
     {% endif %}
     <div class="content_set">
         <div class="content_set_title">User Ranks</div>
@@ -169,7 +252,7 @@
     </div>
 
     <div class="content_set">
-        <div class="content_set_title">View user info</div>
+        <div class="content_set_title">View User Info</div>
         <div class="content_set_content">
             <form onsubmit="return goto_user_by_username();">
                 User name: 
@@ -188,7 +271,7 @@
         <div class="content_set_title">Constants</div>
         <div class="content_set_content">
             {% if cons_update_msg %}
-				<span style="font-size:80%"><i>{{ cons_update_msg }}</i></span>
+			<span style="font-size:80%"><i>{{ cons_update_msg }}</i></span>
 			{% endif %}
             <form method="POST" action=".">
 				Bypass key: 
@@ -217,6 +300,19 @@
             <b>Machine Uptime: </b>{{ machine_uptime }}
         </div>
     </div>
+
+    {% if user.operator %}
+    <div class="content_set">
+        <div class="content_set_title">Manage Server</div>
+        <div class="content_set_content">
+            <button class="server_mgr" id="mgr_restart"><img src="/static/restart.png"><span class="server_mgr_txt">Restart</span></button>
+            <br>
+            <button class="server_mgr" id="mgr_close"><img src="/static/close.png"><span class="server_mgr_txt">Close</span></button>
+            <br>
+            <button class="server_mgr" id="mgr_maintenance"><img src="/static/maintenance.png"><span class="server_mgr_txt">Maintenance</span></button>
+        </div>
+    </div>
+    {% endif %}
 
     <div class="content_set">
         <div class="content_set_title">Connected Clients</div>

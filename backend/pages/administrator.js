@@ -61,6 +61,7 @@ module.exports.POST = async function(req, serve, vars) {
     var db = vars.db;
     var db_misc = vars.db_misc;
     var modify_bypass_key = vars.modify_bypass_key;
+    var stopServer = vars.stopServer;
 
     if(!user.superuser) {
         return await dispage("404", null, req, serve, vars)
@@ -92,5 +93,22 @@ module.exports.POST = async function(req, serve, vars) {
         return await dispage("administrator", {
             announcement_update_msg: "Announcement updated"
         }, req, serve, vars);
+    }
+    if("manage_server" in post_data) {
+        if(!user.operator) return;
+        var cmd = post_data.manage_server;
+        if(cmd == "restart") {
+            serve("SUCCESS");
+            stopServer(true);
+        }
+        if(cmd == "close") {
+            serve("SUCCESS");
+            stopServer();
+        }
+        if(cmd == "maintenance") {
+            serve("SUCCESS");
+            stopServer(false, true);
+        }
+        return;
     }
 }

@@ -16,12 +16,14 @@ function validateCSS(c) {
     return c.slice(0, 20);
 }
 
-function validatePerms(p) {
-    // == so that 1 and '1' are both the same. 0 and undefined should return 0 also.
-    if(p == 0) return 0;
-    if(p == 1) return 1;
-    if(p == 2) return 2;
-    return 0;
+function validatePerms(p, max, allowNeg) {
+    if(!max) max = 2;
+    var num = parseInt(p, 10);
+    if(isNaN(num)) return 0;
+    if(num === -1 && allowNeg) return -1;
+    if(num < 0) return 0;
+    if(num > max) return 0;
+    return num;
 }
 
 module.exports.GET = async function(req, serve, vars, params) {
@@ -188,8 +190,8 @@ module.exports.POST = async function(req, serve, vars) {
             message: adduser.username + " is now a member of the \"" + world_name + "\" world"
         }, req, serve, vars);
     } else if(post_data.form == "access_perm") { // access_perm
-        var readability = validatePerms(post_data.readability);
-        var writability = validatePerms(post_data.writability);
+        var readability = validatePerms(post_data.readability, 2);
+        var writability = validatePerms(post_data.writability, 2);
 
         await db.run("UPDATE world SET (readability,writability)=(?,?) WHERE id=?",
             [readability, writability, world.id]);
@@ -201,13 +203,12 @@ module.exports.POST = async function(req, serve, vars) {
         var username_to_remove = to_remove.substr("remove_".length);
         await db.run("DELETE FROM whitelist WHERE user_id=(SELECT id FROM auth_user WHERE username=? COLLATE NOCASE) AND world_id=?", [username_to_remove, world.id]);
     } else if(post_data.form == "features") {
-        var go_to_coord = validatePerms(post_data.go_to_coord);
-        var coord_link = validatePerms(post_data.coord_link);
-        var url_link = validatePerms(post_data.url_link);
-		var animate = validatePerms(post_data.animate);
-        var paste = validatePerms(post_data.paste);
-        var chat = validatePerms(post_data.chat);
-        var color_text = validatePerms(post_data.color_text);
+        var go_to_coord = validatePerms(post_data.go_to_coord, 2);
+        var coord_link = validatePerms(post_data.coord_link, 2);
+        var url_link = validatePerms(post_data.url_link, 2);
+        var paste = validatePerms(post_data.paste, 2);
+        var chat = validatePerms(post_data.chat, 2, true);
+        var color_text = validatePerms(post_data.color_text, 2);
         var membertiles_addremove = post_data.membertiles_addremove;
         if(membertiles_addremove == "false") {
             membertiles_addremove = 0;

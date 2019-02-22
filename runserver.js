@@ -716,6 +716,9 @@ function command_prompt() {
         if(code == "res") {
             return stopServer(true);
         }
+        if(code == "maint") {
+            return stopServer(false, true);
+        }
         if(code == "sta") {
             load_static();
             command_prompt();
@@ -1163,7 +1166,17 @@ var server = https_reference.createServer(options, async function(req, res) {
         res.end(err500Temp);
         handle_error(e); // writes error to error log
     }
-})
+});
+
+var HTTPSockets = {};
+var HTTPSockketID = 0;
+server.on("connection", function(socket) {
+    var sockID = HTTPSockketID++;
+    HTTPSockets[sockID] = socket;
+    socket.on("close", function() {
+        delete HTTPSockets[sockID];
+    });
+});
 
 var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
 
@@ -1616,7 +1629,6 @@ function broadcastUserCount() {
 async function clear_expired_sessions(no_timeout) {
     // clear expires sessions
     await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
-
     // clear expired registration keys (and accounts that aren't activated yet)
     await db.each("SELECT id FROM auth_user WHERE is_active=0 AND ? - date_joined >= ?",
         [Date.now(), Day * settings.activation_key_days_expire], async function(data) {
@@ -2077,7 +2089,8 @@ var global_data = {
     staticRaw_append,
     staticIdx_append,
     static_retrieve,
-    static_fileData_append
+    static_fileData_append,
+    stopServer
 }
 
 async function sysLoad() {
@@ -2106,7 +2119,7 @@ function stopPrompt() {
 // stops server (for upgrades/maintenance) without crashing everything
 // This lets node terminate the program when all handles are complete
 var isStopping = false;
-function stopServer(restart) {
+function stopServer(restart, maintenance) {
     if(isStopping) return;
     isStopping = true;
     console.log("\x1b[32mStopping server...\x1b[0m");
@@ -2118,25 +2131,34 @@ function stopServer(restart) {
             delete intv[i];
         }
 
-        await updateChatLogData(true);
-        await clear_expired_sessions(true);
+        try {
+            await updateChatLogData(true);
+            await clear_expired_sessions(true);
 
-        for(var i in pages) {
-            var mod = pages[i];
-            if(mod.server_exit) {
-                await mod.server_exit();
+            for(var i in pages) {
+                var mod = pages[i];
+                if(mod.server_exit) {
+                    await mod.server_exit();
+                }
             }
-        }
 
-        for(var i in systems) {
-            var sys = systems[i];
-            if(sys.server_exit) {
-                await sys.server_exit();
+            for(var i in systems) {
+                var sys = systems[i];
+                if(sys.server_exit) {
+                    await sys.server_exit();
+                }
             }
-        }
 
-        server.close();
-        wss.close();
+            server.close();
+            wss.close();
+
+            for(var id in HTTPSockets) {
+                HTTPSockets[id].destroy();
+            }
+        } catch(e) {
+            handle_error(e);
+            if(!isTestServer) console.log(e);
+        }
 
         var handles = process._getActiveHandles();
 
@@ -2173,6 +2195,8 @@ function stopServer(restart) {
         console.log("Stopped server with " + count + " handles remaining.");
         if(restart) {
             sendProcMsg("RESTART");
+        } else if(maintenance) {
+            sendProcMsg("MAINT");
         } else {
             sendProcMsg("EXIT");
         }

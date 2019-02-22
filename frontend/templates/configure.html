@@ -181,16 +181,17 @@
 						</td>
 					</tr>
 					<tr>
-						<td class="feature_name">Chat in this page</td>
+						<td class="feature_name">Chat</td>
 						<td>
 							<select name="chat">
 								<option value="0"{%if chat_permission==0%} selected{%endif%}>anyone</option>
 								<option value="1"{%if chat_permission==1%} selected{%endif%}>me and members</option>
 								<option value="2"{%if chat_permission==2%} selected{%endif%}>only me</option>
+								<option value="-1"{%if chat_permission==-1%} selected{%endif%}>disabled</option>
 							</select>
 						</td>
 						<td class="feature_description">
-							Allows certain users to chat in this page. Not affected by read permissions nor write permissions.
+							Allows users to chat using the chatbox. This is not affected by read permissions or write permissions.
 						</td>
 					</tr>
 					<tr>
@@ -284,7 +285,7 @@
 	</div>
 	
 	<div class="content_set">
-		<div class="content_set_title">Time machine</div>
+		<div class="content_set_title">Time Machine</div>
 		<div class="content_set_content">
 			<span style="margin-left:1em"><a href="/accounts/timemachine/{{ world }}/1000000/">View your world history</a></span>
 		</div>
@@ -399,7 +400,7 @@
 						<button name="clear_all" class="action_btn" id="clear_all">Clear everything</button>
 					</td>
 					<td class="action_desc">
-						Clear the entire world. All text will be completely gone (including protected areas).
+						Clear the entire world. All text will be completely gone including protected areas.
 					</td>
 				</tr>
 				<tr>
