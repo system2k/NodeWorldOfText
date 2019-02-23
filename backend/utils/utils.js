@@ -727,6 +727,19 @@ function fixColors(colors) {
     return colors;
 }
 
+function parseAcceptEncoding(str) {
+    if(!str) return [];
+    var res = [];
+    str = str.split(",");
+    for(var i = 0; i < str.length; i++) {
+        var encoding = str[i];
+        encoding = encoding.split(";")[0];
+        encoding = encoding.trim();
+        res.push(encoding);
+    }
+    return res;
+}
+
 module.exports = {
     trimHTML,
     create_date,
@@ -756,5 +769,6 @@ module.exports = {
     insert_char_at_index,
     html_tag_esc,
     sanitize_color,
-    fixColors
+    fixColors,
+    parseAcceptEncoding
 }

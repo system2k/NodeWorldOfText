@@ -25,6 +25,7 @@ const url         = require("url");
 const utils       = require("./backend/utils/utils.js");
 const WebSocket   = require("ws");
 const zip         = require("adm-zip");
+const zlib        = require("zlib");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -55,6 +56,7 @@ var insert_char_at_index = utils.insert_char_at_index;
 var html_tag_esc         = utils.html_tag_esc;
 var sanitize_color       = utils.sanitize_color;
 var fixColors            = utils.fixColors;
+var parseAcceptEncoding  = utils.parseAcceptEncoding;
 
 var prepare_chat_db     = chat_mgr.prepare_chat_db;
 var init_chat_history   = chat_mgr.init_chat_history;
@@ -1219,7 +1221,9 @@ async function process_request(req, res, current_req_id) {
     // server will return cookies to the client if it needs to
     var include_cookies = [];
 
-    var transaction = transaction_obj(current_req_id)
+    var transaction = transaction_obj(current_req_id);
+
+    var acceptEncoding = parseAcceptEncoding(req.headers["accept-encoding"]);
 
     function dispatch(data, status_code, params) {
         if(request_resolved) return; // if request is already sent
@@ -1267,10 +1271,25 @@ async function process_request(req, res, current_req_id) {
         if(!status_code) {
             status_code = 200;
         }
-        res.writeHead(status_code, info);
         if(!data) {
             data = "";
         }
+        if(acceptEncoding.includes("gzip") || acceptEncoding.includes("*")) {
+            var doNotEncode = false;
+            if(data.length < 64) {
+                doNotEncode = true;
+            }
+            if(typeof params.mime == "string") {
+                if(params.mime.indexOf("text") == -1 && params.mime.indexOf("javascript") == -1) {
+                    doNotEncode = true;
+                }
+            }
+            if(!doNotEncode) {
+                info["Content-Encoding"] = "gzip";
+                data = zlib.gzipSync(data);
+            }
+        }
+        res.writeHead(status_code, info);
         res.write(data, "utf8");
         res.end();
     }
