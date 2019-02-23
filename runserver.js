@@ -157,9 +157,9 @@ if(!fs.existsSync(filesPath)) fs.mkdirSync(filesPath, 0o777);
 if(!fs.existsSync(staticFilesRaw)) fs.writeFileSync(staticFilesRaw, "");
 if(!fs.existsSync(staticFilesIdx)) fs.writeFileSync(staticFilesIdx, "");
 
-var read_staticRaw = fs.openSync(staticFilesRaw);
+var read_staticRaw = fs.openSync(staticFilesRaw, "r");
 var write_staticRaw = fs.createWriteStream(staticFilesRaw, { flags: "a" });
-var read_staticIdx = fs.openSync(staticFilesIdx);
+var read_staticIdx = fs.openSync(staticFilesIdx, "r");
 var write_staticIdx = fs.createWriteStream(staticFilesIdx, { flags: "a" });
 
 var staticRaw_size = fs.statSync(staticFilesRaw).size;
