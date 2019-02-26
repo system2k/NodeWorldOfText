@@ -4,6 +4,7 @@ var args = process.argv.slice(2);
 var fork = require("child_process").fork;
 var serverPath = "./runserver.js";
 var http = require("http");
+var fs = require("fs");
 
 var isTestServer = false;
 var args = process.argv;
@@ -16,10 +17,13 @@ args.forEach(function(a) {
 
 var DATA_PATH = "../data/";
 var SETTINGS_PATH = DATA_PATH + "settings.json";
-var settings = require(SETTINGS_PATH);
-var maintenance_port = settings.port;
-if(isTestServer) {
-    maintenance_port = settings.test_port;
+var settings, maintenance_port;
+if(fs.existsSync(SETTINGS_PATH)) {
+    settings = require(SETTINGS_PATH);
+    maintenance_port = settings.port;
+    if(isTestServer) {
+        maintenance_port = settings.test_port;
+    }
 }
 
 function runServer() {
