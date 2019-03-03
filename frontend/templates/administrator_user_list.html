@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}
+	User List | Our World of Text
+{% endblock %}
+
+{% block header %}
+	<h1>User List</h1>
+	<span><a href="/administrator/">« Back to Admin Panel</a></span>
+{% endblock %}
+
+{% block content %}
+	<div class="content_set" style="width: auto; display: table;">
+		<div class="content_set_title">User Rank</div>
+		<div class="content_set_content">
+            <table>
+                <tbody>
+                    <tr>
+                        <th>
+                            ID
+                        </th>
+                        <th>
+                            Username
+                        </th>
+                        <th>
+                            Active
+                        </th>
+                        <th>
+                            Level
+                        </th>
+                        <th>
+                            Last Login
+                        </th>
+                        <th>
+                            Date Joined
+                        </th>
+                    </tr>
+                    {% for user in users %}
+                    <tr>
+                        <td>
+                            {{user.id|safe}}
+                        </td>
+                        <td>
+                            {{user.username|safe}}
+                        </td>
+                        <td>
+                            {{user.is_active|safe}}
+                        </td>
+                        <td>
+                            {{user.level|safe}}
+                        </td>
+                        <td>
+                            {{user.last_login|safe}}
+                        </td>
+                        <td>
+                            {{user.date_joined|safe}}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+		</div>
+	</div>
+{% endblock %}

@@ -9,13 +9,13 @@ module.exports.GET = async function(req, serve, vars, params) {
     if(!user.authenticated) {
         return serve(null, null, {
             redirect: "/accounts/login/?next=/accounts/profile/"
-        })
+        });
     }
 
     var world_list = [];
     var memberships = [];
 
-    var owned = await db.all("SELECT * FROM world WHERE owner_id=?", user.id)
+    var owned = await db.all("SELECT * FROM world WHERE owner_id=?", user.id);
     for(var i = 0; i < owned.length; i++) {
         var world = owned[i];
         var member_total = await db.get("select world_id, count(world_id) as count from whitelist where world_id=?", world.id);
@@ -40,14 +40,14 @@ module.exports.GET = async function(req, serve, vars, params) {
             views_plural: plural(properties.views),
             views,
             name: world.name
-        })
+        });
     }
 
     world_list.sort(function(v1, v2) {
         return v1.name.localeCompare(v2.name, "en", { sensitivity: "base" })
-    })
+    });
 
-    var whitelists = await db.all("SELECT * FROM whitelist WHERE user_id=?", user.id)
+    var whitelists = await db.all("SELECT * FROM whitelist WHERE user_id=?", user.id);
 
     for(var i = 0; i < whitelists.length; i++) {
         var world_reference = whitelists[i];
@@ -60,7 +60,7 @@ module.exports.GET = async function(req, serve, vars, params) {
             get_absolute_url: "/" + name,
             url: display_name,
             name
-        })
+        });
     }
 
     var message = null;
@@ -76,7 +76,8 @@ module.exports.GET = async function(req, serve, vars, params) {
         message: message,
         csrftoken: cookies.csrftoken,
         worlds_owned: world_list,
-        memberships: memberships
+        memberships: memberships,
+        email_verified: user.is_active
     };
 
     serve(HTML("profile.html", data));

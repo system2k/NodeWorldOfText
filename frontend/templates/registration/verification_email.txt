@@ -1,0 +1,2 @@
+Thanks for signing up at Our World of Text. Please verify your account by 
+visiting {{ website }}{{ reg_key }}

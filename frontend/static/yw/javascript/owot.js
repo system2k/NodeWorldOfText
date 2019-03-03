@@ -71,6 +71,7 @@ var surrogateCharsEnabled  = true;
 var defaultCoordLinkColor  = "#008000";
 var defaultURLLinkColor    = "#0000FF";
 var secureJSLink           = true;
+var priorityOverwriteChar  = false;
 
 var images_to_load         = {
     unloaded: "/static/unloaded.png"
@@ -2651,7 +2652,7 @@ function decodeCharProt(str) {
         console.error("Unrecognized char-protection format");
         return;
     }
-    var res = new Array(128).fill(0);
+    var res = new Array(tileArea).fill(0);
     str = str.substr(1);
     for(var i = 0; i < str.length; i++) {
         var code = base64table.indexOf(str.charAt(i));
@@ -2659,9 +2660,9 @@ function decodeCharProt(str) {
         var char2 = Math.trunc(code / (4) % 4);
         var char3 = Math.trunc(code / (1) % 4);
         res[i*3 + 0] = char1;
-        if(i*3 + 1 > 127) break;
+        if(i*3 + 1 > tileArea - 1) break;
         res[i*3 + 1] = char2;
-        if(i*3 + 2 > 127) break;
+        if(i*3 + 2 > tileArea - 1) break;
         res[i*3 + 2] = char3;
     }
     // convert from base64-format to writability-format
@@ -2686,18 +2687,105 @@ function encodeCharProt(array) {
         }
     }
     var str = "@";
-    var bytes = Math.ceil(128 / 3)
+    var bytes = Math.ceil(tileArea / 3)
     for(var i = 0; i < bytes; i++) {
         var idx = i * 3;
         var char1 = ((4*4)*array[idx + 0]);
         var char2 = ((4)*array[idx + 1])
         var char3 = ((1)*array[idx + 2])
-        if(idx + 1 > 127) char2 = 0;
-        if(idx + 2 > 127) char3 = 0;
+        if(idx + 1 > tileArea - 1) char2 = 0;
+        if(idx + 2 > tileArea - 1) char3 = 0;
         var code = char1 + char2 + char3;
         str += base64table.charAt(code)
     }
     return str;
+}
+
+function renderChar(x, y, str, content, props, textRender, colors) {
+    // fillText is always off by 5 pixels, adjust it
+    var textYOffset = cellH - (5 * zoom);
+    // fill background if defined
+    if(coloredChars[str]) {
+        if(coloredChars[str][y]) {
+            if(coloredChars[str][y][x]) {
+                var color = coloredChars[str][y][x];
+                textRender.fillStyle = color;
+                textRender.fillRect(x * cellW, y * cellH, cellW, cellH);
+            }
+        }
+    }
+
+    var char = content[y * tileC + x];
+    var color = colors[y * tileC + x];
+    // initialize link color to default text color in case there's no link to color
+    var linkColor = styles.text;
+    var isLink = false;
+
+    // check if this char is a link
+    if(linksRendered) {
+        if(props[y]) {
+            if(props[y][x]) {
+                var link = props[y][x].link;
+                if(link) {
+                    isLink = true;
+                    if(link.type == "url") {
+                        linkColor = defaultURLLinkColor;
+                    } else if(link.type == "coord") {
+                        linkColor = defaultCoordLinkColor;
+                    }
+                }
+            }
+        }
+    }
+    if(!char) char = " ";
+    var cCode = char.charCodeAt(0);
+    if(char == "\x1A") char = "\u2588";
+
+    // if text has no color, use default text color. otherwise, colorize it
+    if(color == 0 || !colorsEnabled || (isLink && !colorizeLinks)) {
+        textRender.fillStyle = linkColor;
+    } else {
+        textRender.fillStyle = "rgb(" + (color >> 16 & 255) + "," + (color >> 8 & 255) + "," + (color & 255) + ")";
+    }
+
+    // x padding of text if the char width is > 10
+    var XPadding = cellWidthPad * zoom;
+
+    // underline link
+    if(isLink) {
+        textRender.fillRect(x * cellW, y * cellH + textYOffset + zoom, cellW, zoom);
+    }
+    if(char != "\u0020" && char != "\u00a0") { // ignore whitespace characters
+        if(cCode >= 0x2800 && cCode <= 0x28FF && brBlockFill) { // render braille chars as rectangles
+            var dimX = cellW / 2;
+            var dimY = cellH / 4;
+            if(cCode & 1) textRender.fillRect(x * cellW, y * cellH, dimX, dimY);
+            if(cCode & 8) textRender.fillRect(x * cellW + dimX, y * cellH, dimX, dimY);
+            if(cCode & 2) textRender.fillRect(x * cellW, y * cellH + dimY, dimX, dimY);
+            if(cCode & 16) textRender.fillRect(x * cellW + dimX, y * cellH + dimY, dimX, dimY);
+            if(cCode & 4) textRender.fillRect(x * cellW, y * cellH + dimY * 2, dimX, dimY);
+            if(cCode & 32) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 2, dimX, dimY);
+            if(cCode & 64) textRender.fillRect(x * cellW, y * cellH + dimY * 3, dimX, dimY);
+            if(cCode & 128) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 3, dimX, dimY);
+        } else if(char == "\u2588" && ansiBlockFill) { // █ full block
+            textRender.fillRect(x * cellW, y * cellH, cellW, cellH);
+        } else if(char == "\u2580" && ansiBlockFill) { // ▀ top half block
+            textRender.fillRect(x * cellW, y * cellH, cellW, Math.trunc(cellH / 2));
+        } else if(char == "\u2584" && ansiBlockFill) { // ▄ bottom half block
+            textRender.fillRect(x * cellW, y * cellH + Math.trunc(cellH / 2), cellW, Math.trunc(cellH / 2));
+        } else if(char == "\u258c" && ansiBlockFill) { // ▌ left half block
+            textRender.fillRect(x * cellW, y * cellH, Math.trunc(cellW / 2), cellH);
+        } else if(char == "\u2590" && ansiBlockFill) { // ▐ right half block
+            textRender.fillRect(x * cellW + Math.trunc(cellW / 2), y * cellH, Math.trunc(cellW / 2), cellH);
+        } else { // character rendering
+            var mSpec = (char.charCodeAt(1) == 822) && mSpecRendering;
+            if(char.length > 1 && !mSpec) textRender.font = specialCharFont;
+            if(mSpec) char = char.replace(String.fromCharCode(822), "");
+            textRender.fillText(char, x * cellW + XPadding, y * cellH + textYOffset); // render text
+            if(char.length > 1 && !mSpec) textRender.font = font;
+            if(mSpec) textRender.fillRect(x * cellW, y * cellH + cellH - 9 * zoom, cellW, zoom);
+        }
+    }
 }
 
 function renderTile(tileX, tileY, redraw) {
@@ -2761,18 +2849,16 @@ function renderTile(tileX, tileY, redraw) {
 
     // render char protections
     if(tile.properties.char && !tile.backgroundColor) {
-        function plotCharProt(x, y, writability) {
-            if(writability == null) return;
-            
-            if(writability == 0) ctx.fillStyle = styles.public;
-            if(writability == 1) ctx.fillStyle = styles.member;
-            if(writability == 2) ctx.fillStyle = styles.owner;
-
-            ctx.fillRect(offsetX + x * cellW, offsetY + y * cellH, cellW, cellH);
-        }
-        for(var p = 0; p < 128; p++) {
-            var code = tile.properties.char[p];
-            plotCharProt(p % 16, Math.floor(p / 16), code);
+        for(var p = 0; p < tileArea; p++) {
+            var code = tile.properties.char[p]; // writability
+            var cX = p % 16;
+            var cY = Math.floor(p / 16);
+            if(code != null) {
+                if(code == 0) ctx.fillStyle = styles.public;
+                if(code == 1) ctx.fillStyle = styles.member;
+                if(code == 2) ctx.fillStyle = styles.owner;
+                ctx.fillRect(offsetX + cX * cellW, offsetY + cY * cellH, cellW, cellH);
+            }
         }
     }
 
@@ -2865,91 +2951,23 @@ function renderTile(tileX, tileY, redraw) {
     if(!props) props = {};
 
     content = advancedSplit(content);
-    // fillText is always off by 5 pixels, adjust it
-    var textYOffset = cellH - (5 * zoom);
-    for(var y = 0; y < tileR; y++) {
-        for(var x = 0; x < tileC; x++) {
-            // fill background if defined
-            if(coloredChars[str]) {
-                if(coloredChars[str][y]) {
-                    if(coloredChars[str][y][x]) {
-                        var color = coloredChars[str][y][x];
-                        textRender.fillStyle = color;
-                        textRender.fillRect(x * cellW, y * cellH, cellW, cellH);
-                    }
-                }
+    if(priorityOverwriteChar && tile.properties.char) {
+        for(var lev = 0; lev < 3; lev++) {
+            for(var c = 0; c < tileArea; c++) {
+                var code = tile.properties.char[c]; // writability
+                if(code == null) code = tile.properties.writability;
+                if(code == null) code = state.worldModel.writability;
+                if(code != lev) continue;
+                var cX = c % 16;
+                var cY = Math.floor(c / 16);
+                textRender.clearRect(cX * cellW, cY * cellH, cellW, cellH);
+                renderChar(cX, cY, str, content, props, textRender, colors);
             }
-
-            var char = content[y * tileC + x];
-            var color = colors[y * tileC + x];
-            // initialize link color to default text color in case there's no link to color
-            var linkColor = styles.text;
-            var isLink = false;
-
-            // check if this char is a link
-            if(linksRendered) {
-                if(props[y]) {
-                    if(props[y][x]) {
-                        var link = props[y][x].link;
-                        if(link) {
-                            isLink = true;
-                            if(link.type == "url") {
-                                linkColor = defaultURLLinkColor;
-                            } else if(link.type == "coord") {
-                                linkColor = defaultCoordLinkColor;
-                            }
-                        }
-                    }
-                }
-            }
-            if(!char) char = " ";
-            var cCode = char.charCodeAt(0);
-            if(char == "\x1A") char = "\u2588";
-
-            // if text has no color, use default text color. otherwise, colorize it
-            if(color == 0 || !colorsEnabled || (isLink && !colorizeLinks)) {
-                textRender.fillStyle = linkColor;
-            } else {
-                textRender.fillStyle = "rgb(" + (color >> 16 & 255) + "," + (color >> 8 & 255) + "," + (color & 255) + ")";
-            }
-
-            // x padding of text if the char width is > 10
-            var XPadding = cellWidthPad * zoom;
-
-            // underline link
-            if(isLink) {
-                textRender.fillRect(x * cellW, y * cellH + textYOffset + zoom, cellW, zoom);
-            }
-            if(char != "\u0020" && char != "\u00a0") { // ignore whitespace characters
-                if(cCode >= 0x2800 && cCode <= 0x28FF && brBlockFill) { // render braille chars as rectangles
-                    var dimX = cellW / 2;
-                    var dimY = cellH / 4;
-                    if(cCode & 1) textRender.fillRect(x * cellW, y * cellH, dimX, dimY);
-                    if(cCode & 8) textRender.fillRect(x * cellW + dimX, y * cellH, dimX, dimY);
-                    if(cCode & 2) textRender.fillRect(x * cellW, y * cellH + dimY, dimX, dimY);
-                    if(cCode & 16) textRender.fillRect(x * cellW + dimX, y * cellH + dimY, dimX, dimY);
-                    if(cCode & 4) textRender.fillRect(x * cellW, y * cellH + dimY * 2, dimX, dimY);
-                    if(cCode & 32) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 2, dimX, dimY);
-                    if(cCode & 64) textRender.fillRect(x * cellW, y * cellH + dimY * 3, dimX, dimY);
-                    if(cCode & 128) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 3, dimX, dimY);
-                } else if(char == "\u2588" && ansiBlockFill) { // █ full block
-                    textRender.fillRect(x * cellW, y * cellH, cellW, cellH);
-                } else if(char == "\u2580" && ansiBlockFill) { // ▀ top half block
-                    textRender.fillRect(x * cellW, y * cellH, cellW, Math.trunc(cellH / 2));
-                } else if(char == "\u2584" && ansiBlockFill) { // ▄ bottom half block
-                    textRender.fillRect(x * cellW, y * cellH + Math.trunc(cellH / 2), cellW, Math.trunc(cellH / 2));
-                } else if(char == "\u258c" && ansiBlockFill) { // ▌ left half block
-                    textRender.fillRect(x * cellW, y * cellH, Math.trunc(cellW / 2), cellH);
-                } else if(char == "\u2590" && ansiBlockFill) { // ▐ right half block
-                    textRender.fillRect(x * cellW + Math.trunc(cellW / 2), y * cellH, Math.trunc(cellW / 2), cellH);
-                } else { // character rendering
-                    var mSpec = (char.charCodeAt(1) == 822) && mSpecRendering;
-                    if(char.length > 1 && !mSpec) textRender.font = specialCharFont;
-                    if(mSpec) char = char.replace(String.fromCharCode(822), "");
-                    textRender.fillText(char, x * cellW + XPadding, y * cellH + textYOffset); // render text
-                    if(char.length > 1 && !mSpec) textRender.font = font;
-                    if(mSpec) textRender.fillRect(x * cellW, y * cellH + cellH - 9 * zoom, cellW, zoom);
-                }
+        }
+    } else {
+        for(var y = 0; y < tileR; y++) {
+            for(var x = 0; x < tileC; x++) {
+                renderChar(x, y, str, content, props, textRender, colors);
             }
         }
     }
@@ -3195,8 +3213,8 @@ var w = {
             var charY2 = coordB[3];
             var pxCoordA = tileAndCharsToWindowCoords(tileX1, tileY1, charX1, charY1);
             var pxCoordB = tileAndCharsToWindowCoords(tileX2, tileY2, charX2, charY2);
-            var regWidth = pxCoordB[0] - pxCoordA[0] + Math.trunc(cellW) - 2;
-            var regHeight = pxCoordB[1] - pxCoordA[1] + Math.trunc(cellH) - 2;
+            var regWidth = pxCoordB[0] - pxCoordA[0] + Math.trunc(cellW / zoomRatio) - 2;
+            var regHeight = pxCoordB[1] - pxCoordA[1] + Math.trunc(cellH / zoomRatio) - 2;
             var sel = w.regionSelect.selection;
             sel.style.width = regWidth + "px";
             sel.style.height = regHeight + "px";

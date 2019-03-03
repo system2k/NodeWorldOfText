@@ -80,6 +80,10 @@
 		<div class="content_set_title">Account</div>
 		<div class="content_set_content">
 			<a href="/accounts/password_change/">Change Password</a>
+			{% if !email_verified && ver_count == 0 %}
+			<br>
+			<a href="/accounts/verify_email/{{ csrftoken }}/">Verify Email</a>
+			{% endif %}
 		</div>
 	</div>
 

@@ -465,7 +465,16 @@ async function loadEmail() {
     }
 }
 
+var testEmailAddress = "test@local";
+
 async function send_email(destination, subject, text) {
+    if(isTestServer || subject == testEmailAddress) {
+        console.log("To:", destination);
+        console.log("Subject:", subject);
+        console.log("Body:", text);
+        console.log("================");
+        return null;
+    }
     if(!email_available) return false;
     var options = {
         from: settings.email.display_email,
@@ -780,13 +789,14 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^accounts/member_autocomplete[\\/]?$", pages.member_autocomplete],
     ["^accounts/timemachine/(.*)/$", pages.timemachine],
     ["^accounts/register/complete[\\/]?$", pages.register_complete],
-    ["^accounts/activate/(.*)/$", pages.activate],
+    ["^accounts/verify/(.*)/$", pages.verify],
     ["^accounts/download/$", pages.accounts_download], // for front page downloading
     ["^accounts/download/(.*)/$", pages.accounts_download],
     ["^accounts/password_change[\\/]?$", pages.password_change],
     ["^accounts/password_change/done[\\/]?$", pages.password_change_done],
     ["^accounts/nsfw/(.*)[\\/]?$", pages.accounts_nsfw],
     ["^accounts/tabular[\\/]?$", pages.accounts_tabular],
+    ["^accounts/verify_email/(.*)[\\/]?$", pages.accounts_verify_email],
 
     ["^ajax/protect[\\/]?$", pages.protect],
     ["^ajax/unprotect[\\/]?$", pages.unprotect],
@@ -806,6 +816,7 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^administrator/files[\\/]?$", pages.administrator_files, { binary_post_data: true }],
     ["^administrator/manage_ranks[\\/]?$", pages.administrator_manage_ranks],
     ["^administrator/set_custom_rank/(.*)/$", pages.administrator_set_custom_rank],
+    ["^administrator/user_list[\\/]?$", pages.administrator_user_list],
 
     ["^script_manager/$", pages.script_manager],
     ["^script_manager/edit/(.*)/$", pages.script_edit],
@@ -969,7 +980,10 @@ async function get_user_info(cookies, is_websocket) {
         operator: false,
         superuser: false,
         staff: false,
-        scripts: []
+        is_active: false,
+        scripts: [],
+        session_key: "",
+        email: ""
     };
     if(cookies.sessionid) {
         // user data from session
@@ -979,7 +993,10 @@ async function get_user_info(cookies, is_websocket) {
             user = JSON.parse(s_data.session_data);
             if(cookies.csrftoken == user.csrftoken) { // verify csrftoken
                 user.authenticated = true;
-                var level = (await db.get("SELECT level FROM auth_user WHERE id=?", user.id)).level;
+                var userauth = (await db.get("SELECT level, is_active, email FROM auth_user WHERE id=?", user.id));
+                var level = userauth.level;
+                user.is_active = !!userauth.is_active;
+                user.email = userauth.email;
 
                 var operator = level == 3;
                 var superuser = level == 2;
@@ -1657,12 +1674,11 @@ function broadcastUserCount() {
 async function clear_expired_sessions(no_timeout) {
     // clear expires sessions
     await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
-    // clear expired registration keys (and accounts that aren't activated yet)
-    await db.each("SELECT id FROM auth_user WHERE is_active=0 AND ? - date_joined >= ?",
+    // clear expired registration keys
+    await db.each("SELECT id FROM auth_user WHERE is_active=0 AND ? - date_joined >= ? AND (SELECT COUNT(*) FROM registration_registrationprofile WHERE user_id=auth_user.id) > 0",
         [Date.now(), Day * settings.activation_key_days_expire], async function(data) {
         var id = data.id;
         await db.run("DELETE FROM registration_registrationprofile WHERE user_id=?", id);
-        await db.run("DELETE FROM auth_user WHERE id=?", id)
     })
 
     if(!no_timeout) intv.clearExpiredSessions = setTimeout(clear_expired_sessions, Minute);
@@ -2118,7 +2134,8 @@ var global_data = {
     staticIdx_append,
     static_retrieve,
     static_fileData_append,
-    stopServer
+    stopServer,
+    testEmailAddress
 }
 
 async function sysLoad() {
