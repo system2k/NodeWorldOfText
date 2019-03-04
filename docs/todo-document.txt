@@ -65,3 +65,5 @@
 - 3d client (our world of three) as an experiment
 - select an area to move
 - sharing coordinates in chat
+- complete control over edits/chats in the event of a raid or spam attack
+- ability to limit rate/speed of edits and chats

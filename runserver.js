@@ -173,8 +173,8 @@ async function staticRaw_append(data) {
             var start = staticRaw_size;
             staticRaw_size += data.length;
             res(start);
-        })
-    })
+        });
+    });
 }
 
 async function staticIdx_append(data) {
@@ -183,11 +183,11 @@ async function staticIdx_append(data) {
             var index = staticIdx_size / 9;
             staticIdx_size += 9;
             res(index + 1);
-        })
-    })
+        });
+    });
 }
 
-async function static_retrieve(id) {
+function static_retrieve(id) {
     id--;
     if(id < 0 || id >= staticIdx_size / 9) return null;
     return new Promise(function(res) {
@@ -195,15 +195,35 @@ async function static_retrieve(id) {
         fs.read(read_staticIdx, pos, 0, 9, id * 9, function() {
             var start = pos[0] + pos[1] * 256 + pos[2] * 65536 + pos[3] * 16777216;
             var len = pos[4] + pos[5] * 256 + pos[6] * 65536 + pos[7] * 16777216;
-            if(len > 50000000) {
-                return res(null);
-            }
             var data = Buffer.alloc(len);
             fs.read(read_staticRaw, data, 0, len, start, function() {
                 res(data);
             });
         });
     })
+}
+
+function static_retrieve_raw_header(startOffset) {
+    return new Promise(function(res) {
+        var size = Buffer.alloc(2);
+        fs.read(read_staticRaw, size, 0, size.length, startOffset, function() {
+            var headLen = (size[0] + size[1] * 256) - 2;
+            var head = Buffer.alloc(headLen);
+            fs.read(read_staticRaw, head, 0, headLen, startOffset + size.length, function() {
+                res(head);
+            });
+        });
+    });
+}
+
+function staticIdx_full_buffer() {
+    return new Promise(function(res, rej) {
+        var file = Buffer.alloc(staticIdx_size);
+        fs.read(read_staticIdx, file, 0, file.length, 0, function(err) {
+            if(err) return rej(err);
+            res(file);
+        });
+    });
 }
 
 var static_fileData_queue = [];
@@ -817,6 +837,7 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^administrator/manage_ranks[\\/]?$", pages.administrator_manage_ranks],
     ["^administrator/set_custom_rank/(.*)/$", pages.administrator_set_custom_rank],
     ["^administrator/user_list[\\/]?$", pages.administrator_user_list],
+    ["^administrator/file_list[\\/]?$", pages.administrator_file_list],
 
     ["^script_manager/$", pages.script_manager],
     ["^script_manager/edit/(.*)/$", pages.script_edit],
@@ -2135,7 +2156,9 @@ var global_data = {
     static_retrieve,
     static_fileData_append,
     stopServer,
-    testEmailAddress
+    testEmailAddress,
+    staticIdx_full_buffer,
+    static_retrieve_raw_header
 }
 
 async function sysLoad() {

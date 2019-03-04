@@ -46,6 +46,23 @@
         </div>
         <span id="com" style="display: none;">---</span>
     </div>
+    <div class="panel" style="border-color: #f19113;">
+            <div style="width: 100%; background-color: #000000;">
+                <span class="titlebar">Restore world from JSON file</span>
+            </div>
+            <div class="panelContent">
+                <div style="padding-bottom: 4px;">
+                    <label>World name: </label><input style="width: 460px;" id="json_worldname">
+                </div>
+                <div style="padding-bottom: 4px;">
+                    <label>JSON file: </label><input type="file" id="json_file_input">
+                </div>
+                <div style="text-align: right;">
+                    <button onclick="begin_process_json();" id="be_button_json">Begin process</button>
+                </div>
+            </div>
+            <span id="com_json" style="display: none;">---</span>
+        </div>
     <script>
         var be_button = document.getElementById("be_button");
         function begin_process() {
@@ -93,6 +110,62 @@
             }
 
             xhr.send("world=" + world + "&time=" + timecode);
+        }
+
+        var be_button_json = document.getElementById("be_button_json");
+        var json_file_input = document.getElementById("json_file_input");
+        var com_json = document.getElementById("com_json");
+        var json_worldname = document.getElementById("json_worldname");
+        var json_file_data;
+        json_file_input.onchange = function(e) {
+			if(!json_file_input.files.length) return;
+			var fReader = new FileReader();
+			fReader.onload = function() {
+				json_file_data = fReader.result;
+			}
+			fReader.readAsText(json_file_input.files[0]);
+		}
+        function begin_process_json() {
+            be_button_json.innerText = "Restoring...";
+            be_button_json.disabled = true;
+            com_json.style.display = "";
+            com_json.innerText = "Restoring is in progress...";
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/administrator/world_restore/", true);
+
+            xhr.onload = function(res, b) {
+                var res = xhr.responseText;
+                be_button_json.innerText = "Begin process";
+                be_button_json.disabled = false;
+                // errors
+                if(res == "PARSE_ERR") {
+                    com_json.style.color = "red";
+                    com_json.innerText = "A JSON parsing error occured";
+                    return;
+                } else if(res == "NO_NAME") {
+                    com_json.style.color = "red";
+                    com_json.innerText = "No name has been given";
+                    return;
+                } else if(res == "NO_WORLD") {
+                    com_json.style.color = "red";
+                    com_json.innerText = "This world does not exist";
+                    return;
+                }
+
+                // successful events
+                if(res == "COMPLETED") {
+                    com_json.style.color = "";
+                    com_json.innerText = "World restoration has completed";
+                    return;
+                }
+
+                // no response data
+                com_json.style.color = "red";
+                com_json.innerText = "The request has completed with no response data";
+            }
+
+            xhr.send("world=" + json_worldname.value + "&json=" + encodeURIComponent(json_file_data));
         }
     </script>
 {% endblock %}

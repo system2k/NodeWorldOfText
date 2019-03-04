@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
 {% block title %}
-	User List | Our World of Text
+	File List | Our World of Text
 {% endblock %}
 
 {% block header %}
-	<h1>User List</h1>
+	<h1>File List</h1>
 	<span><a href="/administrator/">« Back to Admin Panel</a></span>
 {% endblock %}
 
 {% block content %}
 	<div class="content_set" style="width: auto; display: table;">
-		<div class="content_set_title">User List</div>
+		<div class="content_set_title">File List</div>
 		<div class="content_set_content">
             <table>
                 <tbody>
@@ -20,40 +20,46 @@
                             ID
                         </th>
                         <th>
-                            Username
+                            Name
                         </th>
                         <th>
-                            Active
+                            Created
                         </th>
                         <th>
-                            Level
+                            Mime
                         </th>
                         <th>
-                            Last Login
+                            Offset Start
                         </th>
                         <th>
-                            Date Joined
+                            Size
+                        </th>
+                        <th>
+                            Offset
                         </th>
                     </tr>
-                    {% for user in users %}
+                    {% for file in files %}
                     <tr>
                         <td>
-                            {{user.id}}
+                            {{file.index}}
                         </td>
                         <td>
-                            {{user.username}}
+                            <a href="/static?file={{file.index}}">{{file.filename}}</a>
                         </td>
                         <td>
-                            {{user.is_active}}
+                            {{file.unixtime|safe}}
                         </td>
                         <td>
-                            {{user.level}}
+                            {{file.mimetype}}
                         </td>
                         <td>
-                            {{user.last_login|safe}}
+                            {{file.start}}
                         </td>
                         <td>
-                            {{user.date_joined|safe}}
+                            {{file.len}}
+                        </td>
+                        <td>
+                            {{file.offset}}
                         </td>
                     </tr>
                     {% endfor %}

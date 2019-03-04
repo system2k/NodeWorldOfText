@@ -7,7 +7,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         {% if meta_desc %}<meta name="description" content="{{meta_desc}}">{% else %}<meta name="description" content="An infinite grid of text editable by anyone. This is like YourWorldOfText, but with more features.">{% endif %}
         <meta property="og:image" content="/static/logo.png">
+        <meta name="theme-color" content="#ff7d0e">
         <link type="text/css" rel="stylesheet" href="/static/css/yourworld.css">
+        {% if meta_desc %}<meta property="og:description" content="{{meta_desc}}">{% else %}<meta property="og:description" content="An infinite grid of text editable by anyone.">{% endif %}
         {% for script in user.scripts %}<script src="/script_manager/view/{{ script.name }}/"></script>{% endfor %}
     </head>
     <body>

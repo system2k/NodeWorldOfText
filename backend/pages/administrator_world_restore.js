@@ -32,6 +32,45 @@ module.exports.POST = async function(req, serve, vars) {
         return;
     }
 
+    if(post_data.json) {
+        var world_data;
+        try {
+            world_data = JSON.parse(post_data.json);
+        } catch(e) {
+            return serve("PARSE_ERR");
+        }
+
+        var world_name = post_data.world;
+        if(!world_name) return serve("NO_NAME");
+
+        var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", world_name);
+        if(!world) return serve("NO_WORLD");
+
+        await db.run("DELETE FROM tile WHERE world_id=?", world.id);
+
+        await transaction.begin();
+        for(var i = 0; i < world_data.length; i++) {
+            var tile = world_data[i];
+            
+            var world_id = san_nbr(tile.world_id);
+            var content = tile.content;
+            var tileX = san_nbr(tile.tileX);
+            var tileY = san_nbr(tile.tileY);
+            var properties = tile.properties;
+            var writability = tile.writability;
+
+            if(!world_id || !content || world_id < 1 || !properties || writability === void 0) {
+                continue;
+            }
+
+            await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?, ?)",
+                [world.id, content, tileY, tileX, properties, writability, Date.now()]);
+        }
+        await transaction.end();
+
+        return serve("COMPLETED");
+    }
+
     var r_world = post_data.world;
     var r_time = post_data.time;
 

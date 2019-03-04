@@ -47,9 +47,9 @@ module.exports.POST = async function(req, serve, vars) {
         }, req, serve, vars)
     }
 
-    if(confirm_pass_1.length < 5 || confirm_pass_1.length > 128) {
+    if(confirm_pass_1.length < 3 || confirm_pass_1.length > 128) {
         return await dispage("password_change", {
-            error: "The new password must be 5 - 128 characters."
+            error: "The new password must be 3 - 128 characters."
         }, req, serve, vars)
     }
 
