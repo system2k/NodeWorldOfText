@@ -3,7 +3,7 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
         <title>{% block title %}Our World of Text{% endblock %}</title>
-        <link rel="stylesheet" href="/static/css/blueprint/print.css" type="text/css" media="print"> <!-- Affect appearance when previewing in print settings -->
+        <link rel="stylesheet" href="/static/css/blueprint/print.css" type="text/css" media="print">
         <link rel="shortcut icon" type="image/png" href="/static/favicon.png"/>
         <link rel="stylesheet" type="text/css" href="/static/css/site.css">
         <link rel="shortcut icon" href="/static/favicon.png">
@@ -24,6 +24,7 @@
                         | <a href="/accounts/profile/">Your Worlds</a>
                         {% if user.superuser %}
                             | <a href="/administrator/">Admin Panel</a>
+                            | <a href="/administrator/monitor/">Monitor</a>
                         {% endif %}
                         {% if user.staff %}
                             | <a href="/script_manager/">Script Manager</a>

@@ -838,6 +838,7 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^administrator/set_custom_rank/(.*)/$", pages.administrator_set_custom_rank],
     ["^administrator/user_list[\\/]?$", pages.administrator_user_list],
     ["^administrator/file_list[\\/]?$", pages.administrator_file_list],
+    ["^administrator/monitor[\\/]?$", pages.monitor],
 
     ["^script_manager/$", pages.script_manager],
     ["^script_manager/edit/(.*)/$", pages.script_edit],
@@ -1253,6 +1254,8 @@ async function process_request(req, res, current_req_id) {
     var fullPath = URLparse.path;
     if(fullPath.charAt(0) == "/") { fullPath = fullPath.substr(1); }
     try { fullPath = decodeURIComponent(fullPath); } catch (e) {};
+
+    if(monitorEventSockets.length) broadcastMonitorEvent("HTTP " + req.method + " " + fullPath);
 
     var request_resolved = false;
 
@@ -1832,6 +1835,28 @@ async function initialize_server_components() {
     wss.on("connection", manageWebsocketConnection);
 }
 
+var monitorEventSockets = [];
+function sendMonitorEvents(ws) {
+    monitorEventSockets.push(ws);
+}
+function removeMonitorEvents(ws) {
+    var idx = monitorEventSockets.indexOf(ws);
+    if(idx > -1) {
+        monitorEventSockets.splice(idx, 1);
+    }
+}
+function broadcastMonitorEvent(data) {
+    if(!monitorEventSockets.length) return;
+    for(var i = 0; i < monitorEventSockets.length; i++) {
+        var sock = monitorEventSockets[i];
+        try {
+            sock.send(data);
+        } catch(e) {
+            continue;
+        }
+    }
+}
+
 async function manageWebsocketConnection(ws, req) {
     if(isStopping) return;
     var ipHeaderAddr = "Unknown";
@@ -1839,12 +1864,15 @@ async function manageWebsocketConnection(ws, req) {
         var rnd = Math.floor(Math.random() * 1E4);
         var forwd = req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"];
         var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
+        var remIp = req.socket.remoteAddress;
         if(!forwd) forwd = "None;" + rnd;
         if(!realIp) realIp = "None;" + rnd;
-        ipHeaderAddr = forwd + " & " + realIp;
+        if(!remIp) remIp = "None;" + rnd;
+        ipHeaderAddr = forwd + " & " + realIp + " & " + remIp;
         ws.ipHeaderAddr = ipHeaderAddr;
         ws.ipFwd = forwd;
         ws.ipReal = realIp;
+        ws.ipRem = remIp;
     } catch(e) {
         var error_ip = "ErrC" + Math.floor(Math.random() * 1E4);
         ws.ipHeaderAddr = error_ip;
@@ -1874,10 +1902,23 @@ async function manageWebsocketConnection(ws, req) {
         }
     }
     try {
+        var location = url.parse(req.url).pathname;
         // must be at the top before any async calls (errors would occur before this event declaration)
         ws.on("error", function(err) {
             handle_error(JSON.stringify(process_error_arg(err)));
         });
+        if(location == "/administrator/monitor/") {
+            var cookies = parseCookie(req.headers.cookie);
+            var user = await get_user_info(cookies, true);
+            if(!user.superuser) {
+                return ws.close();
+            }
+            sendMonitorEvents(ws);
+            ws.on("close", function() {
+                removeMonitorEvents(ws);
+            })
+            return;
+        }
         var pre_queue = [];
         // adds data to a queue. this must be before any async calls and the message event
         function onMessage(msg) {
@@ -1889,6 +1930,7 @@ async function manageWebsocketConnection(ws, req) {
         });
         var status, clientId = void 0;
         ws.on("close", function() {
+            if(monitorEventSockets.length) broadcastMonitorEvent(ws.ipHeaderAddr + " closed");
             if(status && clientId != void 0) {
                 if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
                     client_ips[status.world.id][clientId][4] = true;
@@ -1896,12 +1938,12 @@ async function manageWebsocketConnection(ws, req) {
                 }
             }
         });
-        var location = url.parse(req.url).pathname;
         var world_name;
         function send_ws(data) {
             if(ws.readyState === WebSocket.OPEN) {
                 try {
                     ws.send(data); // not protected by callbacks
+                    if(monitorEventSockets.length) broadcastMonitorEvent(ws.ipHeaderAddr + " received message with length of " + data.length + " utf-8 chars");
                 } catch(e) {
                     handle_error(e);
                 };
@@ -1939,6 +1981,8 @@ async function manageWebsocketConnection(ws, req) {
         if(typeof status == "string") { // error
             return ws.close();
         }
+
+        if(monitorEventSockets.length) broadcastMonitorEvent(ws.ipHeaderAddr + " connected to world " + world_name);
 
         ws.world_id = status.world.id;
 
@@ -2009,6 +2053,7 @@ async function manageWebsocketConnection(ws, req) {
             req_id++;
             var current_req_id = req_id;
             try {
+                if(monitorEventSockets.length) broadcastMonitorEvent(ws.ipHeaderAddr + " sent message with length of " + msg.length + " utf-8 chars");
                 // This is a ping
                 if(msg.startsWith("2::")) {
                     var args = msg.substr(3);
