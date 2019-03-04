@@ -1907,7 +1907,7 @@ async function manageWebsocketConnection(ws, req) {
         ws.on("error", function(err) {
             handle_error(JSON.stringify(process_error_arg(err)));
         });
-        if(location == "/administrator/monitor/") {
+        if(location == "/administrator/monitor/ws/") {
             var cookies = parseCookie(req.headers.cookie);
             var user = await get_user_info(cookies, true);
             if(!user.superuser) {

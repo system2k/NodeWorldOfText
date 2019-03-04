@@ -83,7 +83,7 @@
 
             var socket;
             function makeSocket() {
-                socket = new WebSocket("ws" + (window.location.protocol === "https:" ? "s" : "") + "://" + window.location.host + "/administrator/monitor/");
+                socket = new WebSocket("ws" + (window.location.protocol === "https:" ? "s" : "") + "://" + window.location.host + "/administrator/monitor/ws/");
                 socket.onopen = function() {
                     appendLine("[Monitor] Opened");
                 }
