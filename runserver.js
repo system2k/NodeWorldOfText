@@ -1255,8 +1255,6 @@ async function process_request(req, res, current_req_id) {
     if(fullPath.charAt(0) == "/") { fullPath = fullPath.substr(1); }
     try { fullPath = decodeURIComponent(fullPath); } catch (e) {};
 
-    if(monitorEventSockets.length) broadcastMonitorEvent("HTTP " + req.method + " " + fullPath);
-
     var request_resolved = false;
 
     // server will return cookies to the client if it needs to
@@ -1865,6 +1863,7 @@ async function manageWebsocketConnection(ws, req) {
         var forwd = req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"];
         var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
         var remIp = req.socket.remoteAddress;
+        var compIp = forwd || realIp || remIp || "Err" + rnd;
         if(!forwd) forwd = "None;" + rnd;
         if(!realIp) realIp = "None;" + rnd;
         if(!remIp) remIp = "None;" + rnd;
@@ -1873,11 +1872,13 @@ async function manageWebsocketConnection(ws, req) {
         ws.ipFwd = forwd;
         ws.ipReal = realIp;
         ws.ipRem = remIp;
+        ws.ipComp = compIp;
     } catch(e) {
         var error_ip = "ErrC" + Math.floor(Math.random() * 1E4);
         ws.ipHeaderAddr = error_ip;
         ws.ipFwd = error_ip;
         ws.ipReal = error_ip;
+        ws.ipComp = error_ip;
         handle_error(e);
     }
     /*
@@ -1930,7 +1931,6 @@ async function manageWebsocketConnection(ws, req) {
         });
         var status, clientId = void 0;
         ws.on("close", function() {
-            if(monitorEventSockets.length) broadcastMonitorEvent(ws.ipHeaderAddr + " closed");
             if(status && clientId != void 0) {
                 if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
                     client_ips[status.world.id][clientId][4] = true;
@@ -1943,7 +1943,6 @@ async function manageWebsocketConnection(ws, req) {
             if(ws.readyState === WebSocket.OPEN) {
                 try {
                     ws.send(data); // not protected by callbacks
-                    if(monitorEventSockets.length) broadcastMonitorEvent(ws.ipHeaderAddr + " received message with length of " + data.length + " utf-8 chars");
                 } catch(e) {
                     handle_error(e);
                 };
@@ -1981,8 +1980,6 @@ async function manageWebsocketConnection(ws, req) {
         if(typeof status == "string") { // error
             return ws.close();
         }
-
-        if(monitorEventSockets.length) broadcastMonitorEvent(ws.ipHeaderAddr + " connected to world " + world_name);
 
         ws.world_id = status.world.id;
 
@@ -2053,7 +2050,6 @@ async function manageWebsocketConnection(ws, req) {
             req_id++;
             var current_req_id = req_id;
             try {
-                if(monitorEventSockets.length) broadcastMonitorEvent(ws.ipHeaderAddr + " sent message with length of " + msg.length + " utf-8 chars");
                 // This is a ping
                 if(msg.startsWith("2::")) {
                     var args = msg.substr(3);
@@ -2097,7 +2093,8 @@ async function manageWebsocketConnection(ws, req) {
                     var res = await websockets[kind](ws, msg, send, objIncludes(vars, {
                         transaction: transaction_obj(current_req_id),
                         broadcast,
-                        clientId
+                        clientId,
+                        ws
                     }));
                     if(typeof res == "string") {
                         send_ws(JSON.stringify({
@@ -2203,7 +2200,9 @@ var global_data = {
     stopServer,
     testEmailAddress,
     staticIdx_full_buffer,
-    static_retrieve_raw_header
+    static_retrieve_raw_header,
+    broadcastMonitorEvent,
+    monitorEventSockets
 }
 
 async function sysLoad() {

@@ -40,6 +40,7 @@ module.exports = async function(data, vars) {
     
     var total_edits = 0;
     var tiles = {};
+    var tileCount = 0;
     // organize edits into tile coordinates
     for(var i = 0; i < edits.length; i++) {
         var segment = edits[i];
@@ -54,6 +55,7 @@ module.exports = async function(data, vars) {
 
         if (!tiles[segment[0] + "," + segment[1]]) {
             tiles[segment[0] + "," + segment[1]] = [];
+            tileCount++;
         }
         segment[5] = segment[5].replace(/\n/g, " ");
         segment[5] = segment[5].replace(/\r/g, " ");
@@ -62,6 +64,10 @@ module.exports = async function(data, vars) {
         if(total_edits >= edits_limit) { // edit limit reached
             break;
         }
+    }
+
+    if(vars.ws && vars.monitorEventSockets.length && (tileCount >= 5 || total_edits >= 256)) {
+        vars.broadcastMonitorEvent(vars.ws.ipComp + " sent 'write'. " + tileCount + " modified tiles, " + total_edits + " edits.");
     }
 
     var call_id = tile_database.newCallId();
