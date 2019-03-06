@@ -2090,12 +2090,12 @@ async function manageWebsocketConnection(ws, req) {
                         data.source = kind;
                         ws_broadcast(data, world_name, opts);
                     }
-                    var res = await websockets[kind](ws, msg, send, objIncludes(vars, {
+                    var res = await websockets[kind](ws, msg, send, vars, {
                         transaction: transaction_obj(current_req_id),
                         broadcast,
                         clientId,
                         ws
-                    }));
+                    });
                     if(typeof res == "string") {
                         send_ws(JSON.stringify({
                             kind: "error",

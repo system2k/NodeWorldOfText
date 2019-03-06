@@ -1,8 +1,9 @@
-module.exports = async function(ws, data, send, vars) {
+module.exports = async function(ws, data, send, vars, evars) {
+    var broadcast = evars.broadcast;
+
     var db = vars.db;
     var user = vars.user;
     var san_nbr = vars.san_nbr;
-    var broadcast = vars.broadcast;
     var world = vars.world;
     var tile_database = vars.tile_database;
 

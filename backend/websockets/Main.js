@@ -1,6 +1,6 @@
 // Runs after establishing a websocket handshake
 
-module.exports = async function(ws, worldname, vars) {
+module.exports = async function(ws, worldname, vars, evars) {
     var db = vars.db;
     var get_user_info = vars.get_user_info;
     var world_get_or_create = vars.world_get_or_create;

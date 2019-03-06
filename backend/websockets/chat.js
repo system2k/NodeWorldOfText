@@ -28,16 +28,17 @@ function sanitizeColor(col) {
 
 var chat_ip_limits = {};
 
-module.exports = async function(ws, data, send, vars) {
+module.exports = async function(ws, data, send, vars, evars) {
+    var transaction = evars.transaction;
+    var broadcast = evars.broadcast; // broadcast to current world
+    var clientId = evars.clientId;
+
     var db = vars.db;
     var user = vars.user;
     var world = vars.world;
-    var transaction = vars.transaction;
     var san_nbr = vars.san_nbr;
     var tile_coord = vars.tile_coord;
     var modules = vars.modules;
-    var broadcast = vars.broadcast; // broadcast to current world
-    var clientId = vars.clientId;
     var ws_broadcast = vars.ws_broadcast; // site-wide broadcast
     var add_to_chatlog = vars.add_to_chatlog;
     var html_tag_esc = vars.html_tag_esc;
@@ -138,29 +139,24 @@ module.exports = async function(ws, data, send, vars) {
         msg = msg.slice(0, 3030);
     }
 
-    var chatIdBlockLimit = 256;
+    var chatIdBlockLimit = 1280;
 
     var command_list = [
         [3, "uptime", null, "get uptime of server"],
-        /* [3, "downtime", null, "view calculated downtime"] */
-        /* [3, "stopserver", null, "stop the server"] */
-        /* [3, "restartserver", null, "restart the server"] */
 
         [2, "worlds", null, "list all worlds"],
 
         [0, "help", null, "lists all commands"],
         [0, "nick", ["nickname"], "changes your nickname"], // client-side
-        [0, "ping", null, "determine the time of server requests"],
-        [0, "warp", ["world"], "force client to another world"], // client-side
-        [0, "warpserver", ["server"], "force client to a different server"], // client-side
-        [0, "gridsize", ["WxH"], "change size of cells in client"], // client-side
-        [0, "logout", null, "shortcut to logout your account"],
-        [0, "block", ["id"], "block chats from this client"],
-        /* [0, "invisible", ["on/off"], "make this client invisible to others"] */
-        [0, "color", ["color code"], "change current color for this client"], // client-side
+        [0, "ping", null, "check the latency"],
+        [0, "warp", ["world"], "go to another world"], // client-side
+        [0, "warpserver", ["server"], "connect to a different server"], // client-side
+        [0, "gridsize", ["WxH"], "change size of cells"], // client-side
+        [0, "logout", null, "logs your account off"],
+        [0, "block", ["id"], "block chats from this user"],
+        [0, "color", ["color code"], "change the text color"], // client-side
         [0, "chatcolor", ["color code"], "change only the chat color"], // client-side
         [0, "night", null, "enable night mode"] // client-side
-        /* [0, "option", null, "reserved for future use"] */
     ];
 
     function generate_command_list() {

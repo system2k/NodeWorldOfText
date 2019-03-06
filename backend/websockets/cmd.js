@@ -1,5 +1,6 @@
-module.exports = async function(ws, data, send, vars) {
-    var broadcast = vars.broadcast; // broadcast to current world
+module.exports = async function(ws, data, send, vars, evars) {
+    var broadcast = evars.broadcast; // broadcast to current world
+
     var data_rec = data.data;
     var wss = vars.wss;
     var NCaseCompare = vars.NCaseCompare;

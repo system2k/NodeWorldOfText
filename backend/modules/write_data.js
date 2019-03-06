@@ -1,4 +1,4 @@
-module.exports = async function(data, vars) {
+module.exports = async function(data, vars, evars) {
     var user = vars.user;
     var world = vars.world;
     var san_nbr = vars.san_nbr;
@@ -66,8 +66,8 @@ module.exports = async function(data, vars) {
         }
     }
 
-    if(vars.ws && vars.monitorEventSockets.length && (tileCount >= 5 || total_edits >= 256)) {
-        vars.broadcastMonitorEvent(vars.ws.ipComp + " sent 'write'. " + tileCount + " modified tiles, " + total_edits + " edits.");
+    if(evars && evars.ws && vars.monitorEventSockets.length && (tileCount >= 5 || total_edits >= 256)) {
+        vars.broadcastMonitorEvent(evars.ws.ipComp + " sent 'write'. " + tileCount + " modified tiles, " + total_edits + " edits.");
     }
 
     var call_id = tile_database.newCallId();
