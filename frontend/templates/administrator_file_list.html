@@ -37,6 +37,9 @@
                         <th>
                             Offset
                         </th>
+                        <th>
+                            Accessible
+                        </th>
                     </tr>
                     {% for file in files %}
                     <tr>
@@ -60,6 +63,9 @@
                         </td>
                         <td>
                             {{file.offset}}
+                        </td>
+                        <td>
+                            {{file.accessible}}
                         </td>
                     </tr>
                     {% endfor %}

@@ -414,7 +414,6 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     }
     if(type == "user_nick") {
         nickDom.style.color = color;
-        nickDom.href = "javascript:alert(\"Username [" + realUsername + "]\")"
         nickTitle.push("Username \"" + realUsername + "\"");
         if(state.userModel.is_operator) idTag = "[*" + id + "]";
     }

@@ -40,7 +40,7 @@ var parseCookie          = utils.parseCookie;
 var ar_str_trim          = utils.ar_str_trim;
 var ar_str_decodeURI     = utils.ar_str_decodeURI;
 var filename_sanitize    = utils.filename_sanitize;
-var cookie_expire        = utils.cookie_expire;
+var http_time            = utils.http_time;
 var encode_base64        = utils.encode_base64;
 var decode_base64        = utils.decode_base64;
 var process_error_arg    = utils.process_error_arg;
@@ -187,20 +187,69 @@ async function staticIdx_append(data) {
     });
 }
 
-function static_retrieve(id) {
+async function static_retrieve(id, range) {
     id--;
     if(id < 0 || id >= staticIdx_size / 9) return null;
-    return new Promise(function(res) {
-        var pos = Buffer.alloc(9);
-        fs.read(read_staticIdx, pos, 0, 9, id * 9, function() {
-            var start = pos[0] + pos[1] * 256 + pos[2] * 65536 + pos[3] * 16777216;
-            var len = pos[4] + pos[5] * 256 + pos[6] * 65536 + pos[7] * 16777216;
-            var data = Buffer.alloc(len);
-            fs.read(read_staticRaw, data, 0, len, start, function() {
-                res(data);
-            });
+    
+    var pos = Buffer.alloc(9);
+    await asyncFsRead(read_staticIdx, pos, 0, 9, id * 9);
+
+    var accessible = pos[8];
+    if(!accessible) return res(null);
+    var start = pos[0] + pos[1] * 256 + pos[2] * 65536 + pos[3] * 16777216;
+    var len = pos[4] + pos[5] * 256 + pos[6] * 65536 + pos[7] * 16777216;
+    var totalLen = len;
+    var headerPrepend = null;
+    if(range) {
+        var headLenBuff = Buffer.alloc(2);
+        // get the size of the header
+        await asyncFsRead(read_staticRaw, headLenBuff, 0, 2, start);
+        var headLen = headLenBuff[0] + headLenBuff[1] * 256;
+        var dataLen = len - headLen;
+        var headerPrepend = Buffer.alloc(headLen);
+        headerPrepend[0] = headLenBuff[0];
+        headerPrepend[1] = headLenBuff[1];
+        // read the header data to prepend later
+        await asyncFsRead(read_staticRaw, headerPrepend, 2, headLen - 2, start + 2);
+
+        var rangeLen, rangeOffset;
+        // validate and change the range
+        if(range[0] < 0) range[0] = 0;
+        if(range[1] == "") {
+            range[1] = dataLen - 1;
+        } else {
+            if(range[1] >= dataLen) range[1] = dataLen - 1;
+        }
+        if(range[0] > range[1]) {
+            var tmp = range[0];
+            range[0] = range[1];
+            range[1] = tmp;
+        }
+        rangeLen = range[1] - range[0] + 1;
+        rangeOffset = range[0];
+
+        len = rangeLen;
+        start = start + headLen + rangeOffset;
+    }
+    var data = Buffer.alloc(len);
+    await asyncFsRead(read_staticRaw, data, 0, len, start);
+    if(headerPrepend) {
+        data = Buffer.concat([headerPrepend, data]);
+    }
+
+    return {
+        data,
+        len: totalLen
+    };
+}
+
+function asyncFsRead(fd, buff, offset, len, start) {
+    return new Promise(function(res, rej) {
+        fs.read(fd, buff, offset, len, start, function(err) {
+            if(err) return rej(err);
+            res();
         });
-    })
+    });
 }
 
 function static_retrieve_raw_header(startOffset) {
@@ -1328,6 +1377,7 @@ async function process_request(req, res, current_req_id) {
                 data = zlib.gzipSync(data);
             }
         }
+        info["Content-Length"] = data.length;
         res.writeHead(status_code, info);
         res.write(data, "utf8");
         res.end();
@@ -1364,7 +1414,7 @@ async function process_request(req, res, current_req_id) {
                     if(!cookies.csrftoken) {
                         var token = new_token(32)
                         var date = Date.now();
-                        include_cookies.push("csrftoken=" + token + "; expires=" + cookie_expire(date + Year) + "; path=/;");
+                        include_cookies.push("csrftoken=" + token + "; expires=" + http_time(date + Year) + "; path=/;");
                         user.csrftoken = token;
                     } else {
                         user.csrftoken = cookies.csrftoken;
@@ -2143,7 +2193,7 @@ var global_data = {
     db_misc,
     dispage,
     ms,
-    cookie_expire,
+    http_time,
     checkHash,
     encryptHash,
     new_token,
@@ -2227,6 +2277,11 @@ function stopPrompt() {
     prompt_stopped = true; // do not execute any more prompts
     prompt.stop();
 }
+
+// systemctl
+process.once("SIGTERM", function() {
+    stopServer();
+});
 
 // stops server (for upgrades/maintenance) without crashing everything
 // This lets node terminate the program when all handles are complete

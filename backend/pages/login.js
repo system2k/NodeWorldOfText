@@ -22,7 +22,7 @@ module.exports.POST = async function(req, serve, vars, params) {
     var post_data = vars.post_data;
     var checkHash = vars.checkHash;
     var new_token = vars.new_token;
-    var cookie_expire = vars.cookie_expire;
+    var http_time = vars.http_time;
     var ms = vars.ms;
     var querystring = vars.querystring;
     var referer = vars.referer;
@@ -49,8 +49,7 @@ module.exports.POST = async function(req, serve, vars, params) {
     var expires = date_now + ms.Month;
 
     var sessionid = new_token(32);
-    var new_cookie = "sessionid=" + sessionid + "; expires=" +
-        cookie_expire(expires) + "; path=/;";
+    var new_cookie = "sessionid=" + sessionid + "; expires=" + http_time(expires) + "; path=/;";
 
     var data = {
         type: "sessionid_auth",

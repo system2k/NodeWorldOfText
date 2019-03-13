@@ -33,7 +33,7 @@ module.exports.POST = async function(req, serve, vars) {
     var handle_error = vars.handle_error;
     var ms = vars.ms;
     var new_token = vars.new_token;
-    var cookie_expire = vars.cookie_expire;
+    var http_time = vars.http_time;
     var cookies = vars.cookies;
     var testEmailAddress = vars.testEmailAddress;
 

@@ -223,12 +223,10 @@ var filename_sanitize = (function() {
 })();
 
 // generate an expire string for cookies
-function cookie_expire(timeStamp) {
-    var dayWeekList = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    var monthList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
+var dayWeekList = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+var monthList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function http_time(timeStamp) {
 	var _date = new Date(timeStamp);
-	
     var _DayOfWeek = dayWeekList[_date.getUTCDay()];
     var _Day = _date.getUTCDate().toString().padStart(2, 0);
     var _Month = monthList[_date.getUTCMonth()];
@@ -237,7 +235,7 @@ function cookie_expire(timeStamp) {
     var _Minute = _date.getUTCMinutes().toString().padStart(2, 0);
     var _Second = _date.getUTCSeconds().toString().padStart(2, 0);
 
-    var compile = _DayOfWeek + ", " + _Day + " " + _Month + " " + _Year + " " + _Hour + ":" + _Minute + ":" + _Second + " UTC";
+    var compile = _DayOfWeek + ", " + _Day + " " + _Month + " " + _Year + " " + _Hour + ":" + _Minute + ":" + _Second + " GMT";
     return compile;
 }
 
@@ -754,7 +752,7 @@ module.exports = {
     ar_str_trim,
     ar_str_decodeURI,
     filename_sanitize,
-    cookie_expire,
+    http_time,
     encode_base64,
     decode_base64,
     process_error_arg,

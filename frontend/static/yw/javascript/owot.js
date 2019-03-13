@@ -132,6 +132,12 @@ clientOnload.push(function() {
          YourWorld.Color & 255);
 });
 
+function random_color() {
+    jscolorInput.fromRGB(Math.floor(Math.random() * 256),
+        Math.floor(Math.random() * 256),
+        Math.floor(Math.random() * 256));
+}
+
 init_dom();
 
 var draggable_element_mousemove = [];
@@ -1734,6 +1740,9 @@ document.onkeydown = function(e) {
         tileProtectAuto.active = false;
         linkAuto.active = false;
     }
+    if(checkKeyPress(e, "CTRL+ENTER")) {
+        writeChar("\n");
+    }
     if(checkKeyPress(e, keyConfig.erase)) { // erase character
         moveCursor("left", true);
         writeChar(" ", true);
@@ -3101,7 +3110,7 @@ function buildMenu() {
 
 document.onselectstart = function(e) {
     var target = e.target;
-    if(closest(target, getChatfield()) || target == chatbar || closest(target, confirm_js_code)) {
+    if(closest(target, getChatfield()) || target == chatbar || closest(target, confirm_js_code) || closest(target, announce_text)) {
         return true;
     }
     return w._state.uiModal;
