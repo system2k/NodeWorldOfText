@@ -8,7 +8,6 @@ module.exports.startup_internal = function(vars) {
     db = vars.db;
     worldViews = vars.worldViews;
 
-    // wait at least 5 minutes and then allow user to download again
     worldViewCommit();
 }
 
@@ -75,10 +74,12 @@ module.exports.GET = async function(req, serve, vars, params) {
                 maxY: query_data.max_tileY,
                 maxX: query_data.max_tileX
             }],
-            utf16static: query_data.utf16static
+            utf16: query_data.utf16,
+            array: query_data.array,
+            content_only: query_data.content_only
         }, vars)
         serve(JSON.stringify(tiles), null, {
-            mime: "text/plain; charset=utf-8"
+            mime: "application/json; charset=utf-8"
         })
     } else { // the HTML page
         if(!worldViews[world.id]) worldViews[world.id] = 0;

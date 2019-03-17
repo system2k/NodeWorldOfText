@@ -9,10 +9,8 @@ module.exports = async function(data, vars, evars) {
     var channel = vars.channel;
 
     var bypass_key = get_bypass_key();
-    // the retrieval of the key failed (aka "undefined"). change to a value that cannot be compared to
-    // in case the key provided in the request is also "undefined"
     if(!bypass_key) {
-        bypass_key = Object;
+        bypass_key = NaN;
     }
 
     var public_only = data.public_only;

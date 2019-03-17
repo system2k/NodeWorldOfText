@@ -1364,13 +1364,15 @@ async function process_request(req, res, current_req_id) {
         }
         if(acceptEncoding.includes("gzip") || acceptEncoding.includes("*")) {
             var doNotEncode = false;
-            if(data.length < 64) {
+            if(data.length < 1450) {
                 doNotEncode = true;
             }
             if(typeof params.mime == "string") {
-                if(params.mime.indexOf("text") == -1 && params.mime.indexOf("javascript") == -1) {
+                if(params.mime.indexOf("text") == -1 && params.mime.indexOf("javascript") == -1 && params.mime.indexOf("json") == -1) {
                     doNotEncode = true;
                 }
+            } else {
+                doNotEncode = true;
             }
             if(!doNotEncode) {
                 info["Content-Encoding"] = "gzip";

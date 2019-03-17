@@ -15,7 +15,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var world_list = [];
     var memberships = [];
 
-    var owned = await db.all("SELECT * FROM world WHERE owner_id=?", user.id);
+    var owned = await db.all("SELECT * FROM world WHERE owner_id=? LIMIT 65536", user.id);
     for(var i = 0; i < owned.length; i++) {
         var world = owned[i];
         var member_total = await db.get("select world_id, count(world_id) as count from whitelist where world_id=?", world.id);

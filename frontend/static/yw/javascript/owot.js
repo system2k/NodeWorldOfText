@@ -72,6 +72,8 @@ var defaultCoordLinkColor  = "#008000";
 var defaultURLLinkColor    = "#0000FF";
 var secureJSLink           = true;
 var priorityOverwriteChar  = false;
+var pasteDirRight          = true;
+var pasteDirDown           = true;
 
 var images_to_load         = {
     unloaded: "/static/unloaded.png"
@@ -1496,18 +1498,37 @@ function writeChar(char, doNotMoveCursor, temp_color) {
     if(!doNotMoveCursor) {
         // get copy of cursor coordinates
         var cSCopy = cursor.slice();
-        // move cursor to right
-        cSCopy[2]++;
-        if(cSCopy[2] >= tileC) {
-            cSCopy[2] = 0;
-            cSCopy[0]++;
+        if(pasteDirRight) {
+            // move cursor right
+            cSCopy[2]++;
+            if(cSCopy[2] >= tileC) {
+                cSCopy[2] = 0;
+                cSCopy[0]++;
+            }
+        } else {
+            // move cursor left
+            cSCopy[2]--;
+            if(cSCopy[2] < 0) {
+                cSCopy[2] = tileC - 1;
+                cSCopy[0]--;
+            }
         }
+
         if(newLine) {
-            // move cursor down
-            cSCopy[3]++;
-            if(cSCopy[3] >= tileR) {
-                cSCopy[3] = 0;
-                cSCopy[1]++;
+            if(pasteDirDown) {
+                // move cursor down
+                cSCopy[3]++;
+                if(cSCopy[3] >= tileR) {
+                    cSCopy[3] = 0;
+                    cSCopy[1]++;
+                }
+            } else {
+                // move cursor up
+                cSCopy[3]--;
+                if(cSCopy[3] < 0) {
+                    cSCopy[3] = tileR - 1;
+                    cSCopy[1]--;
+                }
             }
             // move x position to last x position
             cSCopy[0] = lastX[0];
@@ -1717,6 +1738,7 @@ document.onkeydown = function(e) {
     if(document.activeElement == chatbar) return;
     if(document.activeElement != textInput) textInput.focus();
     // stop paste
+    textInput.value = "";
     clearInterval(pasteInterval);
     write_busy = false;
 
@@ -1809,7 +1831,7 @@ function getRange(x1, y1, x2, y2) {
     for(var y = y1; y <= y2; y++) {
         for(var x = x1; x <= x2; x++) {
             coords.push([x, y]);
-            if(coords.length >= 10000) throw "Array too large";
+            if(coords.length >= 400000) throw "Array too large";
         }
     }
     return coords;

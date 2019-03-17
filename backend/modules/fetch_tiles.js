@@ -44,7 +44,7 @@ function advancedSplit(str, noSurrog, noComb) {
     }
 	return data;
 }
-function filterUTF16Static(str) {
+function filterUTF16(str) {
     return advancedSplit(str, true, true).join("");
 }
 
@@ -59,11 +59,13 @@ module.exports = async function(data, vars) {
 
     var tiles = {};
     var editLimit = 100000; // don't overload server
-    var fetchRectLimit = 40;
+    var fetchRectLimit = 10;
 
     var len = data.fetchRectangles.length
     if(len >= fetchRectLimit) len = fetchRectLimit;
-    var utf16static = data.utf16static;
+    var q_utf16 = data.utf16;
+    var q_array = data.array;
+    var q_content_only = data.content_only;
     for(var i = 0; i < len; i++) {
         var rect = data.fetchRectangles[i];
         var minY = san_nbr(rect.minY);
@@ -74,7 +76,7 @@ module.exports = async function(data, vars) {
         if(!(minY <= maxY && minX <= maxX)) {
             return "Invalid range";
         }
-        if(!((maxY - minY) * (maxX - minX) <= 2000)) {
+        if(!((maxY - minY) * (maxX - minX) <= 45 * 45)) {
             return "Too many tiles";
         }
         var YTileRange = xrange(minY, maxY + 1);
@@ -158,13 +160,20 @@ module.exports = async function(data, vars) {
                 [world.id, minY, minX, maxY, maxX], function(data) {
                 var properties = JSON.parse(data.properties);
                 var content = data.content;
-                if(utf16static) content = filterUTF16Static(content);
-                tiles[data.tileY + "," + data.tileX] = {
-                    content,
-                    properties: Object.assign(properties, {
-                        writability: data.writability
-                    })
-                };
+                if(q_utf16) content = filterUTF16(content);
+                if(q_array) content = advancedSplit(content);
+                var tileRes;
+                if(q_content_only) {
+                    tileRes = content;
+                } else {
+                    tileRes = {
+                        content,
+                        properties: Object.assign(properties, {
+                            writability: data.writability
+                        })
+                    };
+                }
+                tiles[data.tileY + "," + data.tileX] = tileRes;
             });
         }
     }
