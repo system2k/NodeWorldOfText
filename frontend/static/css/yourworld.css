@@ -370,3 +370,8 @@ a:visited {
     margin-right: 8px;
     margin-bottom: 8px;
 }
+#random_color_link {
+    float: right;
+    color: blue;
+    text-decoration: underline;
+}

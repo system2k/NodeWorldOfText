@@ -22,10 +22,10 @@ module.exports.GET = async function(req, serve, vars, params) {
     if(!user.authenticated) {
         return serve(null, null, {
             redirect: "/accounts/login/?next=" + url.parse(req.url).pathname
-        })
+        });
     }
 
-    // gets world name from /accounts/configure/{world}/
+    // gets world name from /accounts/timemachine/{world}/
     var world_name = get_third(path, "accounts", "timemachine")
 
     var sp = world_name.split("/");
@@ -46,7 +46,5 @@ module.exports.GET = async function(req, serve, vars, params) {
     return await dispage("yourworld", {
         timemachine: true,
         world: world.name
-    }, req, serve, vars)
-    
-    serve()
+    }, req, serve, vars);
 }

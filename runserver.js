@@ -65,6 +65,12 @@ var add_to_chatlog      = chat_mgr.add_to_chatlog;
 var clearChatlog        = chat_mgr.clearChatlog;
 var updateChatLogData   = chat_mgr.updateChatLogData;
 
+// Global
+CONST = {};
+CONST.tileCols = 16;
+CONST.tileRows = 8;
+CONST.tileArea = CONST.tileCols * CONST.tileRows;
+
 console.log("Loaded libs");
 
 var DATA_PATH = "../data/";

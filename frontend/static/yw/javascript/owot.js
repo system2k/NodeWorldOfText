@@ -124,6 +124,7 @@ var chat_window = byId("chat_window");
 var confirm_js = byId("confirm_js");
 var confirm_js_code = byId("confirm_js_code");
 var main_view = byId("main_view");
+var random_color_link = byId("random_color_link");
 
 var jscolorInput;
 clientOnload.push(function() {
@@ -139,6 +140,8 @@ function random_color() {
         Math.floor(Math.random() * 256),
         Math.floor(Math.random() * 256));
 }
+
+random_color_link.onclick = random_color;
 
 init_dom();
 
@@ -1979,10 +1982,8 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
                 linkElm.href = URL_Link;
             } else if(linkProtocol == "com:") {
                 var com = URL_Link.split("com:")[1];
-                if(com == "test") {
-                    URL_Link = "javascript:console.log(\"Test\");";
-                    linkElm.href = URL_Link;
-                }
+                URL_Link = "javascript:w.broadcastCommand(\"" + escapeQuote(com) + "\");";
+                linkElm.href = URL_Link;
                 linkElm.title = "com:" + com;
             } else {
                 linkElm.rel = "noopener noreferrer";
@@ -3356,6 +3357,7 @@ var w = {
     moveCursor: moveCursor,
     fetchUpdates: getAndFetchTiles,
     acceptOwnEdits: false,
+    receivingBroadcasts: false,
     getTileVisibility: function() {
         var minVisY = (-positionY - Math.trunc(height / 2)) / tileH;
         var minVisX = (-positionX - Math.trunc(width / 2)) / tileW;
@@ -3406,6 +3408,8 @@ var w = {
         }
     },
     broadcastReceive: function() {
+        if(w.receivingBroadcasts) return;
+        w.receivingBroadcasts = true;
         w.socket.send(JSON.stringify({
             kind: "cmd_opt"
         }));

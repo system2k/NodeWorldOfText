@@ -86,7 +86,7 @@ function write_edits(tile, t, accepted, rejected, edit, data, editLog) {
     var is_owner = data.is_owner;
     var is_member = data.is_member;
 
-    var offset = charY * 16 + charX;
+    var offset = charY * CONST.tileCols + charX;
     var char_writability = t.charProt[offset];
 
     // permission checking - compute the writability of the cell, accounting for tile and world writing permissions
@@ -156,7 +156,7 @@ function write_edits(tile, t, accepted, rejected, edit, data, editLog) {
                     var frame = frames[f];
                     var frameText = frame[0];
                     var frameColors = fixColors(frame[1]);
-                    if ((typeof frameText == "string") && (frameText.length == 128)) {
+                    if ((typeof frameText == "string") && (frameText.length == CONST.tileArea)) {
                         okFrames.push([frameText, frameColors]);
                     }
                 }
@@ -205,7 +205,7 @@ function write_link(call_id, tile, t, data) {
     var tile_props = t.properties;
     var charProt = t.charProt;
 
-    var char_writability = charProt[charY * 16 + charX];
+    var char_writability = charProt[charY * CONST.tileCols + charX];
     if(char_writability == null) char_writability = tile ? tile.writability : null; // inherit from tile
     if(char_writability == null) char_writability = world.writability; // inherit from world
 
@@ -265,7 +265,7 @@ function protect_area(call_id, tile, t, data) {
     var has_modified = false;
 
     if(precise) {
-        var idx = charY * 16 + charX;
+        var idx = charY * CONST.tileCols + charX;
         var char_writability = charProt[idx];
         if(char_writability == null) char_writability = tile_writability;
         var area_perm = is_owner || (is_member && char_writability < 2);
@@ -288,7 +288,7 @@ function protect_area(call_id, tile, t, data) {
         properties.char = encodeCharProt(charProt);
     } else {
         var full_protection_complete = true;
-        for(var i = 0; i < 128; i++) {
+        for(var i = 0; i < CONST.tileArea; i++) {
             var char_writability = charProt[i];
             if(char_writability == null) char_writability = tile_writability;
             var area_perm = is_owner || (is_member && char_writability < 2);
@@ -364,22 +364,22 @@ async function loadTile(tileCache, world_id, tileX, tileY) {
         if(tile) {
             t.properties = JSON.parse(tile.properties);
             if(!t.properties.color) {
-                t.properties.color = Array(128).fill(0);
+                t.properties.color = Array(CONST.tileArea).fill(0);
             }
             if(t.properties.char) {
                 t.charProt = decodeCharProt(t.properties.char);
             } else {
-                t.charProt = new Array(128).fill(null);
+                t.charProt = new Array(CONST.tileArea).fill(null);
             }
             t.tile_data = tile.content;
             t.writability = tile.writability;
         } else {
             // tile does not exist. this is an empty tile
             t.properties = {
-                color: Array(128).fill(0)
+                color: Array(CONST.tileArea).fill(0)
             };
-            t.charProt = new Array(128).fill(null);
-            t.tile_data = " ".repeat(128);
+            t.charProt = new Array(CONST.tileArea).fill(null);
+            t.tile_data = " ".repeat(CONST.tileArea);
             t.writability = null;
         }
         t.oldWritability = t.writability;
@@ -526,8 +526,8 @@ async function flushQueue() {
             for(var f in t.properties) {
                 delete t.properties[f];
             }
-            t.tile_data = " ".repeat(128);
-            t.properties.color = Array(128).fill(0);
+            t.tile_data = " ".repeat(CONST.tileArea);
+            t.properties.color = Array(CONST.tileArea).fill(0);
 
             prepareTileUpdate(updatedTiles, tileX, tileY, t);
             updatedTilesBroadcast = true;
@@ -563,8 +563,8 @@ async function flushQueue() {
                         var hasUpdated = false;
                         for(var r = 0; r < charData.length; r++) {
                             var char = charData[r];
-                            var charX = r % 16;
-                            var charY = Math.floor(r / 16);
+                            var charX = r % CONST.tileCols;
+                            var charY = Math.floor(r / CONST.tileCols);
                             var charWritability = char;
                             if(charWritability == null) charWritability = tile.writability;
                             if(charWritability == null) charWritability = world.writability;
@@ -590,11 +590,11 @@ async function flushQueue() {
                     } else {
                         if(tile.writability == 0) {
                             await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE id=?",
-                                [" ".repeat(128), "{}", tile.id]);
+                                [" ".repeat(CONST.tileArea), "{}", tile.id]);
                         } else if(tile.writability == null && world.writability == 0) {
                             // delete default tiles that are public too (null = default protection)
                             await db.run("UPDATE tile SET (content,properties)=(?,?) WHERE id=?",
-                                [" ".repeat(128), "{}", tile.id]);
+                                [" ".repeat(CONST.tileArea), "{}", tile.id]);
                         }
                     }
                 }

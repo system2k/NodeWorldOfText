@@ -568,14 +568,14 @@ function encodeCharProt(array) {
         }
     }
     var str = "@";
-    var bytes = Math.ceil(128 / 3);
+    var bytes = Math.ceil(CONST.tileArea / 3);
     for(var i = 0; i < bytes; i++) {
         var idx = i * 3;
         var char1 = ((4*4)*arrayCom[idx + 0]);
         var char2 = ((4)*arrayCom[idx + 1]);
         var char3 = ((1)*arrayCom[idx + 2]);
-        if(idx + 1 > 127) char2 = 0;
-        if(idx + 2 > 127) char3 = 0;
+        if(idx + 1 > CONST.tileArea - 1) char2 = 0;
+        if(idx + 2 > CONST.tileArea -1) char3 = 0;
         var code = char1 + char2 + char3;
         str += base64table.charAt(code);
     }
@@ -583,7 +583,7 @@ function encodeCharProt(array) {
 }
 
 function decodeCharProt(str) {
-    var res = new Array(128).fill(0);
+    var res = new Array(CONST.tileArea).fill(0);
     str = str.substr(1);
     for(var i = 0; i < str.length; i++) {
         var code = base64table.indexOf(str.charAt(i));
@@ -591,9 +591,9 @@ function decodeCharProt(str) {
         var char2 = Math.trunc(code / (4) % 4);
         var char3 = Math.trunc(code / (1) % 4);
         res[i*3 + 0] = char1;
-        if(i*3 + 1 > 127) break;
+        if(i*3 + 1 > CONST.tileArea - 1) break;
         res[i*3 + 1] = char2;
-        if(i*3 + 2 > 127) break;
+        if(i*3 + 2 > CONST.tileArea - 1) break;
         res[i*3 + 2] = char3;
     }
     // convert from base64-format to writability-format
@@ -672,7 +672,7 @@ function insert_char_at_index(string, char, index) {
     
     string = advancedSplit(string);
     
-    for(var i = 0; i < 128; i++) {
+    for(var i = 0; i < CONST.tileArea; i++) {
         var char1 = stringPrev[i];
         var char2 = string[i];
         
@@ -684,8 +684,8 @@ function insert_char_at_index(string, char, index) {
     }
     
     // make sure content is exactly 128
-    if(string.length > 128) string = string.slice(0, 128);
-    if(string.length < 128) string = string.concat(Array(128).fill(" ")).slice(0, 128);
+    if(string.length > CONST.tileArea) string = string.slice(0, CONST.tileArea);
+    if(string.length < CONST.tileArea) string = string.concat(Array(CONST.tileArea).fill(" ")).slice(0, CONST.tileArea);
     
     return string.join("");
 }
@@ -715,7 +715,7 @@ function sanitize_color(col) {
 
 function fixColors(colors) {
     if(Array.isArray(colors)) {
-        colors = colors.slice(0, 128);
+        colors = colors.slice(0, CONST.tileArea);
         for(var g = 0; g < colors.length; g++) {
             colors[g] = sanitize_color(colors[g]);
         }

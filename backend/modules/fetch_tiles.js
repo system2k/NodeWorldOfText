@@ -2,10 +2,10 @@ var url = require("url");
 
 function generateDiag(text, tileX, tileY) {
     var str = "";
-    for(var y = 0; y < 8; y++) {
-        for(var x = 0; x < 16; x++) {
-            var posX = tileX * 16 + x;
-            var posY = tileY * 8 + y;
+    for(var y = 0; y < CONST.tileRows; y++) {
+        for(var x = 0; x < CONST.tileCols; x++) {
+            var posX = tileX * CONST.tileCols + x;
+            var posY = tileY * CONST.tileRows + y;
             var ind = posX + posY;
             var len = text.length;
             var charPos = ind - Math.floor(ind / len) * len
@@ -129,21 +129,21 @@ module.exports = async function(data, vars) {
                     var z = con[q]
                     if(!tiles[z[0] + "," + z[1]]) {
                         tiles[z[0] + "," + z[1]] = {
-                            content: " ".repeat(128).split(""),
+                            content: " ".repeat(CONST.tileArea).split(""),
                             properties: {
                                 writability: 2
                             }
                         };
                     };
                     var tile_r = tiles[z[0] + "," + z[1]];
-                    var index_r = z[2]*16+z[3];
+                    var index_r = z[2]*CONST.tileCols+z[3];
                     tile_r.content[index_r] = z[5]
                     var color = z[7];
                     if(!color) color = 0;
                     if(typeof color != "number") color = 0;
                     if(color) {
                         if(!tile_r.properties.color) {
-                            tile_r.properties.color = new Array(128).fill(0);
+                            tile_r.properties.color = new Array(CONST.tileArea).fill(0);
                         }
                         tile_r.properties.color[index_r] = color;
                     }

@@ -49,11 +49,11 @@ module.exports = async function(data, vars) {
     }
 
     // the x position going from 0 - 127 may be used at times
-    var charIdx = charY * 16 + charX;
-    charX = charIdx % 16;
-    charY = Math.floor(charIdx / 16);
+    var charIdx = charY * CONST.tileCols + charX;
+    charX = charIdx % CONST.tileCols;
+    charY = Math.floor(charIdx / CONST.tileCols);
 
-    if(charIdx < 0 || charIdx >= 128) { // out of range coords
+    if(charIdx < 0 || charIdx >= CONST.tileArea) { // out of range coords
         return [true, "PARAM"];
     }
 

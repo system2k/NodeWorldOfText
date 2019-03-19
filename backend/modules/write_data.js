@@ -85,12 +85,12 @@ module.exports = async function(data, vars, evars) {
 
             var charX = san_nbr(editIncome[3]);
             var charY = san_nbr(editIncome[2]);
-            var charInsIdx = charY * 16 + charX;
+            var charInsIdx = charY * CONST.tileCols + charX;
             if(charInsIdx < 0) charInsIdx = 0;
-            if(charInsIdx > 127) charInsIdx = 127;
+            if(charInsIdx > CONST.tileArea - 1) charInsIdx = CONST.tileArea - 1;
 
-            charX = charInsIdx % 16;
-            charY = Math.floor(charInsIdx / 16);
+            charX = charInsIdx % CONST.tileCols;
+            charY = Math.floor(charInsIdx / CONST.tileCols);
             editIncome[3] = charX;
             editIncome[2] = charY;
 
@@ -116,10 +116,10 @@ module.exports = async function(data, vars, evars) {
             }
             for(var i = 0; i < char.length; i++) {
                 var newIdx = charInsIdx + i;
-                if(newIdx > 127) continue; // overflow
+                if(newIdx > CONST.tileArea - 1) continue; // overflow
                 // convert back to proper X/Y
-                var newX = newIdx % 16;
-                var newY = Math.floor(newIdx / 16);
+                var newX = newIdx % CONST.tileCols;
+                var newY = Math.floor(newIdx / CONST.tileCols);
                 var newChar = char[i];
                 var newColor = editIncome[7];
                 if(Array.isArray(newColor)) {
