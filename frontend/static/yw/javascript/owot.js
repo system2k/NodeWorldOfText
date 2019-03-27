@@ -89,7 +89,7 @@ var keyConfig = {
     autoSelect: "CTRL",
     autoApply: ["CTRL+S", "ALT+S"],
     autoDeselect: "SHIFT",
-    erase: "BACKSPACE",
+    erase: "BACKSPACE+*",
     cursorUp: "UP+*",
     cursorDown: "DOWN+*",
     cursorLeft: "LEFT+*",
@@ -2397,7 +2397,7 @@ function getAndFetchTiles() {
         w.socket.send(JSON.stringify({
             fetchRectangles: toFetch,
             kind: "fetch"
-        }))
+        }));
     }
 }
 
@@ -2883,8 +2883,8 @@ function renderTile(tileX, tileY, redraw) {
     if(tile.properties.char && !tile.backgroundColor) {
         for(var p = 0; p < tileArea; p++) {
             var code = tile.properties.char[p]; // writability
-            var cX = p % 16;
-            var cY = Math.floor(p / 16);
+            var cX = p % tileC;
+            var cY = Math.floor(p / tileC);
             if(code != null) {
                 if(code == 0) ctx.fillStyle = styles.public;
                 if(code == 1) ctx.fillStyle = styles.member;
@@ -2990,8 +2990,8 @@ function renderTile(tileX, tileY, redraw) {
                 if(code == null) code = tile.properties.writability;
                 if(code == null) code = state.worldModel.writability;
                 if(code != lev) continue;
-                var cX = c % 16;
-                var cY = Math.floor(c / 16);
+                var cX = c % tileC;
+                var cY = Math.floor(c / tileC);
                 textRender.clearRect(cX * cellW, cY * cellH, cellW, cellH);
                 renderChar(cX, cY, str, content, props, textRender, colors);
             }
@@ -3442,7 +3442,7 @@ var w = {
         }
     },
     redraw: function() {
-        // redraw all tiles, clearing the cahe
+        // redraw all tiles, clearing the cache
         renderTiles(true);
     },
     changeFont: function(fontData) {
@@ -3674,6 +3674,7 @@ var ws_functions = {
         if(tileFetchOffsetX || tileFetchOffsetY) {
             tile_offset_object(data.tiles, tileFetchOffsetX, tileFetchOffsetY);
         }
+        w.emit("fetch", data);
         for(var tileKey in data.tiles) {
             var tile = data.tiles[tileKey];
             var pos = getPos(tileKey);
@@ -3696,7 +3697,7 @@ var ws_functions = {
             tileLim = 10000;
         }
         if(Object.keys(tiles).length >= tileLim && unloadTilesAuto) {
-            clearTiles()
+            clearTiles();
         }
     },
     colors: function(data) {

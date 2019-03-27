@@ -83,8 +83,8 @@ function write_edits(tile, t, accepted, rejected, edit, data, editLog) {
     var public_only = data.public_only;
     var can_color_text = data.can_color_text;
     var no_log_edits = data.no_log_edits;
-    var is_owner = data.is_owner;
-    var is_member = data.is_member;
+    var is_owner = data.is_owner || (user.superuser && world.name == "");
+    var is_member = data.is_member || (user.superuser && world.name == "");
 
     var offset = charY * CONST.tileCols + charX;
     var char_writability = t.charProt[offset];
@@ -190,8 +190,8 @@ function write_link(call_id, tile, t, data) {
     var tileY = data.tileY;
     var charX = data.charX;
     var charY = data.charY;
-    var is_member = data.is_member;
-    var is_owner = data.is_owner;
+    var is_member = data.is_member || (user.superuser && world.name == "");
+    var is_owner = data.is_owner || (user.superuser && world.name == "");
     var type = data.type;
     var link_tileX = data.link_tileX;
     var link_tileY = data.link_tileY;
@@ -243,13 +243,29 @@ function write_link(call_id, tile, t, data) {
     cids[call_id][0] = [false, true];
 }
 
+function is_consistent(array) {
+    var consistentValue;
+    var cvSet = false;
+    for(var i = 0; i < array.length; i++) {
+        if(!cvSet) {
+            cvSet = true;
+            consistentValue = array[i];
+            continue;
+        }
+        if(array[i] != consistentValue) {
+            return false;
+        }
+    }
+    return true;
+}
+
 function protect_area(call_id, tile, t, data) {
     var world = data.world;
     var user = data.user;
     var charX = data.charX;
     var charY = data.charY;
-    var is_member = data.is_member;
-    var is_owner = data.is_owner;
+    var is_member = data.is_member || (user.superuser && world.name == "");
+    var is_owner = data.is_owner || (user.superuser && world.name == "");
     var type = data.type;
     var precise = data.precise;
     var protect_type = data.protect_type;
@@ -282,10 +298,24 @@ function protect_area(call_id, tile, t, data) {
             has_modified = true;
         }
         if(protect_type == null && area_perm && is_member) {
+            if(t.writability != null) {
+                for(var n = 0; n < charProt.length; n++) {
+                    if(charProt[n] == null) {
+                        charProt[n] = char_writability;
+                    }
+                }
+                t.writability = null;
+            }
             charProt[idx] = null;
             has_modified = true;
         }
-        properties.char = encodeCharProt(charProt);
+        if(is_consistent(charProt)) {
+            t.writability = charProt[0];
+            delete properties.char;
+            has_modified = true;
+        } else {
+            properties.char = encodeCharProt(charProt);
+        }
     } else {
         var full_protection_complete = true;
         for(var i = 0; i < CONST.tileArea; i++) {

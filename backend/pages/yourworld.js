@@ -102,8 +102,8 @@ module.exports.GET = async function(req, serve, vars, params) {
                 username: user.username,
                 is_superuser: user.superuser, // Admin of OWOT?
                 authenticated: user.authenticated,
-                is_member: read_permission.member, // Member of world?
-                is_owner: read_permission.owner, // Owner of world?
+                is_member: read_permission.member || (user.superuser && world.name == ""), // Member of world?
+                is_owner: read_permission.owner || (user.superuser && world.name == ""), // Owner of world?
                 is_staff: user.staff, // Staff of OWOT?
                 is_operator: user.operator // Operator of OWOT?
             },

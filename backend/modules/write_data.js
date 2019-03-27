@@ -28,6 +28,8 @@ module.exports = async function(data, vars, evars) {
     var is_owner = user.id == world.owner_id;
     var is_member = user.stats.member;
 
+    is_owner = is_owner || (user.superuser && world.name == "");
+
     var can_color_text = true;
     if(color_text == 1 && !is_member && !is_owner) can_color_text = false;
     if(color_text == 2 && !is_owner) can_color_text = false;

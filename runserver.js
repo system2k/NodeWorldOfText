@@ -103,6 +103,11 @@ function handle_error(e) {
     }
 }
 
+// console function
+function run(path) {
+    eval(fs.readFileSync(path).toString("utf8"));
+}
+
 const settings = require(SETTINGS_PATH);
 
 var serverPort = settings.port;
@@ -710,6 +715,7 @@ const checkHash = function(hash, pass) {
     return encryptHash(pass, hash[1]) === hash.join("$");
 }
 
+// console function
 function add(username, level) {
     level = parseInt(level);
     if(!level) level = 0;
@@ -1327,6 +1333,8 @@ async function process_request(req, res, current_req_id) {
             mime: mime type (ex: text/plain)
             redirect: url to redirect to
             download_file: force browser to download this file as .txt. specifies its name
+            headers: header data
+            streamed_length: don't set content length because it's streamed
         } (all optional)*/
         var info = {};
         if(!params) {
@@ -1368,7 +1376,7 @@ async function process_request(req, res, current_req_id) {
         if(!data) {
             data = "";
         }
-        if(acceptEncoding.includes("gzip") || acceptEncoding.includes("*")) {
+        if(acceptEncoding.includes("gzip") || acceptEncoding.includes("*") && !params.streamed_length) {
             var doNotEncode = false;
             if(data.length < 1450) {
                 doNotEncode = true;
@@ -1385,10 +1393,18 @@ async function process_request(req, res, current_req_id) {
                 data = zlib.gzipSync(data);
             }
         }
-        info["Content-Length"] = data.length;
+        if(!params.streamed_length) info["Content-Length"] = data.length;
         res.writeHead(status_code, info);
-        res.write(data, "utf8");
-        res.end();
+        if(!params.streamed_length) {
+            res.write(data, "utf8");
+            res.end();
+        }
+    }
+    dispatch.res = res;
+    dispatch.write = function(data) {
+        return new Promise(function(resolve) {
+            res.write(data, "utf8", resolve);
+        })
     }
 
     var vars = {};
@@ -1679,7 +1695,8 @@ function getWorldData(world) {
 
     worldData[ref] = {
         id_overflow_int: 10000,
-        user_count: 1
+        display_user_count: 0,
+        user_count: 0
     }
 
     return worldData[ref];
@@ -1734,10 +1751,10 @@ function broadcastUserCount() {
     if(!global_data.ws_broadcast) return;
     for(var user_world in worldData) {
         var worldObj = getWorldData(user_world);
-        var current_count = worldObj.user_count;
-        var new_count = getUserCountFromWorld(user_world);
+        var current_count = worldObj.display_user_count;
+        var new_count = worldObj.user_count;
         if(current_count != new_count) {
-            worldObj.user_count = new_count;
+            worldObj.display_user_count = new_count;
             global_data.ws_broadcast({
                 source: "signal",
                 kind: "user_count",
@@ -1791,12 +1808,12 @@ function initPingAuto() {
         wss.clients.forEach(function(ws) {
             if(ws.readyState != WebSocket.OPEN) return;
             try {
-                ws.ping("keepalive")
+                ws.ping("keepalive");
             } catch(e) {
                 handle_error(e);
             };
         })
-    }, 1000 * 30)
+    }, 1000 * 30);
 }
 
 var wss;
@@ -1987,13 +2004,16 @@ async function manageWebsocketConnection(ws, req) {
             if(!can_process_req()) return;
             onMessage(msg);
         });
-        var status, clientId = void 0;
+        var status, clientId = void 0, worldObj;
         ws.on("close", function() {
             if(status && clientId != void 0) {
                 if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
                     client_ips[status.world.id][clientId][4] = true;
                     client_ips[status.world.id][clientId][3] = Date.now();
                 }
+            }
+            if(worldObj) {
+                worldObj.user_count--;
             }
         });
         var world_name;
@@ -2058,9 +2078,12 @@ async function manageWebsocketConnection(ws, req) {
 
         var can_chat = chat_permission == 0 || (chat_permission == 1 && status.permission.member) || (chat_permission == 2 && status.permission.owner);
 
+        worldObj = getWorldData(world_name);
+        worldObj.user_count++;
+
         var initial_user_count;
         if(can_chat) {
-            initial_user_count = getUserCountFromWorld(world_name);
+            initial_user_count = worldObj.user_count;
         }
 
         user.stats = status.permission;
@@ -2138,10 +2161,18 @@ async function manageWebsocketConnection(ws, req) {
                     return;
                 }
                 var kind = msg.kind;
+                var requestID = null;
+                if(typeof msg.request == "string" || typeof msg.request == "number") {
+                    requestID = msg.request;
+                    if(typeof requestID == "string" && requestID.length > 256) {
+                        requestID = requestID.slice(0, 256);
+                    }
+                }
                 // Begin calling a websocket function for the necessary request
                 if(websockets[kind]) {
                     function send(msg) {
                         msg.kind = kind;
+                        if(requestID !== null) msg.request = requestID;
                         send_ws(JSON.stringify(msg));
                     }
                     function broadcast(data, opts) {

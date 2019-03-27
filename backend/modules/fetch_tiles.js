@@ -59,33 +59,65 @@ module.exports = async function(data, vars) {
 
     var tiles = {};
     var editLimit = 100000; // don't overload server
-    var fetchRectLimit = 10;
+    var fetchRectLimit = 50;
+    var totalAreaLimit = 5000;
 
     var len = data.fetchRectangles.length
     if(len >= fetchRectLimit) len = fetchRectLimit;
     var q_utf16 = data.utf16;
     var q_array = data.array;
     var q_content_only = data.content_only;
-    for(var i = 0; i < len; i++) {
-        var rect = data.fetchRectangles[i];
+
+    var total_area = 0;
+    for(var v = 0; v < len; v++) {
+        var rect = data.fetchRectangles[v];
         var minY = san_nbr(rect.minY);
         var minX = san_nbr(rect.minX);
         var maxY = san_nbr(rect.maxY);
         var maxX = san_nbr(rect.maxX);
 
-        if(!(minY <= maxY && minX <= maxX)) {
-            return "Invalid range";
+        var tmp;
+        if(minX > maxX) {
+            tmp = minX;
+            minX = maxX;
+            maxX = tmp;
         }
-        if(!((maxY - minY) * (maxX - minX) <= 45 * 45)) {
+        if(minY > maxY) {
+            tmp = minY;
+            minY = maxY;
+            maxY = tmp;
+        }
+        
+        var area = Math.abs(maxY - minY + 1) * Math.abs(maxX - minX + 1);
+        if(area > 50 * 50) {
             return "Too many tiles";
         }
-        var YTileRange = xrange(minY, maxY + 1);
-        var XTileRange = xrange(minX, maxX + 1);
-        for (var ty in YTileRange) { // fill in null values
-            for (var tx in XTileRange) {
-                tiles[YTileRange[ty] + "," + XTileRange[tx]] = null;
+
+        total_area += area;
+
+        if(total_area > totalAreaLimit) {
+            return "Too many tiles";
+        }
+
+        rect.minY = minY;
+        rect.minX = minX;
+        rect.maxY = maxY;
+        rect.maxX = maxX;
+    }
+
+    for(var i = 0; i < len; i++) {
+        var rect = data.fetchRectangles[i];
+        var minY = rect.minY;
+        var minX = rect.minX;
+        var maxY = rect.maxY;
+        var maxX = rect.maxX;
+
+        for(var ty = minY; ty <= maxY; ty++) {
+            for(var tx = minX; tx <= maxX; tx++) {
+                tiles[ty + "," + tx] = null;
             }
         }
+
         if(timemachine.active) {
             var dr1 = await db.get("SELECT time FROM edit WHERE world_id=? LIMIT 1",
                 world.id);

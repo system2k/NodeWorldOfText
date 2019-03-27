@@ -87,8 +87,7 @@ module.exports.POST = async function(req, serve, vars) {
         form_email_errors.push("Invalid email.");
     }
 
-    var reg = await db.get("SELECT username FROM auth_user WHERE username=? COLLATE NOCASE",
-        username);
+    var reg = await db.get("SELECT username FROM auth_user WHERE username=? COLLATE NOCASE", username);
 
     if(reg) {
         form_username_errors.push("The user already exists.");

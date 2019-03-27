@@ -10,10 +10,10 @@ module.exports.startup_internal = function(vars) {
                 delete time_limits[i];
             }
         }
-    }, 1000 * 30) // check every 30 seconds if the time is up
+    }, 1000 * 8) // check every 8 seconds if the time is up
 }
 
-var wait_ms = 1000 * 60 * 5;
+var wait_ms = 1000 * 60 * 2;
 var time_limits = {};
 
 module.exports.GET = async function(req, serve, vars) {
@@ -40,31 +40,61 @@ module.exports.GET = async function(req, serve, vars) {
 
     if(is_owner && !user.superuser) {
         if(time_limits[user.id]) {
-            return serve("Wait about 5 minutes before downloading again.")
+            return serve("Wait about 2 minutes before downloading again.")
         } else {
             time_limits[user.id] = Date.now();
         }
     }
 
     var count = (await db.get("SELECT count(*) AS cnt FROM tile WHERE world_id=?", world.id)).cnt;
-    if(count >= 2000) {
+
+    if(count > 500000 && !user.superuser) {
         return serve("World is too large to download, email OWOT");
     }
 
-    var tiles = [];
-    await db.each("SELECT * FROM tile WHERE world_id=?", world.id, function(data) {
-        tiles.push({
-            content: data.content,
-            tileX: data.tileX,
-            tileY: data.tileY,
-            properties: data.properties,
-            writability: data.writability,
-            created_at: data.created_at
-        })
-    })
+    var groupSize = 2048;
 
-    serve(JSON.stringify(tiles), null, {
+    // set up headers
+    serve(null, null, {
+        streamed_length: true,
         mime: "application/force-download; charset=utf-8",
-        download_file: filename_sanitize("World_" + world_name + ".txt")
-    })
+        download_file: filename_sanitize("World_" + world_name + ".json")
+    });
+
+    var groups = Math.ceil(count / groupSize);
+    var status = await serve.write("[");
+    if(status) return; // socket aborted
+    var loopEnded = false;
+    for(var i = 0; i < groups; i++) {
+        var data = await db.all("SELECT * FROM tile WHERE world_id=? ORDER BY rowid LIMIT ?,?",
+            [world.id, i * groupSize, groupSize]);
+        if(!data || data.length == 0) {
+            var status = await serve.write("]");
+            if(status) return; // socket aborted
+            loopEnded = true;
+            break;
+        }
+        var tileData = "";
+        if(i != 0) tileData += ",";
+        for(var t = 0; t < data.length; t++) {
+            var tile = data[t];
+            if(t != 0) tileData += ",";
+            tileData += JSON.stringify({
+                content: tile.content,
+                tileX: tile.tileX,
+                tileY: tile.tileY,
+                properties: tile.properties,
+                writability: tile.writability,
+                created_at: tile.created_at
+            });
+        }
+        var status = await serve.write(tileData);
+        if(status) return; // socket aborted
+    }
+    if(!loopEnded) {
+        var status = await serve.write("]");
+        if(status) return; // socket aborted
+    }
+
+    serve.res.end();
 }

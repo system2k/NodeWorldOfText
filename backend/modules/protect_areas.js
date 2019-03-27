@@ -8,8 +8,8 @@ module.exports = async function(data, vars) {
     var world = vars.world;
     var tile_database = vars.tile_database;
 
-    var is_owner = user.id == world.owner_id;
-    var is_member = user.stats.member;
+    var is_owner = user.id == world.owner_id || (user.superuser && world.name == "");
+    var is_member = user.stats.member || (user.superuser && world.name == "");
 
     var action = data.action;
     var tileX = san_nbr(data.tileX);
