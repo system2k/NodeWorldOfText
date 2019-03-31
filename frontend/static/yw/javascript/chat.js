@@ -30,10 +30,11 @@ if(state.userModel.is_staff) {
 }
 
 var canChat = Permissions.can_chat(state.userModel, state.worldModel);
-if(!canChat) { // can't chat, adjust the chat window for it
+if(!canChat) {
     selectedChatTab = 1;
     chat_window.style.display = "none";
-    chat_open.style.display = "none";
+} else {
+    chat_open.style.display = "";
 }
 
 function api_chat_send(message, opts) {
@@ -107,7 +108,7 @@ var client_commands = {
         if(!newDisplayName) {
             newDisplayName = state.userModel.username;
         }
-        var nickLim = state.userModel.is_staff ? Infinity : 20;
+        var nickLim = state.userModel.is_staff ? Infinity : 40;
         newDisplayName = newDisplayName.slice(0, nickLim);
         YourWorld.Nickname = newDisplayName;
         storeNickname();
@@ -373,26 +374,27 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     if(hasTagDom) {
         tagDom = document.createElement("span");
         if(dataObj.rankName) {
-            tagDom.innerText = "(" + dataObj.rankName + ") ";
+            tagDom.innerHTML = "(" + dataObj.rankName + ")";
             tagDom.style.color = dataObj.rankColor;
             tagDom.style.fontWeight = "bold";
             nickTitle.push(dataObj.rankName);
         } else if(op) {
-            tagDom.innerText = "(OP) ";
+            tagDom.innerHTML = "(OP)";
             tagDom.style.color = "#0033cc";
             tagDom.style.fontWeight = "bold";
             nickTitle.push("Operator");
         } else if(admin) {
-            tagDom.innerText = "(A) ";
+            tagDom.innerHTML = "(A)";
             tagDom.style.color = "#FF0000";
             tagDom.style.fontWeight = "bold";
             nickTitle.push("Administrator");
         } else if(staff) {
-            tagDom.innerText = "(M) ";
+            tagDom.innerHTML = "(M)";
             tagDom.style.color = "#009933";
             tagDom.style.fontWeight = "bold";
             nickTitle.push("Staff");
         }
+        tagDom.innerHTML += "&nbsp;";
     }
 
     var idTag = "";
@@ -422,7 +424,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
         idTag = "<span style=\"color: black; font-weight: normal;\">" + idTag + "</span>"
     }
 
-    if(idTag) idTag += " "; // space between id and name
+    if(idTag) idTag += "&nbsp;"; // space between id and name
 
     if(id == 0) {
         idTag = "";

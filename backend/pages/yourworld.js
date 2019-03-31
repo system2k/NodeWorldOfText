@@ -48,6 +48,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var modules = vars.modules;
     var announcement = vars.announcement();
     var HTML = vars.HTML;
+    var san_nbr = vars.san_nbr;
 
     var world_name = path;
     if(params.timemachine) {
@@ -65,7 +66,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     }
 
     if(query_data.fetch == 1) { // fetch request
-        vars.timemachine = { active: params.timemachine }
+        vars.timemachine = { active: params.timemachine };
         vars.world = world;
         var tiles = await modules.fetch_tiles({
             fetchRectangles: [{
@@ -111,17 +112,22 @@ module.exports.GET = async function(req, serve, vars, params) {
                 feature_membertiles_addremove: !!world.feature_membertiles_addremove,
                 writability: world.writability,
                 feature_url_link: world.feature_url_link,
-                path: world.name,
                 feature_go_to_coord: world.feature_go_to_coord,
                 name: world.name,
                 feature_paste: world.feature_paste,
-                namespace: world.name,
+                namespace: world.name.split("/")[0],
                 readability: world.readability,
                 feature_coord_link: world.feature_coord_link,
                 pathname,
                 chat_permission,
                 color_text
             }
+        }
+        if(CONST.tileRows != 8) {
+            state.worldModel.tileRows = CONST.tileRows;
+        }
+        if(CONST.tileCols != 16) {
+            state.worldModel.tileCols = CONST.tileCols;
         }
         if(world_properties.page_is_nsfw) {
             state.worldModel.nsfw = world_properties.page_is_nsfw;
@@ -137,6 +143,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         }
         if(params.timemachine) {
             state.worldModel.writability = 0;
+            state.worldModel.timemachine = true;
         }
         if(world_properties.background) {
             state.background = world_properties.background;

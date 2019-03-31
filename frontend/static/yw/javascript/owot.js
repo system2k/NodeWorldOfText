@@ -337,12 +337,10 @@ var defaultSizes = {
     tileC: 16, // columns
     tileR: 8 // rows
 }
-if(state.worldModel.square_chars) {
-    defaultSizes.cellW = 18;
-}
-if(state.worldModel.half_chars) {
-    defaultSizes.cellH = 20;
-}
+if(state.worldModel.square_chars) defaultSizes.cellW = 18;
+if(state.worldModel.half_chars) defaultSizes.cellH = 20;
+if(state.worldModel.tileCols) defaultSizes.tileC = state.worldModel.tileCols;
+if(state.worldModel.tileRows) defaultSizes.tileR = state.worldModel.tileRows;
 
 var cellWidthPad, tileW, tileH, cellW, cellH, font, specialCharFont, tileC, tileR, tileArea;
 
@@ -844,6 +842,7 @@ function getCharInfoXY(x, y) {
 document.addEventListener("keydown", function(e) {
     if(w._state.uiModal) return;
     if(!worldFocused) return;
+    if(document.activeElement.tagName == "INPUT" && document.activeElement.type == "text" && document.activeElement != textInput) return;
     var textCursorCopy = checkKeyPress(e, keyConfig.copyCharacterText);
     var mouseCursorCopy = checkKeyPress(e, keyConfig.copyCharacterMouse);
     if(!textCursorCopy && !mouseCursorCopy) return;
@@ -894,16 +893,22 @@ var currentPositionInitted = false;
 var tiles = {};
 
 var Tile = {};
+var tileCount = 0;
 Tile.set = function(tileX, tileY, data) {
-    tiles[tileY + "," + tileX] = data;
+    var str = tileY + "," + tileX;
+    if(!(str in tiles)) {
+        tileCount++;
+    }
+    tiles[str] = data;
 }
 Tile.delete = function(tileX, tileY) {
     var str = tileY + "," + tileX;
     if(str in tilePixelCache) {
         delete tilePixelCache[str][0];
-        delete tilePixelCache[str]
+        delete tilePixelCache[str];
     }
     delete tiles[str];
+    tileCount--;
 }
 
 var ctx = owot.getContext("2d");
@@ -1603,15 +1608,16 @@ function spaceTrim(str_array, left, right, gaps, secondary_array) {
     var marginRight = 0;
     var countL = left;
     var countR = right;
+    var whitespaces = "\u0009\u000a\u000b\u000d\u0020\u0085\u00a0";
     for(var i = 0; i < str_array.length; i++) {
         var idxL = i;
         var idxR = str_array.length - 1 - i;
-        if(str_array[idxL] == " " && countL) {
+        if(whitespaces.indexOf(str_array[idxL]) > -1 && countL) {
             marginLeft++;
         } else {
             countL = false;
         }
-        if(str_array[idxR] == " " && countR) {
+        if(whitespaces.indexOf(str_array[idxR]) > -1 && countR) {
             marginRight++;
         } else {
             countR = false;
@@ -1630,7 +1636,7 @@ function spaceTrim(str_array, left, right, gaps, secondary_array) {
         var spaceFreq = 0;
         for(var i = 0; i < str_array.length; i++) {
             var chr = str_array[i];
-            if(chr == " ") {
+            if(whitespaces.indexOf(chr) > -1) {
                 spaceFreq++;
             } else {
                 spaceFreq = 0;
@@ -1735,11 +1741,12 @@ var char_input_check = setInterval(function() {
 }, 10);
 
 document.onkeydown = function(e) {
+    var actElm = document.activeElement;
     if(!worldFocused) return;
-    var key = getKeyCode(e);
     if(w._state.uiModal) return;
-    if(document.activeElement == chatbar) return;
-    if(document.activeElement != textInput) textInput.focus();
+    if(actElm == chatbar) return;
+    if(actElm.tagName == "INPUT" && actElm.type == "text" && actElm != textInput) return;
+    if(actElm != textInput) textInput.focus();
     // stop paste
     textInput.value = "";
     clearInterval(pasteInterval);
@@ -1957,7 +1964,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
     var charY = coords[3];
 
     for(var i = 0; i < draggable_element_mousemove.length; i++) {
-        draggable_element_mousemove[i](e, pageX, pageY);
+        draggable_element_mousemove[i](e, e.pageX, e.pageY);
     }
 
     if(e.target != owot && e.target != linkDiv) return;
@@ -3696,7 +3703,7 @@ var ws_functions = {
         if(zoom < 0.5) { // zoomed out too far? make sure tiles don't constantly unload
             tileLim = 10000;
         }
-        if(Object.keys(tiles).length >= tileLim && unloadTilesAuto) {
+        if(tileCount >= tileLim && unloadTilesAuto) {
             clearTiles();
         }
     },
@@ -3790,6 +3797,9 @@ var ws_functions = {
             renderTile(pos[1], pos[0]);
         }
         if(highlights.length > 0 && useHighlight) highlight(highlights);
+        if(tileCount >= 10000 && unloadTilesAuto) {
+            clearTiles();
+        }
     },
     write: function(data) {
         // after user has written text, the client should expect list of all edit ids that passed

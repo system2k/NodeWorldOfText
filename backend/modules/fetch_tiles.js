@@ -62,15 +62,20 @@ module.exports = async function(data, vars) {
     var fetchRectLimit = 50;
     var totalAreaLimit = 5000;
 
-    var len = data.fetchRectangles.length
+    if(!Array.isArray(data.fetchRectangles)) return "Invalid parameters";
+    var len = data.fetchRectangles.length;
     if(len >= fetchRectLimit) len = fetchRectLimit;
     var q_utf16 = data.utf16;
     var q_array = data.array;
     var q_content_only = data.content_only;
 
+    var o_editlog = data.editlog;
+    var o_editlog_start = data.editlog_start;
+
     var total_area = 0;
     for(var v = 0; v < len; v++) {
         var rect = data.fetchRectangles[v];
+        if(typeof rect != "object" || Array.isArray(rect)) return "Invalid parameters";
         var minY = san_nbr(rect.minY);
         var minX = san_nbr(rect.minX);
         var maxY = san_nbr(rect.maxY);
@@ -121,21 +126,19 @@ module.exports = async function(data, vars) {
         if(timemachine.active) {
             var dr1 = await db.get("SELECT time FROM edit WHERE world_id=? LIMIT 1",
                 world.id);
-            var dr2 = await db.get("SELECT time FROM edit WHERE world_id=? ORDER BY id DESC LIMIT 1",
+            var dr2 = await db.get("SELECT time FROM edit WHERE world_id=? ORDER BY rowid DESC LIMIT 1",
                 world.id);
             var editCount = await db.get("SELECT count(id) AS cnt FROM edit WHERE world_id=?", world.id);
             editCount = editCount.cnt;
             if((!dr1 || !dr2) || editCount >= editLimit) {
-                // diagonal text...
+                // diagonal text
                 var e_str = "Cannot view timemachine: There are no edits yet. | ";
                 if(editCount >= editLimit) {
                     e_str = "There are too many edits in this world. | ";
                 }
-                for (var ty in YTileRange) {
-                    for (var tx in XTileRange) {
-                        var tileX = XTileRange[tx];
-                        var tileY = YTileRange[ty];
-                        tiles[tileY + "," + tileX] = generateDiag(e_str, tileX, tileY);
+                for(var ty = minY; ty <= maxY; ty++) {
+                    for(var tx = minX; tx <= maxX; tx++) {
+                        tiles[ty + "," + tx] = generateDiag(e_str, tx, ty);
                     }
                 }
                 continue;
@@ -187,6 +190,13 @@ module.exports = async function(data, vars) {
                     if(typeof tiles[z].content == "object") tiles[z].content = tiles[z].content.join("");
                 }
             }
+        } else if(o_editlog) {
+            o_editlog_start = san_nbr(o_editlog_start);
+            if(o_editlog_start < 0) o_editlog_start = 0;
+            var tileX = minX;
+            var tileY = minY;
+            console.log(tileX, tileY, o_editlog_start)
+            break;
         } else {
             await db.each("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?", 
                 [world.id, minY, minX, maxY, maxX], function(data) {

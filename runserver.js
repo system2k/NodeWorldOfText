@@ -1801,14 +1801,14 @@ intv.clear_closed_clients = setInterval(function() {
     }
 }, 1000 * 60)
 
-// ping clients every 30 seconds (resolve the issue where cloudflare terminates sockets inactive for approx. 1 minute)
+// ping clients every 30 seconds
 function initPingAuto() {
     intv.ping_clients = setInterval(function() {
         if(!wss) return;
         wss.clients.forEach(function(ws) {
             if(ws.readyState != WebSocket.OPEN) return;
             try {
-                ws.ping("keepalive");
+                ws.ping();
             } catch(e) {
                 handle_error(e);
             };
@@ -1937,23 +1937,27 @@ async function manageWebsocketConnection(ws, req) {
         var rnd = Math.floor(Math.random() * 1E4);
         var forwd = req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"];
         var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
+        var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
         var remIp = req.socket.remoteAddress;
         var compIp = forwd || realIp || remIp || "Err" + rnd;
         if(!forwd) forwd = "None;" + rnd;
         if(!realIp) realIp = "None;" + rnd;
         if(!remIp) remIp = "None;" + rnd;
+        if(!cfIp) cfIp = "None;" + rnd;
         ipHeaderAddr = forwd + " & " + realIp + " & " + remIp;
         ws.ipHeaderAddr = ipHeaderAddr;
         ws.ipFwd = forwd;
         ws.ipReal = realIp;
         ws.ipRem = remIp;
         ws.ipComp = compIp;
+        ws.ipCF = cfIp;
     } catch(e) {
         var error_ip = "ErrC" + Math.floor(Math.random() * 1E4);
         ws.ipHeaderAddr = error_ip;
         ws.ipFwd = error_ip;
         ws.ipReal = error_ip;
         ws.ipComp = error_ip;
+        ws.ipCF = error_ip;
         handle_error(e);
     }
     /*
@@ -2096,7 +2100,7 @@ async function manageWebsocketConnection(ws, req) {
         if(!client_ips[status.world.id]) {
             client_ips[status.world.id] = {};
         }
-        client_ips[status.world.id][clientId] = [ws._socket.remoteAddress, ws._socket.address(), ws.ipHeaderAddr, -1, false];
+        client_ips[status.world.id][clientId] = [ws._socket.remoteAddress, ws._socket.address(), ws.ipHeaderAddr, -1, false, ws.ipComp, ws.ipCF];
 
         ws.clientId = clientId;
         ws.chat_blocks = [];

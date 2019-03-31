@@ -90,7 +90,7 @@ module.exports = async function(ws, data, send, vars, evars) {
         nick = data.nickname + "";
     }
     if(!user.staff) {
-        nick = nick.slice(0, 20);
+        nick = nick.slice(0, 40);
     } else {
         nick = nick.slice(0, 3030);
     }

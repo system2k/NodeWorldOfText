@@ -1,20 +1,10 @@
-var PERM;
-var Permissions;
-var __indexOf = [].indexOf || function(item) {
-	for(var i = 0, l = this.length; i < l; i++) {
-		if(i in this && this[i] === item) {
-			return i;
-		}
-	}
-	return -1;
-};
-PERM = {
+var PERM = {
 	ADMIN: 2,
 	MEMBERS: 1,
 	PUBLIC: 0
 };
-Permissions = {
-	can_admin: function(user, world) {
+var Permissions = {
+	can_admin: function(user) {
 		if(!user.authenticated) {
 			return false;
 		}
@@ -40,7 +30,7 @@ Permissions = {
 		}
 		var targetWritability;
 		if(tile.char) {
-			targetWritability = tile.char[charY * 16 + charX];
+			targetWritability = tile.char[charY * tileC + charX];
 			if(targetWritability == null) targetWritability = tile.writability; // inherit from tile
 			if(targetWritability == null) targetWritability = world.writability; // inherit from world
 		} else {
