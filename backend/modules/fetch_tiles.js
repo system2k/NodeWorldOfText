@@ -25,7 +25,7 @@ var surrogateRegex = new RegExp(surrogateRegexStr, "g");
 var combiningRegexStr = "(([\\0-\\u02FF\\u0370-\\u1DBF\\u1E00-\\u20CF\\u2100-\\uD7FF\\uDC00-\\uFE1F\\uFE30-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF])([\\u0300-\\u036F\\u1DC0-\\u1DFF\\u20D0-\\u20FF\\uFE20-\\uFE2F]+))";
 var combiningRegex = new RegExp(combiningRegexStr, "g");
 var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\n|\\r", "g");
-function advancedSplit(str, noSurrog, noComb) {
+function advancedSplitCli(str, noSurrog, noComb) {
     str += "";
     // look for surrogate pairs first. then look for combining characters. finally, look for the rest
 	var data = str.match(splitRegex)
@@ -45,7 +45,7 @@ function advancedSplit(str, noSurrog, noComb) {
 	return data;
 }
 function filterUTF16(str) {
-    return advancedSplit(str, true, true).join("");
+    return advancedSplitCli(str, true, true).join("");
 }
 
 module.exports = async function(data, vars) {
@@ -54,7 +54,9 @@ module.exports = async function(data, vars) {
     var san_nbr = vars.san_nbr;
     var xrange = vars.xrange;
     var world = vars.world;
+    var advancedSplit = vars.advancedSplit;
     var timemachine = vars.timemachine;
+    var insert_char_at_index = vars.insert_char_at_index;
     if(!timemachine) timemachine = {};
 
     var tiles = {};
@@ -190,12 +192,91 @@ module.exports = async function(data, vars) {
                     if(typeof tiles[z].content == "object") tiles[z].content = tiles[z].content.join("");
                 }
             }
-        } else if(o_editlog) {
+        } else if(o_editlog && user.superuser) {
             o_editlog_start = san_nbr(o_editlog_start);
             if(o_editlog_start < 0) o_editlog_start = 0;
-            var tileX = minX;
-            var tileY = minY;
-            console.log(tileX, tileY, o_editlog_start)
+            var tileX = rect.tileX;
+            var tileY = rect.tileY;
+            var chunkSize = 500;
+            var chunkIdx = 0;
+            while(true) {
+                var hist = await db.all("SELECT time, content FROM edit WHERE time <= ? AND world_id=? AND tileX=? AND tileY=? ORDER BY rowid DESC LIMIT ?,?",
+                    [o_editlog_start, world.id, tileX, tileY, chunkIdx * chunkSize, chunkSize]);
+                chunkIdx++;
+                if(hist.length == 0) break;
+                var fillData = " ".repeat(CONST.tileArea);
+                var fillColor = new Uint32Array(CONST.tileArea);
+                var fillTable = new Uint8Array(CONST.tileArea);
+                var fillTableCount = 0;
+                var brkWhileLoop = false;
+                for(var i = 0; i < hist.length; i++) {
+                    var row = hist[i];
+                    var time = row.time;
+                    var content = row.content;
+                    if(content[0] == "@") {
+                        content = JSON.parse(content.substr(1));
+                        if(content.kind == "tile_clear") break;
+                    } else {
+                        content = JSON.parse(content);
+                        var brkHist = false;
+                        for(var e = 0; e < content.length; e++) {
+                            var edit = content[e];
+
+                            // input types
+                            var charX = san_nbr(edit[3]);
+                            var charY = san_nbr(edit[2]);
+                            if(typeof edit[5] != "string") edit[5] = "";
+                            var char = advancedSplit(edit[5]);
+                            var color = san_nbr(edit[7]);
+
+                            // input values
+                            var area = charY * 16 + charX;
+                            if(area < 0) area = 0;
+                            if(area > 127) area = 127;
+                            charX = area % 16;
+                            charY = Math.floor(area / 16);
+                            char = char[0];
+                            if(!char) char = " ";
+                            if(char == "\n" || char == "\r" || char == "\x1b") char = " ";
+                            if(color < 0) color = 0;
+                            if(color >= 16777216) color = 16777215;
+
+                            // apply inputs
+                            var pos = charY * 16 + charX;
+                            if(!fillTable[pos]) {
+                                fillTable[pos] = 1;
+                                fillTableCount++;
+                                fillColor[pos] = color;
+                                fillData = insert_char_at_index(fillData, char, pos);
+                            }
+
+                            if(fillTableCount >= 128) {
+                                brkHist = true;
+                                break;
+                            }
+                        }
+                        if(brkHist) {
+                            brkWhileLoop = true;
+                            break;
+                        }
+                    }
+                    if(time >= o_editlog_start) {
+                        brkWhileLoop = true;
+                    }
+                }
+                if(brkWhileLoop) break;
+                if(hist.length < chunkSize) break;
+            }
+            for(var i in tiles) {
+                delete tiles[i];
+            }
+            tiles[tileY + "," + tileX] = {
+                content: fillData,
+                properties: {
+                    color: Array.from(fillColor),
+                    writability: 0
+                }
+            }
             break;
         } else {
             await db.each("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?", 
@@ -203,7 +284,7 @@ module.exports = async function(data, vars) {
                 var properties = JSON.parse(data.properties);
                 var content = data.content;
                 if(q_utf16) content = filterUTF16(content);
-                if(q_array) content = advancedSplit(content);
+                if(q_array) content = advancedSplitCli(content);
                 var tileRes;
                 if(q_content_only) {
                     tileRes = content;

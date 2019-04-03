@@ -8,7 +8,7 @@ function init_dom() {
     loading.style.display = "none";
     owot = document.getElementById("owot");
     owot.hidden = false;
-    owot.style.cursor = "text";
+    owot.style.cursor = defaultCursor;
     textInput = document.getElementById("textInput");
     textLayer = document.getElementById("text");
     textLayer.hidden = false;
@@ -74,6 +74,8 @@ var secureJSLink           = true;
 var priorityOverwriteChar  = false;
 var pasteDirRight          = true;
 var pasteDirDown           = true;
+var defaultCursor          = "text";
+var defaultDragCursor      = "move";
 
 var images_to_load         = {
     unloaded: "/static/unloaded.png"
@@ -1045,7 +1047,7 @@ function stopLinkUI() {
     if(!w.isLinking) return;
     w.isLinking = false;
     linkAuto.active = false;
-    owot.style.cursor = "text";
+    owot.style.cursor = defaultCursor;
     var tileX = lastLinkHover[0];
     var tileY = lastLinkHover[1];
     var charX = lastLinkHover[2];
@@ -1059,7 +1061,7 @@ function stopSelectionUI() {
     if(!lastSelectionHover) return;
     if(!w.isSelecting) return;
     w.isSelecting = false;
-    owot.style.cursor = "text";
+    owot.style.cursor = defaultCursor;
     var tileX = lastSelectionHover[0];
     var tileY = lastSelectionHover[1];
     var charX = lastSelectionHover[2];
@@ -1097,7 +1099,7 @@ function stopTileUI() {
     protect_precision.style.display = "none";
     w.isProtecting = false;
     tileProtectAuto.active = false;
-    owot.style.cursor = "text";
+    owot.style.cursor = defaultCursor;
     removeTileProtectHighlight();
 }
 
@@ -1174,6 +1176,7 @@ var dragStartY = 0;
 var dragPosX = 0;
 var dragPosY = 0;
 var isDragging = false;
+var draggingEnabled = true;
 function event_mousedown(e, arg_pageX, arg_pageY) {
     var target = e.target;
     if(closest(target, getChatfield()) || target == chatbar) {
@@ -1188,12 +1191,14 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
     if(arg_pageY != void 0) pageY = arg_pageY;
     if(target != owot && target != linkDiv) {
         return;
-    };
-    dragStartX = pageX;
-    dragStartY = pageY;
-    dragPosX = positionX;
-    dragPosY = positionY;
-    isDragging = true;
+    }
+    if(draggingEnabled) {
+        dragStartX = pageX;
+        dragStartY = pageY;
+        dragPosX = positionX;
+        dragPosY = positionY;
+        isDragging = true;
+    }
     if(document.activeElement == textInput) textInput.focus(); // for mobile typing
 
     // stop paste
@@ -1213,7 +1218,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
         w.regionSelect.setSelection(regionCoordA, regionCoordA);
         return;
     }
-    owot.style.cursor = "move";
+    owot.style.cursor = defaultDragCursor;
 }
 document.addEventListener("mousedown", function(e) {
     event_mousedown(e);
@@ -1304,11 +1309,12 @@ function removeCursor() {
 
 function stopDragging() {
     isDragging = false;
-    owot.style.cursor = "text";
+    owot.style.cursor = defaultCursor;
 }
 
 // tileX, charX
 var lastX = [0, 0];
+var cursorEnabled = true;
 function event_mouseup(e, arg_pageX, arg_pageY) {
     var pageX = Math.trunc(e.pageX * zoomRatio);
     var pageY = Math.trunc(e.pageY * zoomRatio);
@@ -1327,7 +1333,7 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
             owot.style.pointerEvents = "none";
             setTimeout(function() {
                 owot.style.pointerEvents = "";
-            }, 1)
+            }, 1);
         }
         return;
     }
@@ -1340,17 +1346,19 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
     }
 
     // set cursor
-    var pos = getTileCoordsFromMouseCoords(pageX, pageY, true);
-    if(tiles[pos[1] + "," + pos[0]] !== void 0) {
-        lastX = [pos[0], pos[2]];
-        // render the cursor and get results
-        if(renderCursor(pos) == false) {
-            // cursor should be removed if on area where user cannot write
-            if(cursorCoords) {
-                removeCursor();
+    if(cursorEnabled) {
+        var pos = getTileCoordsFromMouseCoords(pageX, pageY, true);
+        if(tiles[pos[1] + "," + pos[0]] !== void 0) {
+            lastX = [pos[0], pos[2]];
+            // change position of the cursor and get results
+            if(renderCursor(pos) == false) {
+                // cursor should be removed if on area where user cannot write
+                if(cursorCoords) {
+                    removeCursor();
+                }
             }
         }
-    };
+    }
 }
 document.addEventListener("mouseup", function(e) {
     event_mouseup(e);
@@ -2120,8 +2128,10 @@ function touch_pagePos(e) {
     return [Math.trunc(first_touch.pageX * zoomRatio), Math.trunc(first_touch.pageY * zoomRatio)];
 }
 
+var scrollingEnabled = true;
 document.addEventListener("wheel", function(e) {
     if(w._state.uiModal) return;
+    if(!scrollingEnabled) return; // return if disabled
     // if focused on chat, don't scroll world
     if(closest(e.target, getChatfield())) return;
     if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
@@ -3530,6 +3540,46 @@ var w = {
                 clearInterval(rot);
             }
         }, 10);
+    },
+    hideChat: function() {
+        chat_open.style.display = "none";
+        chat_window.style.display = "none";
+    },
+    showChat: function() {
+        chat_open.style.display = "";
+        if(chatOpen) chat_window.style.display = "";
+    },
+    disableDragging: function() {
+        draggingEnabled = false;
+        stopDragging();
+    },
+    enableDragging: function() {
+        draggingEnabled = true;
+    },
+    disableCursor: function() {
+        cursorEnabled = false;
+        removeCursor();
+    },
+    enableCursor: function() {
+        cursorEnabled = true;
+    },
+    disableScrolling: function() {
+        scrollingEnabled = false;
+    },
+    enableScrolling: function() {
+        scrollingEnabled = true;
+    },
+    setMouseCursor: function(cursor) {
+        defaultCursor = cursor;
+    },
+    resetMouseCursor: function() {
+        defaultCursor = "text";
+    },
+    setDragCursor: function(cursor) {
+        defaultDragCursor = cursor;
+    },
+    resetDragCursor: function() {
+        defaultDragCursor = "move";
     }
 }
 

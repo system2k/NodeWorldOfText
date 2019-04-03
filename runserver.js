@@ -95,6 +95,133 @@ if(!fs.existsSync(SETTINGS_PATH)) {
     process.exit();
 }
 
+function normalize_ipv6(ip) {
+	ip = ip.replace(/^:|:$/g, "");
+	ip = ip.split(":");
+	
+	for(var i = 0; i < ip.length; i++) {
+		var seg = ip[i];
+		if(seg) {
+			ip[i] = seg.padStart(4, "0");
+		} else {
+			seg = [];
+			for(var a = ip.length; a <= 8; a++) {
+				seg.push("0000");
+			}
+			ip[i] = seg.join(":");
+		}
+	}
+	return ip.join(":");
+}
+
+var cloudflare_ipv4_txt = fs.readFileSync("./backend/cloudflare_ipv4.txt").toString();
+var cloudflare_ipv6_txt = fs.readFileSync("./backend/cloudflare_ipv6.txt").toString();
+
+var cloudflare_ipv4_int = [];
+var cloudflare_ipv6_int = [];
+
+function ipv4_to_int(str) {
+    str = str.split(".").map(function(e) {
+        return parseInt(e, 10);
+    });
+    return str[0] * 16777216 + str[1] * 65536 + str[2] * 256 + str[3];
+}
+
+// ipv6 must be normalized
+function ipv6_to_int(str) {
+    str = str.split(":").map(function(e) {
+        return BigInt(parseInt(e, 16));
+    });
+    return str[7] | str[6] << 16n | str[5] << 32n | str[4] << 48n | str[3] << 64n | str[2] << 80n | str[1] << 96n | str[0] << 112n;
+}
+
+function ipv4_txt_to_int() {
+    var txt = cloudflare_ipv4_txt;
+    txt = txt.replace(/\r\n/g, "\n");
+    txt = txt.split("\n");
+    for(var i = 0; i < txt.length; i++) {
+        var ip = txt[i];
+        if(!ip) continue;
+        ip = ip.trim().split("/");
+        var addr = ip[0];
+        var sub = parseInt(ip[1]);
+        var num = ipv4_to_int(addr);
+
+        var ip_start = unsigned_u32_and(num, subnetMask_ipv4(sub));
+        var ip_end = unsigned_u32_or(num, subnetOr_ipv4(sub));
+
+        cloudflare_ipv4_int.push([ip_start, ip_end]);
+    }
+}
+
+function ipv6_txt_to_int() {
+    var txt = cloudflare_ipv6_txt;
+    txt = txt.replace(/\r\n/g, "\n");
+    txt = txt.split("\n");
+    for(var i = 0; i < txt.length; i++) {
+        var ip = txt[i];
+        if(!ip) continue;
+        ip = ip.trim().split("/");
+        var addr = ip[0];
+        var sub = parseInt(ip[1]);
+        addr = normalize_ipv6(addr);
+        var num = ipv6_to_int(addr);
+
+        var ip_start = num & subnetMask_ipv6(sub);
+        var ip_end = num | subnetOr_ipv6(sub);
+
+        cloudflare_ipv6_int.push([ip_start, ip_end]);
+    }
+}
+
+var u32Byte = new Uint32Array(1);
+function unsigned_u32_and(x, y) {
+	u32Byte[0] = x;
+	u32Byte[0] &= y;
+	return u32Byte[0];
+}
+
+function unsigned_u32_or(x, y) {
+	u32Byte[0] = x;
+	u32Byte[0] |= y;
+	return u32Byte[0];
+}
+
+function subnetMask_ipv4(num) {
+	return 0b11111111111111111111111111111111 - (1 << (32 - num)) + 1;
+}
+
+function subnetOr_ipv4(num) {
+	return ((1 << (32 - num)) - 1);
+}
+
+function subnetMask_ipv6(num) {
+	return ((1n << 128n) - 1n) - (1n << (128n - BigInt(num))) + 1n;
+}
+
+function subnetOr_ipv6(num) {
+	return ((1n << (128n - BigInt(num))) - 1n);
+}
+
+function is_cf_ipv4_int(num) {
+    for(var i = 0; i < cloudflare_ipv4_int.length; i++) {
+        var ip = cloudflare_ipv4_int[i];
+        if(num >= ip[0] && num <= ip[1]) return true;
+    }
+    return false;
+}
+
+function is_cf_ipv6_int(num) {
+    for(var i = 0; i < cloudflare_ipv6_int.length; i++) {
+        var ip = cloudflare_ipv6_int[i];
+        if(num >= ip[0] && num <= ip[1]) return true;
+    }
+    return false;
+}
+
+ipv4_txt_to_int();
+ipv6_txt_to_int();
+
 function handle_error(e) {
     var str = JSON.stringify(process_error_arg(e));
     log_error(str);
@@ -571,6 +698,29 @@ async function send_email(destination, subject, text) {
             }
         });
     })
+}
+
+async function fetchCloudflareIPs(ip_type) {
+    if(ip_type == 4) {
+        ip_type = "ips-v4";
+    } else if(ip_type == 6) {
+        ip_type = "ips-v6";
+    } else {
+        return null;
+    }
+    return new Promise(function(resolve) {
+        https.get("https://www.cloudflare.com/" + ip_type, function(response) {
+            var data = "";
+            response.on("data", function(part) {
+                data += part;
+            });
+            response.on("end", function() {
+                resolve(data);
+            });
+        }).on("error", function() {
+            resolve(null);
+        });
+    });
 }
 
 var valid_methods = ["GET", "POST", "HEAD", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"];
@@ -1939,6 +2089,52 @@ async function manageWebsocketConnection(ws, req) {
         var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
         var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
         var remIp = req.socket.remoteAddress;
+
+        var ipAddress = remIp;
+        var ipAddressFam = 4;
+        if(!ipAddress) { // ipv4
+            ipAddress = "0.0.0.0";
+        } else {
+            if(ipAddress.indexOf(".") > -1) { // ipv4
+                ipAddress = ipAddress.split(":").slice(-1);
+                ipAddress = ipAddress[0];
+            } else { // ipv6
+                ipAddressFam = 6;
+                ipAddress = normalize_ipv6(ipAddress);
+            }
+        }
+
+        if(ipAddress == "127.0.0.1" && realIp) {
+            ipAddress = realIp;
+            if(ipAddress.indexOf(".") > -1) {
+                ipAddressFam = 4;
+            } else {
+                ipAddressFam = 6;
+                ipAddress = normalize_ipv6(ipAddress);
+            }
+            if(ipAddressFam == 4) {
+                if(is_cf_ipv4_int(ipv4_to_int(ipAddress))) {
+                    ipAddress = cfIp;
+                    if(ipAddress.indexOf(".") > -1) {
+                        ipAddressFam = 4;
+                    } else {
+                        ipAddressFam = 6;
+                        ipAddress = normalize_ipv6(ipAddress);
+                    }
+                }
+            } else if(ipAddressFam == 6) {
+                if(is_cf_ipv4_int(ipv4_to_int(ipAddress))) {
+                    ipAddress = cfIp;
+                    if(ipAddress.indexOf(".") > -1) {
+                        ipAddressFam = 4;
+                    } else {
+                        ipAddressFam = 6;
+                        ipAddress = normalize_ipv6(ipAddress);
+                    }
+                }
+            }
+        }
+
         var compIp = forwd || realIp || remIp || "Err" + rnd;
         if(!forwd) forwd = "None;" + rnd;
         if(!realIp) realIp = "None;" + rnd;
@@ -1951,6 +2147,8 @@ async function manageWebsocketConnection(ws, req) {
         ws.ipRem = remIp;
         ws.ipComp = compIp;
         ws.ipCF = cfIp;
+
+        ws.ipAddress = ipAddress;
     } catch(e) {
         var error_ip = "ErrC" + Math.floor(Math.random() * 1E4);
         ws.ipHeaderAddr = error_ip;
@@ -1958,6 +2156,7 @@ async function manageWebsocketConnection(ws, req) {
         ws.ipReal = error_ip;
         ws.ipComp = error_ip;
         ws.ipCF = error_ip;
+        ws.ipAddress = "0.0.0.0";
         handle_error(e);
     }
     /*
@@ -2100,7 +2299,7 @@ async function manageWebsocketConnection(ws, req) {
         if(!client_ips[status.world.id]) {
             client_ips[status.world.id] = {};
         }
-        client_ips[status.world.id][clientId] = [ws._socket.remoteAddress, ws._socket.address(), ws.ipHeaderAddr, -1, false, ws.ipComp, ws.ipCF];
+        client_ips[status.world.id][clientId] = [ws._socket.remoteAddress, ws._socket.address(), ws.ipHeaderAddr, -1, false, ws.ipComp, ws.ipCF, ws.ipAddress];
 
         ws.clientId = clientId;
         ws.chat_blocks = [];
