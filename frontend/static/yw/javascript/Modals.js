@@ -191,6 +191,7 @@ var SelectionModal = (function() {
 		this.res = document.getElementById("area_results");
 		this.cpy = document.getElementById("area_copy");
 		this.c_color = document.getElementById("area_cbox_color");
+		this.c_link = document.getElementById("area_cbox_link");
 		this.c_tleft = document.getElementById("area_cbox_tleft");
 		this.c_tright = document.getElementById("area_cbox_tright");
 		this.c_tempty = document.getElementById("area_cbox_tempty");
@@ -200,10 +201,12 @@ var SelectionModal = (function() {
 		this.c_rcomb = document.getElementById("area_cbox_rcomb");
 		this.textData = null;
 		this.colorData = null;
+		this.linkData = null;
 
 		this.updateTextOutput = function() {
 			if(!_this.isOpen) return;
 			var o_color = _this.c_color.checked;
+			var o_link = _this.c_link.checked;
 			var o_tleft = _this.c_tleft.checked;
 			var o_tright = _this.c_tright.checked;
 			var o_tempty = _this.c_tempty.checked;
@@ -216,8 +219,10 @@ var SelectionModal = (function() {
 			for(var y = 0; y < text.length; y++) {
 				text[y] = advancedSplit(text[y], o_rsurrog, o_rcomb);
 				var colRow;
+				var linkRow;
 				if(o_color) colRow = _this.colorData.slice(y * text[y].length, y * text[y].length + text[y].length);
-				if(o_tleft || o_tright || o_rgap) spaceTrim(text[y], o_tleft, o_tright, o_rgap, colRow);
+				if(o_link) linkRow = _this.linkData.slice(y * text[y].length, y * text[y].length + text[y].length);
+				if(o_tleft || o_tright || o_rgap) spaceTrim(text[y], o_tleft, o_tright, o_rgap, [colRow, linkRow]);
 				var line = text[y];
 				if(o_color) {
 					for(var x = 0; x < line.length; x++) {
@@ -240,6 +245,13 @@ var SelectionModal = (function() {
 						}
 						chr += line[x];
 						line[x] = chr;
+					}
+				}
+				if(o_link) {
+					for(var x = 0; x < line.length; x++) {
+						var link = linkRow[x];
+						if(!link) continue;
+						line[x] = "\x1b" + link + line[x];
 					}
 				}
 				text[y] = text[y].join("");
@@ -273,6 +285,7 @@ var SelectionModal = (function() {
 			w.clipboard.copy(_this.res.value);
 		}
 		this.c_color.onclick = _this.updateTextOutput;
+		this.c_link.onclick = _this.updateTextOutput;
 		this.c_tleft.onclick = _this.updateTextOutput;
 		this.c_tright.onclick = _this.updateTextOutput;
 		this.c_tempty.onclick = _this.updateTextOutput;
@@ -281,9 +294,10 @@ var SelectionModal = (function() {
 		this.c_rsurrog.onclick = _this.updateTextOutput;
 		this.c_rcomb.onclick = _this.updateTextOutput;
 	}
-	SelectionModal.prototype.open = function(str, colors) {
+	SelectionModal.prototype.open = function(str, colors, links) {
 		this.textData = str;
 		this.colorData = colors;
+		this.linkData = links;
 		this.isOpen = true;
 		this.panel.style.display = "";
 		this.overlay.style.display = "";

@@ -192,11 +192,11 @@ function unsigned_u32_or(x, y) {
 }
 
 function subnetMask_ipv4(num) {
-	return 0b11111111111111111111111111111111 - (1 << (32 - num)) + 1;
+	return ((1 << 32) - 2 >>> 0) - (2 ** (32 - num) - 1);
 }
 
 function subnetOr_ipv4(num) {
-	return ((1 << (32 - num)) - 1);
+	return 2 ** (32 - num) - 1;
 }
 
 function subnetMask_ipv6(num) {

@@ -304,6 +304,7 @@ function handleRegionSelection() {
     var charY = coordA[3];
     var reg = "";
     var colors = [];
+    var links = [];
     for(var y = 0; y < regHeight; y++) {
         if(y != 0) {
             reg += "\n";
@@ -311,6 +312,25 @@ function handleRegionSelection() {
         for(var x = 0; x < regWidth; x++) {
             reg += getChar(tileX, tileY, charX, charY);
             colors.push(getCharColor(tileX, tileY, charX, charY));
+            var tile = tiles[tileY + "," + tileX];
+            var containsLink = false;
+            if(tile && tile.properties && tile.properties.cell_props) {
+                if(tile.properties.cell_props[charY] && tile.properties.cell_props[charY][charX]) {
+                    var link = tile.properties.cell_props[charY][charX];
+                    if(link.link) {
+                        link = link.link;
+                        containsLink = true;
+                        if(link.type == "url") {
+                            links.push("$u" + "\"" + escapeQuote(link.url) + "\"");
+                        } else if(link.type == "coord") {
+                            links.push("$c" + "[" + link.link_tileX + "," + link.link_tileY + "]");
+                        }
+                    }
+                }
+            }
+            if(!containsLink) {
+                links.push(null);
+            }
             charX++;
             if(charX >= tileC) {
                 charX = 0;
@@ -325,7 +345,7 @@ function handleRegionSelection() {
             tileY++;
         }
     }
-    w._ui.selectionModal.open(reg, colors);
+    w._ui.selectionModal.open(reg, colors, links);
     w.emit("regionSelected", {
         a: coordA,
         b: coordB
@@ -1654,6 +1674,19 @@ function writeChar(char, doNotMoveCursor, temp_color) {
     }
 }
 
+function spliceArray(array, A, B) {
+    if(!array) return;
+    if(Array.isArray(array)) {
+        // list of arrays
+        for(var i = 0; i < array.length; i++) {
+            if(!array[i]) continue;
+            array[i].splice(A, B);
+        }
+    } else {
+        array.splice(A, B);
+    }
+}
+
 function spaceTrim(str_array, left, right, gaps, secondary_array) {
     // secondary_array is an optional argument where elements are trimmed in parallel with str_array
     var marginLeft = 0;
@@ -1678,11 +1711,11 @@ function spaceTrim(str_array, left, right, gaps, secondary_array) {
     }
     if(marginLeft) {
         str_array.splice(0, marginLeft);
-        if(secondary_array) secondary_array.splice(0, marginLeft);
+        spliceArray(secondary_array, 0, marginLeft);
     }
     if(marginRight) {
         str_array.splice(str_array.length - marginRight);
-        if(secondary_array) secondary_array.splice(secondary_array.length - marginRight);
+        spliceArray(secondary_array, secondary_array.length - marginRight);
     }
     if(gaps) {
         var spaceFreq = 0;
@@ -1695,7 +1728,7 @@ function spaceTrim(str_array, left, right, gaps, secondary_array) {
             }
             if(spaceFreq > 1) {
                 str_array.splice(i, 1);
-                if(secondary_array) secondary_array.splice(i, 1);
+                spliceArray(secondary_array, i, 1);
                 i--;
             }
         }
@@ -1734,6 +1767,7 @@ function convertToDate(epoch) {
 // write characters inputted
 var write_busy = false; // busy pasting
 var pasteInterval;
+var linkQueue = [];
 var char_input_check = setInterval(function() {
     if(write_busy) return;
     var value = textInput.value;
@@ -1752,28 +1786,104 @@ var char_input_check = setInterval(function() {
         return
     };
     if(Permissions.can_paste(state.userModel, state.worldModel)) {
+        linkQueue.splice(0);
         write_busy = true;
         clearInterval(pasteInterval);
         var hex = "ABCDEF";
         var pasteColor = YourWorld.Color;
+        var pauseValue = 0;
         pasteInterval = setInterval(function() {
+            if(pauseValue) {
+                pauseValue--;
+                return;
+            }
             var chr = value[index];
-            // colored paste
             if(chr == "\x1b") {
                 var hCode = value[index + 1];
-                var cCol = "";
-                if(hCode == "x") {
-                    cCol = "000000";
+                if(hCode == "$") { // contains links
                     index += 2;
-                } else {
-                    var code = hex.indexOf(hCode);
-                    if(code > -1) {
-                        cCol = value.slice(index + 2, index + 2 + code + 1).join("");
-                        index += code + 1;
+                    var lType = value[index];
+                    index++;
+                    if(lType == "c") {
+                        var strPoint = index;
+                        var buf = "";
+                        var mode = 0;
+                        while(true) {
+                            if(value[strPoint] == "[" && mode == 0) {
+                                mode = 1;
+                                if(++strPoint >= value.length) break;
+                                continue;
+                            }
+                            if(value[strPoint] == "]" && mode == 1) {
+                                strPoint++;
+                                break;
+                            }
+                            if(mode == 1) {
+                                buf += value[strPoint];
+                                if(++strPoint >= value.length) break;
+                                continue;
+                            }
+                            if(++strPoint >= value.length) break;
+                        }
+                        index = strPoint;
+                        buf = buf.split(",");
+                        var coordTileX = parseInt(buf[0].trim());
+                        var coordTileY = parseInt(buf[1].trim());
+                        if(Permissions.can_coordlink(state.userModel, state.worldModel)) {
+                            linkQueue.push(["coord", cursorCoords[0], cursorCoords[1], cursorCoords[2], cursorCoords[3], coordTileX, coordTileY]);
+                            pauseValue += 2;
+                        }
+                    } else if(lType == "u") {
+                        var strPoint = index;
+                        var buf = "";
+                        var quotMode = 0;
+                        while(true) {
+                            if(value[strPoint] == "\"" && quotMode == 0) {
+                                quotMode = 1;
+                                if(++strPoint >= value.length) break;
+                                continue;
+                            }
+                            if(value[strPoint] == "\"" && quotMode == 1) {
+                                strPoint++;
+                                break;
+                            }
+                            if(quotMode == 1) {
+                                if(value[strPoint] == "\\") {
+                                    quotMode = 2;
+                                    if(++strPoint >= value.length) break;
+                                    continue;
+                                }
+                                buf += value[strPoint];
+                            }
+                            if(quotMode == 2) {
+                                buf += value[strPoint];
+                                quotMode = 1;
+                                if(++strPoint >= value.length) break;
+                                continue;
+                            }
+                            if(++strPoint >= value.length) break;
+                        }
+                        index = strPoint;
+                        if(Permissions.can_urllink(state.userModel, state.worldModel)) {
+                            linkQueue.push(["url", cursorCoords[0], cursorCoords[1], cursorCoords[2], cursorCoords[3], buf]);
+                            pauseValue += 2;
+                        }
                     }
-                    index += 2;
+                } else { // colored paste
+                    var cCol = "";
+                    if(hCode == "x") {
+                        cCol = "000000";
+                        index += 2;
+                    } else {
+                        var code = hex.indexOf(hCode);
+                        if(code > -1) {
+                            cCol = value.slice(index + 2, index + 2 + code + 1).join("");
+                            index += code + 1;
+                        }
+                        index += 2;
+                    }
+                    pasteColor = parseInt(cCol, 16);
                 }
-                pasteColor = parseInt(cCol, 16);
             } else {
                 var res = writeChar(chr, false, pasteColor);
                 if(res === null) { // write failed
@@ -1786,7 +1896,7 @@ var char_input_check = setInterval(function() {
                 clearInterval(pasteInterval);
                 write_busy = false;
             }
-        }, 1)
+        }, 1);
     } else {
         textInput.value = "";
     }
@@ -3930,8 +4040,48 @@ var ws_functions = {
         for(var i = 0; i < data.accepted.length; i++) {
             for(var x = 0; x < tellEdit.length; x++) {
                 if(tellEdit[x][4] == data.accepted[i]) {
+                    var tileX = tellEdit[x][0];
+                    var tileY = tellEdit[x][1];
+                    var charX = tellEdit[x][2];
+                    var charY = tellEdit[x][3];
+                    // check if there are links in queue
+                    for(var i = 0; i < linkQueue.length; i++) {
+                        var queueItem = linkQueue[i];
+                        if(queueItem[1] == tileX && queueItem[2] == tileY && queueItem[3] == charX && queueItem[4] == charY) {
+                            var linkType = queueItem[0];
+                            if(linkType == "url") {
+                                w.socket.send(JSON.stringify({
+                                    kind: "link",
+                                    data: {
+                                        tileY: tileY,
+                                        tileX: tileX,
+                                        charY: charY,
+                                        charX: charX,
+                                        url: queueItem[5]
+                                    },
+                                    type: "url"
+                                }));
+                            } else if(linkType == "coord") {
+                                w.socket.send(JSON.stringify({
+                                    kind: "link",
+                                    data: {
+                                        tileY: tileY,
+                                        tileX: tileX,
+                                        charY: charY,
+                                        charX: charX,
+                                        link_tileX: queueItem[5],
+                                        link_tileY: queueItem[6]
+                                    },
+                                    type: "coord"
+                                }));
+                            }
+                            linkQueue.splice(i, 1);
+                            break;
+                        }
+                    }
+
                     tellEdit.splice(x, 1);
-                    // because the element has been removed, so the length of the array is shorter
+                    // because the element has been removed, the length of the array is shorter
                     x--;
                 }
             }
