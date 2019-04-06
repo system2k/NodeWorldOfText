@@ -274,12 +274,14 @@ chatbar.addEventListener("keydown", function(e) {
 })
 
 chat_close.addEventListener("click", function() {
+    w.emit("chatClose");
     chat_window.style.display = "none";
     chat_open.style.display = "";
     chatOpen = false;
 })
 
 chat_open.addEventListener("click", function() {
+    w.emit("chatOpen");
     chat_window.style.display = "";
     chat_open.style.display = "none";
     chatOpen = true;

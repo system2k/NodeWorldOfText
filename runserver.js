@@ -142,7 +142,9 @@ function ipv4_txt_to_int() {
     for(var i = 0; i < txt.length; i++) {
         var ip = txt[i];
         if(!ip) continue;
-        ip = ip.trim().split("/");
+        ip = ip.trim();
+        if(ip == "") continue;
+        ip = ip.split("/");
         var addr = ip[0];
         var sub = parseInt(ip[1]);
         var num = ipv4_to_int(addr);
@@ -161,7 +163,9 @@ function ipv6_txt_to_int() {
     for(var i = 0; i < txt.length; i++) {
         var ip = txt[i];
         if(!ip) continue;
-        ip = ip.trim().split("/");
+        ip = ip.trim();
+        if(ip == "") continue;
+        ip = ip.split("/");
         var addr = ip[0];
         var sub = parseInt(ip[1]);
         addr = normalize_ipv6(addr);
@@ -1932,7 +1936,7 @@ async function clear_expired_sessions(no_timeout) {
 }
 
 var client_ips = {};
-var closed_client_limit = 1000 * 60 * 16;
+var closed_client_limit = 1000 * 60 * 60 * 24 * 2;
 // TODO: some leftover disconnected clients (although rare)
 intv.clear_closed_clients = setInterval(function() {
     var curTime = Date.now();
@@ -1949,7 +1953,7 @@ intv.clear_closed_clients = setInterval(function() {
             delete client_ips[w];
         }
     }
-}, 1000 * 60)
+}, 1000 * 60 * 10);
 
 // ping clients every 30 seconds
 function initPingAuto() {
@@ -2115,6 +2119,9 @@ async function manageWebsocketConnection(ws, req) {
             if(ipAddressFam == 4) {
                 if(is_cf_ipv4_int(ipv4_to_int(ipAddress))) {
                     ipAddress = cfIp;
+                    if(!ipAddress) {
+                        ipAddress = "0.0.0.0";
+                    }
                     if(ipAddress.indexOf(".") > -1) {
                         ipAddressFam = 4;
                     } else {
@@ -2123,8 +2130,11 @@ async function manageWebsocketConnection(ws, req) {
                     }
                 }
             } else if(ipAddressFam == 6) {
-                if(is_cf_ipv4_int(ipv4_to_int(ipAddress))) {
+                if(is_cf_ipv6_int(ipv6_to_int(ipAddress))) {
                     ipAddress = cfIp;
+                    if(!ipAddress) {
+                        ipAddress = "0.0.0.0";
+                    }
                     if(ipAddress.indexOf(".") > -1) {
                         ipAddressFam = 4;
                     } else {

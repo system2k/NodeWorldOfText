@@ -326,6 +326,10 @@ function handleRegionSelection() {
         }
     }
     w._ui.selectionModal.open(reg, colors);
+    w.emit("regionSelected", {
+        a: coordA,
+        b: coordB
+    });
 }
 
 var defaultSizes = {
@@ -541,7 +545,7 @@ function mousemove_tileProtectAuto() {
         }
     }
 }
-document.addEventListener("mousemove", mousemove_tileProtectAuto)
+document.addEventListener("mousemove", mousemove_tileProtectAuto);
 
 function keydown_tileProtectAuto(e) {
     if(!worldFocused) return;
@@ -570,7 +574,7 @@ function keydown_tileProtectAuto(e) {
             var data = {
                 tileY: tileY,
                 tileX: tileX
-            }
+            };
 
             var action;
             if(prot == 3) {
@@ -656,7 +660,7 @@ function mousemove_linkAuto() {
         }
     }
 }
-document.addEventListener("mousemove", mousemove_linkAuto)
+document.addEventListener("mousemove", mousemove_linkAuto);
 
 function keydown_linkAuto(e) {
     if(!worldFocused) return;
@@ -686,7 +690,7 @@ function keydown_linkAuto(e) {
                 tileX: tileX,
                 charY: charY,
                 charX: charX
-            }
+            };
 
             var link_type;
             if(mode == 0) {
@@ -722,7 +726,7 @@ function keydown_linkAuto(e) {
         linkAuto.shiftDown = checkKeyPress(e, keyConfig.autoDeselect);
     }
 }
-document.body.addEventListener("keydown", keydown_linkAuto)
+document.body.addEventListener("keydown", keydown_linkAuto);
 
 function onKeyUp(e) {
     var sel = checkKeyPress(e, keyConfig.autoSelect);
@@ -732,7 +736,7 @@ function onKeyUp(e) {
     tileProtectAuto.ctrlDown = sel;
     tileProtectAuto.shiftDown = des;
 }
-document.body.addEventListener("keyup", onKeyUp)
+document.body.addEventListener("keyup", onKeyUp);
 
 // adjust canvas width, canvas display width, and variable width to
 // disobey the browser zoom so that the custom zoom can be used
@@ -758,12 +762,13 @@ function adjust_scaling_DOM(ratio) {
 window.addEventListener("resize", function(e) {
     var ratio = window.devicePixelRatio;
     if(!ratio) ratio = 1;
+    w.emit("resize", ratio);
 
     adjust_scaling_DOM(ratio);
 
     browserZoomAdjust();
     renderTiles();
-})
+});
 
 // fix zooming blurriness issue
 browserZoomAdjust(true);
@@ -1218,6 +1223,15 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
         w.regionSelect.setSelection(regionCoordA, regionCoordA);
         return;
     }
+    var pos = getTileCoordsFromMouseCoords(pageX, pageY, true);
+    w.emit("mouseDown", {
+        tileX: pos[0],
+        tileY: pos[1],
+        charX: pos[2],
+        charY: pos[3],
+        pageX: pageX,
+        pageY: pageY
+    });
     owot.style.cursor = defaultDragCursor;
 }
 document.addEventListener("mousedown", function(e) {
@@ -1346,8 +1360,16 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
     }
 
     // set cursor
+    var pos = getTileCoordsFromMouseCoords(pageX, pageY, true);
+    w.emit("mouseUp", {
+        tileX: pos[0],
+        tileY: pos[1],
+        charX: pos[2],
+        charY: pos[3],
+        pageX: pageX,
+        pageY: pageY
+    });
     if(cursorEnabled) {
-        var pos = getTileCoordsFromMouseCoords(pageX, pageY, true);
         if(tiles[pos[1] + "," + pos[0]] !== void 0) {
             lastX = [pos[0], pos[2]];
             // change position of the cursor and get results
@@ -1452,7 +1474,7 @@ var writeInterval = setInterval(function() {
     } catch(e) {
         console.log(e);
     }
-}, 1000)
+}, 1000);
 
 window.onbeforeunload = function() {
     if(writeBuffer.length) flushWrites();
@@ -1494,6 +1516,60 @@ function moveCursor(direction, do_not_change_enter_x) {
     renderCursor(cSCopy);
 }
 
+// place a character
+function writeCharTo(char, charColor, tileX, tileY, charX, charY) {
+    if(!tiles[tileY + "," + tileX]) {
+		Tile.set(tileX, tileY, blankTile());
+	}
+	
+	// get the objects containing link data and color data
+	var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
+	if(!cell_props) cell_props = {};
+	var color = tiles[tileY + "," + tileX].properties.color;
+	if(!color) color = Object.assign([], blankColor);
+
+	// delete link
+	if(cell_props[charY]) {
+		if(cell_props[charY][charX]) {
+			delete cell_props[charY][charX];
+		}
+	}
+	// change color
+	if(Permissions.can_color_text(state.userModel, state.worldModel)) {
+		color[charY * tileC + charX] = charColor;
+		tiles[tileY + "," + tileX].properties.color = color; // if the color array doesn't already exist in the tile
+	}
+
+	// update cell properties (link positions)
+	tiles[tileY + "," + tileX].properties.cell_props = cell_props;
+
+	var con = tiles[tileY + "," + tileX].content;
+	con = advancedSplit(con);
+	// replace character
+	con[charY * tileC + charX] = char;
+	// join splitted content string
+	tiles[tileY + "," + tileX].content = con.join("");
+	// re-render
+	renderTile(tileX, tileY, true);
+
+	var editArray = [tileY, tileX, charY, charX, Date.now(), char, nextObjId];
+	if(tileFetchOffsetX || tileFetchOffsetY) {
+		editArray[0] += tileFetchOffsetY;
+		editArray[1] += tileFetchOffsetX;
+	}
+	if(charColor && Permissions.can_color_text(state.userModel, state.worldModel)) {
+		editArray.push(charColor);
+	}
+	tellEdit.push([tileX, tileY, charX, charY, nextObjId]);
+	writeBuffer.push(editArray);
+	nextObjId++;
+}
+
+function writeCharToXY(char, charColor, x, y) {
+	writeCharTo(char, charColor, Math.floor(x / 16), Math.floor(y / 8), x - Math.floor(x / 16) * 16, y - Math.floor(y / 8) * 8);
+}
+
+// type a character
 function writeChar(char, doNotMoveCursor, temp_color) {
     var charColor = temp_color || YourWorld.Color;
     if(temp_color == 0) charColor = 0;
@@ -1564,49 +1640,17 @@ function writeChar(char, doNotMoveCursor, temp_color) {
     }
     // add the character at where the cursor was from
     if(!newLine) {
-        if(!tiles[tileY + "," + tileX]) {
-            Tile.set(tileX, tileY, blankTile());
-        }
-        var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
-        if(!cell_props) cell_props = {};
-        var color = tiles[tileY + "," + tileX].properties.color;
-        if(!color) color = Object.assign([], blankColor);
-
-        // delete link
-        if(cell_props[charY]) {
-            if(cell_props[charY][charX]) {
-                delete cell_props[charY][charX];
-            }
-        }
-        // change color
-        if(Permissions.can_color_text(state.userModel, state.worldModel)) {
-            color[charY * tileC + charX] = charColor;
-            tiles[tileY + "," + tileX].properties.color = color;
-        }
-
-        // update cell properties (link positions)
-        tiles[tileY + "," + tileX].properties.cell_props = cell_props;
-
-        var con = tiles[tileY + "," + tileX].content;
-        con = advancedSplit(con);
-        // replace character
-        con[charY * tileC + charX] = char;
-        // join splitted content string
-        tiles[tileY + "," + tileX].content = con.join("");
-        // re-render
-        renderTile(tileX, tileY, true)
-
-        var editArray = [tileY, tileX, charY, charX, Date.now(), char, nextObjId];
-        if(tileFetchOffsetX || tileFetchOffsetY) {
-            editArray[0] += tileFetchOffsetY;
-            editArray[1] += tileFetchOffsetX;
-        }
-        if(charColor && Permissions.can_color_text(state.userModel, state.worldModel)) {
-            editArray.push(charColor);
-        }
-        tellEdit.push([tileX, tileY, charX, charY, nextObjId]);
-        writeBuffer.push(editArray);
-        nextObjId++;
+        var data = {
+            char: char,
+            color: charColor,
+            tileX: tileX,
+            tileY: tileY,
+            charX: charX,
+            charY: charY
+        };
+        w.emit("writeBefore", data);
+        writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY);
+        w.emit("write", data);
     }
 }
 
@@ -1748,7 +1792,7 @@ var char_input_check = setInterval(function() {
     }
 }, 10);
 
-document.onkeydown = function(e) {
+document.addEventListener("keydown", function(e) {
     var actElm = document.activeElement;
     if(!worldFocused) return;
     if(w._state.uiModal) return;
@@ -1773,6 +1817,7 @@ document.onkeydown = function(e) {
         moveCursor("right");
     }
     if(checkKeyPress(e, keyConfig.reset)) { // esc
+        w.emit("esc");
         stopLinkUI();
         stopTileUI();
         stopSelectionUI();
@@ -1791,7 +1836,8 @@ document.onkeydown = function(e) {
         for(var i = 0; i < 4; i++) writeChar(" ");
         e.preventDefault();
     }
-}
+    w.emit("keyDown", e);
+});
 
 var colors = ["#660066", "#003366", "#ff9900", "#ff0066", "#003300", "#ff0000", "#3a3a3a", "#006666", "#3399ff", "#3333ff", "#000000"];
 function assignColor(username) {
@@ -1970,6 +2016,14 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
     var tileY = coords[1];
     var charX = coords[2];
     var charY = coords[3];
+    w.emit("mouseMove", {
+        tileX: tileX,
+        tileY: tileY,
+        charX: charX,
+        charY: charY,
+        pageX: pageX,
+        pageY: pageY
+    });
 
     for(var i = 0; i < draggable_element_mousemove.length; i++) {
         draggable_element_mousemove[i](e, e.pageX, e.pageY);
@@ -2147,6 +2201,10 @@ document.addEventListener("wheel", function(e) {
     }
     positionY -= deltaY;
     positionX -= deltaX;
+    w.emit("scroll", {
+        deltaX: -deltaX,
+        deltaY: -deltaY
+    });
     renderTiles();
 })
 
@@ -2353,6 +2411,11 @@ function createSocket() {
 
     socket.onopen = function(msg) {
         console.log("Connected socket");
+        for(var tile in tiles) {
+            if(tiles[tile] == null) {
+                delete tiles[tile];
+            }
+        }
         getAndFetchTiles();
         clearInterval(fetchInterval);
         fetchInterval = setInterval(function() {
@@ -2370,6 +2433,10 @@ function createSocket() {
 
     socket.onclose = function() {
         console.log("Socket has closed. Reconnecting...");
+    }
+
+    socket.onerror = function(err) {
+        console.log("Socket error:", err);
     }
 }
 
@@ -3403,12 +3470,14 @@ var w = {
         if(typeof call != "function") {
             throw "Callback is not a function";
         }
+        type = type.toLowerCase();
         if(!OWOT.events[type]) {
             OWOT.events[type] = [];
         }
         OWOT.events[type].push(call);
     },
     off: function(type, call) {
+        type = type.toLowerCase();
         if(!OWOT.events[type]) return;
         while(true) {
             var idx = OWOT.events[type].indexOf(call);
@@ -3417,12 +3486,17 @@ var w = {
         }
     },
     emit: function(type, data) {
+        type = type.toLowerCase();
         var evt = OWOT.events[type];
         if(!evt) return;
         for(var e = 0; e < evt.length; e++) {
             var func = evt[e];
             func(data);
         }
+    },
+    listening: function(type) {
+        type = type.toLowerCase();
+        return !!OWOT.events[type];
     },
     broadcastReceive: function() {
         if(w.receivingBroadcasts) return;

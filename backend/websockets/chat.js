@@ -145,17 +145,19 @@ module.exports = async function(ws, data, send, vars, evars) {
         [3, "uptime", null, "get uptime of server"],
 
         [2, "worlds", null, "list all worlds"],
+        [2, "getip", ["id"], "retrieve the IP address"],
+        [2, "getclients", null, "get list of all connected clients"],
 
         [0, "help", null, "lists all commands"],
         [0, "nick", ["nickname"], "changes your nickname"], // client-side
         [0, "ping", null, "check the latency"],
         [0, "warp", ["world"], "go to another world"], // client-side
-        [0, "warpserver", ["server"], "connect to a different server"], // client-side
-        [0, "gridsize", ["WxH"], "change size of cells"], // client-side
-        [0, "logout", null, "logs your account off"],
+        [0, "warpserver", ["server"], "use a different server"], // client-side
+        [0, "gridsize", ["WxH"], "change the size of cells"], // client-side
+        [0, "logout", null, "log your account off"],
         [0, "block", ["id"], "block chats from this user"],
-        [0, "color", ["color code"], "change the text color"], // client-side
-        [0, "chatcolor", ["color code"], "change only the chat color"], // client-side
+        [0, "color", ["color code"], "change your text color"], // client-side
+        [0, "chatcolor", ["color code"], "change only your chat color"], // client-side
         [0, "night", null, "enable night mode"] // client-side
     ];
 
@@ -270,6 +272,54 @@ module.exports = async function(ws, data, send, vars, evars) {
         },
         uptime: function() {
             serverChatResponse("Server uptime: " + uptime(), data.location);
+        },
+        getip: function(id) {
+            id = san_nbr(id);
+            if(id < 0) id = 0;
+            var res = "Client [" + id + "]:<br><div style=\"background-color: #c0c0c0\">";
+            var clientsFound = 0;
+            wss.clients.forEach(function(ws) {
+                if(data.location == "page") {
+                    if(ws.world_id == world.id && ws.clientId == id) {
+                        if(clientsFound != 0) res += "<br>";
+                        res += ws.ipAddress;
+                        clientsFound++;
+                    }
+                } else if(data.location == "global") {
+                    if(ws.clientId == id) {
+                        if(clientsFound != 0) res += "<br>";
+                        res += "[world: " + ws.world_id + "] " + ws.ipAddress;
+                        clientsFound++;
+                    }
+                }
+            });
+            res += "</div>";
+            if(clientsFound == 0) {
+                res = "No clients found for id " + id;
+            }
+            serverChatResponse(res, data.location);
+        },
+        getclients: function() {
+            var res = "Clients:<br><div style=\"background-color: #c0c0c0\">";
+            var clientsFound = 0;
+            wss.clients.forEach(function(ws) {
+                if(data.location == "page") {
+                    if(ws.world_id == world.id) {
+                        if(clientsFound != 0) res += "<br>";
+                        res += "[" + ws.clientId + "] " + ws.ipAddress;
+                        clientsFound++;
+                    }
+                } else if(data.location == "global") {
+                        if(clientsFound != 0) res += "<br>";
+                        res += "[id: " + ws.clientId + ", world: " + ws.world_id + "] " + ws.ipAddress;
+                        clientsFound++;
+                }
+            });
+            res += "</div>";
+            if(clientsFound == 0) {
+                res = "No clients found";
+            }
+            serverChatResponse(res, data.location);
         }
     }
 
@@ -297,6 +347,12 @@ module.exports = async function(ws, data, send, vars, evars) {
                 return;
             case "logout":
                 await com.logout();
+                return;
+            case "getip":
+                com.getip(args[1]);
+                return;
+            case "getclients":
+                com.getclients();
                 return;
             default:
                 serverChatResponse("Invalid command: " + msg);
