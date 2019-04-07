@@ -1069,6 +1069,7 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^other/serverrequeststatus/(.*)[\\/]?$", pages.other_serverrequeststatus, { no_login: true }],
     ["^other/info/(.*)[\\/]?$", pages.other_info, { no_login: true }],
     ["^other/cd/(.*)[\\/]?$", pages.other_cd, { no_login: true }],
+    ["^other/ipaddress[\\/]?$", pages.ipaddress],
 
     ["^static/(.*)[\\/]?$", pages.static, { no_login: true }],
     ["^static\\?file=(.*)[\\/]?$", pages.static, { no_login: true, check_query: true }],
@@ -1479,6 +1480,11 @@ async function process_request(req, res, current_req_id) {
 
     var acceptEncoding = parseAcceptEncoding(req.headers["accept-encoding"]);
 
+    var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
+    var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
+    var remIp = req.socket.remoteAddress;
+    var ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
+
     function dispatch(data, status_code, params) {
         if(request_resolved) return; // if request is already sent
         request_resolved = true;
@@ -1644,7 +1650,8 @@ async function process_request(req, res, current_req_id) {
                     referer: req.headers.referer,
                     transaction,
                     broadcast: global_data.ws_broadcast,
-                    HTML
+                    HTML,
+                    ipAddress
                 })
                 vars_joined = true;
                 if(row[1][method] && valid_method(method)) {
@@ -2084,6 +2091,60 @@ function broadcastMonitorEvent(data) {
     }
 }
 
+function evaluateIpAddress(remIp, realIp, cfIp) {
+    var ipAddress = remIp;
+    var ipAddressFam = 4;
+    if(!ipAddress) { // ipv4
+        ipAddress = "0.0.0.0";
+    } else {
+        if(ipAddress.indexOf(".") > -1) { // ipv4
+            ipAddress = ipAddress.split(":").slice(-1);
+            ipAddress = ipAddress[0];
+        } else { // ipv6
+            ipAddressFam = 6;
+            ipAddress = normalize_ipv6(ipAddress);
+        }
+    }
+
+    if(ipAddress == "127.0.0.1" && realIp) {
+        ipAddress = realIp;
+        if(ipAddress.indexOf(".") > -1) {
+            ipAddressFam = 4;
+        } else {
+            ipAddressFam = 6;
+            ipAddress = normalize_ipv6(ipAddress);
+        }
+        if(ipAddressFam == 4) {
+            if(is_cf_ipv4_int(ipv4_to_int(ipAddress))) {
+                ipAddress = cfIp;
+                if(!ipAddress) {
+                    ipAddress = "0.0.0.0";
+                }
+                if(ipAddress.indexOf(".") > -1) {
+                    ipAddressFam = 4;
+                } else {
+                    ipAddressFam = 6;
+                    ipAddress = normalize_ipv6(ipAddress);
+                }
+            }
+        } else if(ipAddressFam == 6) {
+            if(is_cf_ipv6_int(ipv6_to_int(ipAddress))) {
+                ipAddress = cfIp;
+                if(!ipAddress) {
+                    ipAddress = "0.0.0.0";
+                }
+                if(ipAddress.indexOf(".") > -1) {
+                    ipAddressFam = 4;
+                } else {
+                    ipAddressFam = 6;
+                    ipAddress = normalize_ipv6(ipAddress);
+                }
+            }
+        }
+    }
+    return [ipAddress, ipAddressFam];
+}
+
 async function manageWebsocketConnection(ws, req) {
     if(isStopping) return;
     var ipHeaderAddr = "Unknown";
@@ -2094,56 +2155,7 @@ async function manageWebsocketConnection(ws, req) {
         var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
         var remIp = req.socket.remoteAddress;
 
-        var ipAddress = remIp;
-        var ipAddressFam = 4;
-        if(!ipAddress) { // ipv4
-            ipAddress = "0.0.0.0";
-        } else {
-            if(ipAddress.indexOf(".") > -1) { // ipv4
-                ipAddress = ipAddress.split(":").slice(-1);
-                ipAddress = ipAddress[0];
-            } else { // ipv6
-                ipAddressFam = 6;
-                ipAddress = normalize_ipv6(ipAddress);
-            }
-        }
-
-        if(ipAddress == "127.0.0.1" && realIp) {
-            ipAddress = realIp;
-            if(ipAddress.indexOf(".") > -1) {
-                ipAddressFam = 4;
-            } else {
-                ipAddressFam = 6;
-                ipAddress = normalize_ipv6(ipAddress);
-            }
-            if(ipAddressFam == 4) {
-                if(is_cf_ipv4_int(ipv4_to_int(ipAddress))) {
-                    ipAddress = cfIp;
-                    if(!ipAddress) {
-                        ipAddress = "0.0.0.0";
-                    }
-                    if(ipAddress.indexOf(".") > -1) {
-                        ipAddressFam = 4;
-                    } else {
-                        ipAddressFam = 6;
-                        ipAddress = normalize_ipv6(ipAddress);
-                    }
-                }
-            } else if(ipAddressFam == 6) {
-                if(is_cf_ipv6_int(ipv6_to_int(ipAddress))) {
-                    ipAddress = cfIp;
-                    if(!ipAddress) {
-                        ipAddress = "0.0.0.0";
-                    }
-                    if(ipAddress.indexOf(".") > -1) {
-                        ipAddressFam = 4;
-                    } else {
-                        ipAddressFam = 6;
-                        ipAddress = normalize_ipv6(ipAddress);
-                    }
-                }
-            }
-        }
+        var ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
 
         var compIp = forwd || realIp || remIp || "Err" + rnd;
         if(!forwd) forwd = "None;" + rnd;

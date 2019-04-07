@@ -1768,6 +1768,7 @@ function convertToDate(epoch) {
 var write_busy = false; // busy pasting
 var pasteInterval;
 var linkQueue = [];
+textInput.value = "";
 var char_input_check = setInterval(function() {
     if(write_busy) return;
     var value = textInput.value;
