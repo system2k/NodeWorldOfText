@@ -147,3 +147,12 @@ ul {
     float: left;
     margin-right: 10px;
 }
+
+.action_btn {
+    width: 150px;
+}
+
+.action_desc {
+    font-size: 10px;
+    color: #2e2e2e;
+}
