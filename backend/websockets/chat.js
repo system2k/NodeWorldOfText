@@ -278,21 +278,29 @@ module.exports = async function(ws, data, send, vars, evars) {
             if(id < 0) id = 0;
             var res = "Client [" + id + "]:<br><div style=\"background-color: #c0c0c0\">";
             var clientsFound = 0;
-            wss.clients.forEach(function(ws) {
-                if(data.location == "page") {
-                    if(ws.world_id == world.id && ws.clientId == id) {
+
+            if(data.location == "page") {
+                if(client_ips[world.id] && client_ips[world.id][id]) {
+                    var cli = client_ips[world.id][id];
+                    var cli_ip = cli[7];
+                    var cli_closed = cli[4];
+                    if(clientsFound != 0) res += "<br>";
+                    res += cli_ip + ", " + (cli_closed ? "disconnected" : "connected");
+                    clientsFound++;
+                }
+            } else if(data.location == "global") {
+                for(var c_world in client_ips) {
+                    var c_obj = client_ips[c_world];
+                    if(c_obj[id]) {
+                        var cli = c_obj[id];
+                        var cli_ip = cli[7];
+                        var cli_closed = cli[4];
                         if(clientsFound != 0) res += "<br>";
-                        res += ws.ipAddress;
-                        clientsFound++;
-                    }
-                } else if(data.location == "global") {
-                    if(ws.clientId == id) {
-                        if(clientsFound != 0) res += "<br>";
-                        res += "[world: " + ws.world_id + "] " + ws.ipAddress;
+                        res += "[world: " + c_world + "], " + (cli_closed ? "disconnected" : "connected");
                         clientsFound++;
                     }
                 }
-            });
+            }
             res += "</div>";
             if(clientsFound == 0) {
                 res = "No clients found for id " + id;
