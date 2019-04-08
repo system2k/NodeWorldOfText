@@ -7,6 +7,8 @@ module.exports.GET = async function(req, serve, vars) {
     var handle_error = vars.handle_error;
     var db = vars.db;
     var new_token = vars.new_token;
+    var get_third = vars.get_third;
+    var path = vars.path;
     if(!user.authenticated) {
         return;
     }
@@ -18,6 +20,13 @@ module.exports.GET = async function(req, serve, vars) {
         return serve(HTML("registration/verify_email.html", {
             verified: true
         }));
+    }
+
+    var url_csrftoken = get_third(path, "accounts", "verify_email");
+    
+    // invalid csrftoken
+    if(user.csrftoken != url_csrftoken) {
+        return;
     }
 
     var token = new_token(20);
