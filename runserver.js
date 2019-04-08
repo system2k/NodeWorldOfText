@@ -2147,6 +2147,7 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 
 async function manageWebsocketConnection(ws, req) {
     if(isStopping) return;
+    var socketTerminated = false;
     var ipHeaderAddr = "Unknown";
     try {
         var rnd = Math.floor(Math.random() * 1E4);
@@ -2217,7 +2218,7 @@ async function manageWebsocketConnection(ws, req) {
             sendMonitorEvents(ws);
             ws.on("close", function() {
                 removeMonitorEvents(ws);
-            })
+            });
             return;
         }
         var pre_queue = [];
@@ -2231,6 +2232,7 @@ async function manageWebsocketConnection(ws, req) {
         });
         var status, clientId = void 0, worldObj;
         ws.on("close", function() {
+            socketTerminated = true;
             if(status && clientId != void 0) {
                 if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
                     client_ips[status.world.id][clientId][4] = true;
@@ -2304,7 +2306,9 @@ async function manageWebsocketConnection(ws, req) {
         var can_chat = chat_permission == 0 || (chat_permission == 1 && status.permission.member) || (chat_permission == 2 && status.permission.owner);
 
         worldObj = getWorldData(world_name);
-        worldObj.user_count++;
+        if(!socketTerminated) {
+            worldObj.user_count++;
+        }
 
         var initial_user_count;
         if(can_chat) {

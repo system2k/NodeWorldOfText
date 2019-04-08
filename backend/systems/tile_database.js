@@ -631,6 +631,9 @@ async function flushQueue() {
                 idx++;
             }
         }
+        if(type == types.settile) {
+            cids[call_id][0] = "COMPLETE";
+        }
 
         if(updatedTilesBroadcast) {
             wss.clients.forEach(function(client) {
@@ -737,7 +740,8 @@ var types = {
     link: 1,
     protect: 2,
     clear: 3,
-    publicclear: 4
+    publicclear: 4,
+    settile: 5
 }
 
 module.exports.types = types;
