@@ -66,8 +66,8 @@ module.exports = async function(data, vars, evars) {
         }
     }
 
-    if(evars && evars.ws && vars.monitorEventSockets.length && (tileCount >= 5 || total_edits >= 256)) {
-        vars.broadcastMonitorEvent(evars.ws.ipComp + " sent 'write'. " + tileCount + " modified tiles, " + total_edits + " edits.");
+    if(evars && evars.ws && vars.monitorEventSockets.length) {
+        vars.broadcastMonitorEvent(evars.ws.ipAddress + " sent 'write' on world ['" + world.name + "', " + world.id + "]. " + tileCount + " modified tiles, " + total_edits + " edits.");
     }
 
     var call_id = tile_database.newCallId();
