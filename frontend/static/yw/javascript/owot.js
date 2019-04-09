@@ -4046,8 +4046,8 @@ var ws_functions = {
                     var charX = tellEdit[x][2];
                     var charY = tellEdit[x][3];
                     // check if there are links in queue
-                    for(var i = 0; i < linkQueue.length; i++) {
-                        var queueItem = linkQueue[i];
+                    for(var r = 0; r < linkQueue.length; r++) {
+                        var queueItem = linkQueue[r];
                         if(queueItem[1] == tileX && queueItem[2] == tileY && queueItem[3] == charX && queueItem[4] == charY) {
                             var linkType = queueItem[0];
                             if(linkType == "url") {
@@ -4076,7 +4076,7 @@ var ws_functions = {
                                     type: "coord"
                                 }));
                             }
-                            linkQueue.splice(i, 1);
+                            linkQueue.splice(r, 1);
                             break;
                         }
                     }
