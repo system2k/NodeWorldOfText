@@ -637,6 +637,7 @@ async function flushQueue() {
 
         if(updatedTilesBroadcast) {
             wss.clients.forEach(function(client) {
+                if(!client.userClient) return;
                 if(client.world_id == world.id && client.readyState == WebSocket.OPEN) {
                     try {
                         client.send(JSON.stringify({

@@ -311,6 +311,7 @@ module.exports = async function(ws, data, send, vars, evars) {
             var res = "Clients:<br><div style=\"background-color: #c0c0c0\">";
             var clientsFound = 0;
             wss.clients.forEach(function(ws) {
+                if(!ws.userClient) return;
                 if(data.location == "page") {
                     if(ws.world_id == world.id) {
                         if(clientsFound != 0) res += "<br>";

@@ -65,6 +65,8 @@ var add_to_chatlog      = chat_mgr.add_to_chatlog;
 var clearChatlog        = chat_mgr.clearChatlog;
 var updateChatLogData   = chat_mgr.updateChatLogData;
 
+var gzipEnabled = false;
+
 // Global
 CONST = {};
 CONST.tileCols = 16;
@@ -1536,7 +1538,7 @@ async function process_request(req, res, current_req_id) {
         if(!data) {
             data = "";
         }
-        if(acceptEncoding.includes("gzip") || acceptEncoding.includes("*") && !params.streamed_length) {
+        if(gzipEnabled && (acceptEncoding.includes("gzip") || acceptEncoding.includes("*") && !params.streamed_length)) {
             var doNotEncode = false;
             if(data.length < 1450) {
                 doNotEncode = true;
@@ -1887,6 +1889,7 @@ function generateClientId(world, world_id) {
 function getUserCountFromWorld(world) {
     var counter = 0;
     wss.clients.forEach(function(ws) {
+        if(!ws.userClient) return;
         var user_world = ws.world_name;
         if(NCaseCompare(user_world, world)) {
             counter++;
@@ -2032,6 +2035,7 @@ async function initialize_server_components() {
         if(!opts) opts = {};
         data = JSON.stringify(data);
         wss.clients.forEach(function each(client) {
+            if(!client.userClient) return;
             try {
                 if(client.readyState == WebSocket.OPEN &&
                 world == void 0 || NCaseCompare(client.world_name, world)) {
@@ -2221,6 +2225,7 @@ async function manageWebsocketConnection(ws, req) {
             });
             return;
         }
+        ws.userClient = true;
         var pre_queue = [];
         // adds data to a queue. this must be before any async calls and the message event
         function onMessage(msg) {
