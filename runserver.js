@@ -65,7 +65,7 @@ var add_to_chatlog      = chat_mgr.add_to_chatlog;
 var clearChatlog        = chat_mgr.clearChatlog;
 var updateChatLogData   = chat_mgr.updateChatLogData;
 
-var gzipEnabled = false;
+var gzipEnabled = true;
 
 // Global
 CONST = {};
@@ -1555,7 +1555,7 @@ async function process_request(req, res, current_req_id) {
                 data = zlib.gzipSync(data);
             }
         }
-        if(!params.streamed_length) info["Content-Length"] = data.length;
+        if(!params.streamed_length) info["Content-Length"] = Buffer.byteLength(data);
         res.writeHead(status_code, info);
         if(!params.streamed_length) {
             res.write(data, "utf8");
