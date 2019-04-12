@@ -11,23 +11,20 @@
 {% block endhead %}
 	<style>
 		#world_table {
-            border: solid 1px;
+			border: solid 1px #9ba7ff;
 			border-bottom: none;
-			background-color: #e6eefb;
-    	}
+			background-color: #0004a0;
+			border-spacing: 1px;
+		}
 		#world_table th {
-			background-color: #7575ff;
-			border-bottom: solid 1px;
+			background-color: #323498;
+			color: #ffffff;
 		}
 		#world_table td {
-			border-bottom: solid 1px;
-			border-right: solid 1px;
+			background-color: #a8bbf1;
 		}
-		#world_table td:last-child {
-			border-right: none;
-		}
-		.table_worldname {
-			background-color: #83abe9;
+		.table_sort_arrows {
+			cursor: pointer;
 		}
 	</style>
 {% endblock %}
@@ -38,18 +35,23 @@
 			<tr>
 				<th>
 					Name
+					<img src="/static/sort_arrows.png" class="table_sort_arrows" id="sort_name">
 				</th>
 				<th>
-					Write state
+					Write&nbsp;state
+					<img src="/static/sort_arrows.png" class="table_sort_arrows" id="sort_write">
 				</th>
 				<th>
-					Read state
+					Read&nbsp;state
+					<img src="/static/sort_arrows.png" class="table_sort_arrows" id="sort_read">
 				</th>
 				<th>
 					Members
+					<img src="/static/sort_arrows.png" class="table_sort_arrows" id="sort_members">
 				</th>
 				<th>
 					Views
+					<img src="/static/sort_arrows.png" class="table_sort_arrows" id="sort_views">
 				</th>
 			</tr>
 		</tbody>
@@ -61,6 +63,7 @@
 	var worlds = document.getElementById("worlds");
 	var rowNum = 0;
 	var rows = {};
+	var sortData = [];
 	function addRow(name, write, read, members, views) {
 		var row = document.createElement("tr");
 		var col_name = document.createElement("td");
@@ -83,6 +86,7 @@
 			members: members,
 			views: views
 		};
+		sortData.push(rows[rowNum]);
 		rowNum++;
 		row.appendChild(col_name);
 		row.appendChild(col_write);
@@ -90,6 +94,100 @@
 		row.appendChild(col_members);
 		row.appendChild(col_views);
 		worlds.appendChild(row);
+	}
+
+	var sortDir = {
+		name: 1,
+		write: 0,
+		read: 0,
+		members: 0,
+		views: 0
+	};
+	var lastSortMode = null;
+
+	function doSort(mode) {
+		for(var i in rows) {
+			var row = rows[i];
+			row.row.remove();
+		}
+		if(lastSortMode == mode) {
+			sortDir[mode] = 1 - sortDir[mode];
+		}
+		var dir = sortDir[mode];
+		switch(mode) {
+			case "name":
+				sortData.sort(function(a, b) {
+					var cmp = a.name.localeCompare(b.name, "en", {
+						sensitivity: "base"
+					});
+					if(dir) {
+						cmp = -cmp;
+					}
+					return cmp;
+				});
+				break;
+			case "write":
+				sortData.sort(function(a, b) {
+					if(dir) {
+						return b.write - a.write;
+					} else {
+						return a.write - b.write;
+					}
+				});
+				break;
+			case "read":
+				sortData.sort(function(a, b) {
+					if(dir) {
+						return b.read - a.read;
+					} else {
+						return a.read - b.read;
+					}
+				});
+				break;
+			case "members":
+				sortData.sort(function(a, b) {
+					if(dir) {
+						return b.members - a.members;
+					} else {
+						return a.members - b.members;
+					}
+				});
+				break;
+			case "views":
+				sortData.sort(function(a, b) {
+					if(dir) {
+						return b.views - a.views;
+					} else {
+						return a.views - b.views;
+					}
+				});
+				break;
+		}
+		lastSortMode = mode;
+		for(var i = 0; i < sortData.length; i++) {
+			var row = sortData[i];
+			worlds.appendChild(row.row);
+		}
+	}
+
+	sort_name.onclick = function() {
+		doSort("name");
+	}
+
+	sort_write.onclick = function() {
+		doSort("write");
+	}
+
+	sort_read.onclick = function() {
+		doSort("read");
+	}
+
+	sort_members.onclick = function() {
+		doSort("members");
+	}
+
+	sort_views.onclick = function() {
+		doSort("views");
 	}
 
 	{% for world in worlds_owned %}addRow("{{world.name}}", {{world.writability}}, {{world.readability}}, {{world.members}}, {{world.views}});

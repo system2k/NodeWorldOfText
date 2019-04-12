@@ -37,6 +37,12 @@ module.exports.GET = async function(req, serve, vars, params) {
         });
     }
 
+    world_list.sort(function(a, b) {
+        return a.name.localeCompare(b.name, "en", {
+            sensitivity: "base"
+        });
+    });
+
     var data = {
         csrftoken: cookies.csrftoken,
         worlds_owned: world_list

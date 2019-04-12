@@ -1710,7 +1710,7 @@ async function MODIFY_ANNOUNCEMENT(text) {
     ws_broadcast({
         kind: "announcement",
         text: text
-    })
+    });
 }
 
 async function modify_bypass_key(key) {
@@ -2223,6 +2223,14 @@ async function manageWebsocketConnection(ws, req) {
             ws.on("close", function() {
                 removeMonitorEvents(ws);
             });
+            ws.monitorSocket = true;
+            var msCount = 0;
+            wss.clients.forEach(function(ms) {
+                if(ms.monitorSocket) {
+                    msCount++;
+                }
+            });
+            broadcastMonitorEvent("[Server] " + msCount + " listening sockets, " + monitorEventSockets.length + " listeners");
             return;
         }
         ws.userClient = true;
@@ -2244,7 +2252,7 @@ async function manageWebsocketConnection(ws, req) {
                     client_ips[status.world.id][clientId][3] = Date.now();
                 }
             }
-            if(worldObj) {
+            if(worldObj && !ws.hide_user_count) {
                 worldObj.user_count--;
             }
         });
@@ -2264,7 +2272,7 @@ async function manageWebsocketConnection(ws, req) {
             send_ws('"sure m8"');
             onMessage = function() {
                 send_ws('"yes im still alive"');
-            };
+            }
             delete pre_queue;
             return;
         } else {
@@ -2284,6 +2292,10 @@ async function manageWebsocketConnection(ws, req) {
             user,
             channel
         });
+
+        if(cookies.hide_user_count == "1") {
+            ws.hide_user_count = true;
+        }
 
         status = await websockets.Main(ws, world_name, vars);
 
@@ -2311,7 +2323,7 @@ async function manageWebsocketConnection(ws, req) {
         var can_chat = chat_permission == 0 || (chat_permission == 1 && status.permission.member) || (chat_permission == 2 && status.permission.owner);
 
         worldObj = getWorldData(world_name);
-        if(!socketTerminated) {
+        if(!socketTerminated && !ws.hide_user_count) {
             worldObj.user_count++;
         }
 
@@ -2335,6 +2347,10 @@ async function manageWebsocketConnection(ws, req) {
         ws.clientId = clientId;
         ws.chat_blocks = [];
 
+        if(monitorEventSockets.length) {
+            broadcastMonitorEvent(ws.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + vars.world.name + "', " + vars.world.id + "]");
+        }
+
         var sentClientId = clientId;
         if(!can_chat) sentClientId = -1;
         send_ws(JSON.stringify({
@@ -2343,6 +2359,7 @@ async function manageWebsocketConnection(ws, req) {
             id: sentClientId,
             initial_user_count
         }));
+
         onMessage = async function(msg) {
             if(!can_process_req()) return;
             try {
