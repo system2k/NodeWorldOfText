@@ -2556,6 +2556,7 @@ function createSocket() {
 function getAndFetchTiles() {
     var margin = 200; // px
     var data = getVisibleTiles(margin);
+    if(!data.length) return;
     
     var startX = data[0][0];
     var startY = data[0][1];
