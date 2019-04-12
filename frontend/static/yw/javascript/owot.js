@@ -1024,7 +1024,7 @@ function defaultStyles() {
 function manageCoordHash() {
     if(!Permissions.can_go_to_coord(state.userModel, state.worldModel)) return;
     try {
-        var coord = window.location.hash.match(/#x:-?\d*,y:-?\d*$/);
+        var coord = window.location.hash.match(/#x:-?\d+,y:-?\d+$/);
         if(coord) {
             coord = window.location.hash.split(/#x:|,y:/).slice(1).map(function(a) {
                 return parseInt(a, 10);
