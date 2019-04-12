@@ -222,7 +222,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 
     var com = {
         worlds: function() {
-            var topCount = 5;
+            var topCount = 1000;
             var lst = topActiveWorlds(topCount);
             var worldList = "";
             for(var i = 0; i < lst.length; i++) {
