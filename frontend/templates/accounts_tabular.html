@@ -103,17 +103,14 @@
 		members: 0,
 		views: 0
 	};
-	var lastSortMode = null;
 
 	function doSort(mode) {
 		for(var i in rows) {
 			var row = rows[i];
 			row.row.remove();
 		}
-		if(lastSortMode == mode) {
-			sortDir[mode] = 1 - sortDir[mode];
-		}
 		var dir = sortDir[mode];
+		sortDir[mode] = 1 - sortDir[mode];
 		switch(mode) {
 			case "name":
 				sortData.sort(function(a, b) {
@@ -163,7 +160,6 @@
 				});
 				break;
 		}
-		lastSortMode = mode;
 		for(var i = 0; i < sortData.length; i++) {
 			var row = sortData[i];
 			worlds.appendChild(row.row);
