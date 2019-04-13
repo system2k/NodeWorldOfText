@@ -17,6 +17,7 @@ const https       = require("https");
 const isIP        = require("net").isIP;
 const nodemailer  = require("nodemailer");
 const path        = require("path");
+const pgClient    = require("pg").Client;
 const prompt      = require("./lib/prompt/prompt");
 const querystring = require("querystring");
 const sql         = require("sqlite3");
