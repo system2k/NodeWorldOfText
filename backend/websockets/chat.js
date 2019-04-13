@@ -282,8 +282,8 @@ module.exports = async function(ws, data, send, vars, evars) {
             if(data.location == "page") {
                 if(client_ips[world.id] && client_ips[world.id][id]) {
                     var cli = client_ips[world.id][id];
-                    var cli_ip = cli[7];
-                    var cli_closed = cli[4];
+                    var cli_ip = cli[0];
+                    var cli_closed = cli[2];
                     if(clientsFound != 0) res += "<br>";
                     res += cli_ip + ", " + (cli_closed ? "disconnected" : "connected");
                     clientsFound++;
@@ -293,8 +293,8 @@ module.exports = async function(ws, data, send, vars, evars) {
                     var c_obj = client_ips[c_world];
                     if(c_obj[id]) {
                         var cli = c_obj[id];
-                        var cli_ip = cli[7];
-                        var cli_closed = cli[4];
+                        var cli_ip = cli[0];
+                        var cli_closed = cli[2];
                         if(clientsFound != 0) res += "<br>";
                         res += "[world: " + c_world + "], " + (cli_closed ? "disconnected" : "connected");
                         clientsFound++;

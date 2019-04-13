@@ -81,6 +81,7 @@ function write_edits(tile, t, accepted, rejected, edit, data, editLog) {
     var world = data.world;
     var user = data.user;
     var public_only = data.public_only;
+    var preserve_links = data.preserve_links;
     var can_color_text = data.can_color_text;
     var no_log_edits = data.no_log_edits;
     var is_owner = data.is_owner || (user.superuser && world.name == "");
@@ -120,7 +121,7 @@ function write_edits(tile, t, accepted, rejected, edit, data, editLog) {
     }
 
     // detect overriden links
-    if(t.properties.cell_props) {
+    if(!preserve_links && t.properties.cell_props) {
         if(t.properties.cell_props[charY]) {
             // clear properties for this char
             if(t.properties.cell_props[charY][charX]) {
@@ -140,7 +141,7 @@ function write_edits(tile, t, accepted, rejected, edit, data, editLog) {
     var incAnimationEditLog = false; // valid animation with valid password
     if(Array.isArray(animation) && (animation.length === 4)) {
         // Animation code.
-        var notSoSecret = animation[0]
+        var notSoSecret = animation[0];
         if ((typeof notSoSecret == "string") && (notSoSecret === NOT_SO_SECRET)) {
             incAnimationEditLog = true;
             var changeInterval = san_nbr(animation[1]);

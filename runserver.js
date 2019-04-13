@@ -243,12 +243,13 @@ function run(path) {
 
 const settings = require(SETTINGS_PATH);
 
-var serverPort = settings.port;
-var serverDB = settings.DATABASE_PATH;
-var chatDB = settings.CHAT_HISTORY_PATH;
-var imageDB = settings.IMAGES_PATH;
-var miscDB = settings.MISC_PATH;
-var filesPath = settings.FILES_PATH;
+var serverPort     = settings.port;
+var serverDB       = settings.DATABASE_PATH;
+var editsDB        = settings.EDITS_PATH;
+var chatDB         = settings.CHAT_HISTORY_PATH;
+var imageDB        = settings.IMAGES_PATH;
+var miscDB         = settings.MISC_PATH;
+var filesPath      = settings.FILES_PATH;
 var staticFilesRaw = settings.STATIC_FILES_RAW;
 var staticFilesIdx = settings.STATIC_FILES_IDX;
 
@@ -269,11 +270,11 @@ args.forEach(function(a) {
         chatDB = settings.TEST_CHAT_HISTORY_PATH;
         imageDB = settings.TEST_IMAGES_PATH;
         miscDB = settings.TEST_MISC_PATH;
+        editsDB = settings.TEST_EDITS_PATH;
         settings.LOG_PATH = settings.TEST_LOG_PATH;
         settings.ZIP_LOG_PATH = settings.TEST_ZIP_LOG_PATH;
         settings.UNCAUGHT_PATH = settings.TEST_UNCAUGHT_PATH;
         settings.REQ_LOG_PATH = settings.TEST_REQ_LOG_PATH;
-        settings.MISC_PATH = settings.TEST_MISC_PATH;
         return;
     }
 });
@@ -468,6 +469,7 @@ function static_fileData_append(data) {
 }
 
 const database = new sql.Database(serverDB);
+const edits_db = new sql.Database(editsDB);
 const chat_history = new sql.Database(chatDB);
 const image_db = new sql.Database(imageDB);
 const misc_db = new sql.Database(miscDB);
@@ -506,6 +508,7 @@ load_static();
 
 var sql_table_init = "./backend/default.sql";
 var sql_indexes_init = "./backend/indexes.sql";
+var sql_edits_init = "./backend/edits.sql";
 
 var zip_file;
 if(!fs.existsSync(settings.ZIP_LOG_PATH)) {
@@ -640,6 +643,7 @@ function asyncDbSystem(database) {
 }
 
 const db = asyncDbSystem(database);
+const db_edits = asyncDbSystem(edits_db);
 const db_ch = asyncDbSystem(chat_history);
 const db_img = asyncDbSystem(image_db);
 const db_misc = asyncDbSystem(misc_db);
@@ -784,6 +788,12 @@ function sendProcMsg(msg) {
 async function initialize_misc_db() {
     if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='properties'")) {
         await db_misc.run("CREATE TABLE 'properties' (key BLOB, value BLOB)");
+    }
+}
+
+async function initialize_edits_db() {
+    if(!await db_edits.get("SELECT name FROM sqlite_master WHERE type='table' AND name='edit'")) {
+        await db_edits.exec(fs.readFileSync(sql_edits_init).toString());
     }
 }
 
@@ -1034,6 +1044,7 @@ var url_regexp = [ // regexp , function/redirect to , options
     ["^accounts/nsfw/(.*)[\\/]?$", pages.accounts_nsfw],
     ["^accounts/tabular[\\/]?$", pages.accounts_tabular],
     ["^accounts/verify_email/(.*)[\\/]?$", pages.accounts_verify_email],
+    ["^accounts/sso[\\/]?$", pages.sso],
 
     ["^ajax/protect[\\/]?$", pages.protect],
     ["^ajax/unprotect[\\/]?$", pages.unprotect],
@@ -1946,7 +1957,7 @@ async function clear_expired_sessions(no_timeout) {
 }
 
 var client_ips = {};
-var closed_client_limit = 1000 * 60 * 60 * 24 * 2;
+var closed_client_limit = 1000 * 60 * 60; // 1 hour
 // TODO: some leftover disconnected clients (although rare)
 intv.clear_closed_clients = setInterval(function() {
     var curTime = Date.now();
@@ -1954,7 +1965,7 @@ intv.clear_closed_clients = setInterval(function() {
         var world = client_ips[w];
         for(var c in world) {
             var client = world[c];
-            if(client[4] && client[3] > -1 && client[3] + closed_client_limit <= curTime) {
+            if(client[2] && client[1] > -1 && client[1] + closed_client_limit <= curTime) {
                 delete world[c];
             }
         }
@@ -1963,7 +1974,7 @@ intv.clear_closed_clients = setInterval(function() {
             delete client_ips[w];
         }
     }
-}, 1000 * 60 * 10);
+}, 1000 * 60 * 10); // 10 minutes
 
 // ping clients every 30 seconds
 function initPingAuto() {
@@ -2028,6 +2039,7 @@ async function initialize_server_components() {
 
     await initialize_misc_db();
     await initialize_ranks_db();
+    await initialize_edits_db();
 
     initPingAuto();
 
@@ -2169,7 +2181,6 @@ async function manageWebsocketConnection(ws, req) {
         if(!cfIp) cfIp = "None;" + rnd;
         ipHeaderAddr = forwd + " & " + realIp + " & " + remIp;
         ws.ipHeaderAddr = ipHeaderAddr;
-        ws.ipFwd = forwd;
         ws.ipReal = realIp;
         ws.ipRem = remIp;
         ws.ipComp = compIp;
@@ -2179,7 +2190,6 @@ async function manageWebsocketConnection(ws, req) {
     } catch(e) {
         var error_ip = "ErrC" + Math.floor(Math.random() * 1E4);
         ws.ipHeaderAddr = error_ip;
-        ws.ipFwd = error_ip;
         ws.ipReal = error_ip;
         ws.ipComp = error_ip;
         ws.ipCF = error_ip;
@@ -2248,8 +2258,8 @@ async function manageWebsocketConnection(ws, req) {
             socketTerminated = true;
             if(status && clientId != void 0) {
                 if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
-                    client_ips[status.world.id][clientId][4] = true;
-                    client_ips[status.world.id][clientId][3] = Date.now();
+                    client_ips[status.world.id][clientId][2] = true;
+                    client_ips[status.world.id][clientId][1] = Date.now();
                 }
             }
             if(worldObj && !ws.hide_user_count) {
@@ -2342,7 +2352,7 @@ async function manageWebsocketConnection(ws, req) {
         if(!client_ips[status.world.id]) {
             client_ips[status.world.id] = {};
         }
-        client_ips[status.world.id][clientId] = [ws._socket.remoteAddress, ws._socket.address(), ws.ipHeaderAddr, -1, false, ws.ipComp, ws.ipCF, ws.ipAddress];
+        client_ips[status.world.id][clientId] = [ws.ipAddress, -1, false];
 
         ws.clientId = clientId;
         ws.chat_blocks = [];

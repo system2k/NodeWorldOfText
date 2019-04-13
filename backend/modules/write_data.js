@@ -14,6 +14,7 @@ module.exports = async function(data, vars, evars) {
     }
 
     var public_only = data.public_only;
+    var preserve_links = data.preserve_links;
 
     var edits_limit = 500;
     if(user.superuser) {
@@ -154,7 +155,7 @@ module.exports = async function(data, vars, evars) {
         date: DateNow,
         tile_edits,
         user, world, is_owner, is_member,
-        can_color_text, public_only, no_log_edits,
+        can_color_text, public_only, no_log_edits, preserve_links,
         channel
     });
 

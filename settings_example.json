@@ -20,6 +20,9 @@
     "DATABASE_PATH": "../data/nwot.sqlite",
     "TEST_DATABASE_PATH": "../data/test/nwot_test.sqlite",
 
+    "EDITS_PATH": "../data/edits.sqlite",
+    "TEST_EDITS_PATH": "../data/test/edits_test.sqlite",
+
     "IMAGES_PATH": "../data/images.sqlite",
     "TEST_IMAGES_PATH": "../data/test/images_test.sqlite",
 
