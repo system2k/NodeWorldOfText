@@ -27,6 +27,7 @@ module.exports.GET = async function(req, serve, vars, params) {
 
 module.exports.POST = async function(req, serve, vars) {
     var db = vars.db;
+    var db_edits = vars.db_edits;
     var post_data = vars.post_data;
     var user = vars.user;
     var get_third = vars.get_third;
@@ -50,7 +51,7 @@ module.exports.POST = async function(req, serve, vars) {
         }, req, serve, vars)
     }
 
-    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+    await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)",
         [user.id, 0, 0, 0, Date.now(), "@" + JSON.stringify({
             kind: "administrator_user",
             user_edit: {

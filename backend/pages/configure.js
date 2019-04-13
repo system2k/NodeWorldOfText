@@ -128,6 +128,7 @@ module.exports.GET = async function(req, serve, vars, params) {
 
 module.exports.POST = async function(req, serve, vars) {
     var db = vars.db;
+    var db_edits = vars.db_edits;
     var post_data = vars.post_data;
     var user = vars.user;
     var get_third = vars.get_third;
@@ -345,7 +346,7 @@ module.exports.POST = async function(req, serve, vars) {
         } else if("clear_all" in post_data) {
             // small command, big impact
             await db.run("DELETE FROM tile WHERE world_id=?", world.id);
-            await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+            await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)",
                 [user.id, world.id, 0, 0, Date.now(), "@{\"kind\":\"clear_all\"}"]);
         } else if("clear_chat_hist" in post_data) {
             clearChatlog(world.id);

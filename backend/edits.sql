@@ -1,5 +1,4 @@
 CREATE TABLE "edit" (
-    "id" integer NOT NULL PRIMARY KEY,
     "user_id" integer REFERENCES "auth_user" ("id"),
     "world_id" integer NOT NULL REFERENCES "world" ("id"),
     "tileY" integer NOT NULL,

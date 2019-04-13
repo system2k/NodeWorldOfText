@@ -1,4 +1,5 @@
 var db;
+var db_edits;
 var decodeCharProt;
 var insert_char_at_index;
 var handle_error;
@@ -17,6 +18,7 @@ var NOT_SO_SECRET = "@^&$%!#*%^#*)~@$^*#!)~*%38259`25equfahgrqieavkj4bh8ofweieag
 
 module.exports.main = function(vars) {
     db = vars.db;
+    db_edits = vars.db_edits;
     decodeCharProt = vars.decodeCharProt;
     insert_char_at_index = vars.insert_char_at_index;
     handle_error = vars.handle_error;
@@ -511,7 +513,7 @@ async function flushQueue() {
                     var tileX = parseInt(posyx[1]);
                     var tileY = parseInt(posyx[0]);
                     var tileEdits = editTileGroups[yx];
-                    await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)", // log the edit
+                    await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)", // log the edit
                         [0, world.id, tileY, tileX, date, JSON.stringify(tileEdits)]);
                 }
             }
@@ -563,7 +565,7 @@ async function flushQueue() {
             prepareTileUpdate(updatedTiles, tileX, tileY, t);
             updatedTilesBroadcast = true;
 
-            await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)", // log the edit
+            await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)", // log the edit
                 [user.id, world.id, tileY, tileX, date, "@{\"kind\":\"tile_clear\"}"]);
         }
         if(type == types.publicclear) {
@@ -575,7 +577,7 @@ async function flushQueue() {
             var chunkSize = 2048;
             var idx = 0;
 
-            await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+            await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)",
                 [user.id, world.id, 0, 0, Date.now(), "@{\"kind\":\"clear_public\"}"]);
 
             while(true) {
@@ -702,12 +704,14 @@ var cycleTimeout = Math.floor(1000 / 60);
 async function writeCycle() {
     if(queue.length) {
         await g_transaction.begin();
+        await db_edits.run("BEGIN TRANSACTION");
         try {
             await flushQueue();
         } catch(e) {
             handle_error(e);
         }
         await g_transaction.end();
+        await db_edits.run("COMMIT");
         intv.writeCycle = setTimeout(writeCycle, cycleTimeout);
     } else {
         intv.writeCycle = setTimeout(writeCycle, cycleTimeout);

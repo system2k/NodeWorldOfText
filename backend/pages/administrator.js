@@ -60,6 +60,7 @@ module.exports.POST = async function(req, serve, vars) {
     var announce = vars.announce;
     var db = vars.db;
     var db_misc = vars.db_misc;
+    var db_edits = vars.db_edits;
     var modify_bypass_key = vars.modify_bypass_key;
     var stopServer = vars.stopServer;
 
@@ -78,7 +79,7 @@ module.exports.POST = async function(req, serve, vars) {
         var new_announcement = post_data.announcement;
         await announce(new_announcement);
     
-        await db.run("INSERT INTO edit VALUES(null, ?, ?, ?, ?, ?, ?)",
+        await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)",
             [user.id, 0, 0, 0, Date.now(), "@" + JSON.stringify({
                 kind: "administrator_announce",
                 post_data: {
