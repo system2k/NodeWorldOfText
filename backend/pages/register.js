@@ -3,6 +3,14 @@ var emailFormatRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 module.exports.GET = async function(req, serve, vars, params) {
     var HTML = vars.HTML;
     var user = vars.user;
+    var accountSystem = vars.accountSystem;
+    var uvias = vars.uvias;
+    
+    if(accountSystem == "uvias") {
+        return serve(null, null, {
+            redirect: uvias.registerPath
+        });
+    }
 
     var data = {
         csrftoken: user.csrftoken,
@@ -36,6 +44,11 @@ module.exports.POST = async function(req, serve, vars) {
     var http_time = vars.http_time;
     var cookies = vars.cookies;
     var testEmailAddress = vars.testEmailAddress;
+    var accountSystem = vars.accountSystem;
+    
+    if(accountSystem == "uvias") {
+        return;
+    }
 
     if(post_data.csrfmiddlewaretoken != user.csrftoken) { // csrftokens not matching?
         return serve();

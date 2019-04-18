@@ -8,6 +8,9 @@ module.exports.GET = async function(req, serve, vars, params) {
     var wss = vars.wss;
     var get_bypass_key = vars.get_bypass_key;
     var ranks_cache = vars.ranks_cache;
+    var db_misc = vars.db_misc;
+    var uvias = vars.uvias;
+    var accountSystem = vars.accountSystem
 
     // not a superuser...
     if(!user.superuser) {
@@ -38,8 +41,33 @@ module.exports.GET = async function(req, serve, vars, params) {
         }
     }
 
+    var user_ranks;
+    if(accountSystem == "uvias") {
+        var admin_ranks = await db_misc.all("SELECT * FROM admin_ranks ORDER BY level DESC");
+        user_ranks = [];
+        for(var i = 0; i < admin_ranks.length; i++) {
+            var adr = admin_ranks[i];
+            var uid = adr.id.substr(1);
+            var level = adr.level;
+    
+            var username = "deleted~" + adr.id;
+    
+            var usr_data = await uvias.get("SELECT * FROM accounts.users WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", uid);
+            if(usr_data) {
+                username = usr_data.username;
+            }
+    
+            user_ranks.push({
+                level,
+                username
+            });
+        }
+    } else if(accountSystem == "local") {
+        user_ranks = await db.all("SELECT * FROM auth_user WHERE level > 0 ORDER BY level DESC")
+    }
+
     var data = {
-        user_ranks: await db.all("SELECT * FROM auth_user WHERE level > 0 ORDER BY level DESC"),
+        user_ranks,
         announcement: announcement(),
         announcement_update_msg: params.announcement_update_msg,
         cons_update_msg: params.cons_update_msg,

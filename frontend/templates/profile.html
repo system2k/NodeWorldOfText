@@ -79,12 +79,15 @@
 	<div class="content_set">
 		<div class="content_set_title">Account</div>
 		<div class="content_set_content">
-			<a href="/accounts/password_change/">Change Password</a>
-			{% if !email_verified && ver_count == 0 %}
-			<br>
-			<a href="/accounts/verify_email/{{ csrftoken }}/">Verify Email</a>
+			{% if accountSystem == "uvias" %}
+				No options available yet
+			{% else %}
+				<a href="/accounts/password_change/">Change Password</a>
+				{% if !email_verified && ver_count == 0 %}
+				<br>
+				<a href="/accounts/verify_email/{{ csrftoken }}/">Verify Email</a>
+				{% endif %}
 			{% endif %}
 		</div>
 	</div>
-
 {% endblock %}

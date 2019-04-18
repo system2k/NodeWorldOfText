@@ -3035,6 +3035,7 @@ function renderTile(tileX, tileY, redraw) {
         }
         // generate tile background
         var imgData = generateBackgroundPixels(tileX, tileY, images.unloaded, true);
+        if(!imgData.tagName) return;
         // get main canvas of the tile
         var tileCanv = getTileCanvas(str);
         // get the canvas context

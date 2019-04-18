@@ -6,16 +6,30 @@ module.exports.GET = async function(req, serve, vars, params) {
     var db = vars.db;
     var dispage = vars.dispage;
     var ranks_cache = vars.ranks_cache;
+    var uvias = vars.uvias;
+    var accountSystem = vars.accountSystem;
 
     if(!user.superuser) {
-        return await dispage("404", null, req, serve, vars)
+        return await dispage("404", null, req, serve, vars);
     }
 
-    var username = get_third(path, "administrator", "set_custom_rank")
-    var user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
+    var username = get_third(path, "administrator", "set_custom_rank");
 
-    if(!user_edit) {
-        return await dispage("404", null, req, serve, vars)
+    var user_edit;
+    if(accountSystem == "uvias") {
+        var duser = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
+        if(!duser) {
+            return await dispage("404", null, req, serve, vars);
+        }
+        user_edit = {
+            id: "x" + duser.uid,
+            username: duser.username
+        };
+    } else if(accountSystem == "local") {
+        user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
+        if(!user_edit) {
+            return await dispage("404", null, req, serve, vars)
+        }
     }
 
     var custom_ranks = [];
@@ -54,15 +68,30 @@ module.exports.POST = async function(req, serve, vars) {
     var ranks_cache = vars.ranks_cache;
     var san_nbr = vars.san_nbr;
     var db_misc = vars.db_misc;
+    var uvias = vars.uvias;
+    var accountSystem = vars.accountSystem;
 
     if(!user.superuser) {
         return;
     }
 
-    var username = get_third(path, "administrator", "set_custom_rank")
-    var user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
-    if(!user_edit) {
-        return;
+    var username = get_third(path, "administrator", "set_custom_rank");
+    
+    var user_edit;
+    if(accountSystem == "uvias") {
+        var duser = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
+        if(!duser) {
+            return;
+        }
+        user_edit = {
+            id: "x" + duser.uid,
+            username: duser.username
+        };
+    } else if(accountSystem == "local") {
+        user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
+        if(!user_edit) {
+            return;
+        }
     }
 
     var rank = san_nbr(post_data.rank);
@@ -95,5 +124,5 @@ module.exports.POST = async function(req, serve, vars) {
 
     return await dispage("administrator_set_custom_rank", {
         message: "Successfully set " + user_edit.username + "'s rank to " + rankName
-    }, req, serve, vars)
+    }, req, serve, vars);
 }

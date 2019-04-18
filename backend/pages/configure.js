@@ -35,6 +35,8 @@ module.exports.GET = async function(req, serve, vars, params) {
     var db = vars.db;
     var dispage = vars.dispage;
     var world_get_or_create = vars.world_get_or_create;
+    var uvias = vars.uvias;
+    var accountSystem = vars.accountSystem;
 
     if(!user.authenticated) {
         return serve(null, null, {
@@ -59,9 +61,21 @@ module.exports.GET = async function(req, serve, vars, params) {
     var members = await db.all("SELECT * FROM whitelist WHERE world_id=?", world.id)
     var member_list = []; // processed list of members
     for(var i = 0; i < members.length; i++) {
-        var username = await db.get("SELECT username FROM auth_user WHERE id=?", members[i].user_id)
+        var username;
+        if(accountSystem == "uvias") {
+            var uidt = members[i].user_id.substr(1);
+            username = await uvias.get("SELECT * FROM accounts.users WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", uidt);
+            if(!username) {
+                username = "deleted~" + uidt;
+            } else {
+                username = username.username;
+            }
+        } else if(accountSystem == "local") {
+            username = await db.get("SELECT username FROM auth_user WHERE id=?", members[i].user_id);
+            username = username.username;
+        }
         member_list.push({
-            member_name: username.username
+            member_name: username
         });
     }
 
@@ -71,10 +85,21 @@ module.exports.GET = async function(req, serve, vars, params) {
     // ([] is considered to not be empty through boolean conversion)
     if(member_list.length === 0) member_list = null;
 
-    var owner_name = ""
+    var owner_name = "";
 
     if(world.owner_id) {
-        owner_name = (await db.get("SELECT username FROM auth_user WHERE id=?", [world.owner_id])).username
+        if(accountSystem == "uvias") {
+            var debug1 = world.owner_id;
+            if(typeof debug1 == "string") debug1 = debug1.substr(1);
+            owner_name = await uvias.get("SELECT username FROM accounts.users WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", debug1);
+            if(owner_name) {
+                owner_name = owner_name.username;
+            } else {
+                owner_name = "deleted~" + debug1;
+            }
+        } else if(accountSystem == "local") {
+            owner_name = (await db.get("SELECT username FROM auth_user WHERE id=?", [world.owner_id])).username;
+        }
     }
 
     var color = world.custom_color || "default";
@@ -144,6 +169,8 @@ module.exports.POST = async function(req, serve, vars) {
     var encodeCharProt = vars.encodeCharProt;
     var clearChatlog = vars.clearChatlog;
     var tile_database = vars.tile_database;
+    var uvias = vars.uvias;
+    var accountSystem = vars.accountSystem;
 
     if(!user.authenticated) {
         return serve();
@@ -168,24 +195,35 @@ module.exports.POST = async function(req, serve, vars) {
     if(post_data.form == "add_member") {
         var username = post_data.add_member;
         var date = Date.now();
-        var adduser = await db.get("SELECT * from auth_user WHERE username=? COLLATE NOCASE", username);
+
+        var adduser;
+        var user_id;
+        if(accountSystem == "uvias") {
+            adduser = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
+            user_id = "x" + adduser.uid;
+        } else if(accountSystem == "local") {
+            adduser = await db.get("SELECT * from auth_user WHERE username=? COLLATE NOCASE", username);
+            user_id = adduser.id;
+        }
+
         if(!adduser) {
             return await dispage("configure", { message: "User not found" }, req, serve, vars);
         }
-        if(adduser.id == world.owner_id) {
+        
+        if(user_id == world.owner_id) {
             return await dispage("configure", {
                 message: "User is already the owner of \"" + world_name + "\""
             }, req, serve, vars);
         }
         var whitelist = await db.get("SELECT * FROM whitelist WHERE user_id=? AND world_id=?",
-            [adduser.id, world.id]);
+            [user_id, world.id]);
         if(whitelist) {
             return await dispage("configure", {
                 message: "User is already part of this world"
             }, req, serve, vars);
         }
 
-        await db.run("INSERT into whitelist VALUES(null, (SELECT id FROM auth_user WHERE username=? COLLATE NOCASE), ?, ?)", [username, world.id, date]);
+        await db.run("INSERT into whitelist VALUES(null, ?, ?, ?)", [user_id, world.id, date]);
 
         return await dispage("configure", {
             message: adduser.username + " is now a member of the \"" + world_name + "\" world"
@@ -197,12 +235,36 @@ module.exports.POST = async function(req, serve, vars) {
         await db.run("UPDATE world SET (readability,writability)=(?,?) WHERE id=?",
             [readability, writability, world.id]);
     } else if(post_data.form == "remove_member") {
-        var to_remove;
+        var to_remove = "";
         for(var key in post_data) {
             if(key.startsWith("remove_")) to_remove = key;
         }
         var username_to_remove = to_remove.substr("remove_".length);
-        await db.run("DELETE FROM whitelist WHERE user_id=(SELECT id FROM auth_user WHERE username=? COLLATE NOCASE) AND world_id=?", [username_to_remove, world.id]);
+        if(accountSystem == "uvias") {
+            if(username_to_remove.startsWith("deleted~")) {
+                var id_to_remove = username_to_remove.substr("deleted~".length);
+                var validId = true;
+                if(id_to_remove.length < 1 || id_to_remove.length > 16) validId = false;
+                var validSet = "0123456789abcdef";
+                for(var c = 0; c < id_to_remove.length; c++) {
+                    if(validSet.indexOf(id_to_remove.charAt(c)) == -1) {
+                        validId = false;
+                        break;
+                    }
+                }
+                if(validId) {
+                    await db.run("DELETE FROM whitelist WHERE user_id=? AND world_id=?", ["x" + id_to_remove, world.id]);
+                }
+            } else {
+                var remuser = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", [username_to_remove]);
+                if(remuser) {
+                    var remuid = "x" + remuser.uid;
+                    await db.run("DELETE FROM whitelist WHERE user_id=? AND world_id=?", [remuid, world.id]);
+                }
+            }
+        } else if(accountSystem == "local") {
+            await db.run("DELETE FROM whitelist WHERE user_id=(SELECT id FROM auth_user WHERE username=? COLLATE NOCASE) AND world_id=?", [username_to_remove, world.id]);
+        }
     } else if(post_data.form == "features") {
         var go_to_coord = validatePerms(post_data.go_to_coord, 2);
         var coord_link = validatePerms(post_data.coord_link, 2);

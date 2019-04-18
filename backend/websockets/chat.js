@@ -48,6 +48,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     var client_ips = vars.client_ips;
     var uptime = vars.uptime;
     var ranks_cache = vars.ranks_cache;
+    var accountSystem = vars.accountSystem;
 
     var ipHeaderAddr = ws.ipHeaderAddr;
 
@@ -247,16 +248,20 @@ module.exports = async function(ws, data, send, vars, evars) {
             return serverChatResponse(generate_command_list(), data.location);
         },
         logout: async function() {
-            var sessionid = user.session_key;
-            var fromDb;
-            if(sessionid) {
-                fromDb = await db.get("SELECT * FROM auth_session WHERE session_key=?", sessionid);
+            if(accountSystem == "uvias") {
+                serverChatResponse("Please log out here:<br><a href=\"/accounts/logout/\">/accounts/logout/</a>", data.location);
+            } else if(accountSystem == "local") {
+                var sessionid = user.session_key;
+                var fromDb;
+                if(sessionid) {
+                    fromDb = await db.get("SELECT * FROM auth_session WHERE session_key=?", sessionid);
+                }
+                if(!fromDb) {
+                    return serverChatResponse("You are not logged in", data.location);
+                }
+                await db.run("DELETE FROM auth_session WHERE session_key=?", sessionid);
+                serverChatResponse("Logged out from: " + user.username, data.location);
             }
-            if(!fromDb) {
-                return serverChatResponse("You are not logged in", data.location);
-            }
-            await db.run("DELETE FROM auth_session WHERE session_key=?", sessionid);
-            serverChatResponse("Logged out from: " + user.username, data.location);
             return;
         },
         block: function(id) {
@@ -368,9 +373,13 @@ module.exports = async function(ws, data, send, vars, evars) {
         }
     }
 
+    var username_to_display = user.username;
+    if(accountSystem == "uvias") {
+        username_to_display = user.display_username;
+    }
     var chatData = {
         nickname: nick,
-        realUsername: user.username,
+        realUsername: username_to_display,
         id: clientId,
         message: msg,
         registered: user.authenticated,

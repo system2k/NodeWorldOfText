@@ -20,6 +20,16 @@
                     {{ user_info.username }}
                 </td>
             </tr>
+            {% if accountSystem == "uvias" %}
+			<tr>
+                <td>
+                    <b>Display Name</b>
+                </td>
+                <td>
+                    {{ user_info.display_name }}
+                </td>
+            </tr>
+            {% endif %}
             <tr>
                 <td>
                     <b>ID</b>

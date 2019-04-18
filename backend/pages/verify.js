@@ -5,6 +5,11 @@ module.exports.GET = async function(req, serve, vars, params) {
     var get_third = vars.get_third;
     var db = vars.db;
     var dispage = vars.dispage;
+    var accountSystem = vars.accountSystem;
+
+    if(accountSystem == "uvias") {
+        return;
+    }
 
     // gets id from /accounts/verify/{world}/
     var verification_key = get_third(path, "accounts", "verify");

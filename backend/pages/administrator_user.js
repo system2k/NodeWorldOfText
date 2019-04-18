@@ -5,16 +5,39 @@ module.exports.GET = async function(req, serve, vars, params) {
     var get_third = vars.get_third;
     var db = vars.db;
     var dispage = vars.dispage;
+    var db_misc = vars.db_misc;
+    var uvias = vars.uvias;
+    var accountSystem = vars.accountSystem;
 
     if(!user.operator) {
-        return await dispage("404", null, req, serve, vars)
+        return await dispage("404", null, req, serve, vars);
     }
 
-    var username = get_third(path, "administrator", "user")
-    var user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
-
-    if(!user_edit) {
-        return await dispage("404", null, req, serve, vars)
+    var username = get_third(path, "administrator", "user");
+    
+    var user_edit;
+    if(accountSystem == "uvias") {
+        var db_user = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
+        if(!db_user) {
+            return await dispage("404", null, req, serve, vars);
+        }
+        var uid = db_user.uid;
+        uid = "x" + uid;
+        var user_rank = await db_misc.get("SELECT level FROM admin_ranks WHERE id=?", [uid]);
+        if(user_rank) {
+            user_rank = user_rank.level;
+        } else {
+            user_rank = 0;
+        }
+        user_edit = {
+            username: db_user.username,
+            level: user_rank
+        };
+    } else if(accountSystem == "local") {
+        user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
+        if(!user_edit) {
+            return await dispage("404", null, req, serve, vars);
+        }
     }
 
     var data = {
@@ -34,21 +57,41 @@ module.exports.POST = async function(req, serve, vars) {
     var path = vars.path;
     var dispage = vars.dispage;
     var url = vars.url;
+    var uvias = vars.uvias;
+    var db_misc = vars.db_misc;
+    var accountSystem = vars.accountSystem;
 
     if(!user.operator) {
         return;
     }
 
-    var username = get_third(path, "administrator", "user")
-    var user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
-    if(!user_edit) {
-        return;
+    var username = get_third(path, "administrator", "user");
+
+    var user_edit;
+    if(accountSystem == "uvias") {
+        var db_user = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
+        if(!db_user) {
+            return;
+        }
+        var uid = db_user.uid;
+        var edit_username = db_user.username;
+        uid = "x" + uid;
+        var db_rank = await db_misc.get("SELECT level FROM admin_ranks WHERE id=?", [uid]);
+        user_edit = {
+            id: uid,
+            username: edit_username
+        };
+    } else if(accountSystem == "local") {
+        user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
+        if(!user_edit) {
+            return;
+        }
     }
 
     if(user_edit.id == user.id) {
         return await dispage("administrator_user", {
             message: "You cannot set your own rank"
-        }, req, serve, vars)
+        }, req, serve, vars);
     }
 
     await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)",
@@ -68,13 +111,27 @@ module.exports.POST = async function(req, serve, vars) {
         if(post_data.rank == "staff") rank = 1;
         if(post_data.rank == "default") rank = 0;
         if(rank > -1) {
-            await db.run("UPDATE auth_user SET level=? WHERE id=?", [rank, user_edit.id])
+            if(accountSystem == "uvias") {
+                if(db_rank) {
+                    if(rank) {
+                        await db_misc.run("UPDATE admin_ranks SET level=? WHERE id=?", [rank, uid]);
+                    } else {
+                        await db_misc.run("DELETE FROM admin_ranks WHERE id=?", [uid]);
+                    }
+                } else {
+                    if(rank) {
+                        await db_misc.run("INSERT INTO admin_ranks VALUES(?, ?)", [uid, rank]);
+                    }
+                }
+            } else if(accountSystem == "local") {
+                await db.run("UPDATE auth_user SET level=? WHERE id=?", [rank, user_edit.id]);
+            }
         } else {
-            return serve("Invalid rank")
+            return serve("Invalid rank");
         }
         return await dispage("administrator_user", {
             message: "Successfully set " + user_edit.username + "'s rank to " + ["Default", "Staff", "Superuser", "Operator"][rank]
-        }, req, serve, vars)
+        }, req, serve, vars);
     }
 
     serve(null, null, {

@@ -9,6 +9,12 @@ module.exports.GET = async function(req, serve, vars) {
     var new_token = vars.new_token;
     var get_third = vars.get_third;
     var path = vars.path;
+    var accountSystem = vars.accountSystem;
+	
+    if(accountSystem == "uvias") {
+        return;
+    }
+
     if(!user.authenticated) {
         return;
     }

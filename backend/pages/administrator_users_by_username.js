@@ -5,16 +5,50 @@ module.exports.GET = async function(req, serve, vars, params) {
     var get_fourth = vars.get_fourth;
     var db = vars.db;
     var dispage = vars.dispage;
+    var uvias = vars.uvias;
+    var db_misc = vars.db_misc;
+    var accountSystem = vars.accountSystem;
 
     if(!user.superuser) {
         return await dispage("404", null, req, serve, vars)
     }
 
-    var username = get_fourth(path, "administrator", "users", "by_username")
-    var user_info = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
-
-    if(!user_info) {
-        return "This user does not exist.";
+    var username = get_fourth(path, "administrator", "users", "by_username");
+    
+    var user_info;
+    if(accountSystem == "uvias") {
+        var d_user = await uvias.get("SELECT uid as rawuid, to_hex(uid) as uid, login_name, email_verified FROM accounts.links_local WHERE lower(login_name)=lower($1::text)", username);
+        if(!d_user) {
+            return "This user does not exist.";
+        }
+        
+        var d_inf = await uvias.get("SELECT username, created, last_login FROM accounts.users WHERE uid=$1::bigint", d_user.rawuid);
+        
+        user_info = {
+            id: "x" + d_user.uid,
+            username: d_user.login_name,
+            date_joined: 0,
+            last_login: 0,
+            level: 0,
+            is_active: d_user.email_verified,
+            display_name: "< none >"
+        };
+        
+        if(d_inf) {
+            user_info.date_joined = d_inf.created;
+            user_info.last_login = d_inf.last_login;
+            user_info.display_name = d_inf.username;
+        }
+        
+        var level = await db_misc.get("SELECT level FROM admin_ranks WHERE id=?", [user_info.id]);
+        if(level) {
+            user_info.level = level.level;
+        }
+    } else if(accountSystem == "local") {
+        user_info = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
+        if(!user_info) {
+            return "This user does not exist.";
+        }
     }
 
     var data = {
@@ -23,7 +57,8 @@ module.exports.GET = async function(req, serve, vars, params) {
         last_login: new Date(user_info.last_login).toString(),
         worlds_owned: (await db.get("SELECT count(*) AS cnt FROM world WHERE owner_id=?", [user_info.id])).cnt,
         level: user_info.level,
-        is_active: !!user_info.is_active
+        is_active: !!user_info.is_active,
+        display_name: user_info.display_name
     };
 
     serve(HTML("administrator_users_template.html", data));

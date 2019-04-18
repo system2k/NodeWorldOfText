@@ -97,16 +97,21 @@ module.exports.POST = async function(req, serve, vars) {
 
     var message = null;
     if(post_data.form == "claim") {
-        var worldname = post_data.worldname + "";
-        var validate = await validate_claim_worldname(worldname, vars);
-        if(validate.error) { // an error occurred while claiming
-            return await dispage("profile", {
-                message: validate.message
-            }, req, serve, vars)
-        }
-        await db.run("UPDATE world SET owner_id=? WHERE id=?", [user.id, validate.world_id]);
-        message = validate.message;
-
+		if(user.uv_rank == 3) {
+			return await dispage("profile", {
+				message: "Guests cannot claim worlds"
+			}, req, serve, vars);
+		} else {
+			var worldname = post_data.worldname + "";
+			var validate = await validate_claim_worldname(worldname, vars);
+			if(validate.error) { // an error occurred while claiming
+				return await dispage("profile", {
+					message: validate.message
+				}, req, serve, vars);
+			}
+			await db.run("UPDATE world SET owner_id=? WHERE id=?", [user.id, validate.world_id]);
+			message = validate.message;
+		}
     } else if(post_data.form == "leave") { // user is leaving the world (terminating own membership)
         for(var key in post_data) {
             if(key.startsWith("leave_")) {

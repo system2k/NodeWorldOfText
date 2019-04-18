@@ -22,6 +22,11 @@
                         <th>
                             Username
                         </th>
+                        {% if accountSystem == "uvias" %}
+                        <th>
+                            Display Name
+                        </th>
+                        {% endif %}
                         <th>
                             Active
                         </th>
@@ -40,7 +45,12 @@
                         <td>
                             {{user.id}}
                         </td>
+                        {% if accountSystem == "uvias" %}
                         <td>
+                            {{user.login_name}}
+                        </td>
+                        {% endif %}
+						<td>
                             {{user.username}}
                         </td>
                         <td>

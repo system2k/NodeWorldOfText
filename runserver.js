@@ -17,7 +17,7 @@ const https       = require("https");
 const isIP        = require("net").isIP;
 const nodemailer  = require("nodemailer");
 const path        = require("path");
-const pgClient    = require("pg").Client;
+const pg          = require("pg");
 const prompt      = require("./lib/prompt/prompt");
 const querystring = require("querystring");
 const sql         = require("sqlite3");
@@ -27,6 +27,74 @@ const utils       = require("./backend/utils/utils.js");
 const WebSocket   = require("ws");
 const zip         = require("adm-zip");
 const zlib        = require("zlib");
+
+// uvias or local
+var accountSystem = "local";
+var loginPath = "/accounts/login/";
+var logoutPath = "/accounts/logout/";
+var registerPath = "/accounts/register/";
+
+if(accountSystem != "uvias" && accountSystem != "local") {
+    console.log("ERROR: Invalid account system: " + accountSystem);
+    sendProcMsg("EXIT");
+    process.exit();
+}
+
+var pgClient = pg.Client;
+var pgConn;
+if(accountSystem == "uvias") {
+    pg.defaults.user = "fp";
+    pg.defaults.host = "/var/run/postgresql";
+    pg.defaults.database = "uvias";
+    pgConn = new pgClient({
+        connectionString: "pg://"
+    });
+}
+
+var uvias = {};
+
+uvias.all = async function(query, data) {
+    if(data != void 0 && !Array.isArray(data)) data = [data];
+    var result = await pgConn.query(query, data);
+    return result.rows;
+}
+
+uvias.get = async function(query, data) {
+    if(data != void 0 && !Array.isArray(data)) data = [data];
+    var result = await pgConn.query(query, data);
+    return result.rows[0];
+}
+
+uvias.run = async function(query, data) {
+    if(data != void 0 && !Array.isArray(data)) data = [data];
+    await pgConn.query(query, data);
+}
+
+uvias.id = "owottest";
+uvias.name = "Our World Of Text Test Server";
+uvias.domain = "testserver1.ourworldoftext.com";
+uvias.sso = "/accounts/sso";
+uvias.logout = "/home/";
+uvias.loginPath = "https://uvias.com/api/loginto/" + uvias.id;
+uvias.logoutPath = "https://uvias.com/logoff?service=" + uvias.id;
+uvias.registerPath = "https://uvias.com/api/loginto/" + uvias.id;
+if(accountSystem == "uvias") {
+    loginPath = uvias.loginPath;
+    logoutPath = uvias.logoutPath;
+    registerPath = uvias.registerPath;
+}
+
+function toHex64(n) {
+    var a = new BigUint64Array(1);
+    a[0] = BigInt(n);
+    return a[0].toString(16);
+}
+
+function toInt64(n) {
+    var a = new BigInt64Array(1);
+    a[0] = BigInt("0x" + n);
+    return a[0];
+}
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -99,22 +167,22 @@ if(!fs.existsSync(SETTINGS_PATH)) {
 }
 
 function normalize_ipv6(ip) {
-	ip = ip.replace(/^:|:$/g, "");
-	ip = ip.split(":");
-	
-	for(var i = 0; i < ip.length; i++) {
-		var seg = ip[i];
-		if(seg) {
-			ip[i] = seg.padStart(4, "0");
-		} else {
-			seg = [];
-			for(var a = ip.length; a <= 8; a++) {
-				seg.push("0000");
-			}
-			ip[i] = seg.join(":");
-		}
-	}
-	return ip.join(":");
+    ip = ip.replace(/^:|:$/g, "");
+    ip = ip.split(":");
+    
+    for(var i = 0; i < ip.length; i++) {
+        var seg = ip[i];
+        if(seg) {
+            ip[i] = seg.padStart(4, "0");
+        } else {
+            seg = [];
+            for(var a = ip.length; a <= 8; a++) {
+                seg.push("0000");
+            }
+            ip[i] = seg.join(":");
+        }
+    }
+    return ip.join(":");
 }
 
 var cloudflare_ipv4_txt = fs.readFileSync("./backend/cloudflare_ipv4.txt").toString();
@@ -183,31 +251,31 @@ function ipv6_txt_to_int() {
 
 var u32Byte = new Uint32Array(1);
 function unsigned_u32_and(x, y) {
-	u32Byte[0] = x;
-	u32Byte[0] &= y;
-	return u32Byte[0];
+    u32Byte[0] = x;
+    u32Byte[0] &= y;
+    return u32Byte[0];
 }
 
 function unsigned_u32_or(x, y) {
-	u32Byte[0] = x;
-	u32Byte[0] |= y;
-	return u32Byte[0];
+    u32Byte[0] = x;
+    u32Byte[0] |= y;
+    return u32Byte[0];
 }
 
 function subnetMask_ipv4(num) {
-	return ((1 << 32) - 2 >>> 0) - (2 ** (32 - num) - 1);
+    return ((1 << 32) - 2 >>> 0) - (2 ** (32 - num) - 1);
 }
 
 function subnetOr_ipv4(num) {
-	return 2 ** (32 - num) - 1;
+    return 2 ** (32 - num) - 1;
 }
 
 function subnetMask_ipv6(num) {
-	return ((1n << 128n) - 1n) - (1n << (128n - BigInt(num))) + 1n;
+    return ((1n << 128n) - 1n) - (1n << (128n - BigInt(num))) + 1n;
 }
 
 function subnetOr_ipv6(num) {
-	return ((1n << (128n - BigInt(num))) - 1n);
+    return ((1n << (128n - BigInt(num))) - 1n);
 }
 
 function is_cf_ipv4_int(num) {
@@ -281,15 +349,15 @@ args.forEach(function(a) {
 });
 
 const log_error = function(err) {
-	if(settings.error_log) {
-		try {
-			err = JSON.stringify(err);
-			err = "TIME: " + Date.now() + "\r\n" + err + "\r\n" + "-".repeat(20) + "\r\n\r\n\r\n";
-			fs.appendFileSync(settings.LOG_PATH, err);
-		} catch(e) {
-			console.log("Error logging error:", e);
-		}
-	}
+    if(settings.error_log) {
+        try {
+            err = JSON.stringify(err);
+            err = "TIME: " + Date.now() + "\r\n" + err + "\r\n" + "-".repeat(20) + "\r\n\r\n\r\n";
+            fs.appendFileSync(settings.LOG_PATH, err);
+        } catch(e) {
+            console.log("Error logging error:", e);
+        }
+    }
 }
 
 if(!fs.existsSync(settings.bypass_key)) {
@@ -686,6 +754,7 @@ async function loadEmail() {
 var testEmailAddress = "test@local";
 
 async function send_email(destination, subject, text) {
+    if(accountSystem != "local") return;
     if(isTestServer || subject == testEmailAddress) {
         console.log("To:", destination);
         console.log("Subject:", subject);
@@ -744,7 +813,9 @@ var bypass_key_cache = "";
 
 async function initialize_server() {
     console.log("Starting server...");
-    await loadEmail();
+    if(accountSystem == "local") {
+        await loadEmail();
+    }
     await init_chat_history();
     await init_image_database();
     if(!await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='server_info'")) {
@@ -808,6 +879,9 @@ async function initialize_ranks_db() {
         await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["max_rank_id", 0]);
         await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["rank_next_level", 4]);
     }
+    if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='admin_ranks'")) {
+        await db_misc.run("CREATE TABLE 'admin_ranks' (id INTEGER, level INTEGER)");
+    }
     var ranks = await db_misc.all("SELECT * FROM ranks");
     var user_ranks = await db_misc.all("SELECT * FROM user_ranks");
     ranks_cache.ids = [];
@@ -860,18 +934,18 @@ var prompt_account_yesno = {
     properties: {
         yes_no_account: {
             message: "You just installed the server,\nwhich means you don\'t have any superusers defined.\nWould you like to create one now? (yes/no):"
-		}
-	}
+        }
+    }
 }
 
 var pw_encryption = "sha512WithRSAEncryption";
 const encryptHash = function(pass, salt) {
-	if(!salt) {
-		var salt = crypto.randomBytes(10).toString("hex");
-	}
-	var hsh = crypto.createHmac(pw_encryption, salt).update(pass).digest("hex");
-	var hash = pw_encryption + "$" + salt + "$" + hsh;
-	return hash;
+    if(!salt) {
+        var salt = crypto.randomBytes(10).toString("hex");
+    }
+    var hsh = crypto.createHmac(pw_encryption, salt).update(pass).digest("hex");
+    var hash = pw_encryption + "$" + salt + "$" + hsh;
+    return hash;
 };
 
 const checkHash = function(hash, pass) {
@@ -889,6 +963,10 @@ function add(username, level) {
     level = Math.trunc(level);
     if(level < 0) level = 0;
     if(level >= 3) level = 3;
+    if(accountSystem != "local") {
+        console.log("Cannot register " + username + ":" + level + " because the account system is not local");
+        return;
+    }
     var Date_ = Date.now();
     ask_password = true;
     account_to_create = username;
@@ -904,19 +982,19 @@ function add(username, level) {
 
 function account_prompt() {
     passFunc = function(err, result) {
-		var err = false;
-		if(result["password"] !== result["confirmpw"]) {
-			console.log("Error: Your passwords didn't match.");
-			err = true;
-			prompt.get(prompt_account_properties, passFunc);
-		} else if(result.password.length > 128) {
-			console.log("The password is too long. It must be 128 characters or less.");
-			err = true;
-			prompt.get(prompt_account_properties, passFunc);
-		}
-		
-		if(!err) {
-			var Date_ = Date.now();
+        var err = false;
+        if(result["password"] !== result["confirmpw"]) {
+            console.log("Error: Your passwords didn't match.");
+            err = true;
+            prompt.get(prompt_account_properties, passFunc);
+        } else if(result.password.length > 128) {
+            console.log("The password is too long. It must be 128 characters or less.");
+            err = true;
+            prompt.get(prompt_account_properties, passFunc);
+        }
+        
+        if(!err) {
+            var Date_ = Date.now();
             var passHash = encryptHash(result["password"]);
 
             db.run("INSERT INTO auth_user VALUES(null, ?, '', ?, 1, 3, ?, ?)",
@@ -924,20 +1002,20 @@ function account_prompt() {
 
             console.log("Superuser created successfully.\n");
             start_server();
-		}
-	}
-	yesNoAccount = function(err, result) {
-		var re = result["yes_no_account"];
-		if(toUpper(re) === "YES") {
-			prompt.get(prompt_account_properties, passFunc);
-		}
-		if(toUpper(re) === "NO") {
-			start_server();
-		}
-		if(toUpper(re) !== "YES" && toUpper(re) !== "NO") {
-			console.log("Please enter either \"yes\" or \"no\" (not case sensitive):");
-			prompt.get(prompt_account_yesno, yesNoAccount);
-		}
+        }
+    }
+    yesNoAccount = function(err, result) {
+        var re = result["yes_no_account"];
+        if(toUpper(re) === "YES") {
+            prompt.get(prompt_account_properties, passFunc);
+        }
+        if(toUpper(re) === "NO") {
+            start_server();
+        }
+        if(toUpper(re) !== "YES" && toUpper(re) !== "NO") {
+            console.log("Please enter either \"yes\" or \"no\" (not case sensitive):");
+            prompt.get(prompt_account_yesno, yesNoAccount);
+        }
     }
     prompt.start();
     prompt.get(prompt_account_yesno, yesNoAccount);
@@ -947,8 +1025,8 @@ var prompt_command_input = {
     properties: {
         input: {
             message: ">>"
-		}
-	}
+        }
+    }
 }
 
 var prompt_password_new_account = {
@@ -957,8 +1035,8 @@ var prompt_password_new_account = {
             message: "Enter password for this account: ",
             replace: "*",
             hidden: true
-		}
-	}
+        }
+    }
 }
 
 var ask_password = false;
@@ -1227,6 +1305,7 @@ async function get_user_info(cookies, is_websocket) {
     var user = {
         authenticated: false,
         username: "",
+        display_username: "",
         id: 0,
         csrftoken: null,
         operator: false,
@@ -1235,9 +1314,10 @@ async function get_user_info(cookies, is_websocket) {
         is_active: false,
         scripts: [],
         session_key: "",
-        email: ""
+        email: "",
+        uv_rank: 0
     };
-    if(cookies.sessionid) {
+    if(accountSystem == "local" && cookies.sessionid) {
         // user data from session
         var s_data = await db.get("SELECT * FROM auth_session WHERE session_key=?", 
             cookies.sessionid);
@@ -1265,6 +1345,58 @@ async function get_user_info(cookies, is_websocket) {
                 }
             }
             user.session_key = s_data.session_key;
+        }
+    }
+
+    if(accountSystem == "uvias" && cookies.token) {
+        var parsed = await uvias.get("SELECT * FROM accounts.parse_token($1::VARCHAR(41))", cookies.token);
+        var uid = parsed.uid;
+        var session_id = parsed.session_id;
+        var session = await uvias.get("SELECT * FROM accounts.get_session($1::bigint, $2::bytea)", [uid, session_id]);
+        if(session) {
+            var user_account = await uvias.get("SELECT to_hex(uid) as uid, username, rank_id FROM accounts.users WHERE uid=$1::bigint", uid);
+            if(user_account) {
+                var links_local = await uvias.get("SELECT to_hex(uid) as uid, login_name, email, email_verified FROM accounts.links_local WHERE uid=$1::bigint", uid);
+                user.authenticated = true;
+                user.display_username = user_account.username;
+                user.uv_rank = user_account.rank_id;
+                if(links_local) {
+                    user.is_active = links_local.email_verified;
+                    user.email = links_local.email;
+                    user.username = links_local.login_name;
+                    user.id = "x" + links_local.uid;
+                } else {
+                    user.username = user_account.username;
+                    user.id = "x" + user_account.uid;
+                }
+
+                // no data yet
+                user.operator = false;
+                user.superuser = false;
+                user.staff = false;
+                
+                var rank_data = await db_misc.get("SELECT level FROM admin_ranks WHERE id=?", [user.id]);
+                if(rank_data) {
+                    var level = rank_data.level;
+
+                    var operator = level == 3;
+                    var superuser = level == 2;
+                    var staff = level == 1;
+
+                    user.operator = operator;
+                    user.superuser = superuser || operator;
+                    user.staff = staff || superuser || operator;
+                }
+
+                if(user.staff && !is_websocket) {
+                    user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id);
+                } else {
+                    user.scripts = [];
+                }
+                user.csrftoken = new_token(32);
+
+                user.session_key = cookies.token;
+            }
         }
     }
     return user;
@@ -1438,7 +1570,7 @@ var server = https_reference.createServer(options, async function(req, res) {
         res.statusCode = 500;
         var err500Temp = "";
         try {
-            err500Temp = template_data["500.html"]()
+            err500Temp = template_data["500.html"]();
         } catch(e) {
             err500Temp = "An error has occurred while displaying the 500 internal server error page";
             handle_error(e);
@@ -1467,7 +1599,7 @@ async function process_request(req, res, current_req_id) {
     var hostname = req.headers.host;
     if(!hostname) hostname = "www.ourworldoftext.com";
     hostname = hostname.slice(0, 1000);
-	var offset = 2;
+    var offset = 2;
     var subdomains = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
     var sub = subdomains.slice(offset);
     for(var i = 0; i < sub.length; i++) sub[i]= sub[i].toLowerCase();
@@ -1649,9 +1781,13 @@ async function process_request(req, res, current_req_id) {
                         data = {};
                     }
                     data.user = user;
-                    /*if(data.csrftoken) {
-                        csrf_tokens[data.csrftoken] = 1;
-                    }*/
+                    data.loginPath = loginPath;
+                    data.logoutPath = logoutPath;
+                    data.registerPath = registerPath;
+                    data.accountSystem = accountSystem;
+                    // if(data.csrftoken) {
+                    //     csrf_tokens[data.csrftoken] = 1;
+                    // }
                     return template_data[path](data);
                 }
                 vars = objIncludes(global_data, { // extra information
@@ -1685,18 +1821,18 @@ async function process_request(req, res, current_req_id) {
     if(!vars.user) vars.user = await get_user_info(parseCookie(req.headers.cookie))
     if(!vars.cookies) vars.cookie = parseCookie(req.headers.cookie);
     if(!vars.path) vars.path = URL;
-	if(!vars.HTML) {
-		vars.HTML = function (path, data) {
-			if(!template_data[path]) { // template not found
-				return "An unexpected error occurred while generating this page"
-			}
-			if(!data) {
-				data = {};
-			}
-			data.user = vars.user;
-			return template_data[path](data);
-		}
-	}
+    if(!vars.HTML) {
+        vars.HTML = function (path, data) {
+            if(!template_data[path]) { // template not found
+                return "An unexpected error occurred while generating this page";
+            }
+            if(!data) {
+                data = {};
+            }
+            data.user = vars.user;
+            return template_data[path](data);
+        }
+    }
 
     if(!vars_joined) {
         vars = objIncludes(global_data, vars);
@@ -1883,15 +2019,15 @@ function generateClientId(world, world_id) {
     if(!rand_ids) rand_ids = {};
 
     // attempt to get a random id
-	for(var i = 0; i < 64; i++) {
-		var inclusive_id = Math.floor(Math.random() * ((9999 - 1) + 1)) + 1;
-		if(!rand_ids[inclusive_id]) {
+    for(var i = 0; i < 64; i++) {
+        var inclusive_id = Math.floor(Math.random() * ((9999 - 1) + 1)) + 1;
+        if(!rand_ids[inclusive_id]) {
             return inclusive_id;
         }
-	}
-	// attempt to enumerate if it failed
-	for(var i = 1; i <= 9999; i++) {
-		if(!rand_ids[i]) {
+    }
+    // attempt to enumerate if it failed
+    for(var i = 1; i <= 9999; i++) {
+        if(!rand_ids[i]) {
             return i;
         }
     }
@@ -1992,8 +2128,62 @@ function initPingAuto() {
     }, 1000 * 30);
 }
 
+async function uvias_init() {
+    console.log("Connecting to account database...");
+    await pgConn.connect();
+    await uvias.run("SELECT accounts.set_service_info($1::text, $2::text, $3::text, $4::text, $5::text, $6::integer);",
+        [uvias.id, uvias.name, uvias.domain, uvias.sso, uvias.logout, process.pid]);
+    console.log("Sent service identifier");
+
+    await uvias.run("LISTEN uv_kick");
+    await uvias.run("LISTEN uv_sess_renew");
+    await uvias.run("LISTEN uv_rep_upd");
+    await uvias.run("LISTEN uv_user_upd");
+    await uvias.run("LISTEN uv_user_del");
+    await uvias.run("LISTEN uv_service");
+    await uvias.run("LISTEN uv_rank_upd");
+
+    pgConn.on("notification", function(notif) {
+        var channel = notif.channel;
+        var data;
+        try {
+            data = JSON.parse(notif.payload);
+        } catch(e) {
+            console.log("Malformed data:", notif.payload);
+            return;
+        }
+        switch(channel) {
+            case "uv_kick":
+                console.log("Signal uv_kick. Session '" + data.session + "', Reason '" + data.reason + "'");
+                break;
+            case "uv_sess_renew":
+                console.log("Signal uv_sess_renew. Session '" + data.session + "'");
+                break;
+            case "uv_rep_upd":
+                console.log("Signal uv_rep_upd. UID 'x" + toHex64(toInt64(data.uid)) + "'");
+                break;
+            case "uv_user_upd":
+                console.log("Signal uv_user_upd. UID 'x" + toHex64(toInt64(data.uid)) + "'");
+                break;
+            case "uv_user_del":
+                console.log("Signal uv_user_del. UID 'x" + toHex64(toInt64(data.uid)) + "'");
+                break;
+            case "uv_service":
+                console.log("Signal uv_service. ID '" + data.id + "'");
+                break;
+            case "uv_rank_upd":
+                console.log("Signal uv_rank_upd. ID '" + data.id + "'");
+                break;
+        }
+    });
+}
+
 var wss;
 async function initialize_server_components() {
+    if(accountSystem == "uvias") {
+        await uvias_init();
+    }
+
     await (async function() {
         announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
         if(!announcement_cache) {
@@ -2009,7 +2199,9 @@ async function initialize_server_components() {
         broadcastUserCount();
     }, 2000);
 
-    await clear_expired_sessions();
+    if(accountSystem == "local") {
+        await clear_expired_sessions();
+    }
 
     server.listen(serverPort, function() {
         var addr = server.address();
@@ -2489,6 +2681,8 @@ var global_data = {
     get_bypass_key: function() { return bypass_key_cache },
     add_background_cache: pages.load_backgrounds.add_cache,
     template_data,
+    uvias,
+    accountSystem,
     db,
     db_img,
     db_misc,
@@ -2602,7 +2796,7 @@ function stopServer(restart, maintenance) {
 
         try {
             await updateChatLogData(true);
-            await clear_expired_sessions(true);
+            //await clear_expired_sessions(true);
 
             for(var i in pages) {
                 var mod = pages[i];
@@ -2623,6 +2817,10 @@ function stopServer(restart, maintenance) {
 
             for(var id in HTTPSockets) {
                 HTTPSockets[id].destroy();
+            }
+
+            if(accountSystem == "uvias") {
+                pgConn.end();
             }
         } catch(e) {
             handle_error(e);
