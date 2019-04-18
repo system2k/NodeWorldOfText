@@ -359,6 +359,28 @@ const log_error = function(err) {
     }
 }
 
+var write_reqLog;
+var reqLogBuffer = [];
+function flushReqLogBuffer(stop) {
+    if(isStopping && !stop) return;
+    if(!reqLogBuffer.length) {
+        if(!stop) intv.flushReqLogBuffer = setTimeout(flushReqLogBuffer, 1000 * 5);
+        return;
+    }
+    var bdata = reqLogBuffer.join("\n") + "\n";
+    reqLogBuffer.splice(0);
+    write_reqLog.write(bdata, function() {
+        if(!stop) intv.flushReqLogBuffer = setTimeout(flushReqLogBuffer, 1000 * 5);
+    });
+}
+function beginReqLog() {
+    write_reqLog = fs.createWriteStream(settings.REQ_LOG_PATH, { flags: "a" });
+    flushReqLogBuffer();
+}
+function doLogReq(data) {
+    reqLogBuffer.push(data);
+}
+
 if(!fs.existsSync(settings.bypass_key)) {
     var rand = "";
     var key = "0123456789ABCDEF";
@@ -1630,6 +1652,8 @@ async function process_request(req, res, current_req_id) {
     var remIp = req.socket.remoteAddress;
     var ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
 
+    doLogReq("http;" + JSON.stringify(req.method) + ";" + ipAddress + ";" + JSON.stringify(URL) + ";" + JSON.stringify(req.headers["user-agent"]) + ";" + Date.now());
+
     function dispatch(data, status_code, params) {
         if(request_resolved) return; // if request is already sent
         request_resolved = true;
@@ -2144,6 +2168,7 @@ async function uvias_init() {
 
     pgConn.on("notification", function(notif) {
         var channel = notif.channel;
+        doLogReq("uvSignal;" + channel + ";" + JSON.stringify(notif.payload));
         var data;
         try {
             data = JSON.parse(notif.payload);
@@ -2182,6 +2207,7 @@ async function initialize_server_components() {
     if(accountSystem == "uvias") {
         await uvias_init();
     }
+    beginReqLog();
 
     await (async function() {
         announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
@@ -2821,6 +2847,8 @@ function stopServer(restart, maintenance) {
             if(accountSystem == "uvias") {
                 pgConn.end();
             }
+
+            flushReqLogBuffer(true);
         } catch(e) {
             handle_error(e);
             if(!isTestServer) console.log(e);
