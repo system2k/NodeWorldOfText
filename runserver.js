@@ -1652,7 +1652,7 @@ async function process_request(req, res, current_req_id) {
     var remIp = req.socket.remoteAddress;
     var ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
 
-    doLogReq("http;" + JSON.stringify(req.method) + ";" + ipAddress + ";" + JSON.stringify(URL) + ";" + JSON.stringify(req.headers["user-agent"]) + ";" + Date.now());
+    doLogReq("http;" + JSON.stringify(req.method) + ";" + ipAddress + ";" + JSON.stringify(req.url) + ";" + JSON.stringify(req.headers["user-agent"]) + ";" + Date.now());
 
     function dispatch(data, status_code, params) {
         if(request_resolved) return; // if request is already sent
