@@ -28,74 +28,6 @@ const WebSocket   = require("ws");
 const zip         = require("adm-zip");
 const zlib        = require("zlib");
 
-// uvias or local
-var accountSystem = "local";
-var loginPath = "/accounts/login/";
-var logoutPath = "/accounts/logout/";
-var registerPath = "/accounts/register/";
-
-if(accountSystem != "uvias" && accountSystem != "local") {
-    console.log("ERROR: Invalid account system: " + accountSystem);
-    sendProcMsg("EXIT");
-    process.exit();
-}
-
-var pgClient = pg.Client;
-var pgConn;
-if(accountSystem == "uvias") {
-    pg.defaults.user = "fp";
-    pg.defaults.host = "/var/run/postgresql";
-    pg.defaults.database = "uvias";
-    pgConn = new pgClient({
-        connectionString: "pg://"
-    });
-}
-
-var uvias = {};
-
-uvias.all = async function(query, data) {
-    if(data != void 0 && !Array.isArray(data)) data = [data];
-    var result = await pgConn.query(query, data);
-    return result.rows;
-}
-
-uvias.get = async function(query, data) {
-    if(data != void 0 && !Array.isArray(data)) data = [data];
-    var result = await pgConn.query(query, data);
-    return result.rows[0];
-}
-
-uvias.run = async function(query, data) {
-    if(data != void 0 && !Array.isArray(data)) data = [data];
-    await pgConn.query(query, data);
-}
-
-uvias.id = "owottest";
-uvias.name = "Our World Of Text Test Server";
-uvias.domain = "testserver1.ourworldoftext.com";
-uvias.sso = "/accounts/sso";
-uvias.logout = "/home/";
-uvias.loginPath = "https://uvias.com/api/loginto/" + uvias.id;
-uvias.logoutPath = "https://uvias.com/logoff?service=" + uvias.id;
-uvias.registerPath = "https://uvias.com/api/loginto/" + uvias.id;
-if(accountSystem == "uvias") {
-    loginPath = uvias.loginPath;
-    logoutPath = uvias.logoutPath;
-    registerPath = uvias.registerPath;
-}
-
-function toHex64(n) {
-    var a = new BigUint64Array(1);
-    a[0] = BigInt(n);
-    return a[0].toString(16);
-}
-
-function toInt64(n) {
-    var a = new BigInt64Array(1);
-    a[0] = BigInt("0x" + n);
-    return a[0];
-}
-
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
 var san_nbr              = utils.san_nbr;
@@ -321,6 +253,73 @@ var miscDB         = settings.MISC_PATH;
 var filesPath      = settings.FILES_PATH;
 var staticFilesRaw = settings.STATIC_FILES_RAW;
 var staticFilesIdx = settings.STATIC_FILES_IDX;
+var accountSystem  = settings.accountSystem; // "uvias" or "local"
+
+var loginPath = "/accounts/login/";
+var logoutPath = "/accounts/logout/";
+var registerPath = "/accounts/register/";
+
+if(accountSystem != "uvias" && accountSystem != "local") {
+    console.log("ERROR: Invalid account system: " + accountSystem);
+    sendProcMsg("EXIT");
+    process.exit();
+}
+
+var pgClient = pg.Client;
+var pgConn;
+if(accountSystem == "uvias") {
+    pg.defaults.user = "fp";
+    pg.defaults.host = "/var/run/postgresql";
+    pg.defaults.database = "uvias";
+    pgConn = new pgClient({
+        connectionString: "pg://"
+    });
+}
+
+var uvias = {};
+
+uvias.all = async function(query, data) {
+    if(data != void 0 && !Array.isArray(data)) data = [data];
+    var result = await pgConn.query(query, data);
+    return result.rows;
+}
+
+uvias.get = async function(query, data) {
+    if(data != void 0 && !Array.isArray(data)) data = [data];
+    var result = await pgConn.query(query, data);
+    return result.rows[0];
+}
+
+uvias.run = async function(query, data) {
+    if(data != void 0 && !Array.isArray(data)) data = [data];
+    await pgConn.query(query, data);
+}
+
+uvias.id = "owottest";
+uvias.name = "Our World Of Text Test Server";
+uvias.domain = "testserver1.ourworldoftext.com";
+uvias.sso = "/accounts/sso";
+uvias.logout = "/home/";
+uvias.loginPath = "https://uvias.com/api/loginto/" + uvias.id;
+uvias.logoutPath = "https://uvias.com/logoff?service=" + uvias.id;
+uvias.registerPath = "https://uvias.com/api/loginto/" + uvias.id;
+if(accountSystem == "uvias") {
+    loginPath = uvias.loginPath;
+    logoutPath = uvias.logoutPath;
+    registerPath = uvias.registerPath;
+}
+
+function toHex64(n) {
+    var a = new BigUint64Array(1);
+    a[0] = BigInt(n);
+    return a[0].toString(16);
+}
+
+function toInt64(n) {
+    var a = new BigInt64Array(1);
+    a[0] = BigInt("0x" + n);
+    return a[0];
+}
 
 Error.stackTraceLimit = Infinity;
 if(!global.AsyncFunction) var AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;

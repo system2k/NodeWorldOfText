@@ -7,12 +7,14 @@
         "cert": "../pem_dir/cert.pem",
         "chain": "../pem_dir/chain.pem"
     },
-        
+
     "port": 8080,
     "test_port": 9090,
-	
+
+    "accountSystem": "local",
+
     "error_log": true,
-    
+
     "FILES_PATH": "../data/files",
     "STATIC_FILES_RAW": "../data/static_files_raw.dat",
     "STATIC_FILES_IDX": "../data/static_files_idx.dat",
@@ -28,29 +30,29 @@
 
     "MISC_PATH": "../data/misc.sqlite",
     "TEST_MISC_PATH": "../data/test/misc_test.sqlite",
-	
+
     "LOG_PATH": "../data/nwot_log.log",
     "TEST_LOG_PATH": "../data/test/test_nwot_log.log",
-        
+
     "ZIP_LOG_PATH": "../data/nwot_error_logs.zip",
     "TEST_ZIP_LOG_PATH": "../data/test/test_nwot_error_logs.zip",
-        
+
     "UNCAUGHT_PATH": "../data/exc.err",
     "TEST_UNCAUGHT_PATH": "../data/test/test_exc.err",
-	
+
     "REQ_LOG_PATH": "../data/reqs.err",
     "TEST_REQ_LOG_PATH": "../data/test/test_reqs.err",
-	
+
     "CHAT_HISTORY_PATH": "../data/chat_history.sqlite",
     "TEST_CHAT_HISTORY_PATH": "../data/test/test_chat_history.sqlite",
 
     "bypass_key": "../data/bypass_key.txt",
-        
+
     "email": {
         "username": "email@site.com",
         "password": "password123",
         "display_email": "\"Our World of Text\" <email@site.com>"
     },
-        
+
     "activation_key_days_expire": 3
 }
