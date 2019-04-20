@@ -14,11 +14,22 @@ module.exports.GET = async function(req, serve, vars, params) {
     }
 
     var user_id = get_fourth(path, "administrator", "users", "by_id");
+	if(typeof user_id != "string") return;
     
     var user_info;
     if(accountSystem == "uvias") {
         user_id = user_id.toLowerCase();
         if(user_id.charAt(0) == "x") user_id = user_id.substr(1);
+		
+		var id_valid = true;
+		var id_alpha = "0123456789abcdef";
+		if(user_id.length < 1 || user_id.length > 16) id_valid = false;
+		for(var i = 0; i < user_id.length; i++) {
+			if(id_alpha.indexOf(user_id.charAt(i)) == -1) {
+				id_valid = false;
+			}
+		}
+		if(!id_valid) return "Invalid ID format";
         
         var d_user = await uvias.get("SELECT uid as rawuid, to_hex(uid) as uid, login_name, email_verified FROM accounts.links_local WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", user_id);
         if(!d_user) {

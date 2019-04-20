@@ -2168,7 +2168,7 @@ async function uvias_init() {
 
     pgConn.on("notification", function(notif) {
         var channel = notif.channel;
-        doLogReq("uvSignal;" + channel + ";" + JSON.stringify(notif.payload));
+        doLogReq("uvSignal;" + channel + ";" + JSON.stringify(notif.payload) + ";" + Date.now());
         var data;
         try {
             data = JSON.parse(notif.payload);
