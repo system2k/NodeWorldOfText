@@ -90,7 +90,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         if(pathname != "") {
             pathname = "/" + pathname;
         }
-		if(params.timemachine) {
+        if(params.timemachine) {
             pathname = "/" + path;
             if(pathname.charAt(pathname.length - 1) == "/") pathname = pathname.slice(0, -1);
         }

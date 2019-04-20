@@ -1,13 +1,13 @@
 function fjoin(ar, str, len) {
-	var s = ""
-	for(var i = 0; i < len; i++) {
-		s += ar[0]
-		if(i < len - 1) {
-			s += str
-		}
-		ar.shift();
-	}
-	return [s, ar.join("")];
+    var s = ""
+    for(var i = 0; i < len; i++) {
+        s += ar[0]
+        if(i < len - 1) {
+            s += str
+        }
+        ar.shift();
+    }
+    return [s, ar.join("")];
 }
 
 module.exports.GET = async function(req, serve, vars, params) {

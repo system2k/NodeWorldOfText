@@ -28,7 +28,7 @@ var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\
 function advancedSplitCli(str, noSurrog, noComb) {
     str += "";
     // look for surrogate pairs first. then look for combining characters. finally, look for the rest
-	var data = str.match(splitRegex)
+    var data = str.match(splitRegex)
     if(data == null) return [];
     for(var i = 0; i < data.length; i++) {
         // contains surrogates without second character?
@@ -42,7 +42,7 @@ function advancedSplitCli(str, noSurrog, noComb) {
             data[i] = data[i].charAt(0);
         }
     }
-	return data;
+    return data;
 }
 function filterUTF16(str) {
     return advancedSplitCli(str, true, true).join("");

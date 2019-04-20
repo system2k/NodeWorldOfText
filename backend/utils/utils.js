@@ -14,40 +14,40 @@ function trimHTML(html) {
 
 var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 function create_date(time) {
-	var str = "(UTC) ";
-	
-	var date = new Date(time);
-	var month = date.getUTCMonth();
-	str += months[month] + " ";
-	
-	var day = date.getUTCDate();
-	str += day + ", ";
-	
-	var year = date.getUTCFullYear();
-	str += year + " ";
-	
-	var hour = date.getUTCHours();
-	var ampm = " AM";
-	if(hour >= 12) {
-		ampm = " PM";
-	}
-	if(hour > 12) {
-		hour = hour - 12;
-	}
-	if(hour === 0) {
-		hour = 12;
-	}
-	str += hour;
-	
-	var minute = date.getUTCMinutes();
-	minute = ("0" + minute).slice(-2);
-	str += ":" + minute;
-	
-	var second = date.getUTCSeconds();
-	second = ("0" + second).slice(-2);
-	str += ":" + second + ampm;
-	
-	return str;
+    var str = "(UTC) ";
+    
+    var date = new Date(time);
+    var month = date.getUTCMonth();
+    str += months[month] + " ";
+    
+    var day = date.getUTCDate();
+    str += day + ", ";
+    
+    var year = date.getUTCFullYear();
+    str += year + " ";
+    
+    var hour = date.getUTCHours();
+    var ampm = " AM";
+    if(hour >= 12) {
+        ampm = " PM";
+    }
+    if(hour > 12) {
+        hour = hour - 12;
+    }
+    if(hour === 0) {
+        hour = 12;
+    }
+    str += hour;
+    
+    var minute = date.getUTCMinutes();
+    minute = ("0" + minute).slice(-2);
+    str += ":" + minute;
+    
+    var second = date.getUTCSeconds();
+    second = ("0" + second).slice(-2);
+    str += ":" + second + ampm;
+    
+    return str;
 }
 
 // sanitize number input
@@ -71,12 +71,12 @@ function toUpper(x) {
 }
 
 function NCaseCompare(str1, str2) {
-	str1 += "";
-	str2 += "";
-	var res = str1.localeCompare(str2, "en", {
-		sensitivity: "base"
-	});
-	return !res;
+    str1 += "";
+    str2 += "";
+    var res = str1.localeCompare(str2, "en", {
+        sensitivity: "base"
+    });
+    return !res;
 }
 
 /*
@@ -226,7 +226,7 @@ var filename_sanitize = (function() {
 var dayWeekList = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 var monthList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function http_time(timeStamp) {
-	var _date = new Date(timeStamp);
+    var _date = new Date(timeStamp);
     var _DayOfWeek = dayWeekList[_date.getUTCDay()];
     var _Day = _date.getUTCDate().toString().padStart(2, 0);
     var _Month = monthList[_date.getUTCMonth()];
@@ -275,37 +275,37 @@ function uptime(custom_ms_ago) {
     var _data = _time_ago[0];
     var show_minutes = true; // EG: ... and 20 minutes
     var divided = 1;
-	if(milliseconds_ago >= 30067200000) {
+    if(milliseconds_ago >= 30067200000) {
         _data = _time_ago[6];
         divided = 30067200000;
-		milliseconds_ago = Math.floor(milliseconds_ago / divided);
-	} else if(milliseconds_ago >= 2505600000) {
+        milliseconds_ago = Math.floor(milliseconds_ago / divided);
+    } else if(milliseconds_ago >= 2505600000) {
         _data = _time_ago[5];
         divided = 2505600000;
-		milliseconds_ago = Math.floor(milliseconds_ago / divided);
-	} else if(milliseconds_ago >= 86400000) {
+        milliseconds_ago = Math.floor(milliseconds_ago / divided);
+    } else if(milliseconds_ago >= 86400000) {
         _data = _time_ago[4];
         divided = 86400000;
-		milliseconds_ago = Math.floor(milliseconds_ago / divided);
-	} else if(milliseconds_ago >= 3600000) {
+        milliseconds_ago = Math.floor(milliseconds_ago / divided);
+    } else if(milliseconds_ago >= 3600000) {
         _data = _time_ago[3];
         divided = 3600000;
-		milliseconds_ago = Math.floor(milliseconds_ago / divided);
+        milliseconds_ago = Math.floor(milliseconds_ago / divided);
     } else if(milliseconds_ago >= 60000) {
         _data = _time_ago[2];
         divided = 60000;
         show_minutes = false;
-		milliseconds_ago = Math.floor(milliseconds_ago / divided);
+        milliseconds_ago = Math.floor(milliseconds_ago / divided);
     } else if(milliseconds_ago >= 1000) {
         _data = _time_ago[1];
         divided = 1000;
         show_minutes = false;
-		milliseconds_ago = Math.floor(milliseconds_ago / divided);
-	} else {
+        milliseconds_ago = Math.floor(milliseconds_ago / divided);
+    } else {
         show_minutes = false;
     }
-	if(milliseconds_ago !== 1) {
-		_data += "s";
+    if(milliseconds_ago !== 1) {
+        _data += "s";
     }
     var extra = "";
     if(show_minutes) {
@@ -320,16 +320,16 @@ function uptime(custom_ms_ago) {
             }
         }
     }
-	return milliseconds_ago + " " + _data + extra;
+    return milliseconds_ago + " " + _data + extra;
 }
 
 function compareNoCase(str1, str2) {
-	str1 += "";
-	str2 += "";
-	var res = str1.localeCompare(str2, "en", {
-		sensitivity: "base"
-	});
-	return !res;
+    str1 += "";
+    str2 += "";
+    var res = str1.localeCompare(str2, "en", {
+        sensitivity: "base"
+    });
+    return !res;
 }
 
 function resembles_int_number(string) {

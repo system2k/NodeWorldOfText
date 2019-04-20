@@ -64,7 +64,7 @@ function keydown_admclr(e) {
         admclr.color = "#FF0000";
         admclr.renderTile(true);
         admclr.handleClear(currentPosition[0], currentPosition[1]);
-	}
+    }
 }
 document.body.addEventListener("keydown", keydown_admclr);
 
@@ -101,14 +101,14 @@ function keyup_admclr(e) {
     admclrActivated.style.display = "none";
     admclr.color = "#00FF00";
     admclr.renderTile();
-	// remove color of tile
-	if(admclr.lastPos) {
-		tiles[admclr.lastPos[1] + "," + admclr.lastPos[0]].backgroundColor = "";
-		// re-render the tile
-		renderTile(admclr.lastPos[0], admclr.lastPos[1], true);
+    // remove color of tile
+    if(admclr.lastPos) {
+        tiles[admclr.lastPos[1] + "," + admclr.lastPos[0]].backgroundColor = "";
+        // re-render the tile
+        renderTile(admclr.lastPos[0], admclr.lastPos[1], true);
     }
     tiles[currentPosition[1] + "," + currentPosition[0]].backgroundColor = "";
     renderTile(currentPosition[0], currentPosition[1], true);
-	admclr.lastPos = null;
+    admclr.lastPos = null;
 }
 document.body.addEventListener("keyup", keyup_admclr)

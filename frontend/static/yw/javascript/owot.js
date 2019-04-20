@@ -478,31 +478,31 @@ function removeAlpha(data) {
 }
 
 var tileProtectAuto = {
-	selected: {},
-	selectedTile: null,
-	xPos: 0,
-	yPos: 0,
-	mode: 0,
-	ctrlDown: false,
-	shiftDown: false,
-	clearSelections: function() {
-		for(var i in tileProtectAuto.selected){
+    selected: {},
+    selectedTile: null,
+    xPos: 0,
+    yPos: 0,
+    mode: 0,
+    ctrlDown: false,
+    shiftDown: false,
+    clearSelections: function() {
+        for(var i in tileProtectAuto.selected){
             tiles[i].backgroundColor = "";
-			delete tileProtectAuto.selected[i];
-		}
-	},
-	active: false
+            delete tileProtectAuto.selected[i];
+        }
+    },
+    active: false
 }
 
 var linkAuto = {
-	selected: {},
-	ctrlDown: 0,
-	shiftDown: 0,
-	mode: 0,
-	url: "",
-	coordTileX: 0,
-	coordTileY: 0,
-	active: false
+    selected: {},
+    ctrlDown: 0,
+    shiftDown: 0,
+    mode: 0,
+    url: "",
+    coordTileX: 0,
+    coordTileY: 0,
+    active: false
 }
 
 var autoTotal = 0;
@@ -801,10 +801,10 @@ function getChar(tileX, tileY, charX, charY) {
         charX = cursorCoords[2];
         charY = cursorCoords[3];
     }
-	var tile = tiles[tileY + "," + tileX];
-	if(!tile) return " ";
-	var content = advancedSplit(tile.content);
-	return content[charY * tileC + charX];
+    var tile = tiles[tileY + "," + tileX];
+    if(!tile) return " ";
+    var content = advancedSplit(tile.content);
+    return content[charY * tileC + charX];
 }
 
 function getCharColor(tileX, tileY, charX, charY) {
@@ -818,7 +818,7 @@ function getCharColor(tileX, tileY, charX, charY) {
     var tile = tiles[tileY + "," + tileX];
     if(!tile) return 0;
     if(!tile.properties.color) return 0;
-	return tile.properties.color[charY * tileC + charX];
+    return tile.properties.color[charY * tileC + charX];
 }
 
 function getCharProtection(tileX, tileY, charX, charY) {
@@ -874,18 +874,18 @@ document.addEventListener("keydown", function(e) {
     var mouseCursorCopy = checkKeyPress(e, keyConfig.copyCharacterMouse);
     if(!textCursorCopy && !mouseCursorCopy) return;
     textInput.value = "";
-	// ctrl + c to copy characters where the text cursor is,
-	// ctrl + m to copy characters where the mouse cursor is
-	var pos_ref = cursorCoords;
-	if(mouseCursorCopy) { // copy where mouse cursor is
-		pos_ref = currentPosition;
-	}
-	if(!pos_ref) return;
-	var tileX = pos_ref[0];
-	var tileY = pos_ref[1];
-	var charX = pos_ref[2];
-	var charY = pos_ref[3];
-	var char = getChar(tileX, tileY, charX, charY)
+    // ctrl + c to copy characters where the text cursor is,
+    // ctrl + m to copy characters where the mouse cursor is
+    var pos_ref = cursorCoords;
+    if(mouseCursorCopy) { // copy where mouse cursor is
+        pos_ref = currentPosition;
+    }
+    if(!pos_ref) return;
+    var tileX = pos_ref[0];
+    var tileY = pos_ref[1];
+    var charX = pos_ref[2];
+    var charY = pos_ref[3];
+    var char = getChar(tileX, tileY, charX, charY)
     w.clipboard.copy(char);
 })
 
@@ -898,8 +898,8 @@ document.addEventListener("keydown", function(e) {
     var pos = currentPosition;
     if(!pos) return;
     var tileX = pos[0];
-	var tileY = pos[1];
-	var charX = pos[2];
+    var tileY = pos[1];
+    var charX = pos[2];
     var charY = pos[3];
     var color = getCharColor(tileX, tileY, charX, charY)
     YourWorld.Color = color;
@@ -1037,7 +1037,7 @@ function manageCoordHash() {
 }
 
 window.onhashchange = function(e) {
-	manageCoordHash();
+    manageCoordHash();
 }
 
 // begin OWOT's client
@@ -1445,7 +1445,7 @@ var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\
 function advancedSplit(str, noSurrog, noComb) {
     str += "";
     // look for surrogate pairs first. then look for combining characters. finally, look for the rest
-	var data = str.match(splitRegex)
+    var data = str.match(splitRegex)
     if(data == null) return [];
     for(var i = 0; i < data.length; i++) {
         // contains surrogates without second character?
@@ -1459,7 +1459,7 @@ function advancedSplit(str, noSurrog, noComb) {
             data[i] = data[i].charAt(0);
         }
     }
-	return data;
+    return data;
 }
 
 function containsNewLine(char) {
@@ -1540,54 +1540,54 @@ function moveCursor(direction, do_not_change_enter_x) {
 // place a character
 function writeCharTo(char, charColor, tileX, tileY, charX, charY) {
     if(!tiles[tileY + "," + tileX]) {
-		Tile.set(tileX, tileY, blankTile());
-	}
-	
-	// get the objects containing link data and color data
-	var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
-	if(!cell_props) cell_props = {};
-	var color = tiles[tileY + "," + tileX].properties.color;
-	if(!color) color = Object.assign([], blankColor);
+        Tile.set(tileX, tileY, blankTile());
+    }
+    
+    // get the objects containing link data and color data
+    var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
+    if(!cell_props) cell_props = {};
+    var color = tiles[tileY + "," + tileX].properties.color;
+    if(!color) color = Object.assign([], blankColor);
 
-	// delete link
-	if(cell_props[charY]) {
-		if(cell_props[charY][charX]) {
-			delete cell_props[charY][charX];
-		}
-	}
-	// change color
-	if(Permissions.can_color_text(state.userModel, state.worldModel)) {
-		color[charY * tileC + charX] = charColor;
-		tiles[tileY + "," + tileX].properties.color = color; // if the color array doesn't already exist in the tile
-	}
+    // delete link
+    if(cell_props[charY]) {
+        if(cell_props[charY][charX]) {
+            delete cell_props[charY][charX];
+        }
+    }
+    // change color
+    if(Permissions.can_color_text(state.userModel, state.worldModel)) {
+        color[charY * tileC + charX] = charColor;
+        tiles[tileY + "," + tileX].properties.color = color; // if the color array doesn't already exist in the tile
+    }
 
-	// update cell properties (link positions)
-	tiles[tileY + "," + tileX].properties.cell_props = cell_props;
+    // update cell properties (link positions)
+    tiles[tileY + "," + tileX].properties.cell_props = cell_props;
 
-	var con = tiles[tileY + "," + tileX].content;
-	con = advancedSplit(con);
-	// replace character
-	con[charY * tileC + charX] = char;
-	// join splitted content string
-	tiles[tileY + "," + tileX].content = con.join("");
-	// re-render
-	renderTile(tileX, tileY, true);
+    var con = tiles[tileY + "," + tileX].content;
+    con = advancedSplit(con);
+    // replace character
+    con[charY * tileC + charX] = char;
+    // join splitted content string
+    tiles[tileY + "," + tileX].content = con.join("");
+    // re-render
+    renderTile(tileX, tileY, true);
 
-	var editArray = [tileY, tileX, charY, charX, Date.now(), char, nextObjId];
-	if(tileFetchOffsetX || tileFetchOffsetY) {
-		editArray[0] += tileFetchOffsetY;
-		editArray[1] += tileFetchOffsetX;
-	}
-	if(charColor && Permissions.can_color_text(state.userModel, state.worldModel)) {
-		editArray.push(charColor);
-	}
-	tellEdit.push([tileX, tileY, charX, charY, nextObjId]);
-	writeBuffer.push(editArray);
-	nextObjId++;
+    var editArray = [tileY, tileX, charY, charX, Date.now(), char, nextObjId];
+    if(tileFetchOffsetX || tileFetchOffsetY) {
+        editArray[0] += tileFetchOffsetY;
+        editArray[1] += tileFetchOffsetX;
+    }
+    if(charColor && Permissions.can_color_text(state.userModel, state.worldModel)) {
+        editArray.push(charColor);
+    }
+    tellEdit.push([tileX, tileY, charX, charY, nextObjId]);
+    writeBuffer.push(editArray);
+    nextObjId++;
 }
 
 function writeCharToXY(char, charColor, x, y) {
-	writeCharTo(char, charColor, Math.floor(x / 16), Math.floor(y / 8), x - Math.floor(x / 16) * 16, y - Math.floor(y / 8) * 8);
+    writeCharTo(char, charColor, Math.floor(x / 16), Math.floor(y / 8), x - Math.floor(x / 16) * 16, y - Math.floor(y / 8) * 8);
 }
 
 // type a character
@@ -1953,15 +1953,15 @@ document.addEventListener("keydown", function(e) {
 
 var colors = ["#660066", "#003366", "#ff9900", "#ff0066", "#003300", "#ff0000", "#3a3a3a", "#006666", "#3399ff", "#3333ff", "#000000"];
 function assignColor(username) {
-	username = username.toUpperCase();
-	var colLen = colors.length;
-	var usrLen = username.length;
-	var avg = 0;
-	for(var i = 0; i < usrLen; i++) {
-		var chr = username.charCodeAt(i);
-		avg += (chr * chr | (i * chr) % 628) * (i << chr) + (chr*(i + 19 + (chr % 56))*chr);
-	}
-	return colors[(Math.abs(avg | 0)) % colLen];
+    username = username.toUpperCase();
+    var colLen = colors.length;
+    var usrLen = username.length;
+    var avg = 0;
+    for(var i = 0; i < usrLen; i++) {
+        var chr = username.charCodeAt(i);
+        avg += (chr * chr | (i * chr) % 628) * (i << chr) + (chr*(i + 19 + (chr % 56))*chr);
+    }
+    return colors[(Math.abs(avg | 0)) % colLen];
 }
 
 function getTileCoordsFromMouseCoords(x, y, ignoreZoomRatio) {
@@ -2870,11 +2870,11 @@ function isTileLoaded(tileX, tileY) {
 var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /*
-	Writability format (tiles and chars):
-		null: The parent's writability
-		0: public
-		1: members
-		2: owners
+    Writability format (tiles and chars):
+        null: The parent's writability
+        0: public
+        1: members
+        2: owners
 */
 function decodeCharProt(str) {
     if(str.charAt(0) != "@") {
@@ -3395,9 +3395,9 @@ var w = {
         announce: announce,
         announce_text: announce_text,
         announce_close: announce_close,
-		coordinateInputModal: new CoordinateInputModal(),
-		scrolling: null,
-		urlInputModal: new URLInputModal(),
+        coordinateInputModal: new CoordinateInputModal(),
+        scrolling: null,
+        urlInputModal: new URLInputModal(),
         colorInputModal: new ColorInputModal(),
         selectionModal: new SelectionModal()
     },
@@ -3521,12 +3521,12 @@ var w = {
         // show the protection precision menu
         protect_precision.style.display = "";
         tileProtectAuto.active = true;
-		if(unprotect) { // default area protection
-			tileProtectAuto.mode = 3;
-		} else {
-			if(protectType == "owner-only") tileProtectAuto.mode = 0;
-			if(protectType == "member-only") tileProtectAuto.mode = 1;
-			if(protectType == "public") tileProtectAuto.mode = 2;
+        if(unprotect) { // default area protection
+            tileProtectAuto.mode = 3;
+        } else {
+            if(protectType == "owner-only") tileProtectAuto.mode = 0;
+            if(protectType == "member-only") tileProtectAuto.mode = 1;
+            if(protectType == "public") tileProtectAuto.mode = 2;
         }
 
         if(w.isLinking || w.isProtecting) return;
@@ -3821,47 +3821,47 @@ function searchTellEdit(tileX, tileY, charX, charY) {
 var tilesAnimated = {};
 
 function stopAnimation(posStr) {
-	clearInterval(tilesAnimated[posStr]);
-	delete tilesAnimated[posStr];
+    clearInterval(tilesAnimated[posStr]);
+    delete tilesAnimated[posStr];
 }
 
 function isAnimated(posStr) {
-	return tilesAnimated[posStr] != null;
+    return tilesAnimated[posStr] != null;
 }
 
 function animateTile(tile, posStr) {
     var pos = getPos(posStr);
-	if (isAnimated(posStr))
-		stopAnimation(posStr);
-	setTimeout(function() { // delay it a bit, so the parent code is fully executed
+    if (isAnimated(posStr))
+        stopAnimation(posStr);
+    setTimeout(function() { // delay it a bit, so the parent code is fully executed
         var pos = getPos(posStr);
-		var tileY = pos[0];
-		var tileX = pos[1];
-		var animation = tile.properties.animation;
-		var changeInterval = animation.changeInterval;
-		var repeat = animation.repeat;
-		var frames = animation.frames;
-		var framenum = frames.length;
-		var animationInterval;
-		var atFrame = 0;
-		animationInterval = tilesAnimated[posStr] = setInterval(function doAnimation() {
-			if (!tiles[posStr]) // not visible
-				stopAnimation(posStr);
-			var frame = frames[atFrame];
-			var newTile = tile;
-			newTile.content = frame[0];
-			newTile.properties.color = frame[1];
+        var tileY = pos[0];
+        var tileX = pos[1];
+        var animation = tile.properties.animation;
+        var changeInterval = animation.changeInterval;
+        var repeat = animation.repeat;
+        var frames = animation.frames;
+        var framenum = frames.length;
+        var animationInterval;
+        var atFrame = 0;
+        animationInterval = tilesAnimated[posStr] = setInterval(function doAnimation() {
+            if (!tiles[posStr]) // not visible
+                stopAnimation(posStr);
+            var frame = frames[atFrame];
+            var newTile = tile;
+            newTile.content = frame[0];
+            newTile.properties.color = frame[1];
             Tile.set(tileX, tileY, newTile)
-			renderTile(tileX, tileY, true);
-			atFrame++;
-			if (atFrame >= framenum) {
-				if (repeat)
-					atFrame = 0;
-				else
-					stopAnimation(posStr);
-			}
-		}.bind(this), changeInterval);
-	}.bind(this), 200);
+            renderTile(tileX, tileY, true);
+            atFrame++;
+            if (atFrame >= framenum) {
+                if (repeat)
+                    atFrame = 0;
+                else
+                    stopAnimation(posStr);
+            }
+        }.bind(this), changeInterval);
+    }.bind(this), 200);
 }
 
 function tile_offset_object(data, tileOffX, tileOffY) {
@@ -3923,10 +3923,10 @@ var ws_functions = {
         for(var tileKey in data.tiles) {
             var tile = data.tiles[tileKey];
             var pos = getPos(tileKey);
-			if (tile && tile.properties && tile.properties.animation) {
-				animateTile(tile, tileKey); // if it's already animated it will stop the old animation
-			} else if (isAnimated(tileKey)) {
-				stopAnimation(tileKey);
+            if (tile && tile.properties && tile.properties.animation) {
+                animateTile(tile, tileKey); // if it's already animated it will stop the old animation
+            } else if (isAnimated(tileKey)) {
+                stopAnimation(tileKey);
             }
             Tile.set(pos[1], pos[0], tile);
             if(!tiles[tileKey]) Tile.set(pos[1], pos[0], blankTile());
@@ -3979,11 +3979,11 @@ var ws_functions = {
             if(data.tiles[tileKey].properties.char) {
                 data.tiles[tileKey].properties.char = decodeCharProt(data.tiles[tileKey].properties.char);
             }
-			if (data.tiles[tileKey].properties.animation) {
-				animateTile(data.tiles[tileKey], tileKey); // if it's already animated it will stop the old animation
-			} else if (isAnimated(tileKey)) {
-				stopAnimation(tileKey);
-			}
+            if (data.tiles[tileKey].properties.animation) {
+                animateTile(data.tiles[tileKey], tileKey); // if it's already animated it will stop the old animation
+            } else if (isAnimated(tileKey)) {
+                stopAnimation(tileKey);
+            }
             if(!tiles[tileKey].properties.color) {
                 tiles[tileKey].properties.color = Object.assign([], blankColor);
             }
@@ -4099,11 +4099,11 @@ var ws_functions = {
     },
     announcement: function(data) {
         if(data.text) {
-			w._ui.announce_text.innerHTML = data.text;
-			w._ui.announce.style.display = "";
-		} else {
-			w._ui.announce.style.display = "none";
-		}
+            w._ui.announce_text.innerHTML = data.text;
+            w._ui.announce.style.display = "";
+        } else {
+            w._ui.announce.style.display = "none";
+        }
     },
     ping: function(data) {
         if(data.time) {

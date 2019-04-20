@@ -10,7 +10,7 @@ module.exports.GET = async function(req, serve, vars) {
     var get_third = vars.get_third;
     var path = vars.path;
     var accountSystem = vars.accountSystem;
-	
+
     if(accountSystem == "uvias") {
         return;
     }
