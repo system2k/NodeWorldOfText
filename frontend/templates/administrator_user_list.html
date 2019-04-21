@@ -33,6 +33,11 @@
                         <th>
                             Level
                         </th>
+                        {% if accountSystem == "uvias" %}
+                        <th>
+                            Rank
+                        </th>
+                        {% endif %}
                         <th>
                             Last Login
                         </th>
@@ -59,6 +64,11 @@
                         <td>
                             {{user.level}}
                         </td>
+                        {% if accountSystem == "uvias" %}
+                        <th>
+                            {{user.rank_name}}
+                        </th>
+                        {% endif %}
                         <td>
                             {{user.last_login|safe}}
                         </td>

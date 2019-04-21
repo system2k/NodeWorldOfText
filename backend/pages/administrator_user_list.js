@@ -14,12 +14,21 @@ module.exports.GET = async function(req, serve, vars, params) {
     
     var users = [];
     if(accountSystem == "uvias") {
-        var d_users = await uvias.all("SELECT uid as rawuid, to_hex(uid) as uid, username, created, last_login FROM accounts.users");
+        var ranks = await uvias.all("SELECT * FROM accounts.ranks");
+        var d_users = await uvias.all("SELECT uid as rawuid, to_hex(uid) as uid, username, created, last_login, rank_id FROM accounts.users");
         users = [];
         for(var i = 0; i < d_users.length; i++) {
             var dusr = d_users[i];
             var id = "x" + dusr.uid;
             var username = dusr.username;
+            var rank_id = dusr.rank_id;
+            var rank_name = "rank~" + rank_id;
+            for(var r = 0; r < ranks.length; r++) {
+                if(ranks[r].id == rank_id) {
+                    rank_name = ranks[r].name;
+                    break;
+                }
+            }
             var login_name = "< none >";
             var is_active = false;
             var level = await db_misc.get("SELECT level FROM admin_ranks WHERE id=?", [id]);
@@ -42,7 +51,8 @@ module.exports.GET = async function(req, serve, vars, params) {
                 is_active,
                 level,
                 last_login,
-                date_joined
+                date_joined,
+                rank_name
             });
         }
         

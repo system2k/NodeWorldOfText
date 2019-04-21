@@ -302,7 +302,7 @@ uvias.sso = "/accounts/sso";
 uvias.logout = "/home/";
 uvias.loginPath = "https://uvias.com/api/loginto/" + uvias.id;
 uvias.logoutPath = "https://uvias.com/logoff?service=" + uvias.id;
-uvias.registerPath = "https://uvias.com/api/loginto/" + uvias.id;
+uvias.registerPath = "https://uvias.com/api/loginto/" + uvias.id + "#create";
 if(accountSystem == "uvias") {
     loginPath = uvias.loginPath;
     logoutPath = uvias.logoutPath;
