@@ -1315,6 +1315,27 @@ function manage_https() {
 }
 manage_https();
 
+function parseToken(token) {
+    if(typeof token != "string") return false;
+    token = token.split("|");
+    if(token.length != 2) return false;
+    var uid1 = token[0].toLowerCase();
+    var sid2 = token[1];
+    if(uid1.length < 1 || uid1.length > 16) return false;
+    if(sid2.length < 1 || sid2.length > 24) return false;
+    var alpha = "0123456789abcdef";
+    for(var i = 0; i < uid1.length; i++) {
+        if(alpha.indexOf(uid1.charAt(i)) == -1) return false;
+    }
+    var uid = toInt64(uid1).toString();
+    var session_id = Buffer.from(sid2, "base64");
+    if(session_id.length != 16) return false;
+    return {
+        uid,
+        session_id
+    };
+}
+
 async function get_user_info(cookies, is_websocket) {
     /*
         User Levels:
@@ -1370,53 +1391,55 @@ async function get_user_info(cookies, is_websocket) {
     }
 
     if(accountSystem == "uvias" && cookies.token) {
-        var parsed = await uvias.get("SELECT * FROM accounts.parse_token($1::VARCHAR(41))", cookies.token);
-        var uid = parsed.uid;
-        var session_id = parsed.session_id;
-        var session = await uvias.get("SELECT * FROM accounts.get_session($1::bigint, $2::bytea)", [uid, session_id]);
-        if(session) {
-            var user_account = await uvias.get("SELECT to_hex(uid) as uid, username, rank_id FROM accounts.users WHERE uid=$1::bigint", uid);
-            if(user_account) {
-                var links_local = await uvias.get("SELECT to_hex(uid) as uid, login_name, email, email_verified FROM accounts.links_local WHERE uid=$1::bigint", uid);
-                user.authenticated = true;
-                user.display_username = user_account.username;
-                user.uv_rank = user_account.rank_id;
-                if(links_local) {
-                    user.is_active = links_local.email_verified;
-                    user.email = links_local.email;
-                    user.username = links_local.login_name;
-                    user.id = "x" + links_local.uid;
-                } else {
-                    user.username = user_account.username;
-                    user.id = "x" + user_account.uid;
+        var parsed = parseToken(cookies.token);
+        if(parsed) {
+            var uid = parsed.uid;
+            var session_id = parsed.session_id;
+            var session = await uvias.get("SELECT * FROM accounts.get_session($1::bigint, $2::bytea)", [uid, session_id]);
+            if(session) {
+                var user_account = await uvias.get("SELECT to_hex(uid) as uid, username, rank_id FROM accounts.users WHERE uid=$1::bigint", uid);
+                if(user_account) {
+                    var links_local = await uvias.get("SELECT to_hex(uid) as uid, login_name, email, email_verified FROM accounts.links_local WHERE uid=$1::bigint", uid);
+                    user.authenticated = true;
+                    user.display_username = user_account.username;
+                    user.uv_rank = user_account.rank_id;
+                    if(links_local) {
+                        user.is_active = links_local.email_verified;
+                        user.email = links_local.email;
+                        user.username = links_local.login_name;
+                        user.id = "x" + links_local.uid;
+                    } else {
+                        user.username = user_account.username;
+                        user.id = "x" + user_account.uid;
+                    }
+
+                    // no data yet
+                    user.operator = false;
+                    user.superuser = false;
+                    user.staff = false;
+                    
+                    var rank_data = await db_misc.get("SELECT level FROM admin_ranks WHERE id=?", [user.id]);
+                    if(rank_data) {
+                        var level = rank_data.level;
+
+                        var operator = level == 3;
+                        var superuser = level == 2;
+                        var staff = level == 1;
+
+                        user.operator = operator;
+                        user.superuser = superuser || operator;
+                        user.staff = staff || superuser || operator;
+                    }
+
+                    if(user.staff && !is_websocket) {
+                        user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id);
+                    } else {
+                        user.scripts = [];
+                    }
+                    user.csrftoken = new_token(32);
+
+                    user.session_key = cookies.token;
                 }
-
-                // no data yet
-                user.operator = false;
-                user.superuser = false;
-                user.staff = false;
-                
-                var rank_data = await db_misc.get("SELECT level FROM admin_ranks WHERE id=?", [user.id]);
-                if(rank_data) {
-                    var level = rank_data.level;
-
-                    var operator = level == 3;
-                    var superuser = level == 2;
-                    var staff = level == 1;
-
-                    user.operator = operator;
-                    user.superuser = superuser || operator;
-                    user.staff = staff || superuser || operator;
-                }
-
-                if(user.staff && !is_websocket) {
-                    user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id);
-                } else {
-                    user.scripts = [];
-                }
-                user.csrftoken = new_token(32);
-
-                user.session_key = cookies.token;
             }
         }
     }

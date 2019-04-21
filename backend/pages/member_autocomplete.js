@@ -18,6 +18,7 @@ module.exports.GET = async function(req, serve, vars, props) {
     input += "";
     input = input.trim();
     if(!input) return serve("");
+    if(input.length < 4) return serve("");
 
     var list;
     if(accountSystem == "uvias") {

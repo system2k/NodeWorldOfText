@@ -2,7 +2,7 @@ var autocomplete_defaults = {
     inputClass: "ac_input",
     resultsClass: "ac_results",
     loadingClass: "ac_loading",
-    minChars: 1,
+    minChars: 4,
     delay: 400,
     matchCase: false,
     matchSubset: true,
@@ -282,9 +282,7 @@ function autocomplete(options) {
             success(term, data);
         // if an AJAX url has been supplied, try loading the data now
         } else if( (typeof options.url == "string") && (options.url.length > 0) ){
-            var extraParams = {
-                timestamp: +new Date()
-            };
+            var extraParams = {};
 
             for(var key in options.extraParams) {
                 var param = options.extraParams[key];
@@ -295,8 +293,7 @@ function autocomplete(options) {
                 type: "GET",
                 url: options.url,
                 data: Object.assign({
-                    q: lastWord(term),
-                    limit: options.max
+                    q: lastWord(term)
                 }, extraParams),
                 done: function(data) {
                     var parsed = options.parse && options.parse(data) || parse(data);
