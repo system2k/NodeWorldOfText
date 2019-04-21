@@ -200,14 +200,18 @@ module.exports.POST = async function(req, serve, vars) {
         var user_id;
         if(accountSystem == "uvias") {
             adduser = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
-            user_id = "x" + adduser.uid;
         } else if(accountSystem == "local") {
             adduser = await db.get("SELECT * from auth_user WHERE username=? COLLATE NOCASE", username);
-            user_id = adduser.id;
         }
 
         if(!adduser) {
             return await dispage("configure", { message: "User not found" }, req, serve, vars);
+        }
+
+        if(accountSystem == "uvias") {
+            user_id = "x" + adduser.uid;
+        } else if(accountSystem == "local") {
+            user_id = adduser.id;
         }
         
         if(user_id == world.owner_id) {
