@@ -33,6 +33,7 @@ function runServer() {
     var maintenance = false;
 
     owot.on("close", function(code) {
+        code += "";
         console.log("Process exited. [" + code + "; 0x" + code.toString(16).toUpperCase().padStart(8, 0) + "]");
         if(!gracefulStop) {
             console.log("Restarting server...");
