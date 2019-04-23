@@ -325,6 +325,7 @@ Error.stackTraceLimit = Infinity;
 if(!global.AsyncFunction) var AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
 
 var isTestServer = false;
+var debugLogging = false;
 
 var intv = {}; // intervals and timeouts
 
@@ -344,6 +345,10 @@ args.forEach(function(a) {
         settings.UNCAUGHT_PATH = settings.TEST_UNCAUGHT_PATH;
         settings.REQ_LOG_PATH = settings.TEST_REQ_LOG_PATH;
         return;
+    }
+    if(a == "--log") {
+        console.log("\x1b[32;1mDebug logging enabled\x1b[0m");
+        debugLogging = true;
     }
 });
 
@@ -2199,30 +2204,56 @@ async function uvias_init() {
             console.log("Malformed data:", notif.payload);
             return;
         }
-        switch(channel) {
-            case "uv_kick":
-                console.log("Signal uv_kick. Session '" + data.session + "', Reason '" + data.reason + "'");
-                break;
-            case "uv_sess_renew":
-                console.log("Signal uv_sess_renew. Session '" + data.session + "'");
-                break;
-            case "uv_rep_upd":
-                console.log("Signal uv_rep_upd. UID 'x" + toHex64(toInt64(data.uid)) + "'");
-                break;
-            case "uv_user_upd":
-                console.log("Signal uv_user_upd. UID 'x" + toHex64(toInt64(data.uid)) + "'");
-                break;
-            case "uv_user_del":
-                console.log("Signal uv_user_del. UID 'x" + toHex64(toInt64(data.uid)) + "'");
-                break;
-            case "uv_service":
-                console.log("Signal uv_service. ID '" + data.id + "'");
-                break;
-            case "uv_rank_upd":
-                console.log("Signal uv_rank_upd. ID '" + data.id + "'");
-                break;
+        if(debugLogging) {
+            switch(channel) {
+                case "uv_kick":
+                    console.log("Signal uv_kick. Session '" + data.session + "', Reason '" + data.reason + "'");
+                    break;
+                case "uv_sess_renew":
+                    console.log("Signal uv_sess_renew. Session '" + data.session + "'");
+                    break;
+                case "uv_rep_upd":
+                    console.log("Signal uv_rep_upd. UID 'x" + toHex64(toInt64(data.uid)) + "'");
+                    break;
+                case "uv_user_upd":
+                    console.log("Signal uv_user_upd. UID 'x" + toHex64(toInt64(data.uid)) + "'");
+                    break;
+                case "uv_user_del":
+                    console.log("Signal uv_user_del. UID 'x" + toHex64(toInt64(data.uid)) + "'");
+                    break;
+                case "uv_service":
+                    console.log("Signal uv_service. ID '" + data.id + "'");
+                    break;
+                case "uv_rank_upd":
+                    console.log("Signal uv_rank_upd. ID '" + data.id + "'");
+                    break;
+            }
         }
     });
+
+    var current_time = Math.floor(Date.now() / 1000);
+    async function session_check() {
+        try {
+            var ct = current_time;
+            current_time = Math.floor(Date.now() / 1000);
+            var list = await uvias.all("SELECT uid, creator_ip, created, creator_ua FROM accounts.sessions WHERE created >= TO_TIMESTAMP($1::BIGINT)", ct);
+            for(var i = 0; i < list.length; i++) {
+                var uid = list[i].uid;
+                var creator_ip = list[i].creator_ip;
+                var creator_ua = list[i].creator_ua;
+                var created = list[i].created;
+                var msg = "uvLogin;" + toHex64(uid).padStart(16, 0) + ";" + creator_ip + ";" + JSON.stringify(creator_ua) + ";" + created.getTime();
+                doLogReq(msg);
+                if(debugLogging) {
+                    console.log(msg);
+                }
+            }
+        } catch(e) {
+            handle_error(e);
+        }
+        if(!isStopping) intv.session_check = setTimeout(session_check, 5000);
+    }
+    intv.session_check = setTimeout(session_check, 5000);
 }
 
 var wss;
