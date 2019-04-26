@@ -237,6 +237,39 @@ function handle_error(e) {
     }
 }
 
+var isTestServer = false;
+var debugLogging = false;
+var testServerMainDirs = false;
+var testUviasIds = false;
+
+var intv = {}; // intervals and timeouts
+
+var args = process.argv;
+args.forEach(function(a) {
+    if(a == "--test-server") {
+        if(!isTestServer) console.log("\x1b[32;1mThis is a test server\x1b[0m");
+        isTestServer = true;
+    }
+    if(a == "--log") {
+        if(!debugLogging) console.log("\x1b[32;1mDebug logging enabled\x1b[0m");
+        debugLogging = true;
+    }
+    if(a == "--main-dirs") {
+        testServerMainDirs = true;
+    }
+    if(a == "--uvias-test-info") {
+        testUviasIds = true;
+    }
+    if(a == "--lt") {
+        if(!isTestServer) console.log("\x1b[32;1mThis is a test server\x1b[0m");
+        isTestServer = true;
+        if(!debugLogging) console.log("\x1b[32;1mDebug logging enabled\x1b[0m");
+        debugLogging = true;
+        testServerMainDirs = true;
+        testUviasIds = true;
+    }
+});
+
 // console function
 function run(path) {
     eval(fs.readFileSync(path).toString("utf8"));
@@ -267,13 +300,19 @@ if(accountSystem != "uvias" && accountSystem != "local") {
 
 var pgClient = pg.Client;
 var pgConn;
+function makePgClient() {
+    pgConn = new pgClient({
+        connectionString: "pg://"
+    });
+    pgConn.on("end", function() {
+        console.log("WARNING: Postgres client is closed");
+    });
+}
 if(accountSystem == "uvias") {
     pg.defaults.user = "fp";
     pg.defaults.host = "/var/run/postgresql";
     pg.defaults.database = "uvias";
-    pgConn = new pgClient({
-        connectionString: "pg://"
-    });
+    makePgClient();
 }
 
 var uvias = {};
@@ -295,9 +334,17 @@ uvias.run = async function(query, data) {
     await pgConn.query(query, data);
 }
 
-uvias.id = "owottest";
-uvias.name = "Our World Of Text Test Server";
-uvias.domain = "testserver1.ourworldoftext.com";
+if(testUviasIds) {
+    uvias.id = "owottest";
+    uvias.name = "Our World Of Text Test Server";
+    uvias.domain = "testserver1.ourworldoftext.com";
+    uvias.private = true;
+} else {
+    uvias.id = "owot";
+    uvias.name = "Our World Of Text";
+    uvias.domain = "ourworldoftext.com";
+    uvias.private = false;
+}
 uvias.sso = "/accounts/sso";
 uvias.logout = "/home/";
 uvias.loginPath = "https://uvias.com/api/loginto/" + uvias.id;
@@ -324,33 +371,20 @@ function toInt64(n) {
 Error.stackTraceLimit = Infinity;
 if(!global.AsyncFunction) var AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
 
-var isTestServer = false;
-var debugLogging = false;
-
 var intv = {}; // intervals and timeouts
 
-var args = process.argv;
-args.forEach(function(a) {
-    if(a == "--test-server") {
-        console.log("\x1b[32;1mThis is a test server\x1b[0m");
-        isTestServer = true;
-        serverPort = settings.test_port;
-        serverDB = settings.TEST_DATABASE_PATH;
-        chatDB = settings.TEST_CHAT_HISTORY_PATH;
-        imageDB = settings.TEST_IMAGES_PATH;
-        miscDB = settings.TEST_MISC_PATH;
-        editsDB = settings.TEST_EDITS_PATH;
-        settings.LOG_PATH = settings.TEST_LOG_PATH;
-        settings.ZIP_LOG_PATH = settings.TEST_ZIP_LOG_PATH;
-        settings.UNCAUGHT_PATH = settings.TEST_UNCAUGHT_PATH;
-        settings.REQ_LOG_PATH = settings.TEST_REQ_LOG_PATH;
-        return;
-    }
-    if(a == "--log") {
-        console.log("\x1b[32;1mDebug logging enabled\x1b[0m");
-        debugLogging = true;
-    }
-});
+if(isTestServer && !testServerMainDirs) {
+    serverPort = settings.test_port;
+    serverDB = settings.TEST_DATABASE_PATH;
+    chatDB = settings.TEST_CHAT_HISTORY_PATH;
+    imageDB = settings.TEST_IMAGES_PATH;
+    miscDB = settings.TEST_MISC_PATH;
+    editsDB = settings.TEST_EDITS_PATH;
+    settings.LOG_PATH = settings.TEST_LOG_PATH;
+    settings.ZIP_LOG_PATH = settings.TEST_ZIP_LOG_PATH;
+    settings.UNCAUGHT_PATH = settings.TEST_UNCAUGHT_PATH;
+    settings.REQ_LOG_PATH = settings.TEST_REQ_LOG_PATH;
+}
 
 const log_error = function(err) {
     if(settings.error_log) {
@@ -861,7 +895,9 @@ async function initialize_server() {
         await db.exec(indexes);
 
         init = true;
-        account_prompt();
+        if(accountSystem == "local") {
+            account_prompt();
+        }
     }
     if(!init) {
         start_server();
@@ -2179,12 +2215,16 @@ function initPingAuto() {
     }, 1000 * 30);
 }
 
+async function uviasSendIdentifier() {
+    await uvias.run("SELECT accounts.set_service_info($1::text, $2::text, $3::text, $4::text, $5::text, $6::integer, $7::boolean);",
+        [uvias.id, uvias.name, uvias.domain, uvias.sso, uvias.logout, process.pid, uvias.private]);
+    console.log("Sent service identifier");
+}
+
 async function uvias_init() {
     console.log("Connecting to account database...");
     await pgConn.connect();
-    await uvias.run("SELECT accounts.set_service_info($1::text, $2::text, $3::text, $4::text, $5::text, $6::integer);",
-        [uvias.id, uvias.name, uvias.domain, uvias.sso, uvias.logout, process.pid]);
-    console.log("Sent service identifier");
+    await uviasSendIdentifier();
 
     await uvias.run("LISTEN uv_kick");
     await uvias.run("LISTEN uv_sess_renew");
@@ -2194,7 +2234,7 @@ async function uvias_init() {
     await uvias.run("LISTEN uv_service");
     await uvias.run("LISTEN uv_rank_upd");
 
-    pgConn.on("notification", function(notif) {
+    pgConn.on("notification", async function(notif) {
         var channel = notif.channel;
         doLogReq("uvSignal;" + channel + ";" + JSON.stringify(notif.payload) + ";" + Date.now());
         var data;
@@ -2204,30 +2244,31 @@ async function uvias_init() {
             console.log("Malformed data:", notif.payload);
             return;
         }
-        if(debugLogging) {
-            switch(channel) {
-                case "uv_kick":
-                    console.log("Signal uv_kick. Session '" + data.session + "', Reason '" + data.reason + "'");
-                    break;
-                case "uv_sess_renew":
-                    console.log("Signal uv_sess_renew. Session '" + data.session + "'");
-                    break;
-                case "uv_rep_upd":
-                    console.log("Signal uv_rep_upd. UID 'x" + toHex64(toInt64(data.uid)) + "'");
-                    break;
-                case "uv_user_upd":
-                    console.log("Signal uv_user_upd. UID 'x" + toHex64(toInt64(data.uid)) + "'");
-                    break;
-                case "uv_user_del":
-                    console.log("Signal uv_user_del. UID 'x" + toHex64(toInt64(data.uid)) + "'");
-                    break;
-                case "uv_service":
-                    console.log("Signal uv_service. ID '" + data.id + "'");
-                    break;
-                case "uv_rank_upd":
-                    console.log("Signal uv_rank_upd. ID '" + data.id + "'");
-                    break;
-            }
+        switch(channel) {
+            case "uv_kick":
+                if(debugLogging) console.log("Signal uv_kick. Session '" + data.session + "', Reason '" + data.reason + "'");
+                break;
+            case "uv_sess_renew":
+                if(debugLogging) console.log("Signal uv_sess_renew. Session '" + data.session + "'");
+                break;
+            case "uv_rep_upd":
+                if(debugLogging) console.log("Signal uv_rep_upd. UID 'x" + toHex64(toInt64(data.uid)) + "'");
+                break;
+            case "uv_user_upd":
+                if(debugLogging) console.log("Signal uv_user_upd. UID 'x" + toHex64(toInt64(data.uid)) + "'");
+                break;
+            case "uv_user_del":
+                if(debugLogging) console.log("Signal uv_user_del. UID 'x" + toHex64(toInt64(data.uid)) + "'");
+                break;
+            case "uv_service":
+                if(debugLogging) console.log("Signal uv_service. ID '" + data.id + "'");
+                if(data.id == "uvias") {
+                    await uviasSendIdentifier();
+                }
+                break;
+            case "uv_rank_upd":
+                if(debugLogging) console.log("Signal uv_rank_upd. ID '" + data.id + "'");
+                break;
         }
     });
 
