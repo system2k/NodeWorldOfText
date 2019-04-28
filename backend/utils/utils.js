@@ -624,7 +624,8 @@ function advancedSplit(str) {
         // contains surrogates without second character?
         // This invalid character would not have been added to the string anyway
         if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
-            data.splice(i, 1)
+            data.splice(i, 1);
+            i--;
         }
     }
     for(var i = 0; i < data.length; i++) {

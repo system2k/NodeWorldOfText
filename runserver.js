@@ -8,6 +8,8 @@
 
 console.log("\x1b[36;1mStarting up...\x1b[0m");
 
+var serverLoaded = false;
+
 const chat_mgr    = require("./backend/utils/chat_mgr.js");
 const crypto      = require("crypto");
 const dump_dir    = require("./backend/dump_dir");
@@ -1680,6 +1682,7 @@ var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
 var valid_subdomains = ["test", "forums", "serverrequeststatus", "info", "chat", "cd", "random_color", "backgrounds"];
 
 async function process_request(req, res, current_req_id) {
+    if(!serverLoaded) await waitForServerLoad();
     if(isStopping) return;
     var hostname = req.headers.host;
     if(!hostname) hostname = "www.ourworldoftext.com";
@@ -2396,6 +2399,18 @@ async function initialize_server_components() {
     global_data.tile_signal_update = tile_signal_update;
 
     wss.on("connection", manageWebsocketConnection);
+
+    serverLoaded = true;
+    for(var i = 0; i < serverLoadWaitQueue.length; i++) {
+        serverLoadWaitQueue[i]();
+    }
+}
+
+var serverLoadWaitQueue = [];
+function waitForServerLoad() {
+    return new Promise(function(res) {
+        serverLoadWaitQueue.push(res);
+    });
 }
 
 var monitorEventSockets = [];
@@ -2475,6 +2490,7 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 }
 
 async function manageWebsocketConnection(ws, req) {
+    if(!serverLoaded) await waitForServerLoad();
     if(isStopping) return;
     var socketTerminated = false;
     var ipHeaderAddr = "Unknown";

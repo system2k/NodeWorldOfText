@@ -32,6 +32,18 @@ function deviceRatio() {
     return ratio;
 }
 
+var enums = {};
+function makeEnum(vars) {
+	var enums = {};
+	for(var i = 0; i < vars.length; i++) {
+		enums[vars[i]] = i;
+    }
+	return enums;
+}
+
+enums.edit = makeEnum(["tileY", "tileX", "charY", "charX", "time", "char", "id", "color"]);
+enums.position = makeEnum(["tileX", "tileY", "charX", "charY"]);
+
 var nextObjId       = 1; // next edit ID
 var width           = getWndWidth();
 var height          = getWndHeight();
