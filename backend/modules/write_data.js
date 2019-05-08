@@ -58,9 +58,6 @@ module.exports = async function(data, vars, evars) {
             tiles[segment[0] + "," + segment[1]] = [];
             tileCount++;
         }
-        segment[5] = segment[5].replace(/\n/g, " ");
-        segment[5] = segment[5].replace(/\r/g, " ");
-        segment[5] = segment[5].replace(/\x1b/g, " ");
         tiles[segment[0] + "," + segment[1]].push(segment)
         if(total_edits >= edits_limit) { // edit limit reached
             break;

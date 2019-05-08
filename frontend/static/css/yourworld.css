@@ -375,3 +375,7 @@ a:visited {
     color: blue;
     text-decoration: underline;
 }
+.link_element {
+    position: absolute;
+    display: block;
+}

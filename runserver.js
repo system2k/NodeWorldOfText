@@ -471,7 +471,7 @@ async function static_retrieve(id, range) {
     await asyncFsRead(read_staticIdx, pos, 0, 9, id * 9);
 
     var accessible = pos[8];
-    if(!accessible) return res(null);
+    if(!accessible) return 0;
     var start = pos[0] + pos[1] * 256 + pos[2] * 65536 + pos[3] * 16777216;
     var len = pos[4] + pos[5] * 256 + pos[6] * 65536 + pos[7] * 16777216;
     var totalLen = len;

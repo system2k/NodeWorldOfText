@@ -8,7 +8,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var db_misc = vars.db_misc;
     var accountSystem = vars.accountSystem;
 
-    if(!user.superuser) {
+    if(!user.operator) {
         return await dispage("404", null, req, serve, vars);
     }
     

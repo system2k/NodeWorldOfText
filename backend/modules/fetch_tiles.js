@@ -24,16 +24,17 @@ var surrogateRegexStr = "([\\uD800-\\uDBFF][\\uDC00-\\uDFFF])";
 var surrogateRegex = new RegExp(surrogateRegexStr, "g");
 var combiningRegexStr = "(([\\0-\\u02FF\\u0370-\\u1DBF\\u1E00-\\u20CF\\u2100-\\uD7FF\\uDC00-\\uFE1F\\uFE30-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF])([\\u0300-\\u036F\\u1DC0-\\u1DFF\\u20D0-\\u20FF\\uFE20-\\uFE2F]+))";
 var combiningRegex = new RegExp(combiningRegexStr, "g");
-var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\n|\\r", "g");
+var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\n|\\r|\\u2028|\\u2029", "g");
 function advancedSplitCli(str, noSurrog, noComb) {
     str += "";
     // look for surrogate pairs first. then look for combining characters. finally, look for the rest
-    var data = str.match(splitRegex)
+    var data = str.match(splitRegex);
     if(data == null) return [];
     for(var i = 0; i < data.length; i++) {
         // contains surrogates without second character?
         if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
-            data.splice(i, 1)
+            data.splice(i, 1);
+            i--;
         }
         if(noSurrog && data[i].match(surrogateRegex)) {
             data[i] = "?";
@@ -50,6 +51,7 @@ function filterUTF16(str) {
 
 module.exports = async function(data, vars) {
     var db = vars.db;
+    var db_edits = vars.db_edits;
     var user = vars.user;
     var san_nbr = vars.san_nbr;
     var xrange = vars.xrange;
@@ -126,11 +128,11 @@ module.exports = async function(data, vars) {
         }
 
         if(timemachine.active) {
-            var dr1 = await db.get("SELECT time FROM edit WHERE world_id=? LIMIT 1",
+            var dr1 = await db_edits.get("SELECT time FROM edit WHERE world_id=? LIMIT 1",
                 world.id);
-            var dr2 = await db.get("SELECT time FROM edit WHERE world_id=? ORDER BY rowid DESC LIMIT 1",
+            var dr2 = await db_edits.get("SELECT time FROM edit WHERE world_id=? ORDER BY rowid DESC LIMIT 1",
                 world.id);
-            var editCount = await db.get("SELECT count(id) AS cnt FROM edit WHERE world_id=?", world.id);
+            var editCount = await db_edits.get("SELECT count(rowid) AS cnt FROM edit WHERE world_id=?", world.id);
             editCount = editCount.cnt;
             if((!dr1 || !dr2) || editCount >= editLimit) {
                 // diagonal text
@@ -158,7 +160,7 @@ module.exports = async function(data, vars) {
                 time = Math.floor(div * timemachine.time) + dr1;
             }
 
-            await db.each("SELECT * FROM edit WHERE world_id=? AND time <= ? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?",
+            await db_edits.each("SELECT * FROM edit WHERE world_id=? AND time <= ? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?",
                 [world.id, time, minY, minX, maxY, maxX], function(data) {
                 if(data.content.charAt(0) == "@") return;
                 var con = JSON.parse(data.content);
@@ -200,7 +202,7 @@ module.exports = async function(data, vars) {
             var chunkSize = 500;
             var chunkIdx = 0;
             while(true) {
-                var hist = await db.all("SELECT time, content FROM edit WHERE time <= ? AND world_id=? AND tileX=? AND tileY=? ORDER BY rowid DESC LIMIT ?,?",
+                var hist = await db_edits.all("SELECT time, content FROM edit WHERE time <= ? AND world_id=? AND tileX=? AND tileY=? ORDER BY rowid DESC LIMIT ?,?",
                     [o_editlog_start, world.id, tileX, tileY, chunkIdx * chunkSize, chunkSize]);
                 chunkIdx++;
                 if(hist.length == 0) break;

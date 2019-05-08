@@ -322,7 +322,9 @@ function handleRegionSelection() {
             reg += "\n";
         }
         for(var x = 0; x < regWidth; x++) {
-            reg += getChar(tileX, tileY, charX, charY);
+            var char = getChar(tileX, tileY, charX, charY);
+            char = char.replace(/\r|\n/g, " ");
+            reg += char;
             colors.push(getCharColor(tileX, tileY, charX, charY));
             var tile = tiles[tileY + "," + tileX];
             var containsLink = false;
@@ -432,8 +434,8 @@ function doZoom(percentage) {
     // if the tile system has loaded yet. otherwise, update it
     if(window.tilePixelCache) {
         // modify invisible-link size
-        linkDiv.style.width = (cellW + (linkMargin * 2)) + "px";
-        linkDiv.style.height = (cellH + (linkMargin * 2)) + "px";
+        linkDiv.style.width = cellW + "px";
+        linkDiv.style.height = cellH + "px";
 
         textLayerCtx.clearRect(0, 0, width, height);
         // change size of tiles
@@ -791,7 +793,7 @@ function adjust_scaling_DOM(ratio) {
     textLayer.style.height = window_height + "px";
 }
 
-window.addEventListener("resize", function(e) {
+function event_resize() {
     var ratio = window.devicePixelRatio;
     if(!ratio) ratio = 1;
     w.emit("resize", ratio);
@@ -800,7 +802,8 @@ window.addEventListener("resize", function(e) {
 
     browserZoomAdjust();
     renderTiles();
-});
+}
+window.addEventListener("resize", event_resize);
 
 // fix zooming blurriness issue
 browserZoomAdjust(true);
@@ -878,7 +881,7 @@ function getCharInfoXY(x, y) {
 }
 
 // copy individual chars
-document.addEventListener("keydown", function(e) {
+function event_keydown_copy_char(e) {
     if(w._state.uiModal) return;
     if(!worldFocused) return;
     if(document.activeElement.tagName == "INPUT" && document.activeElement.type == "text" && document.activeElement != textInput) return;
@@ -897,12 +900,14 @@ document.addEventListener("keydown", function(e) {
     var tileY = pos_ref[1];
     var charX = pos_ref[2];
     var charY = pos_ref[3];
-    var char = getChar(tileX, tileY, charX, charY)
+    var char = getChar(tileX, tileY, charX, charY);
+    char = char.replace(/\r|\n/g, " ");
     w.clipboard.copy(char);
-})
+}
+document.addEventListener("keydown", event_keydown_copy_char);
 
 // color picker
-document.addEventListener("keydown", function(e) {
+function event_keydown_copy_color(e) {
     if(!worldFocused) return;
     if(!checkKeyPress(e, keyConfig.copyColor)) return;
     textInput.value = "";
@@ -919,7 +924,8 @@ document.addEventListener("keydown", function(e) {
     // update color textbox in "change color" menu
     if(!color) color = 0;
     color_input_form_input.value = ("00000" + color.toString(16)).slice(-6);
-})
+}
+document.addEventListener("keydown", event_keydown_copy_color);
 
 owot.width = width;
 owot.height = height;
@@ -1214,6 +1220,7 @@ var dragStartY = 0;
 var dragPosX = 0;
 var dragPosY = 0;
 var isDragging = false;
+var hasDragged = false;
 var draggingEnabled = true;
 function event_mousedown(e, arg_pageX, arg_pageY) {
     var target = e.target;
@@ -1267,15 +1274,15 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
     });
     owot.style.cursor = defaultDragCursor;
 }
-document.addEventListener("mousedown", function(e) {
-    event_mousedown(e);
-});
-document.addEventListener("touchstart", function(e) {
+document.addEventListener("mousedown", event_mousedown);
+
+function event_touchstart(e) {
     var pos = touch_pagePos(e);
     touchPosX = pos[0];
     touchPosY = pos[1];
     event_mousedown(e, pos[0], pos[1]);
-}, { passive: false });
+}
+document.addEventListener("touchstart", event_touchstart, { passive: false });
 
 // change cursor position
 function renderCursor(coords) {
@@ -1356,6 +1363,7 @@ function removeCursor() {
 
 function stopDragging() {
     isDragging = false;
+    hasDragged = false;
     owot.style.cursor = defaultCursor;
 }
 
@@ -1415,19 +1423,19 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
         }
     }
 }
-document.addEventListener("mouseup", function(e) {
-    event_mouseup(e);
-})
-document.addEventListener("touchend", function(e) {
+document.addEventListener("mouseup", event_mouseup);
+function event_touchend(e) {
     event_mouseup(e, touchPosX, touchPosY);
-})
-
-document.addEventListener("mouseleave", function(e) {
+}
+document.addEventListener("touchend", event_touchend);
+function event_mouseleave() {
     stopDragging();
-})
-document.addEventListener("mouseenter", function(e) {
+}
+document.addEventListener("mouseleave", event_mouseleave);
+function event_mouseenter() {
     stopDragging();
-})
+}
+document.addEventListener("mouseenter", event_mouseenter);
 
 function is_link(tileX, tileY, charX, charY) {
     if(tiles[tileY + "," + tileX]) {
@@ -1451,7 +1459,7 @@ var surrogateRegexStr = "([\\uD800-\\uDBFF][\\uDC00-\\uDFFF])";
 var surrogateRegex = new RegExp(surrogateRegexStr, "g");
 var combiningRegexStr = "(([\\0-\\u02FF\\u0370-\\u1DBF\\u1E00-\\u20CF\\u2100-\\uD7FF\\uDC00-\\uFE1F\\uFE30-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF])([\\u0300-\\u036F\\u1DC0-\\u1DFF\\u20D0-\\u20FF\\uFE20-\\uFE2F]+))";
 var combiningRegex = new RegExp(combiningRegexStr, "g");
-var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\n|\\r", "g");
+var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\n|\\r|\\u2028|\\u2029", "g");
 
 // Split a string properly with surrogates and combining characters in mind
 function advancedSplit(str, noSurrog, noComb) {
@@ -1462,7 +1470,8 @@ function advancedSplit(str, noSurrog, noComb) {
     for(var i = 0; i < data.length; i++) {
         // contains surrogates without second character?
         if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
-            data.splice(i, 1)
+            data.splice(i, 1);
+            i--;
         }
         if((!surrogateCharsEnabled || noSurrog) && data[i].match(surrogateRegex)) {
             data[i] = "?";
@@ -1916,7 +1925,7 @@ var char_input_check = setInterval(function() {
     }
 }, 10);
 
-document.addEventListener("keydown", function(e) {
+function event_keydown(e) {
     var actElm = document.activeElement;
     if(!worldFocused) return;
     if(w._state.uiModal) return;
@@ -1961,7 +1970,8 @@ document.addEventListener("keydown", function(e) {
         e.preventDefault();
     }
     w.emit("keyDown", e);
-});
+}
+document.addEventListener("keydown", event_keydown);
 
 var colors = ["#660066", "#003366", "#ff9900", "#ff0066", "#003300", "#ff0000", "#3a3a3a", "#006666", "#3399ff", "#3333ff", "#000000"];
 function assignColor(username) {
@@ -2112,19 +2122,20 @@ function escapeQuote(text) { // escapes " and ' and \
     return text.replace(/\\/g, "\\\\").replace(/\"/g, "\\\"").replace(/\'/g, "\\'");
 }
 
-var linkMargin = 100; // px
 var linkElm = document.createElement("a");
 linkElm.href = "";
+linkElm.className = "link_element";
 document.body.appendChild(linkElm);
 var linkDiv = document.createElement("div");
-linkDiv.style.width = (cellW + (linkMargin * 2)) + "px";
-linkDiv.style.height = (cellH + (linkMargin * 2)) + "px";
+linkDiv.style.width = cellW + "px";
+linkDiv.style.height = cellH + "px";
 linkElm.appendChild(linkDiv);
-linkElm.style.position = "absolute";
 linkElm.title = "Link to url...";
-linkElm.style.display = "block";
 linkElm.target = "_blank";
 linkElm.style.cursor = "pointer";
+linkElm.ondragstart = function() {
+    return false;
+}
 
 var touchPosX = 0;
 var touchPosY = 0;
@@ -2155,10 +2166,12 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 
     if(e.target != owot && e.target != linkDiv) return;
     var link = is_link(tileX, tileY, charX, charY);
+    if(hasDragged) link = false;
     if(link && linksEnabled && !w.isSelecting) {
         var pos = tileAndCharsToWindowCoords(tileX, tileY, charX, charY);
-        linkElm.style.left = (pos[0] - linkMargin) + "px";
-        linkElm.style.top = (pos[1] - linkMargin) + "px";
+        owot.style.cursor = "pointer";
+        linkElm.style.left = pos[0] + "px";
+        linkElm.style.top = pos[1] + "px";
         linkElm.hidden = false;
         linkElm.onclick = "";
         linkElm.target = "_blank";
@@ -2192,6 +2205,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             linkElm.target = "";
         }
     } else {
+        if(!linkElm.hidden) owot.style.cursor = defaultCursor;
         linkElm.style.top = "-1000px";
         linkElm.style.left = "-1000px";
         linkElm.hidden = true;
@@ -2286,19 +2300,19 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 
     positionX = dragPosX + (pageX - dragStartX);
     positionY = dragPosY + (pageY - dragStartY);
+    hasDragged = true;
 
     renderTiles();
 }
-document.addEventListener("mousemove", function(e) {
-    event_mousemove(e);
-});
-document.addEventListener("touchmove", function(e) {
+document.addEventListener("mousemove", event_mousemove);
+function event_touchmove(e) {
     e.preventDefault();
     var pos = touch_pagePos(e);
     touchPosX = pos[0];
     touchPosY = pos[1];
     event_mousemove(e, pos[0], pos[1]);
-}, { passive: false });
+}
+document.addEventListener("touchmove", event_touchmove, { passive: false });
 
 // get position from touch event
 function touch_pagePos(e) {
@@ -2307,7 +2321,7 @@ function touch_pagePos(e) {
 }
 
 var scrollingEnabled = true;
-document.addEventListener("wheel", function(e) {
+function event_wheel(e) {
     if(w._state.uiModal) return;
     if(!scrollingEnabled) return; // return if disabled
     // if focused on chat, don't scroll world
@@ -2330,7 +2344,8 @@ document.addEventListener("wheel", function(e) {
         deltaY: -deltaY
     });
     renderTiles();
-})
+}
+document.addEventListener("wheel", event_wheel);
 
 function checkKeyPress(e, combination) {
     // if combination arg is an array of combinations
@@ -2980,7 +2995,6 @@ function renderChar(x, y, str, content, props, textRender, colors) {
     }
     if(!char) char = " ";
     var cCode = char.charCodeAt(0);
-    if(char == "\x1A") char = "\u2588";
 
     // if text has no color, use default text color. otherwise, colorize it
     if(color == 0 || !colorsEnabled || (isLink && !colorizeLinks)) {
@@ -4004,7 +4018,7 @@ var ws_functions = {
             var newColors = newColorArray();
             // get content and colors from new tile data
             if(data.tiles[tileKey]) {
-                newContent = data.tiles[tileKey].content
+                newContent = data.tiles[tileKey].content;
                 if(data.tiles[tileKey].properties.color) {
                     newColors = data.tiles[tileKey].properties.color;
                 }

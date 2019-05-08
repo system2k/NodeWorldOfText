@@ -36,6 +36,9 @@ module.exports.GET = async function(req, serve, vars) {
         file = parseFloat(file, 10);
         if(isNaN(file) || !Number.isInteger(file)) return serve(null, 404);
         var fileData = await static_retrieve(file, range);
+        if(fileData === 0) {
+            return serve(null, 403);
+        }
         if(!fileData) {
             return serve(null, 404);
         }

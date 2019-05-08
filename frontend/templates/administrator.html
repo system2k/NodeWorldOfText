@@ -289,8 +289,8 @@
             <a href="/administrator/backgrounds/">Upload Page Backgrounds</a>
             <br>
             <a href="/administrator/files/">Manage files</a>
-            <br>
-            <a href="/administrator/user_list/">User list</a>
+            {% if user.operator %}<br>
+            <a href="/administrator/user_list/">User list</a>{% endif %}
         </div>
     </div>
 
