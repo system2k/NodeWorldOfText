@@ -29,10 +29,10 @@
                         {% if user.staff %}
                             | <a href="/script_manager/">Script Manager</a>
                         {% endif %}
-                        | <a href="{{ logoutPath }}">Logout</a>
+                        | <a href="/accounts/logout/">Logout</a>
                     {% else %}
-                        | <a href="{{ loginPath }}">Login</a>
-                        | <a href="{{ registerPath }}">Register</a>
+                        | <a href="/accounts/login/">Login</a>
+                        | <a href="/accounts/register/">Register</a>
                     {% endif %}
                 </div>
 
