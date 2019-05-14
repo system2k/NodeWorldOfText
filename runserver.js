@@ -293,6 +293,7 @@ var accountSystem  = settings.accountSystem; // "uvias" or "local"
 var loginPath = "/accounts/login/";
 var logoutPath = "/accounts/logout/";
 var registerPath = "/accounts/register/";
+var profilePath = "/accounts/profile/";
 
 if(accountSystem != "uvias" && accountSystem != "local") {
     console.log("ERROR: Invalid account system: " + accountSystem);
@@ -349,13 +350,16 @@ if(testUviasIds) {
 }
 uvias.sso = "/accounts/sso";
 uvias.logout = "/home/";
-uvias.loginPath = "https://uvias.com/api/loginto/" + uvias.id;
-uvias.logoutPath = "https://uvias.com/logoff?service=" + uvias.id;
-uvias.registerPath = "https://uvias.com/api/loginto/" + uvias.id + "#create";
+uvias.address = "https://uvias.com";
+uvias.loginPath = uvias.address + "/api/loginto/" + uvias.id;
+uvias.logoutPath = uvias.address + "/logoff?service=" + uvias.id;
+uvias.registerPath = uvias.address + "/api/loginto/" + uvias.id + "#create";
+uvias.profilePath = uvias.address + "/profile/@me";
 if(accountSystem == "uvias") {
     loginPath = uvias.loginPath;
     logoutPath = uvias.logoutPath;
     registerPath = uvias.registerPath;
+    profilePath = uvias.profilePath;
 }
 
 function toHex64(n) {
@@ -1874,6 +1878,7 @@ async function process_request(req, res, current_req_id) {
                     data.loginPath = loginPath;
                     data.logoutPath = logoutPath;
                     data.registerPath = registerPath;
+                    data.profilePath = profilePath;
                     data.accountSystem = accountSystem;
                     // if(data.csrftoken) {
                     //     csrf_tokens[data.csrftoken] = 1;

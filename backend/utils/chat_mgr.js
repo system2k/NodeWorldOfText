@@ -106,6 +106,7 @@ async function retrieveChatHistory(world_id) {
         for(var a = 0; a < world_chats.length; a++) {
             var row = JSON.parse(world_chats[a].data);
             row.date = world_chats[a].date;
+            row.cid = world_chats[a].id;
             chat_cache[world_id].data.push(row)
         }
     }

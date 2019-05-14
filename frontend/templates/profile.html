@@ -80,7 +80,7 @@
 		<div class="content_set_title">Account</div>
 		<div class="content_set_content">
 			{% if accountSystem == "uvias" %}
-				No options available yet
+				<a href="{{ profilePath }}">Manage profile</a>
 			{% else %}
 				<a href="/accounts/password_change/">Change Password</a>
 				{% if !email_verified && ver_count == 0 %}

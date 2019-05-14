@@ -88,6 +88,8 @@ var pasteDirRight          = true;
 var pasteDirDown           = true;
 var defaultCursor          = "text";
 var defaultDragCursor      = "move";
+var tileMargin             = 0;
+var tileMarginHalf         = tileMargin / 2;
 
 var images_to_load         = {
     unloaded: "/static/unloaded.png"
@@ -2810,8 +2812,8 @@ function getTileCanvas(str) {
     var textRender;
     if(!textRenderCanvas) {
         textRenderCanvas = document.createElement("canvas");
-        textRenderCanvas.width = cellW * tileC;
-        textRenderCanvas.height = cellH * tileR;
+        textRenderCanvas.width = cellW * tileC + tileMargin;
+        textRenderCanvas.height = cellH * tileR + tileMargin;
         textRender = textRenderCanvas.getContext("2d");
         textRender.font = font;
         tilePixelCache[str] = [textRenderCanvas, textRender];
@@ -2958,6 +2960,7 @@ function encodeCharProt(array) {
 }
 
 function renderChar(x, y, str, content, props, textRender, colors) {
+    var off = tileMarginHalf; // offset
     // fillText is always off by 5 pixels, adjust it
     var textYOffset = cellH - (5 * zoom);
     // fill background if defined
@@ -2966,7 +2969,7 @@ function renderChar(x, y, str, content, props, textRender, colors) {
             if(coloredChars[str][y][x]) {
                 var color = coloredChars[str][y][x];
                 textRender.fillStyle = color;
-                textRender.fillRect(x * cellW, y * cellH, cellW, cellH);
+                textRender.fillRect(off + x * cellW, off + y * cellH, cellW, cellH);
             }
         }
     }
@@ -3008,37 +3011,37 @@ function renderChar(x, y, str, content, props, textRender, colors) {
 
     // underline link
     if(isLink) {
-        textRender.fillRect(x * cellW, y * cellH + textYOffset + zoom, cellW, zoom);
+        textRender.fillRect(off + x * cellW, off + y * cellH + textYOffset + zoom, cellW, zoom);
     }
     if(char != "\u0020" && char != "\u00a0") { // ignore whitespace characters
         if(cCode >= 0x2800 && cCode <= 0x28FF && brBlockFill) { // render braille chars as rectangles
             var dimX = cellW / 2;
             var dimY = cellH / 4;
-            if(cCode & 1) textRender.fillRect(x * cellW, y * cellH, dimX, dimY);
-            if(cCode & 8) textRender.fillRect(x * cellW + dimX, y * cellH, dimX, dimY);
-            if(cCode & 2) textRender.fillRect(x * cellW, y * cellH + dimY, dimX, dimY);
-            if(cCode & 16) textRender.fillRect(x * cellW + dimX, y * cellH + dimY, dimX, dimY);
-            if(cCode & 4) textRender.fillRect(x * cellW, y * cellH + dimY * 2, dimX, dimY);
-            if(cCode & 32) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 2, dimX, dimY);
-            if(cCode & 64) textRender.fillRect(x * cellW, y * cellH + dimY * 3, dimX, dimY);
-            if(cCode & 128) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 3, dimX, dimY);
+            if(cCode & 1) textRender.fillRect(off + x * cellW, off + y * cellH, dimX, dimY);
+            if(cCode & 8) textRender.fillRect(off + x * cellW + dimX, off + y * cellH, dimX, dimY);
+            if(cCode & 2) textRender.fillRect(off + x * cellW, off + y * cellH + dimY, dimX, dimY);
+            if(cCode & 16) textRender.fillRect(off + x * cellW + dimX, off + y * cellH + dimY, dimX, dimY);
+            if(cCode & 4) textRender.fillRect(off + x * cellW, off + y * cellH + dimY * 2, dimX, dimY);
+            if(cCode & 32) textRender.fillRect(off + x * cellW + dimX, off + y * cellH + dimY * 2, dimX, dimY);
+            if(cCode & 64) textRender.fillRect(off + x * cellW, off + y * cellH + dimY * 3, dimX, dimY);
+            if(cCode & 128) textRender.fillRect(off + x * cellW + dimX, off + y * cellH + dimY * 3, dimX, dimY);
         } else if(char == "\u2588" && ansiBlockFill) { // █ full block
-            textRender.fillRect(x * cellW, y * cellH, cellW, cellH);
+            textRender.fillRect(off + x * cellW, off + y * cellH, cellW, cellH);
         } else if(char == "\u2580" && ansiBlockFill) { // ▀ top half block
-            textRender.fillRect(x * cellW, y * cellH, cellW, Math.trunc(cellH / 2));
+            textRender.fillRect(off + x * cellW, off + y * cellH, cellW, Math.trunc(cellH / 2));
         } else if(char == "\u2584" && ansiBlockFill) { // ▄ bottom half block
-            textRender.fillRect(x * cellW, y * cellH + Math.trunc(cellH / 2), cellW, Math.trunc(cellH / 2));
+            textRender.fillRect(off + x * cellW, off + y * cellH + Math.trunc(cellH / 2), cellW, Math.trunc(cellH / 2));
         } else if(char == "\u258c" && ansiBlockFill) { // ▌ left half block
-            textRender.fillRect(x * cellW, y * cellH, Math.trunc(cellW / 2), cellH);
+            textRender.fillRect(off + x * cellW, off + y * cellH, Math.trunc(cellW / 2), cellH);
         } else if(char == "\u2590" && ansiBlockFill) { // ▐ right half block
-            textRender.fillRect(x * cellW + Math.trunc(cellW / 2), y * cellH, Math.trunc(cellW / 2), cellH);
+            textRender.fillRect(off + x * cellW + Math.trunc(cellW / 2), off + y * cellH, Math.trunc(cellW / 2), cellH);
         } else { // character rendering
             var mSpec = (char.charCodeAt(1) == 822) && mSpecRendering;
             if(char.length > 1 && !mSpec) textRender.font = specialCharFont;
             if(mSpec) char = char.replace(String.fromCharCode(822), "");
-            textRender.fillText(char, x * cellW + XPadding, y * cellH + textYOffset); // render text
+            textRender.fillText(char, off + x * cellW + XPadding, off + y * cellH + textYOffset); // render text
             if(char.length > 1 && !mSpec) textRender.font = font;
-            if(mSpec) textRender.fillRect(x * cellW, y * cellH + cellH - 9 * zoom, cellW, zoom);
+            if(mSpec) textRender.fillRect(off + x * cellW, off + y * cellH + cellH - 9 * zoom, cellW, zoom);
         }
     }
 }
@@ -3056,7 +3059,7 @@ function renderTile(tileX, tileY, redraw) {
         // unloaded tile background is already drawn
         if(tilePixelCache[str]) {
             textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
-            textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
+            textLayerCtx.drawImage(tilePixelCache[str][0], offsetX - tileMarginHalf, offsetY - tileMarginHalf);
             return;
         }
         // generate tile background
@@ -3068,7 +3071,7 @@ function renderTile(tileX, tileY, redraw) {
         var textRender = tileCanv[1];
         textRender.drawImage(imgData, 0, 0, tileW, tileH);
         textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
-        textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
+        textLayerCtx.drawImage(tilePixelCache[str][0], offsetX - tileMarginHalf, offsetY - tileMarginHalf);
         return;
     }
 
@@ -3177,7 +3180,7 @@ function renderTile(tileX, tileY, redraw) {
     // (force redraw if tile hasn't been drawn before and it's initted)
     if(tilePixelCache[str] && !redraw && !tile.redraw && !(!tile.been_drawn && tile.initted)) {
         textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
-        textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
+        textLayerCtx.drawImage(tilePixelCache[str][0], offsetX - tileMarginHalf, offsetY - tileMarginHalf);
         return;
     }
     // tile has been drawn at least once
@@ -3231,7 +3234,7 @@ function renderTile(tileX, tileY, redraw) {
 
     // add image to main canvas
     textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
-    textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY)
+    textLayerCtx.drawImage(tilePixelCache[str][0], offsetX - tileMarginHalf, offsetY - tileMarginHalf);
 }
 
 function renderTiles(redraw) {

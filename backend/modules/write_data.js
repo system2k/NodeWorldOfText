@@ -1,3 +1,5 @@
+var emptyWriteResponse = { accepted: [], rejected: {} };
+
 module.exports = async function(data, vars, evars) {
     var user = vars.user;
     var world = vars.world;
@@ -36,8 +38,8 @@ module.exports = async function(data, vars, evars) {
     if(color_text == 2 && !is_owner) can_color_text = false;
 
     var edits = data.edits;
-    if(!edits) return;
-    if(!Array.isArray(edits)) return;
+    if(!edits) return emptyWriteResponse;
+    if(!Array.isArray(edits)) return emptyWriteResponse;
     
     var total_edits = 0;
     var tiles = {};
