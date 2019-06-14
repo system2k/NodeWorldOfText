@@ -1,13 +1,14 @@
-var selectedChatTab     = 0; // 0 is the page chat, 1 is the global chat
-var chatOpen            = 0;
-var chatPageUnread      = 0;
-var chatGlobalUnread    = 0;
-var initPageTabOpen     = false;
-var initGlobalTabOpen   = false;
-var chatWriteHistory    = []; // history of user's chats
-var chatWriteHistoryMax = 100; // maximum size of chat write history length
-var chatWriteHistoryIdx = -1; // location in chat write history
-var serverPingTime      = 0;
+var selectedChatTab      = 0; // 0 is the page chat, 1 is the global chat
+var chatOpen             = 0;
+var chatPageUnread       = 0;
+var chatGlobalUnread     = 0;
+var initPageTabOpen      = false;
+var initGlobalTabOpen    = false;
+var chatWriteHistory     = []; // history of user's chats
+var chatWriteHistoryMax  = 100; // maximum size of chat write history length
+var chatWriteHistoryIdx  = -1; // location in chat write history
+var serverPingTime       = 0;
+var chatFilterMessyChars = true;
 
 var chat_window      = document.getElementById("chat_window");
 var chat_open        = document.getElementById("chat_open");
@@ -358,6 +359,14 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
         field = document.getElementById("global_chatfield");
     } else {
         field = getChatfield();
+    }
+
+    if(chatFilterMessyChars) {
+        message = advancedSplit(message);
+        for(var i = 0; i < message.length; i++) {
+            message[i] = message[i].slice(0, 5);
+        }
+        message = message.join("");
     }
 
     if(!op) message = html_tag_esc(message);

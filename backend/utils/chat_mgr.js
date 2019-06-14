@@ -106,8 +106,8 @@ async function retrieveChatHistory(world_id) {
         for(var a = 0; a < world_chats.length; a++) {
             var row = JSON.parse(world_chats[a].data);
             row.date = world_chats[a].date;
-            row.cid = world_chats[a].id;
-            chat_cache[world_id].data.push(row)
+            row.aid = world_chats[a].id;
+            chat_cache[world_id].data.push(row);
         }
     }
     chat_cache[world_id].loaded = true;
@@ -122,6 +122,7 @@ async function retrieveChatHistory(world_id) {
     return chat_cache[world_id].data;
 }
 
+var chatAdditionId = -2; // avoid using -1.
 async function add_to_chatlog(chatData, world_id) {
     var location = "page"
     if(world_id == 0) {
@@ -130,6 +131,7 @@ async function add_to_chatlog(chatData, world_id) {
 
     var date = Date.now();
     chatData.date = date;
+    chatData.aid = chatAdditionId--;
 
     var history = await retrieveChatHistory(world_id);
 
@@ -200,8 +202,9 @@ async function doUpdateChatLogData() {
         } else {
             def_channel = def_channel.channel_id;
         }
-        await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
-            [date, def_channel, JSON.stringify(chatData)])
+        var cent = await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
+            [date, def_channel, JSON.stringify(chatData)]);
+        chatData.aid = cent.lastID;
     }
 
     for(var i = 0; i < copy_global_chat_additions.length; i++) {
@@ -209,8 +212,9 @@ async function doUpdateChatLogData() {
         var data = row[0];
         var date = row[1];
         var global_channel = (await db_ch.get("SELECT id FROM channels WHERE name='global'")).id;
-        await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
-            [date, global_channel, JSON.stringify(data)])
+        var cent = await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
+            [date, global_channel, JSON.stringify(data)]);
+        data.aid = cent.lastID;
     }
 
     await db_ch.run("COMMIT")

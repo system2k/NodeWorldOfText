@@ -50,19 +50,18 @@ function create_date(time) {
     return str;
 }
 
-// sanitize number input
+// sanitize number input to be strictly between -9007199254740991 and 9007199254740991
 function san_nbr(x) {
-    x -= 0;
+    if(typeof x == "string") x -= 0;
+    if(typeof x == "bigint") x = Number(x);
+    if(x === true) x = 1;
+    if(x == Infinity) x = 9007199254740991;
+    if(x == -Infinity) x = -9007199254740991;
+    if(typeof x != "number") x = 0;
+    if(!x || isNaN(x) || !isFinite(x)) x = 0;
     if(x >= 9007199254740991) x = 9007199254740991;
     if(x <= -9007199254740991) x = -9007199254740991;
-    x = parseInt(x);
-    if(!x || isNaN(x) || !isFinite(x)) {
-        x = 0;
-    }
-    x = Math.floor(x);
-    if(x >= 9007199254740991) x = 9007199254740991;
-    if(x <= -9007199254740991) x = -9007199254740991;
-    return x;
+    return Math.trunc(x);
 }
 
 // just to make things easier

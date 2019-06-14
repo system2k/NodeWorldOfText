@@ -77,9 +77,16 @@ module.exports.GET = async function(req, serve, vars, params) {
             }],
             utf16: query_data.utf16,
             array: query_data.array,
-            content_only: query_data.content_only
+            content_only: query_data.content_only,
+            concat: query_data.concat
         }, vars)
-        serve(JSON.stringify(tiles), null, {
+        var tData;
+        if(typeof tiles == "string") {
+            tData = tiles;
+        } else {
+            tData = JSON.stringify(tiles);
+        }
+        serve(tData, null, {
             mime: "application/json; charset=utf-8"
         })
     } else { // the HTML page

@@ -310,6 +310,10 @@ function makePgClient() {
     pgConn.on("end", function() {
         console.log("WARNING: Postgres client is closed");
     });
+    pgConn.on("error", function(err) {
+        console.log("ERROR: Postgres client received an error:");
+        console.log(err);
+    });
 }
 if(accountSystem == "uvias") {
     pg.defaults.user = "fp";
@@ -1694,7 +1698,7 @@ async function process_request(req, res, current_req_id) {
     var offset = 2;
     var subdomains = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
     var sub = subdomains.slice(offset);
-    for(var i = 0; i < sub.length; i++) sub[i]= sub[i].toLowerCase();
+    for(var i = 0; i < sub.length; i++) sub[i] = sub[i].toLowerCase();
 
     var URLparse = url.parse(req.url);
     var URL = URLparse.pathname;
@@ -1869,7 +1873,7 @@ async function process_request(req, res, current_req_id) {
                 // return compiled HTML pages
                 function HTML(path, data) {
                     if(!template_data[path]) { // template not found
-                        return "An unexpected error occurred while generating this page"
+                        return "An unexpected error occurred while generating this page";
                     }
                     if(!data) {
                         data = {};
@@ -1897,7 +1901,7 @@ async function process_request(req, res, current_req_id) {
                     broadcast: global_data.ws_broadcast,
                     HTML,
                     ipAddress
-                })
+                });
                 vars_joined = true;
                 if(row[1][method] && valid_method(method)) {
                     // Return the page
@@ -1906,7 +1910,7 @@ async function process_request(req, res, current_req_id) {
                     dispatch("Method " + method + " not allowed.", 405);
                 }
             } else if(typeof row[1] == "string") { // it's a path and must be redirected to
-                dispatch(null, null, { redirect: row[1] })
+                dispatch(null, null, { redirect: row[1] });
             } else {
                 found_url = false; // it's not found because the type is invalid
             }
@@ -2103,7 +2107,7 @@ function getWorldData(world) {
         id_overflow_int: 10000,
         display_user_count: 0,
         user_count: 0
-    }
+    };
 
     return worldData[ref];
 }
@@ -2183,7 +2187,7 @@ async function clear_expired_sessions(no_timeout) {
         [Date.now(), Day * settings.activation_key_days_expire], async function(data) {
         var id = data.id;
         await db.run("DELETE FROM registration_registrationprofile WHERE user_id=?", id);
-    })
+    });
 
     if(!no_timeout) intv.clearExpiredSessions = setTimeout(clear_expired_sessions, Minute);
 }
@@ -2218,8 +2222,8 @@ function initPingAuto() {
                 ws.ping();
             } catch(e) {
                 handle_error(e);
-            };
-        })
+            }
+        });
     }, 1000 * 30);
 }
 
@@ -2494,6 +2498,44 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
     return [ipAddress, ipAddressFam];
 }
 
+var ws_req_per_second = 1024;
+var ws_limits = { // [amount, per ms, minimum ms cooldown]
+    chat:        [10, 1000, 0],
+    chathistory: [3, 20000, 3000],
+    clear_tile:  [1000, 1000, 0],
+    cmd_opt:     [10, 1000, 0],
+    cmd:         [256, 1000, 0],
+    debug:       [10, 1000, 0],
+    fetch:       [5, 1000, 0],
+    link:        [400, 1000, 0],
+    protect:     [400, 1000, 0],
+    set_tile:    [10, 1000, 0],
+    write:       [10, 1000, 0],
+    paste:       [1, 1000, 0]
+};
+
+function can_process_req_kind(lims, kind) {
+    if(!ws_limits[kind]) return true;
+    var date = Date.now();
+    var wlims = ws_limits[kind];
+    var amount = wlims[0];
+    var per_ms = wlims[1];
+    var cooldn = wlims[2];
+    if(!lims[kind]) lims[kind] = [0, Math.floor(date / per_ms), date % per_ms, 0];
+    var curr_date = Math.floor((date - lims[kind][2]) / per_ms);
+    if(cooldn && date - lims[kind][3] < cooldn) {
+        return false;
+    }
+    if(lims[kind][1] == curr_date) {
+        lims[kind][3] = date;
+        return lims[kind][0]++ <= amount;
+    }
+    lims[kind][0] = 0;
+    lims[kind][1] = curr_date;
+    lims[kind][3] = date;
+    return true;
+}
+
 async function manageWebsocketConnection(ws, req) {
     if(!serverLoaded) await waitForServerLoad();
     if(isStopping) return;
@@ -2505,9 +2547,7 @@ async function manageWebsocketConnection(ws, req) {
         var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
         var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
         var remIp = req.socket.remoteAddress;
-
         var ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
-
         var compIp = forwd || realIp || remIp || "Err" + rnd;
         if(!forwd) forwd = "None;" + rnd;
         if(!realIp) realIp = "None;" + rnd;
@@ -2519,7 +2559,6 @@ async function manageWebsocketConnection(ws, req) {
         ws.ipRem = remIp;
         ws.ipComp = compIp;
         ws.ipCF = cfIp;
-
         ws.ipAddress = ipAddress;
     } catch(e) {
         var error_ip = "ErrC" + Math.floor(Math.random() * 1E4);
@@ -2533,14 +2572,13 @@ async function manageWebsocketConnection(ws, req) {
     /*
         TODO: Limit requests based on packet type.
     */
-    var req_per_second = 256;
     var reqs_second = 0; // requests received at current second
     var current_second = Math.floor(Date.now() / 1000);
     function can_process_req() { // limit requests per second
         var compare_second = Math.floor(Date.now() / 1000);
         reqs_second++;
         if(compare_second == current_second) {
-            if(reqs_second >= req_per_second) {
+            if(reqs_second >= ws_req_per_second) {
                 return false;
             } else {
                 return true;
@@ -2551,6 +2589,7 @@ async function manageWebsocketConnection(ws, req) {
             return true;
         }
     }
+    var kindLimits = {};
     try {
         var location = url.parse(req.url).pathname;
         // must be at the top before any async calls (errors would occur before this event declaration)
@@ -2756,6 +2795,8 @@ async function manageWebsocketConnection(ws, req) {
                     return;
                 }
                 var kind = msg.kind;
+                kind += "";
+                kind = kind.toLowerCase();
                 var requestID = null;
                 if(typeof msg.request == "string" || typeof msg.request == "number") {
                     requestID = msg.request;
@@ -2765,6 +2806,7 @@ async function manageWebsocketConnection(ws, req) {
                 }
                 // Begin calling a websocket function for the necessary request
                 if(websockets[kind]) {
+                    if(!can_process_req_kind(kindLimits, kind)) return;
                     function send(msg) {
                         msg.kind = kind;
                         if(requestID !== null) msg.request = requestID;
@@ -2777,7 +2819,7 @@ async function manageWebsocketConnection(ws, req) {
                     var res = await websockets[kind](ws, msg, send, vars, {
                         transaction: transaction_obj(current_req_id),
                         broadcast,
-                        clientId,
+                        clientId: ws.clientId,
                         ws
                     });
                     if(typeof res == "string") {
@@ -2818,6 +2860,7 @@ function start_server() {
 var worldViews = {};
 
 var global_data = {
+    isTestServer,
     announcement: function() { return announcement_cache },
     get_bypass_key: function() { return bypass_key_cache },
     add_background_cache: pages.load_backgrounds.add_cache,
@@ -2890,7 +2933,7 @@ var global_data = {
     static_retrieve_raw_header,
     broadcastMonitorEvent,
     monitorEventSockets
-}
+};
 
 async function sysLoad() {
     // initialize variables in the systems

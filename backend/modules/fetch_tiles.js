@@ -72,14 +72,17 @@ module.exports = async function(data, vars) {
     var q_utf16 = data.utf16;
     var q_array = data.array;
     var q_content_only = data.content_only;
+    var q_concat = data.concat; // only if content_only is enabled
 
     var o_editlog = data.editlog;
     var o_editlog_start = data.editlog_start;
 
+    var alt_return_obj = null;
+
     var total_area = 0;
     for(var v = 0; v < len; v++) {
         var rect = data.fetchRectangles[v];
-        if(typeof rect != "object" || Array.isArray(rect)) return "Invalid parameters";
+        if(typeof rect != "object" || Array.isArray(rect) || rect == null) return "Invalid parameters";
         var minY = san_nbr(rect.minY);
         var minX = san_nbr(rect.minX);
         var maxY = san_nbr(rect.maxY);
@@ -121,9 +124,16 @@ module.exports = async function(data, vars) {
         var maxY = rect.maxY;
         var maxX = rect.maxX;
 
-        for(var ty = minY; ty <= maxY; ty++) {
-            for(var tx = minX; tx <= maxX; tx++) {
-                tiles[ty + "," + tx] = null;
+        if(q_concat && q_content_only) {
+            if(alt_return_obj === null) {
+                alt_return_obj = "";
+                if(q_array) alt_return_obj = [];
+            }
+        } else {
+            for(var ty = minY; ty <= maxY; ty++) {
+                for(var tx = minX; tx <= maxX; tx++) {
+                    tiles[ty + "," + tx] = null;
+                }
             }
         }
 
@@ -287,21 +297,32 @@ module.exports = async function(data, vars) {
                 var content = data.content;
                 if(q_utf16) content = filterUTF16(content);
                 if(q_array) content = advancedSplitCli(content);
-                var tileRes;
-                if(q_content_only) {
-                    tileRes = content;
+                if(q_concat && q_content_only) {
+                    if(q_array) {
+                        for(var p = 0; p < content.length; p++) {
+                            alt_return_obj.push(content[p]);
+                        }
+                    } else {
+                        alt_return_obj += content;
+                    }
                 } else {
-                    tileRes = {
-                        content,
-                        properties: Object.assign(properties, {
-                            writability: data.writability
-                        })
-                    };
+                    var tileRes;
+                    if(q_content_only) {
+                        tileRes = content;
+                    } else {
+                        tileRes = {
+                            content,
+                            properties: Object.assign(properties, {
+                                writability: data.writability
+                            })
+                        };
+                    }
+                    tiles[data.tileY + "," + data.tileX] = tileRes;
                 }
-                tiles[data.tileY + "," + data.tileX] = tileRes;
             });
         }
     }
 
+    if(alt_return_obj !== null) return alt_return_obj;
     return tiles;
 }

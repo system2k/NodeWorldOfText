@@ -98,22 +98,22 @@ function write_edits(tile, t, accepted, rejected, edit, data, editLog) {
 
     // tile is owner-only, but user is not owner
     if(char_writability == 2 && !is_owner) {
-        rejected[editId] = "NO_TILE_PERM";
+        if(rejected) rejected[editId] = "NO_TILE_PERM";
         return;
     }
     // tile is member-only, but user is not member (nor owner)
     if(char_writability == 1 && !is_owner && !is_member) {
-        rejected[editId] = "NO_TILE_PERM";
+        if(rejected) rejected[editId] = "NO_TILE_PERM";
         return;
     }
 
     // this edit request is only allowed to write on public areas
     if(public_only && char_writability != 0) {
-        rejected[editId] = "NO_TILE_PERM";
+        if(rejected) rejected[editId] = "NO_TILE_PERM";
         return;
     }
 
-    accepted.push(editId);
+    if(accepted) accepted.push(editId);
 
     t.tile_data = insert_char_at_index(t.tile_data, char, offset);
 
@@ -174,7 +174,7 @@ function write_edits(tile, t, accepted, rejected, edit, data, editLog) {
         }
     }
 
-    if(!no_log_edits) {
+    if(!no_log_edits && editLog) {
         var ar = [tileY, tileX, charY, charX, time, char, editId];
         if(color) ar.push(color);
         if(incAnimationEditLog) { // if animation is passed in edit
@@ -221,7 +221,7 @@ function write_link(call_id, tile, t, data) {
     }
 
     if(!can_link) {
-        cids[call_id][0] = [true, "PERM"];
+        if(call_id != null) cids[call_id][0] = [true, "PERM"];
         return;
     }
 
@@ -243,7 +243,7 @@ function write_link(call_id, tile, t, data) {
         }
     }
 
-    cids[call_id][0] = [false, true];
+    if(call_id != null) cids[call_id][0] = [false, true];
 }
 
 function is_consistent(array) {
@@ -372,11 +372,11 @@ function protect_area(call_id, tile, t, data) {
 
     // no permission to modify
     if(!has_modified) {
-        cids[call_id][0] = [true, "PERM"];
+        if(call_id != null) cids[call_id][0] = [true, "PERM"];
         return;
     }
 
-    cids[call_id][0] = [false, true];
+    if(call_id != null) cids[call_id][0] = [false, true];
 }
 
 async function loadTile(tileCache, world_id, tileX, tileY) {
@@ -551,7 +551,7 @@ async function flushQueue() {
         if(type == types.clear) {
             var tileY = data.tileY;
             var tileX = data.tileX;
-            
+            var tileUID = world.id + "," + tileY + "," + tileX;
             var tData = tileCache[tileUID] || await loadTile(tileCache, world.id, tileX, tileY);
             var tile = tData[0]; // tile Database object
             var t = tData[1]; // data processed from tile database object
@@ -637,6 +637,77 @@ async function flushQueue() {
         if(type == types.settile) {
             cids[call_id][0] = "COMPLETE";
         }
+        if(type == types.paste) {
+            var tileX = data.tileX;
+            var tileY = data.tileY;
+            var charX = data.charX;
+            var charY = data.charY;
+            var text = advancedSplit(data.text);
+            var buckets = {};
+            for(var i = 0; i < text.length; i++) {
+                var chr = text[i];
+                if(chr.indexOf("\0") > -1) chr = " ";
+                var tstr = tileY + "," + tileX;
+                if(chr == "\n") {
+                    charX = data.charX;
+                    tileX = data.tileX;
+                    charY++;
+                    if(charY >= CONST.tileRows) {
+                        charY = 0;
+                        tileY++;
+                    }
+                } else {
+                    if(!buckets[tstr]) buckets[tstr] = [];
+                    buckets[tstr].push([tileY, tileX, charY, charX, 0, chr, 0, 0]);
+                    charX++;
+                    if(charX >= CONST.tileCols) {
+                        charX = 0;
+                        tileX++;
+                    }
+                }
+            }
+            for(var i in buckets) {
+                var pos = i.split(",");
+                var tileX = parseInt(pos[1]);
+                var tileY = parseInt(pos[0]);
+
+                var tileUID = world.id + "," + tileY + "," + tileX;
+
+                var tData = tileCache[tileUID] || await loadTile(tileCache, world.id, tileX, tileY);
+                var tile = tData[0]; // tile Database object
+                var t = tData[1]; // data processed from tile database object
+
+                for(var x = 0; x < buckets[i].length; x++) {
+                    write_edits(tile, t, null, null, buckets[i][x], data, null);
+                    write_link(null, tile, t, {
+                        user, world,
+                        tileX, tileY,
+                        charX: buckets[i][x][3],
+                        charY: buckets[i][x][2],
+                        is_member: data.is_member,
+                        is_owner: data.is_owner,
+                        type: "url",
+                        url: "https://ourworldoftext.com/this-is-only-a-test"
+                    });
+                    protect_area(null, tile, t, {
+                        user, world,
+                        tileX, tileY,
+                        charX: buckets[i][x][3],
+                        charY: buckets[i][x][2],
+                        is_member: data.is_member,
+                        is_owner: data.is_owner,
+                        precise: true,
+                        protect_type: 2
+                    });
+                }
+                t.createUndefTile = true;
+
+                // send tile update to the client
+                prepareTileUpdate(updatedTiles, tileX, tileY, t);
+                updatedTilesBroadcast = true;
+            }
+            cids[call_id][0] = "COMPLETE";
+        }
 
         if(updatedTilesBroadcast) {
             wss.clients.forEach(function(client) {
@@ -648,7 +719,7 @@ async function flushQueue() {
                             kind: "tileUpdate",
                             source: "write",
                             tiles: updatedTiles
-                        }))
+                        }));
                     } catch(e) {
                         handle_error(e);
                     }
@@ -747,7 +818,8 @@ var types = {
     protect: 2,
     clear: 3,
     publicclear: 4,
-    settile: 5
+    settile: 5,
+    paste: 6
 }
 
 module.exports.types = types;

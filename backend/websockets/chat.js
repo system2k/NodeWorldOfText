@@ -50,7 +50,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     var ranks_cache = vars.ranks_cache;
     var accountSystem = vars.accountSystem;
 
-    var ipHeaderAddr = ws.ipHeaderAddr;
+    var ipHeaderAddr = ws.ipAddress;
 
     var props = JSON.parse(world.properties);
     var chat_perm = props.chat_permission;

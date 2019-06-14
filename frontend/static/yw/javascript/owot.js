@@ -49,14 +49,12 @@ var width           = getWndWidth();
 var height          = getWndHeight();
 var js_alert_active = false; // js alert window open
 var worldFocused    = false;
-var regionSelected  = false;
-var regionCoordA    = null;
-var regionCoordB    = null;
+var Debug           = false;
 
 var positionX              = 0; // client position in pixels
 var positionY              = 0;
 var gridEnabled            = false;
-var subgridEnabled         = true; // character-level grid
+var subgridEnabled         = false; // character-level grid
 var linksEnabled           = true;
 var linksRendered          = true;
 var colorsEnabled          = true;
@@ -88,8 +86,7 @@ var pasteDirRight          = true;
 var pasteDirDown           = true;
 var defaultCursor          = "text";
 var defaultDragCursor      = "move";
-var tileMargin             = 0;
-var tileMarginHalf         = tileMargin / 2;
+var fetchClientMargin      = 200;
 
 var images_to_load         = {
     unloaded: "/static/unloaded.png"
@@ -120,6 +117,19 @@ window.addEventListener("load", function() {
 
 function byId(a) {
     return document.getElementById(a);
+}
+
+function debugLog() {
+    if(!Debug) return;
+    var args = [];
+    for(var i = 0; i < arguments.length; i++) {
+        args.push(arguments[i]);
+    }
+    args = JSON.stringify(args);
+    w.socket.send(JSON.stringify({
+        kind: "debug",
+        data: args
+    }));
 }
 
 var loading = byId("loading");
@@ -298,20 +308,12 @@ function beginLoadingOWOT() {
 beginLoadingOWOT();
 
 function keydown_regionSelect(e) {
-    if(!checkKeyPress(e, keyConfig.copyRegion) || w.isSelecting) return;
-    w.isSelecting = true;
-    owot.style.cursor = "cell";
+    if(!checkKeyPress(e, keyConfig.copyRegion) || regionSelectionsActive()) return;
+    w.regionSelect.startSelection();
 }
 document.addEventListener("keydown", keydown_regionSelect);
 
-function handleRegionSelection() {
-    regionSelected = true;
-    w.regionSelect.setSelection(regionCoordA, regionCoordB);
-    var coordA = regionCoordA.slice(0);
-    var coordB = regionCoordB.slice(0);
-    orderRangeABCoords(coordA, coordB);
-    var regWidth = (coordB[0] - coordA[0]) * tileC + coordB[2] - coordA[2] + 1;
-    var regHeight = (coordB[1] - coordA[1]) * tileR + coordB[3] - coordA[3] + 1;
+function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
     var tileX = coordA[0];
     var tileY = coordA[1];
     var charX = coordA[2];
@@ -319,15 +321,17 @@ function handleRegionSelection() {
     var reg = "";
     var colors = [];
     var links = [];
+    var protections = [];
     for(var y = 0; y < regHeight; y++) {
         if(y != 0) {
             reg += "\n";
         }
         for(var x = 0; x < regWidth; x++) {
-            var char = getChar(tileX, tileY, charX, charY);
-            char = char.replace(/\r|\n/g, " ");
+            var charInfo = getCharInfo(tileX, tileY, charX, charY);
+            var char = charInfo.char;
+            char = char.replace(/\r|\n|\x1b/g, " ");
             reg += char;
-            colors.push(getCharColor(tileX, tileY, charX, charY));
+            colors.push(charInfo.color);
             var tile = tiles[tileY + "," + tileX];
             var containsLink = false;
             if(tile && tile.properties && tile.properties.cell_props) {
@@ -344,6 +348,7 @@ function handleRegionSelection() {
                     }
                 }
             }
+            protections.push(charInfo.protection);
             if(!containsLink) {
                 links.push(null);
             }
@@ -361,7 +366,7 @@ function handleRegionSelection() {
             tileY++;
         }
     }
-    w._ui.selectionModal.open(reg, colors, links);
+    w._ui.selectionModal.open(reg, colors, links, protections);
     w.emit("regionSelected", {
         a: coordA,
         b: coordB
@@ -446,6 +451,8 @@ function doZoom(percentage) {
             canvas.width = tileW;
             canvas.height = tileH;
             var ctx = tilePixelCache[i][1];
+            tilePixelCache[i][2] = tileW;
+            tilePixelCache[i][3] = tileH;
             ctx.font = font;
         }
         renderTiles(true);
@@ -1062,6 +1069,9 @@ window.onhashchange = function(e) {
 
 // begin OWOT's client
 function begin() {
+    if(Debug) {
+        console.log("Client is in debug mode");
+    }
     manageCoordHash();
     // get world style
     ajaxRequest({
@@ -1101,24 +1111,6 @@ function stopLinkUI() {
     // remove highlight
     uncolorChar(tileX, tileY, charX, charY);
     renderTile(tileX, tileY, true);
-}
-
-function stopSelectionUI() {
-    if(!lastSelectionHover) return;
-    if(!w.isSelecting) return;
-    w.isSelecting = false;
-    owot.style.cursor = defaultCursor;
-    var tileX = lastSelectionHover[0];
-    var tileY = lastSelectionHover[1];
-    var charX = lastSelectionHover[2];
-    var charY = lastSelectionHover[3];
-    // remove highlight
-    uncolorChar(tileX, tileY, charX, charY);
-    renderTile(tileX, tileY, true);
-    regionSelected = false;
-    regionCoordA = null;
-    regionCoordB = null;
-    w.regionSelect.hide();
 }
 
 function removeTileProtectHighlight() {
@@ -1259,12 +1251,17 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
     if(w.isProtecting) {
         doProtect();
     }
-    if(w.isSelecting) {
-        regionCoordA = currentPosition;
-        w.regionSelect.show();
-        w.regionSelect.setSelection(regionCoordA, regionCoordA);
-        return;
+    var foundActiveSelection = false;
+    for(var i = 0; i < regionSelections.length; i++) {
+        var reg = regionSelections[i];
+        if(reg.isSelecting) {
+            reg.regionCoordA = currentPosition;
+            reg.show();
+            reg.setSelection(reg.regionCoordA, reg.regionCoordA);
+            foundActiveSelection = true;
+        }
     }
+    if(foundActiveSelection) return;
     var pos = getTileCoordsFromMouseCoords(pageX, pageY, true);
     w.emit("mouseDown", {
         tileX: pos[0],
@@ -1395,12 +1392,17 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
         return;
     }
 
-    if(w.isSelecting) {
-        regionCoordB = currentPosition;
-        handleRegionSelection();
-        stopSelectionUI();
-        return;
+    var foundActiveSelection = false;
+    for(var i = 0; i < regionSelections.length; i++) {
+        var reg = regionSelections[i];
+        if(reg.isSelecting) {
+            reg.regionCoordB = currentPosition;
+            reg.handleSelection();
+            reg.stopSelectionUI();
+            foundActiveSelection = true;
+        }
     }
+    if(foundActiveSelection) return;
 
     // set cursor
     var pos = getTileCoordsFromMouseCoords(pageX, pageY, true);
@@ -1483,12 +1485,6 @@ function advancedSplit(str, noSurrog, noComb) {
         }
     }
     return data;
-}
-
-function containsNewLine(char) {
-    for(var i = 0; i < char.length; i++) {
-        if(char.charAt(i) == "\n") return true;
-    }
 }
 
 var blankColor = (function() {
@@ -1614,11 +1610,11 @@ function writeCharToXY(char, charColor, x, y) {
 }
 
 // type a character
-function writeChar(char, doNotMoveCursor, temp_color) {
+function writeChar(char, doNotMoveCursor, temp_color, noNewline) {
     var charColor = temp_color || YourWorld.Color;
     if(temp_color == 0) charColor = 0;
     var cursor = cursorCoords;
-    if(!cursor && (char == "\n" || char == "\r")) {
+    if(!cursor && (char == "\n" || char == "\r") && !noNewline) {
         cursor = cursorCoordsCurrent;
     }
     char = advancedSplit(char);
@@ -1629,7 +1625,7 @@ function writeChar(char, doNotMoveCursor, temp_color) {
     var tileY = cursor[1];
     var charX = cursor[2];
     var charY = cursor[3];
-    var newLine = containsNewLine(char);
+    var newLine = (char == "\n" || char == "\r") && !noNewline;
     // first, attempt to move the cursor
     if(!doNotMoveCursor) {
         // get copy of cursor coordinates
@@ -1808,8 +1804,8 @@ var char_input_check = setInterval(function() {
     }
     if(value.length == 1) {
         textInput.value = "";
-        return
-    };
+        return;
+    }
     if(Permissions.can_paste(state.userModel, state.worldModel)) {
         linkQueue.splice(0);
         write_busy = true;
@@ -1823,7 +1819,10 @@ var char_input_check = setInterval(function() {
                 return;
             }
             var chr = value[index];
+            var doWriteChar = true;
+            var noNewline = false;
             if(chr == "\x1b") {
+                doWriteChar = false;
                 var hCode = value[index + 1];
                 if(hCode == "$") { // contains links
                     index += 2;
@@ -1894,6 +1893,45 @@ var char_input_check = setInterval(function() {
                             pauseValue += 2;
                         }
                     }
+                } else if(hCode == "P") { // contains area protections
+                    index += 2;
+                    var protType = parseInt(value[index]);
+                    index++;
+                    if(isNaN(protType)) return;
+                    if(!(protType >= 0 && protType <= 2)) return;
+                    if(protType <= 1) { // public, member
+                        if(!Permissions.can_protect_tiles(state.userModel, state.worldModel)) return;
+                    }
+                    if(protType == 2) { // owner
+                        if(!Permissions.can_admin(state.userModel, state.worldModel)) {
+                            protType = 1; // member
+                        }
+                    }
+                    w.socket.send(JSON.stringify({
+                        kind: "protect",
+                        data: {
+                            tileY: cursorCoords[1],
+                            tileX: cursorCoords[0],
+                            charY: cursorCoords[3],
+                            charX: cursorCoords[2],
+                            type: ["public", "member-only", "owner-only"][protType],
+                            precise: true
+                        },
+                        action: "protect"
+                    }));
+                    pauseValue += 2;
+                } else if(hCode == "\r" || hCode == "\n" || hCode == "\x1b") {
+                    index++;
+                    doWriteChar = true;
+                    if(hCode == "\n") {
+                        chr = "\n";
+                        noNewline = true;
+                    } else if(hCode == "\r") {
+                        chr = "\r";
+                        noNewline = true;
+                    } else if(hCode == "\x1b") {
+                        chr = "\x1b";
+                    }
                 } else { // colored paste
                     var cCol = "";
                     if(hCode == "x") {
@@ -1909,8 +1947,9 @@ var char_input_check = setInterval(function() {
                     }
                     pasteColor = parseInt(cCol, 16);
                 }
-            } else {
-                var res = writeChar(chr, false, pasteColor);
+            }
+            if(doWriteChar) {
+                var res = writeChar(chr, false, pasteColor, noNewline);
                 if(res === null) { // write failed
                     return; // keep waiting until tile loads
                 }
@@ -1955,7 +1994,9 @@ function event_keydown(e) {
         w.emit("esc");
         stopLinkUI();
         stopTileUI();
-        stopSelectionUI();
+        for(var i = 0; i < regionSelections.length; i++) {
+            regionSelections[i].stopSelectionUI();
+        }
         removeCursor();
         tileProtectAuto.active = false;
         linkAuto.active = false;
@@ -2056,6 +2097,13 @@ function getHeight(margin) {
     var A = getTileCoordsFromMouseCoords(0, 0 - margin, true);
     var B = getTileCoordsFromMouseCoords(0, height - 1 + margin, true);
     return B[1] - A[1] + 1;
+}
+
+function getArea(margin) {
+    if(!margin) margin = 0;
+    var A = getTileCoordsFromMouseCoords(0 - margin, 0 - margin, true);
+    var B = getTileCoordsFromMouseCoords(width - 1 + margin, height - 1 + margin, true);
+    return (B[0] - A[0] + 1) * (B[1] - A[1] + 1);
 }
 
 function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
@@ -2169,7 +2217,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
     if(e.target != owot && e.target != linkDiv) return;
     var link = is_link(tileX, tileY, charX, charY);
     if(hasDragged) link = false;
-    if(link && linksEnabled && !w.isSelecting) {
+    if(link && linksEnabled && !regionSelectionsActive()) {
         var pos = tileAndCharsToWindowCoords(tileX, tileY, charX, charY);
         owot.style.cursor = "pointer";
         linkElm.style.left = pos[0] + "px";
@@ -2214,27 +2262,39 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
     }
 
     // region selecting
-    if(w.isSelecting) {
-        if(lastSelectionHover) {
-            var tileX = lastSelectionHover[0];
-            var tileY = lastSelectionHover[1];
-            var charX = lastSelectionHover[2];
-            var charY = lastSelectionHover[3];
-            uncolorChar(tileX, tileY, charX, charY);
+    for(var i = 0; i < regionSelections.length; i++) {
+        var reg = regionSelections[i];
+        if(!reg.isSelecting) continue;
+        if(reg.lastSelectionHover) {
+            var tileX = reg.lastSelectionHover[0];
+            var tileY = reg.lastSelectionHover[1];
+            var charX = reg.lastSelectionHover[2];
+            var charY = reg.lastSelectionHover[3];
+            if(reg.tiled) {
+                if(tiles[tileY + "," + tileX]) {
+                    tiles[tileY + "," + tileX].backgroundColor = "";
+                }
+            } else {
+                uncolorChar(tileX, tileY, charX, charY);
+            }
             renderTile(tileX, tileY, true);
         }
-        lastSelectionHover = currentPosition;
+        reg.lastSelectionHover = currentPosition;
         var newTileX = currentPosition[0];
         var newTileY = currentPosition[1];
         var newCharX = currentPosition[2];
         var newCharY = currentPosition[3];
         if(tiles[newTileY + "," + newTileX]) {
-            colorChar(newTileX, newTileY, newCharX, newCharY, "#9999e6", true);
+            if(reg.tiled) {
+                tiles[newTileY + "," + newTileX].backgroundColor = reg.charColor;
+            } else {
+                colorChar(newTileX, newTileY, newCharX, newCharY, reg.charColor, true);
+            }
             // re-render tile
             renderTile(newTileX, newTileY, true);
         }
-        regionCoordB = currentPosition;
-        if(regionCoordA && regionCoordB) w.regionSelect.setSelection(regionCoordA, regionCoordB);
+        reg.regionCoordB = currentPosition;
+        if(reg.regionCoordA && reg.regionCoordB) reg.setSelection(reg.regionCoordA, reg.regionCoordB);
     }
 
     // url/coordinate linking
@@ -2298,7 +2358,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
     // if dragging beyond window, stop
     if(pageX >= width || pageY >= height || pageX < 0 || pageY < 0) stopDragging();
 
-    if(!isDragging || w.isSelecting) return;
+    if(!isDragging || regionSelectionsActive()) return;
 
     positionX = dragPosX + (pageX - dragStartX);
     positionY = dragPosY + (pageY - dragStartY);
@@ -2331,7 +2391,7 @@ function event_wheel(e) {
     if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
     var deltaX = Math.trunc(e.deltaX);
     var deltaY = Math.trunc(e.deltaY);
-    if(e.deltaMode) { // not zero (default)?
+    if(e.deltaMode && deltaY) { // not zero (default)?
         deltaX = 0;
         deltaY = (deltaY / Math.abs(deltaY)) * 100;
     }
@@ -2532,6 +2592,32 @@ function cutRanges(map, width, height) {
             break;
         }
     }
+    var totalArea = 0;
+    for(var i = 0; i < ranges.length; i++) {
+        var range = ranges[i];
+        var width = Math.abs(range[2] - range[0]) + 1;
+        var height = Math.abs(range[3] - range[1]) + 1;
+        if(width * height > 50 * 50) {
+            if(width > 50 && height > 50) {
+                range[2] -= width - 50; // reduce width
+                range[3] -= height - 50; // reduce height
+                width = 50;
+                height = 50;
+            } else if(width > 50) {
+                range[2] -= width - 50;
+                width = 50;
+            } else if(height > 50) {
+                range[3] -= height - 50;
+                height = 50;
+            }
+        }
+        totalArea += width * height;
+        if(totalArea > 5000) {
+            ranges = ranges.slice(0, i);
+            break;
+        }
+    }
+    if(ranges.length > 50) ranges = ranges.slice(0, 50);
     return ranges;
 }
 
@@ -2583,8 +2669,7 @@ function createSocket() {
 
 // fetches only unloaded tiles
 function getAndFetchTiles() {
-    var margin = 200; // px
-    var data = getVisibleTiles(margin);
+    var data = getVisibleTiles(fetchClientMargin);
     if(!data.length) return;
     
     var startX = data[0][0];
@@ -2592,6 +2677,7 @@ function getAndFetchTiles() {
 
     // fill the map
     var map = [];
+    var n = 0;
     for(var i = 0; i < data.length; i++) {
         var cell = data[i];
         var tileY = cell[1];
@@ -2601,23 +2687,29 @@ function getAndFetchTiles() {
             map.push(1);
         } else {
             map.push(0);
-            Tile.set(tileX, tileY, null);
+            n++;
         }
     }
-    var width = getWidth(margin);
+    var width = getWidth(fetchClientMargin);
     var height = Math.floor(map.length / width);
     var ranges = cutRanges(map, width, height);
 
     var toFetch = [];
     for(var i = 0; i < ranges.length; i++) {
         var range = ranges[i];
-        toFetch.push({
+        var bounds = {
             // the range cutter doesn't handle negative coords, so adjust them
             minX: range[0] + startX + tileFetchOffsetX,
             minY: range[1] + startY + tileFetchOffsetY,
             maxX: range[2] + startX + tileFetchOffsetX,
             maxY: range[3] + startY + tileFetchOffsetY
-        });
+        };
+        toFetch.push(bounds);
+        for(var y = bounds.minY; y <= bounds.maxY; y++) {
+            for(var x = bounds.minX; x <= bounds.maxX; x++) {
+                Tile.set(x, y, null);
+            }
+        }
     }
     if(toFetch.length > 0) {
         w.socket.send(JSON.stringify({
@@ -2812,11 +2904,11 @@ function getTileCanvas(str) {
     var textRender;
     if(!textRenderCanvas) {
         textRenderCanvas = document.createElement("canvas");
-        textRenderCanvas.width = cellW * tileC + tileMargin;
-        textRenderCanvas.height = cellH * tileR + tileMargin;
+        textRenderCanvas.width = cellW * tileC;
+        textRenderCanvas.height = cellH * tileR;
         textRender = textRenderCanvas.getContext("2d");
         textRender.font = font;
-        tilePixelCache[str] = [textRenderCanvas, textRender];
+        tilePixelCache[str] = [textRenderCanvas, textRender, textRenderCanvas.width, textRenderCanvas.height];
     } else {
         textRender = tilePixelCache[str][1];
     }
@@ -2960,7 +3052,6 @@ function encodeCharProt(array) {
 }
 
 function renderChar(x, y, str, content, props, textRender, colors) {
-    var off = tileMarginHalf; // offset
     // fillText is always off by 5 pixels, adjust it
     var textYOffset = cellH - (5 * zoom);
     // fill background if defined
@@ -2969,7 +3060,7 @@ function renderChar(x, y, str, content, props, textRender, colors) {
             if(coloredChars[str][y][x]) {
                 var color = coloredChars[str][y][x];
                 textRender.fillStyle = color;
-                textRender.fillRect(off + x * cellW, off + y * cellH, cellW, cellH);
+                textRender.fillRect(x * cellW, y * cellH, cellW, cellH);
             }
         }
     }
@@ -3011,37 +3102,37 @@ function renderChar(x, y, str, content, props, textRender, colors) {
 
     // underline link
     if(isLink) {
-        textRender.fillRect(off + x * cellW, off + y * cellH + textYOffset + zoom, cellW, zoom);
+        textRender.fillRect(x * cellW, y * cellH + textYOffset + zoom, cellW, zoom);
     }
     if(char != "\u0020" && char != "\u00a0") { // ignore whitespace characters
         if(cCode >= 0x2800 && cCode <= 0x28FF && brBlockFill) { // render braille chars as rectangles
             var dimX = cellW / 2;
             var dimY = cellH / 4;
-            if(cCode & 1) textRender.fillRect(off + x * cellW, off + y * cellH, dimX, dimY);
-            if(cCode & 8) textRender.fillRect(off + x * cellW + dimX, off + y * cellH, dimX, dimY);
-            if(cCode & 2) textRender.fillRect(off + x * cellW, off + y * cellH + dimY, dimX, dimY);
-            if(cCode & 16) textRender.fillRect(off + x * cellW + dimX, off + y * cellH + dimY, dimX, dimY);
-            if(cCode & 4) textRender.fillRect(off + x * cellW, off + y * cellH + dimY * 2, dimX, dimY);
-            if(cCode & 32) textRender.fillRect(off + x * cellW + dimX, off + y * cellH + dimY * 2, dimX, dimY);
-            if(cCode & 64) textRender.fillRect(off + x * cellW, off + y * cellH + dimY * 3, dimX, dimY);
-            if(cCode & 128) textRender.fillRect(off + x * cellW + dimX, off + y * cellH + dimY * 3, dimX, dimY);
+            if(cCode & 1) textRender.fillRect(x * cellW, y * cellH, dimX, dimY);
+            if(cCode & 8) textRender.fillRect(x * cellW + dimX, y * cellH, dimX, dimY);
+            if(cCode & 2) textRender.fillRect(x * cellW, y * cellH + dimY, dimX, dimY);
+            if(cCode & 16) textRender.fillRect(x * cellW + dimX, y * cellH + dimY, dimX, dimY);
+            if(cCode & 4) textRender.fillRect(x * cellW, y * cellH + dimY * 2, dimX, dimY);
+            if(cCode & 32) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 2, dimX, dimY);
+            if(cCode & 64) textRender.fillRect(x * cellW, y * cellH + dimY * 3, dimX, dimY);
+            if(cCode & 128) textRender.fillRect(x * cellW + dimX, y * cellH + dimY * 3, dimX, dimY);
         } else if(char == "\u2588" && ansiBlockFill) { // █ full block
-            textRender.fillRect(off + x * cellW, off + y * cellH, cellW, cellH);
+            textRender.fillRect(x * cellW, y * cellH, cellW, cellH);
         } else if(char == "\u2580" && ansiBlockFill) { // ▀ top half block
-            textRender.fillRect(off + x * cellW, off + y * cellH, cellW, Math.trunc(cellH / 2));
+            textRender.fillRect(x * cellW, y * cellH, cellW, Math.trunc(cellH / 2));
         } else if(char == "\u2584" && ansiBlockFill) { // ▄ bottom half block
-            textRender.fillRect(off + x * cellW, off + y * cellH + Math.trunc(cellH / 2), cellW, Math.trunc(cellH / 2));
+            textRender.fillRect(x * cellW, y * cellH + Math.trunc(cellH / 2), cellW, Math.trunc(cellH / 2));
         } else if(char == "\u258c" && ansiBlockFill) { // ▌ left half block
-            textRender.fillRect(off + x * cellW, off + y * cellH, Math.trunc(cellW / 2), cellH);
+            textRender.fillRect(x * cellW, y * cellH, Math.trunc(cellW / 2), cellH);
         } else if(char == "\u2590" && ansiBlockFill) { // ▐ right half block
-            textRender.fillRect(off + x * cellW + Math.trunc(cellW / 2), off + y * cellH, Math.trunc(cellW / 2), cellH);
+            textRender.fillRect(x * cellW + Math.trunc(cellW / 2), y * cellH, Math.trunc(cellW / 2), cellH);
         } else { // character rendering
             var mSpec = (char.charCodeAt(1) == 822) && mSpecRendering;
             if(char.length > 1 && !mSpec) textRender.font = specialCharFont;
             if(mSpec) char = char.replace(String.fromCharCode(822), "");
-            textRender.fillText(char, off + x * cellW + XPadding, off + y * cellH + textYOffset); // render text
+            textRender.fillText(char, x * cellW + XPadding, y * cellH + textYOffset); // render text
             if(char.length > 1 && !mSpec) textRender.font = font;
-            if(mSpec) textRender.fillRect(off + x * cellW, off + y * cellH + cellH - 9 * zoom, cellW, zoom);
+            if(mSpec) textRender.fillRect(x * cellW, y * cellH + cellH - 9 * zoom, cellW, zoom);
         }
     }
 }
@@ -3059,7 +3150,7 @@ function renderTile(tileX, tileY, redraw) {
         // unloaded tile background is already drawn
         if(tilePixelCache[str]) {
             textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
-            textLayerCtx.drawImage(tilePixelCache[str][0], offsetX - tileMarginHalf, offsetY - tileMarginHalf);
+            textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY, tilePixelCache[str][2], tilePixelCache[str][3]);
             return;
         }
         // generate tile background
@@ -3071,7 +3162,7 @@ function renderTile(tileX, tileY, redraw) {
         var textRender = tileCanv[1];
         textRender.drawImage(imgData, 0, 0, tileW, tileH);
         textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
-        textLayerCtx.drawImage(tilePixelCache[str][0], offsetX - tileMarginHalf, offsetY - tileMarginHalf);
+        textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY, tilePixelCache[str][2], tilePixelCache[str][3]);
         return;
     }
 
@@ -3180,7 +3271,7 @@ function renderTile(tileX, tileY, redraw) {
     // (force redraw if tile hasn't been drawn before and it's initted)
     if(tilePixelCache[str] && !redraw && !tile.redraw && !(!tile.been_drawn && tile.initted)) {
         textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
-        textLayerCtx.drawImage(tilePixelCache[str][0], offsetX - tileMarginHalf, offsetY - tileMarginHalf);
+        textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY, tilePixelCache[str][2], tilePixelCache[str][3]);
         return;
     }
     // tile has been drawn at least once
@@ -3234,7 +3325,7 @@ function renderTile(tileX, tileY, redraw) {
 
     // add image to main canvas
     textLayerCtx.clearRect(offsetX, offsetY, tileW, tileH);
-    textLayerCtx.drawImage(tilePixelCache[str][0], offsetX - tileMarginHalf, offsetY - tileMarginHalf);
+    textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY, tilePixelCache[str][2], tilePixelCache[str][3]);
 }
 
 function renderTiles(redraw) {
@@ -3335,7 +3426,7 @@ function buildMenu() {
     }, function() {
         subgridEnabled = false;
         renderTiles(true);
-    }, true);
+    });
     menu.addCheckboxOption(" Links enabled", function() {
         linksEnabled = true;
     }, function() {
@@ -3355,7 +3446,20 @@ function buildMenu() {
             renderTiles(true);
         }, true);
     }
-    menu.addEntry("<input oninput=\"changeZoom(this.value)\" ondblclick=\"changeZoom(100)\" title=\"Zoom\" type=\"range\" value=\"100\" min=\"20\" max=\"1000\" id=\"zoombar\">");
+    var zoomBar = document.createElement("input");
+    zoomBar.oninput = function() {
+        changeZoom(this.value);
+    }
+    zoomBar.ondblclick = function() {
+        changeZoom(100);
+    }
+    zoomBar.title = "Zoom";
+    zoomBar.type = "range";
+    zoomBar.value = 100;
+    zoomBar.min = 20;
+    zoomBar.max = 1000;
+    zoomBar.id = "zoombar";
+    menu.addEntry(zoomBar);
 }
 
 document.onselectstart = function(e) {
@@ -3398,19 +3502,134 @@ function orderRangeABCoords(coordA, coordB) {
     }
 }
 
+var regionSelections = [];
+function regionSelectionsActive() {
+    for(var i = 0; i < regionSelections.length; i++) {
+        if(regionSelections[i].isSelecting) return true;
+    }
+    return false;
+}
+function RegionSelection() {
+    this.selection = null;
+    this.regionSelected = false;
+    this.regionCoordA = null;
+    this.regionCoordB = null;
+    this.isSelecting = false;
+    this.charColor = "#9999e6";
+    this.color = "rgba(0, 0, 255, 0.1)";
+    this.tiled = false;
+    this.lastSelectionHover = null; // [tileX, tileY, charX, charY]
+    this.init = function() {
+        var div = document.createElement("div");
+        div.className = "region_selection";
+        div.style.display = "none";
+        div.style.backgroundColor = this.color;
+        document.body.appendChild(div);
+        this.selection = div;
+    }
+    this.setSelection = function(start, end) {
+        var coordA = start.slice(0);
+        var coordB = end.slice(0);
+        orderRangeABCoords(coordA, coordB);
+        var tileX1 = coordA[0];
+        var tileY1 = coordA[1];
+        var charX1 = coordA[2];
+        var charY1 = coordA[3];
+        var tileX2 = coordB[0];
+        var tileY2 = coordB[1];
+        var charX2 = coordB[2];
+        var charY2 = coordB[3];
+        if(this.tiled) {
+            charX1 = 0;
+            charY1 = 0;
+            charX2 = tileC - 1;
+            charY2 = tileR - 1;
+        }
+        var pxCoordA = tileAndCharsToWindowCoords(tileX1, tileY1, charX1, charY1);
+        var pxCoordB = tileAndCharsToWindowCoords(tileX2, tileY2, charX2, charY2);
+        var regWidth = pxCoordB[0] - pxCoordA[0] + Math.trunc(cellW / zoomRatio) - 2;
+        var regHeight = pxCoordB[1] - pxCoordA[1] + Math.trunc(cellH / zoomRatio) - 2;
+        var sel = this.selection;
+        sel.style.width = regWidth + "px";
+        sel.style.height = regHeight + "px";
+        sel.style.top = pxCoordA[1] + "px";
+        sel.style.left = pxCoordA[0] + "px";
+    }
+    this.show = function() {
+        this.selection.style.display = "";
+    }
+    this.hide = function() {
+        this.selection.style.display = "none";
+    }
+    this.deselect = function() {
+        this.regionSelected = false;
+        this.regionCoordA = null;
+        this.regionCoordB = null;
+        this.hide();
+    }
+    this.stopSelectionUI = function() {
+        if(!this.lastSelectionHover) return;
+        if(!this.isSelecting) return;
+        this.isSelecting = false;
+        owot.style.cursor = defaultCursor;
+        var tileX = this.lastSelectionHover[0];
+        var tileY = this.lastSelectionHover[1];
+        var charX = this.lastSelectionHover[2];
+        var charY = this.lastSelectionHover[3];
+        // remove highlight
+        if(this.tiled) {
+            if(tiles[tileY + "," + tileX]) {
+                tiles[tileY + "," + tileX].backgroundColor = "";
+            }
+        } else {
+            uncolorChar(tileX, tileY, charX, charY);
+        }
+        renderTile(tileX, tileY, true);
+        this.deselect();
+    }
+    var onselectionEvents = [];
+    this.onselection = function(func) {
+        onselectionEvents.push(func);
+    }
+    this.handleSelection = function() {
+        for(var i = 0; i < onselectionEvents.length; i++) {
+            var func = onselectionEvents[i];
+            this.regionSelected = true;
+            this.setSelection(this.regionCoordA, this.regionCoordB);
+            var coordA = this.regionCoordA.slice(0);
+            var coordB = this.regionCoordB.slice(0);
+            orderRangeABCoords(coordA, coordB);
+            var regWidth = (coordB[0] - coordA[0]) * tileC + coordB[2] - coordA[2] + 1;
+            var regHeight = (coordB[1] - coordA[1]) * tileR + coordB[3] - coordA[3] + 1;
+            func(coordA, coordB, regWidth, regHeight);
+        }
+    }
+    this.startSelection = function() {
+        this.isSelecting = true;
+        owot.style.cursor = "cell";
+    }
+    regionSelections.push(this);
+    this.destroy = function() {
+        for(var i = 0; i < regionSelections.length; i++) {
+            if(regionSelections[i] == this) {
+                regionSelections.splice(i, 1);
+                i--;
+            }
+        }
+    }
+    return this;
+}
+
 // [tileX, tileY, charX, charY]
 var lastLinkHover = null;
 // [type, tileX, tileY, (charX, charY)]
 var lastTileHover = null;
-// [tileX, tileY, charX, charY]
-var lastSelectionHover = null;
 
 var w = {
     userCount: -1,
     clientId: -1,
     isLinking: false,
     isProtecting: false,
-    isSelecting: false,
     url_input: "",
     coord_input_x: 0,
     coord_input_y: 0,
@@ -3449,44 +3668,7 @@ var w = {
             w.clipboard.textarea.value = "";
         }
     },
-    regionSelect: {
-        selection: null,
-        init: function() {
-            var div = document.createElement("div");
-            div.className = "region_selection";
-            div.style.display = "none";
-            document.body.appendChild(div);
-            w.regionSelect.selection = div;
-        },
-        setSelection: function(start, end) {
-            var coordA = start.slice(0);
-            var coordB = end.slice(0);
-            orderRangeABCoords(coordA, coordB);
-            var tileX1 = coordA[0];
-            var tileY1 = coordA[1];
-            var charX1 = coordA[2];
-            var charY1 = coordA[3];
-            var tileX2 = coordB[0];
-            var tileY2 = coordB[1];
-            var charX2 = coordB[2];
-            var charY2 = coordB[3];
-            var pxCoordA = tileAndCharsToWindowCoords(tileX1, tileY1, charX1, charY1);
-            var pxCoordB = tileAndCharsToWindowCoords(tileX2, tileY2, charX2, charY2);
-            var regWidth = pxCoordB[0] - pxCoordA[0] + Math.trunc(cellW / zoomRatio) - 2;
-            var regHeight = pxCoordB[1] - pxCoordA[1] + Math.trunc(cellH / zoomRatio) - 2;
-            var sel = w.regionSelect.selection;
-            sel.style.width = regWidth + "px";
-            sel.style.height = regHeight + "px";
-            sel.style.top = pxCoordA[1] + "px";
-            sel.style.left = pxCoordA[0] + "px";
-        },
-        show: function() {
-            w.regionSelect.selection.style.display = "";
-        },
-        hide: function() {
-            w.regionSelect.selection.style.display = "none";
-        }
-    },
+    regionSelect: new RegionSelection(),
     color: function() {
         w._ui.colorInputModal.open(function(color) {
             var this_color = 0;
@@ -3820,11 +4002,15 @@ w._state.uiModal = false; // is the UI open? (coord, url, go to coord)
 
 buildMenu();
 w.clipboard.init();
+w.regionSelect.onselection(handleRegionSelection);
 w.regionSelect.init();
 
 w.on("tilesRendered", function() {
-    if(regionCoordA && regionCoordB) w.regionSelect.setSelection(regionCoordA, regionCoordB);
-})
+    for(var i = 0; i < regionSelections.length; i++) {
+        var reg = regionSelections[i];
+        if(reg.regionCoordA && reg.regionCoordB) reg.setSelection(reg.regionCoordA, reg.regionCoordB);
+    }
+});
 
 var simplemodal_onopen = function() {
     return w._state.uiModal = true;
@@ -3966,11 +4152,8 @@ var ws_functions = {
             renderTile(pos[1], pos[0], true);
         }
         // too many tiles, remove tiles outside of the viewport
-        var tileLim = 1000;
-        if(zoom < 0.5) { // zoomed out too far? make sure tiles don't constantly unload
-            tileLim = 10000;
-        }
-        if(tileCount >= tileLim && unloadTilesAuto) {
+        var tileLim = Math.floor(getArea(fetchClientMargin) * 1.5 / zoom + 1000);
+        if(tileCount > tileLim && unloadTilesAuto) {
             clearTiles();
         }
     },
@@ -4064,7 +4247,8 @@ var ws_functions = {
             renderTile(pos[1], pos[0]);
         }
         if(highlights.length > 0 && useHighlight) highlight(highlights);
-        if(tileCount >= 10000 && unloadTilesAuto) {
+        var tileLim = Math.floor(getArea(fetchClientMargin) * 1.5 / zoom + 1000);
+        if(tileCount > tileLim && unloadTilesAuto) {
             clearTiles();
         }
     },

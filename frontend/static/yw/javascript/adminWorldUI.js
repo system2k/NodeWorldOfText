@@ -100,7 +100,6 @@ function keyup_admclr(e) {
     admclr.ctrlDown = false;
     admclrActivated.style.display = "none";
     admclr.color = "#00FF00";
-    admclr.renderTile();
     // remove color of tile
     if(admclr.lastPos) {
         tiles[admclr.lastPos[1] + "," + admclr.lastPos[0]].backgroundColor = "";
