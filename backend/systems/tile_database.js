@@ -273,6 +273,9 @@ function protect_area(call_id, tile, t, data) {
     var precise = data.precise;
     var protect_type = data.protect_type;
 
+    var feature_perm = world.feature_membertiles_addremove;
+    is_member = (is_member && feature_perm) || is_owner || (user.superuser && world.name == "");
+
     var world_id = world.id;
 
     var properties = t.properties;
@@ -644,8 +647,10 @@ async function flushQueue() {
             var charY = data.charY;
             var text = advancedSplit(data.text);
             var buckets = {};
-            for(var i = 0; i < text.length; i++) {
-                var chr = text[i];
+            var currColor = 0;
+            var index = 0;
+            while(true) {
+                var chr = text[index];
                 if(chr.indexOf("\0") > -1) chr = " ";
                 var tstr = tileY + "," + tileX;
                 if(chr == "\n") {
@@ -656,18 +661,124 @@ async function flushQueue() {
                         charY = 0;
                         tileY++;
                     }
+                    index++;
                 } else {
-                    if(!buckets[tstr]) buckets[tstr] = [];
-                    buckets[tstr].push([tileY, tileX, charY, charX, 0, chr, 0, 0]);
-                    charX++;
-                    if(charX >= CONST.tileCols) {
-                        charX = 0;
-                        tileX++;
+                    if(!buckets[tstr]) buckets[tstr] = [[], []];
+
+                    var hex = "ABCDEF";
+                    if(chr == "\x1b") {
+                        var hCode = text[index + 1];
+                        if(hCode == "$") {
+                            index += 2;
+                            var lType = text[index];
+                            index++;
+                            if(lType == "c") {
+                                var strPoint = index;
+                                var buf = "";
+                                var mode = 0;
+                                while(true) {
+                                    if(text[strPoint] == "[" && mode == 0) {
+                                        mode = 1;
+                                        if(++strPoint >= text.length) break;
+                                        continue;
+                                    }
+                                    if(text[strPoint] == "]" && mode == 1) {
+                                        strPoint++;
+                                        break;
+                                    }
+                                    if(mode == 1) {
+                                        buf += text[strPoint];
+                                        if(++strPoint >= text.length) break;
+                                        continue;
+                                    }
+                                    if(++strPoint >= text.length) break;
+                                }
+                                index = strPoint;
+                                buf = buf.split(",");
+                                var coordTileX = parseInt(buf[0].trim());
+                                var coordTileY = parseInt(buf[1].trim());
+                                //if(Permissions.can_coordlink(state.userModel, state.worldModel)) {
+                                    buckets[tstr][1].push(["coord", tileX, tileY, charX, charY, coordTileX, coordTileY]);
+                                //}
+                            } else if(lType == "u") {
+                                var strPoint = index;
+                                var buf = "";
+                                var quotMode = 0;
+                                while(true) {
+                                    if(text[strPoint] == "\"" && quotMode == 0) {
+                                        quotMode = 1;
+                                        if(++strPoint >= text.length) break;
+                                        continue;
+                                    }
+                                    if(text[strPoint] == "\"" && quotMode == 1) {
+                                        strPoint++;
+                                        break;
+                                    }
+                                    if(quotMode == 1) {
+                                        if(text[strPoint] == "\\") {
+                                            quotMode = 2;
+                                            if(++strPoint >= text.length) break;
+                                            continue;
+                                        }
+                                        buf += text[strPoint];
+                                    }
+                                    if(quotMode == 2) {
+                                        buf += text[strPoint];
+                                        quotMode = 1;
+                                        if(++strPoint >= text.length) break;
+                                        continue;
+                                    }
+                                    if(++strPoint >= text.length) break;
+                                }
+                                index = strPoint;
+                                //if(Permissions.can_urllink(state.userModel, state.worldModel)) {
+                                    buckets[tstr][1].push(["url", tileX, tileY, charX, charY, buf]);
+                                //}
+                            }
+                        } else if(hCode == "P") { // contains area protections
+                            index += 2;
+                            var protType = parseInt(text[index]);
+                            index++;
+                            if(isNaN(protType)) return;
+                            if(!(protType >= 0 && protType <= 2)) return;
+                            if(protType <= 1) { // public, member
+                               // if(!Permissions.can_protect_tiles(state.userModel, state.worldModel)) return;
+                            }
+                            if(protType == 2) { // owner
+                                //if(!Permissions.can_admin(state.userModel, state.worldModel)) {
+                                    protType = 1; // member
+                                //}
+                            }
+                            buckets[tstr][1].push(["prot", tileX, tileY, charX, charY, protType]);
+                        } else {
+                            var cCol = "";
+                            if(hCode == "x") {
+                                cCol = "000000";
+                                index += 2;
+                            } else {
+                                var code = hex.indexOf(hCode);
+                                if(code > -1) {
+                                    cCol = text.slice(index + 2, index + 2 + code + 1).join("");
+                                    index += code + 1;
+                                }
+                                index += 2;
+                            }
+                            currColor = parseInt(cCol, 16);
+                        }
+                    } else {
+                        buckets[tstr][0].push([tileY, tileX, charY, charX, 0, chr, 0, currColor]);
+                        charX++;
+                        if(charX >= CONST.tileCols) {
+                            charX = 0;
+                            tileX++;
+                        }
+                        index++;
                     }
                 }
+                if(index >= text.length) break;
             }
-            for(var i in buckets) {
-                var pos = i.split(",");
+            for(var bk in buckets) {
+                var pos = bk.split(",");
                 var tileX = parseInt(pos[1]);
                 var tileY = parseInt(pos[0]);
 
@@ -677,28 +788,47 @@ async function flushQueue() {
                 var tile = tData[0]; // tile Database object
                 var t = tData[1]; // data processed from tile database object
 
-                for(var x = 0; x < buckets[i].length; x++) {
-                    write_edits(tile, t, null, null, buckets[i][x], data, null);
-                    write_link(null, tile, t, {
-                        user, world,
-                        tileX, tileY,
-                        charX: buckets[i][x][3],
-                        charY: buckets[i][x][2],
-                        is_member: data.is_member,
-                        is_owner: data.is_owner,
-                        type: "url",
-                        url: "https://ourworldoftext.com/this-is-only-a-test"
-                    });
-                    protect_area(null, tile, t, {
-                        user, world,
-                        tileX, tileY,
-                        charX: buckets[i][x][3],
-                        charY: buckets[i][x][2],
-                        is_member: data.is_member,
-                        is_owner: data.is_owner,
-                        precise: true,
-                        protect_type: 2
-                    });
+                var currTile = buckets[bk][0];
+                var misc = buckets[bk][1];
+
+                for(var x = 0; x < currTile.length; x++) {
+                    write_edits(tile, t, null, null, currTile[x], data, null);
+                }
+                for(var x = 0; x < misc.length; x++) {
+                    var type = misc[x][0];
+                    var m_tileX = misc[x][1];
+                    var m_tileY = misc[x][2];
+                    var m_charX = misc[x][3];
+                    var m_charY = misc[x][4];
+                    if(type == "coord" || type == "url") {
+                        var linkObj = {
+                            user, world,
+                            tileX: m_tileX, tileY: m_tileY,
+                            charX: m_charX,
+                            charY: m_charY,
+                            is_member: data.is_member,
+                            is_owner: data.is_owner,
+                            type
+                        };
+                        if(type == "coord") {
+                            linkObj.link_tileX = misc[x][5];
+                            linkObj.link_tileY = misc[x][6];
+                        } else if(type == "url") {
+                            linkObj.url = misc[x][5];
+                        }
+                        write_link(null, tile, t, linkObj);
+                    } else if(type == "prot") {
+                        protect_area(null, tile, t, {
+                            user, world,
+                            tileX: m_tileX, tileY: m_tileY,
+                            charX: m_charX,
+                            charY: m_charY,
+                            is_member: data.is_member,
+                            is_owner: data.is_owner,
+                            precise: true,
+                            protect_type: misc[x][5]
+                        });
+                    }
                 }
                 t.createUndefTile = true;
 

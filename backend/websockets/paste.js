@@ -1,5 +1,5 @@
 module.exports = async function(ws, data, send, vars, evars) {
-    return; // Under Construction
+    return; // unstable
     var db = vars.db;
     var user = vars.user;
     var world = vars.world;
@@ -18,7 +18,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     var charY = san_nbr(data.charY);
     var text = data.data;
     if(typeof text != "string") return;
-    // if(text.length == 0 || text.length > 10000) return;
+    if(text.length == 0 || text.length > 1000000) return;
     if(charX < 0) charX = 0;
     if(charY < 0) charY = 0;
     if(charX > CONST.tileCols - 1) charX = CONST.tileCols - 1;
@@ -32,6 +32,7 @@ module.exports = async function(ws, data, send, vars, evars) {
         is_owner: user.id == world.owner_id,
         is_member: user.stats.member,
         tileX, tileY, charX, charY,
+        can_color_text: true,
         text
     });
 

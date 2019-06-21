@@ -82,5 +82,5 @@ module.exports.POST = async function(req, serve, vars, params) {
     serve(null, null, {
         cookie: new_cookie,
         redirect: next
-    })
+    });
 }

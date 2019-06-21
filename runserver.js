@@ -10,9 +10,7 @@ console.log("\x1b[36;1mStarting up...\x1b[0m");
 
 var serverLoaded = false;
 
-const chat_mgr    = require("./backend/utils/chat_mgr.js");
 const crypto      = require("crypto");
-const dump_dir    = require("./backend/dump_dir");
 const fs          = require("fs");
 const http        = require("http");
 const https       = require("https");
@@ -25,10 +23,14 @@ const querystring = require("querystring");
 const sql         = require("sqlite3");
 const swig        = require("swig");
 const url         = require("url");
-const utils       = require("./backend/utils/utils.js");
 const WebSocket   = require("ws");
 const zip         = require("adm-zip");
 const zlib        = require("zlib");
+
+const chat_mgr   = require("./backend/utils/chat_mgr.js");
+const bin_packet = require("./backend/utils/bin_packet.js");
+const dump_dir   = require("./backend/dump_dir");
+const utils      = require("./backend/utils/utils.js");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -742,7 +744,7 @@ function asyncDbSystem(database) {
             }
             var def = callbacks;
             var callback_error = false;
-            var cb_err_desc = "callback_error...";
+            var cb_err_desc = "callback_error";
             callbacks = function(e, data) {
                 try {
                     def(data);
@@ -2749,13 +2751,9 @@ async function manageWebsocketConnection(ws, req) {
                 if(!(typeof msg == "string" || typeof msg == "object")) {
                     return;
                 }
-                if(!(msg.constructor == Buffer || msg.constructor == String)) {
-                    return send_ws(JSON.stringify({
-                        kind: "error",
-                        message: "Invalid socket type"
-                    }));
-                }
-                if(msg.constructor == Buffer) { // buffers not supported at the moment
+                if(msg.constructor == Buffer) {
+                    /*msg = bin_packet.decode(msg);
+                    if(!msg) return; // malformed packet*/
                     return;
                 }
             } catch(e) {
@@ -2777,14 +2775,10 @@ async function manageWebsocketConnection(ws, req) {
                     }
                     return send_ws(JSON.stringify(res));
                 }
-                // Parse request. If failed, return a "418" message
+                // Parse request
                 try {
-                    msg = JSON.parse(msg);
+                    if(typeof msg == "string") msg = JSON.parse(msg);
                 } catch(e) {
-                    send_ws(JSON.stringify({
-                        kind: "error",
-                        message: "418 I'm a Teapot"
-                    }));
                     return ws.close();
                 }
                 if(!msg || msg.constructor != Object) {

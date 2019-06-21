@@ -111,3 +111,34 @@ function keyup_admclr(e) {
     admclr.lastPos = null;
 }
 document.body.addEventListener("keyup", keyup_admclr)
+
+function enableServerPasting() {
+    clearInterval(char_input_check);
+    char_input_check = setInterval(function() {
+        if(write_busy) return;
+        var value = textInput.value;
+        if(value == "") return;
+        value = value.replace(/\r\n/g, "\n");
+        value = value.replace(/\r/g, "\n");
+        value = advancedSplit(value);
+        var index = 1;
+        if(value[0] == "\x1b") {
+            index--;
+        } else {
+            writeChar(value[0]);
+        }
+        if(value.length == 1) {
+            textInput.value = "";
+            return;
+        }
+        socket.send(JSON.stringify({
+            kind: "paste",
+            tileX: cursorCoords[0],
+            tileY: cursorCoords[1],
+            charX: cursorCoords[2],
+            charY: cursorCoords[3],
+            data: textInput.value
+        }));
+        textInput.value = "";
+    }, 10);
+}
