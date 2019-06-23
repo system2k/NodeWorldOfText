@@ -307,7 +307,7 @@ function protect_area(call_id, tile, t, data) {
             if(t.writability != null) {
                 for(var n = 0; n < charProt.length; n++) {
                     if(charProt[n] == null) {
-                        charProt[n] = char_writability;
+                        charProt[n] = t.writability;
                     }
                 }
                 t.writability = null;
@@ -315,7 +315,7 @@ function protect_area(call_id, tile, t, data) {
             charProt[idx] = null;
             has_modified = true;
         }
-        if(is_consistent(charProt)) {
+        if(charProt[0] != null && is_consistent(charProt)) {
             t.writability = charProt[0];
             delete properties.char;
             has_modified = true;
