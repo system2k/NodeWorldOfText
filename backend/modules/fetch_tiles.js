@@ -54,7 +54,6 @@ module.exports = async function(data, vars) {
     var db_edits = vars.db_edits;
     var user = vars.user;
     var san_nbr = vars.san_nbr;
-    var xrange = vars.xrange;
     var world = vars.world;
     var advancedSplit = vars.advancedSplit;
     var timemachine = vars.timemachine;

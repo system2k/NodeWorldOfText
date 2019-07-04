@@ -171,6 +171,7 @@ module.exports.POST = async function(req, serve, vars) {
     var tile_database = vars.tile_database;
     var uvias = vars.uvias;
     var accountSystem = vars.accountSystem;
+    var wss = vars.wss;
 
     if(!user.authenticated) {
         return serve();
@@ -235,7 +236,20 @@ module.exports.POST = async function(req, serve, vars) {
     } else if(post_data.form == "access_perm") { // access_perm
         var readability = validatePerms(post_data.readability, 2);
         var writability = validatePerms(post_data.writability, 2);
-
+        wss.clients.forEach(function(e) {
+            if(e.world.id == world.id) {
+                if(readability == 1 && !e.is_member && !e.is_owner) {
+                    e.close();
+                    return;
+                }
+                if(readability == 2 && !e.is_owner) {
+                    e.close();
+                    return;
+                }
+                e.world.writability = writability;
+                e.world.readability = readability;
+            }
+        });
         await db.run("UPDATE world SET (readability,writability)=(?,?) WHERE id=?",
             [readability, writability, world.id]);
     } else if(post_data.form == "remove_member") {
@@ -243,11 +257,12 @@ module.exports.POST = async function(req, serve, vars) {
         for(var key in post_data) {
             if(key.startsWith("remove_")) to_remove = key;
         }
+        var id_to_remove = void 0;
+        var validId = true;
         var username_to_remove = to_remove.substr("remove_".length);
         if(accountSystem == "uvias") {
             if(username_to_remove.startsWith("deleted~")) {
-                var id_to_remove = username_to_remove.substr("deleted~".length);
-                var validId = true;
+                id_to_remove = username_to_remove.substr("deleted~".length);
                 if(id_to_remove.length < 1 || id_to_remove.length > 16) validId = false;
                 var validSet = "0123456789abcdef";
                 for(var c = 0; c < id_to_remove.length; c++) {
@@ -257,17 +272,33 @@ module.exports.POST = async function(req, serve, vars) {
                     }
                 }
                 if(validId) {
-                    await db.run("DELETE FROM whitelist WHERE user_id=? AND world_id=?", ["x" + id_to_remove, world.id]);
+                    id_to_remove = "x" + id_to_remove;
+                    await db.run("DELETE FROM whitelist WHERE user_id=? AND world_id=?", [id_to_remove, world.id]);
                 }
             } else {
                 var remuser = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", [username_to_remove]);
                 if(remuser) {
                     var remuid = "x" + remuser.uid;
+                    id_to_remove = remuid;
                     await db.run("DELETE FROM whitelist WHERE user_id=? AND world_id=?", [remuid, world.id]);
                 }
             }
         } else if(accountSystem == "local") {
-            await db.run("DELETE FROM whitelist WHERE user_id=(SELECT id FROM auth_user WHERE username=? COLLATE NOCASE) AND world_id=?", [username_to_remove, world.id]);
+            var id_to_remove = await db.get("SELECT id FROM auth_user WHERE username=? COLLATE NOCASE", username_to_remove);
+            if(id_to_remove) {
+                id_to_remove = id_to_remove.id;
+                await db.run("DELETE FROM whitelist WHERE user_id=? AND world_id=?", [id_to_remove, world.id]);
+            }
+        }
+        if(id_to_remove) {
+            wss.clients.forEach(function(e) {
+                if(e.user.id == id_to_remove) {
+                    if(!e.is_owner) {
+                        e.is_member = false;
+                        e.user.stats.member = false;
+                    }
+                }
+            });
         }
     } else if(post_data.form == "features") {
         var go_to_coord = validatePerms(post_data.go_to_coord, 2);
@@ -287,20 +318,32 @@ module.exports.POST = async function(req, serve, vars) {
         properties.chat_permission = chat;
         properties.color_text = color_text;
 
+        // update properties in cached world objects for all clients
+        var newProps = JSON.stringify(properties);
+        wss.clients.forEach(function(e) {
+            if(e.world_id == world.id) {
+                e.world.properties = newProps;
+                e.world.feature_go_to_coord = go_to_coord;
+                e.world.feature_membertiles_addremove = membertiles_addremove;
+                e.world.feature_paste = paste;
+                e.world.feature_coord_link = coord_link;
+                e.world.feature_url_link = url_link;
+                e.chat_permission = chat;
+            }
+        });
         await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link,properties)=(?,?,?,?,?,?) WHERE id=?",
-            [go_to_coord, membertiles_addremove, paste, coord_link, url_link, JSON.stringify(properties), world.id]);
+            [go_to_coord, membertiles_addremove, paste, coord_link, url_link, newProps, world.id]);
     } else if(post_data.form == "style") {
         var color = validateCSS(post_data.color);
         var cursor_color = validateCSS(post_data.cursor_color);
-        var cursor_guest_color = validateCSS(post_data.cursor_guest_color);
         var bg = validateCSS(post_data.bg);
         var owner_color = validateCSS(post_data.owner_color);
         var member_color = validateCSS(post_data.member_color);
         var menu_color = validateCSS(post_data.menu_color);
         properties.custom_menu_color = menu_color;
 
-        await db.run("UPDATE world SET (custom_bg,custom_cursor,custom_guest_cursor,custom_color,custom_tile_owner,custom_tile_member,properties)=(?,?,?,?,?,?,?) WHERE id=?",
-            [bg, cursor_color, cursor_guest_color, color, owner_color, member_color, JSON.stringify(properties), world.id]);
+        await db.run("UPDATE world SET (custom_bg,custom_cursor,custom_color,custom_tile_owner,custom_tile_member,properties)=(?,?,?,?,?,?) WHERE id=?",
+            [bg, cursor_color, color, owner_color, member_color, JSON.stringify(properties), world.id]);
         
         ws_broadcast({
             kind: "colors",
@@ -387,13 +430,29 @@ module.exports.POST = async function(req, serve, vars) {
             properties_updated = true;
         }
 
+        var newProps = JSON.stringify(properties);
+        wss.clients.forEach(function(e) {
+            if(e.world_id == world.id) {
+                e.world.properties = newProps;
+            }
+        });
         if(properties_updated) {
             await db.run("UPDATE world SET properties=? WHERE id=?",
-                [JSON.stringify(properties), world.id]);
+                [newProps, world.id]);
         }
     } else if(post_data.form == "action") {
         if("unclaim" in post_data) {
             await db.run("UPDATE world SET owner_id=null WHERE id=?", world.id);
+            if(id_to_remove) {
+                wss.clients.forEach(function(e) {
+                    if(e.user.id == user.id) {
+                        e.is_owner = false;
+                        e.is_member = false;
+                        e.user.stats.owner = false;
+                        e.user.stats.member = false;
+                    }
+                });
+            }
             return serve(null, null, {
                 redirect: "/accounts/profile/"
             });

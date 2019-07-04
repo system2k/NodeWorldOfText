@@ -2677,7 +2677,6 @@ function getAndFetchTiles() {
 
     // fill the map
     var map = [];
-    var n = 0;
     for(var i = 0; i < data.length; i++) {
         var cell = data[i];
         var tileY = cell[1];
@@ -2687,7 +2686,6 @@ function getAndFetchTiles() {
             map.push(1);
         } else {
             map.push(0);
-            n++;
         }
     }
     var width = getWidth(fetchClientMargin);
@@ -3691,8 +3689,8 @@ var w = {
         if(x > maxX || x < -maxX || y > maxY || y < -maxY) {
             return;
         }
-        positionX = -x * tileW * 4;
-        positionY = y * tileH * 4;
+        positionX = Math.floor(-x * tileW * 4);
+        positionY = Math.floor(y * tileH * 4);
         renderTiles();
     },
     getCenterCoords: function() {
@@ -3830,10 +3828,11 @@ var w = {
             kind: "cmd_opt"
         }));
     },
-    broadcastCommand: function(data) {
+    broadcastCommand: function(data, includeUsername) {
         w.socket.send(JSON.stringify({
             kind: "cmd",
-            data: data // maximum length of 2048
+            data: data, // maximum length of 2048
+            include_username: includeUsername
         }));
     },
     jquery: function(callback) {

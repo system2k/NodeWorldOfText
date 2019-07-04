@@ -5,6 +5,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     var wss = vars.wss;
     var NCaseCompare = vars.NCaseCompare;
     var world = vars.world;
+    var user = vars.user;
 
     // rate limit commands
     var msNow = Date.now();
@@ -25,12 +26,18 @@ module.exports = async function(ws, data, send, vars, evars) {
         }
     }
 
-    data = JSON.stringify({
+    var cdata = {
         kind: "cmd",
         data: (data_rec + "").slice(0, 2048),
         sender: vars.channel,
         source: "cmd"
-    })
+    };
+
+    if(data.include_username && user.authenticated) {
+        cdata.username = user.username;
+    }
+
+    data = JSON.stringify(cdata);
     
     wss.clients.forEach(function(client) {
         try {

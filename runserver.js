@@ -35,6 +35,7 @@ const utils      = require("./backend/utils/utils.js");
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
 var san_nbr              = utils.san_nbr;
+var san_dp               = utils.san_dp;
 var toUpper              = utils.toUpper;
 var NCaseCompare         = utils.NCaseCompare;
 var split_limit          = utils.split_limit;
@@ -1543,12 +1544,10 @@ async function world_get_or_create(name, do_not_create, force_create) {
 async function can_view_world(world, user) {
     var permissions = {
         member: false,
-        owner: false,
-        can_write: false
+        owner: false
     };
 
     var is_owner = world.owner_id == user.id;
-    var superuser = user.superuser;
 
     if(world.readability == 2 && !is_owner) { // owner only
         return false;
@@ -1567,37 +1566,10 @@ async function can_view_world(world, user) {
 
     if(is_owner) {
         permissions.member = true;
-        // the owner can write by default
-        if(is_owner) permissions.can_write = true;
     }
-
-    // the readability and writability both have to be less than 2 for members to write
-    if(world.readability < 2 && is_member && world.writability < 2) permissions.can_write = true;
-
-    // anyone can write if anyone can read and write
-    if(world.readability == 0 && world.writability == 0) permissions.can_write = true;
     
     return permissions;
 }
-
-// from: http://stackoverflow.com/questions/8273047/javascript-function-similar-to-python-range
-function xrange(start, stop, step) {
-    if (typeof stop == "undefined") {
-        stop = start;
-        start = 0;
-    }
-    if (typeof step == "undefined") {
-        step = 1;
-    }
-    if ((step > 0 && start >= stop) || (step < 0 && start <= stop)) {
-        return [];
-    }
-    var result = [];
-    for (var i = start; step > 0 ? i < stop : i > stop; i += step) {
-        result.push(i);
-    }
-    return result;
-};
 
 var transaction_active = false;
 var is_switching_mode = false; // is the sql engine (asynchronous) finished with switching transaction mode?
@@ -2502,7 +2474,7 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 
 var ws_req_per_second = 1024;
 var ws_limits = { // [amount, per ms, minimum ms cooldown]
-    chat:        [10, 1000, 0],
+    chat:        [10, 1000, 0], // rate limited further handled in another script
     chathistory: [3, 20000, 3000],
     clear_tile:  [1000, 1000, 0],
     cmd_opt:     [10, 1000, 0],
@@ -2512,7 +2484,7 @@ var ws_limits = { // [amount, per ms, minimum ms cooldown]
     link:        [400, 1000, 0],
     protect:     [400, 1000, 0],
     set_tile:    [10, 1000, 0],
-    write:       [10, 1000, 0],
+    write:       [256, 1000, 0], // rate limited in another script
     paste:       [1, 1000, 0]
 };
 
@@ -2571,9 +2543,6 @@ async function manageWebsocketConnection(ws, req) {
         ws.ipAddress = "0.0.0.0";
         handle_error(e);
     }
-    /*
-        TODO: Limit requests based on packet type.
-    */
     var reqs_second = 0; // requests received at current second
     var current_second = Math.floor(Date.now() / 1000);
     function can_process_req() { // limit requests per second
@@ -2653,13 +2622,6 @@ async function manageWebsocketConnection(ws, req) {
         }
         if(location.match(/(\/ws\/$)/)) {
             world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
-        } else if(location === "/ws/r_u_alive/") {
-            send_ws('"sure m8"');
-            onMessage = function() {
-                send_ws('"yes im still alive"');
-            }
-            delete pre_queue;
-            return;
         } else {
             send_ws(JSON.stringify({
                 kind: "error",
@@ -2699,6 +2661,9 @@ async function manageWebsocketConnection(ws, req) {
         }
         vars.world = status.world;
         vars.timemachine = status.timemachine;
+
+        ws.world = status.world;
+        ws.user = user;
 
         var properties = JSON.parse(status.world.properties);
         var chat_permission = properties.chat_permission;
@@ -2885,7 +2850,7 @@ var global_data = {
     world_get_or_create,
     can_view_world,
     san_nbr,
-    xrange,
+    san_dp,
     tile_coord,
     modules,
     plural,

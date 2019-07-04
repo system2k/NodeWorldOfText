@@ -100,8 +100,10 @@ var CoordinateInputModal = (function() {
         this.cancel.onclick = this.close;
         this.onSubmit = function() {
             var f = _this.form;
-            var y = parseInt(f.coord_input_Y.value, 10);
-            var x = parseInt(f.coord_input_X.value, 10);
+            var y = parseFloat(f.coord_input_Y.value);
+            var x = parseFloat(f.coord_input_X.value);
+            if(!isFinite(y)) y = NaN;
+            if(!isFinite(x)) x = NaN;
             var fail = false;
             if (isNaN(y)) {
                 fail = true;

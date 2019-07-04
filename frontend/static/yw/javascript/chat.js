@@ -8,7 +8,8 @@ var chatWriteHistory     = []; // history of user's chats
 var chatWriteHistoryMax  = 100; // maximum size of chat write history length
 var chatWriteHistoryIdx  = -1; // location in chat write history
 var serverPingTime       = 0;
-var chatFilterMessyChars = true;
+var chatLimitCombChars   = true;
+var chatWriteTmpBuffer   = "";
 
 var chat_window      = document.getElementById("chat_window");
 var chat_open        = document.getElementById("chat_open");
@@ -48,12 +49,15 @@ function api_chat_send(message, opts) {
 
     var msgLim = state.userModel.is_staff ? 3030 : 400;
 
-    message = message.slice(0, msgLim).trim();
+    message = message.trim();
+    if(!message.length) return;
+    message = message.slice(0, msgLim);
     chatWriteHistory.push(message);
     if(chatWriteHistory.length > chatWriteHistoryMax) {
         chatWriteHistory.shift();
     }
     chatWriteHistoryIdx = -1;
+    chatWriteTmpBuffer = "";
 
     var chatColor;
     if(!opts.color) {
@@ -61,7 +65,7 @@ function api_chat_send(message, opts) {
             chatColor = assignColor(YourWorld.Nickname)
         } else {
             chatColor = "#" + ("00000" + YourWorld.Color.toString(16)).slice(-6);
-        };
+        }
     } else {
         chatColor = opts.color;
     }
@@ -101,7 +105,7 @@ function api_chat_send(message, opts) {
 
     if(!isCommand) addChat(location, id, type, nickname,
                             message, username, op, admin, staff, chatColor, Date.now());
-};
+}
 
 var client_commands = {
     nick: function (args) {
@@ -202,7 +206,7 @@ function sendChat() {
     chatbar.value = "";
     var opts = {};
     if(defaultChatColor != null) {
-        opts.color = "#" + ("00000" + defaultChatColor.toString(16)).slice(-6)
+        opts.color = "#" + ("00000" + defaultChatColor.toString(16)).slice(-6);
     }
     api_chat_send(chatText, opts);
 }
@@ -243,7 +247,7 @@ function event_on_chat(data) {
 
 chatsend.addEventListener("click", function() {
     sendChat();
-})
+});
 
 chatbar.addEventListener("keypress", function(e) {
     var keyCode = e.keyCode;
@@ -251,35 +255,71 @@ chatbar.addEventListener("keypress", function(e) {
         sendChat();
         chatbar.blur();
     }
-})
+});
+
+function moveCaretEnd(elm) {
+    if(elm.selectionStart != void 0) {
+        elm.selectionStart = elm.value.length;
+        elm.selectionEnd = elm.value.length;
+    } else if(elm.createTextRange != void 0) {
+        elm.focus();
+        var range = elm.createTextRange();
+        range.collapse(false);
+        range.select();
+    }
+}
 
 chatbar.addEventListener("keydown", function(e) {
     var keyCode = e.keyCode;
-
     // scroll through chat history that the client sent
     if(keyCode == 38) { // up
+        // history modified
+        if(chatWriteHistoryIdx > -1 && chatbar.value != chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1]) {
+            chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1] = chatbar.value;
+        }
+        if(chatWriteHistoryIdx == -1 && chatbar.value) {
+            chatWriteTmpBuffer = chatbar.value;
+        }
         chatWriteHistoryIdx++;
         if(chatWriteHistoryIdx >= chatWriteHistory.length) chatWriteHistoryIdx = chatWriteHistory.length - 1;
         var upVal = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
         if(!upVal) return;
         chatbar.value = upVal;
+        // pressing up will move the cursor all the way to the left by default
+        e.preventDefault();
+        moveCaretEnd(chatbar);
     } else if(keyCode == 40) { // down
+        // history modified
+        if(chatWriteHistoryIdx > -1 && chatbar.value != chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1]) {
+            chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1] = chatbar.value;
+        }
         chatWriteHistoryIdx--;
-        if(chatWriteHistoryIdx < -1) chatWriteHistoryIdx = -1;
+        if(chatWriteHistoryIdx < -1) {
+            chatWriteHistoryIdx = -1;
+            return;
+        }
         var str = "";
         if(chatWriteHistoryIdx != -1) {
             str = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
+        } else {
+            if(chatWriteTmpBuffer) {
+                str = chatWriteTmpBuffer;
+                e.preventDefault();
+                moveCaretEnd(chatbar);
+            }
         }
         chatbar.value = str;
+        e.preventDefault();
+        moveCaretEnd(chatbar);
     }
-})
+});
 
 chat_close.addEventListener("click", function() {
     w.emit("chatClose");
     chat_window.style.display = "none";
     chat_open.style.display = "";
     chatOpen = false;
-})
+});
 
 chat_open.addEventListener("click", function() {
     w.emit("chatOpen");
@@ -301,7 +341,7 @@ chat_open.addEventListener("click", function() {
             global_chatfield.scrollTop = global_chatfield.scrollHeight;
         }
     }
-})
+});
 
 chat_page_tab.addEventListener("click", function() {
     chat_global_tab.style.backgroundColor = "";
@@ -318,7 +358,7 @@ chat_page_tab.addEventListener("click", function() {
         initPageTabOpen = true;
         page_chatfield.scrollTop = page_chatfield.scrollHeight;
     }
-})
+});
 
 chat_global_tab.addEventListener("click", function() {
     chat_global_tab.style.backgroundColor = "#8c8c8c";
@@ -335,7 +375,7 @@ chat_global_tab.addEventListener("click", function() {
         initGlobalTabOpen = true;
         global_chatfield.scrollTop = global_chatfield.scrollHeight;
     }
-})
+});
 
 /*
     [type]:
@@ -361,7 +401,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
         field = getChatfield();
     }
 
-    if(chatFilterMessyChars) {
+    if(chatLimitCombChars) {
         message = advancedSplit(message);
         for(var i = 0; i < message.length; i++) {
             message[i] = message[i].slice(0, 5);
@@ -440,7 +480,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     if(id == 0) {
         idTag = "";
         nickname = "<span style=\"background-color: #e2e2e2;\">" + nickname + "</span>";
-    };
+    }
 
     nickname = idTag + nickname;
 
@@ -474,7 +514,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     }
 }
 
-function getChatfield(elm) {
+function getChatfield() {
     if(selectedChatTab == 0) {
         return document.getElementById("page_chatfield");
     } else if(selectedChatTab == 1) {
@@ -488,14 +528,20 @@ function updateUserCount() {
         usr_online.innerText = "";
         return;
     }
-    var plural = "s";
-    if(count == 1) plural = "";
-    usr_online.innerText = count + " user" + plural + " online";
+    var unit = "user";
+    var units = "users";
+    var current_unit;
+    if(count == 1) {
+        current_unit = unit;
+    } else {
+        current_unit = units;
+    }
+    usr_online.innerText = count + " " + current_unit + " online";
 }
 
 function chatType(registered, nickname, realUsername) {
     var nickMatches = (nickname + "").toUpperCase() == (realUsername + "").toUpperCase();
-    if(realUsername == "[ Server ]") return "user"
+    if(realUsername == "[ Server ]") return "user";
     var type = "";
     if(registered && nickMatches) type = "user";
     if(registered && !nickMatches) type = "user_nick";

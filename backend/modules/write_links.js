@@ -5,6 +5,7 @@ module.exports = async function(data, vars) {
     var user = vars.user;
     var tile_signal_update = vars.tile_signal_update;
     var san_nbr = vars.san_nbr;
+    var san_dp = vars.san_dp;
     var decodeCharProt = vars.decodeCharProt;
     var world = vars.world;
     var tile_database = vars.tile_database;
@@ -20,8 +21,8 @@ module.exports = async function(data, vars) {
     var charY = san_nbr(data.charY);
 
     var url = data.url
-    var link_tileX = san_nbr(data.link_tileX);
-    var link_tileY = san_nbr(data.link_tileY);
+    var link_tileX = san_dp(data.link_tileX);
+    var link_tileY = san_dp(data.link_tileY);
 
     var can_link = false;
     var feature_mode;

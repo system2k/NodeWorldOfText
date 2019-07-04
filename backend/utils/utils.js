@@ -59,9 +59,20 @@ function san_nbr(x) {
     if(x == -Infinity) x = -9007199254740991;
     if(typeof x != "number") x = 0;
     if(!x || isNaN(x) || !isFinite(x)) x = 0;
-    if(x >= 9007199254740991) x = 9007199254740991;
-    if(x <= -9007199254740991) x = -9007199254740991;
+    if(x > 9007199254740991) x = 9007199254740991;
+    if(x < -9007199254740991) x = -9007199254740991;
     return Math.trunc(x);
+}
+
+// sanitize number input containing decimals
+function san_dp(x) {
+    if(typeof x == "string") x = parseFloat(x);
+    if(x == -0) x = 0;
+    if(!isFinite(x)) x = 0;
+    if(typeof x != "number") x = 0;
+    if(x > 9007199254740991) x = 9007199254740991;
+    if(x < -9007199254740991) x = -9007199254740991;
+    return x;
 }
 
 // just to make things easier
@@ -742,6 +753,7 @@ module.exports = {
     trimHTML,
     create_date,
     san_nbr,
+    san_dp,
     toUpper,
     NCaseCompare,
     split_limit,
