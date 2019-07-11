@@ -11,6 +11,18 @@ function intmax(ints) {
     return true;
 }
 
+function byId(a) {
+    return document.getElementById(a);
+}
+
+// Element references
+var elm = {};
+function defineElements(list) {
+    for(var el in list) {
+        elm[el] = list[el];
+    }
+}
+
 var keyCodeTbl = {
     "BACKSPACE":8, "TAB":9, "ENTER":13, "SHIFTRIGHT":16, "CONTROLLEFT":17, "CAPSLOCK":20, "ESCAPE":27, 
     "SPACE":32, "PAGEUP":33, "PAGEDOWN":34, "END":35, "HOME":36, "ARROWLEFT":37, "ARROWUP":38, "ARROWRIGHT":39, 
@@ -24,7 +36,7 @@ var keyCodeTbl = {
     "F3":114, "F4":115, "F5":116, "F6":117, "F7":118, "F8":119, "F9":120, "F10":121, "F11":122, "F12":123,
     "SEMICOLON":186, "COMMA":188, "MINUS":189, "PERIOD":190, "SLASH":191, "BACKQUOTE":192, "BRACKETLEFT":219,
     "BACKSLASH":220, "BRACKETRIGHT":221, "QUOTE":222
-}
+};
 
 function getKeyCode(e) {
     if(e.keyCode != void 0) return e.keyCode;

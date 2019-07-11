@@ -378,3 +378,6 @@ a:visited {
     position: absolute;
     display: block;
 }
+#textInput {
+    font-size: 16px; /* prevent zooming on mobile keyboard */
+}

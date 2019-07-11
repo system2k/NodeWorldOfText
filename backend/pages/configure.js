@@ -336,6 +336,7 @@ module.exports.POST = async function(req, serve, vars) {
     } else if(post_data.form == "style") {
         var color = validateCSS(post_data.color);
         var cursor_color = validateCSS(post_data.cursor_color);
+        var cursor_guest_color = validateCSS(post_data.cursor_guest_color);
         var bg = validateCSS(post_data.bg);
         var owner_color = validateCSS(post_data.owner_color);
         var member_color = validateCSS(post_data.member_color);

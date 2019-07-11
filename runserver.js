@@ -2617,7 +2617,7 @@ async function manageWebsocketConnection(ws, req) {
                     ws.send(data); // not protected by callbacks
                 } catch(e) {
                     handle_error(e);
-                };
+                }
             }
         }
         if(location.match(/(\/ws\/$)/)) {

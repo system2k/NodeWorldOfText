@@ -5,7 +5,7 @@
 
 var owot, textInput, textLayer;
 function init_dom() {
-    loading.style.display = "none";
+    elm.loading.style.display = "none";
     owot = document.getElementById("owot");
     owot.hidden = false;
     owot.style.cursor = defaultCursor;
@@ -14,8 +14,14 @@ function init_dom() {
     textLayer.hidden = false;
     textLayer.style.pointerEvents = "none";
 
-    coord_Y.innerText = "0";
-    coord_X.innerText = "0";
+    elm.coord_Y.innerText = "0";
+    elm.coord_X.innerText = "0";
+
+    defineElements({
+        owot: owot,
+        textInput: textInput,
+        textLayer: textLayer
+    });
 }
 function getWndWidth() {
     return document.body.clientWidth;
@@ -88,9 +94,9 @@ var defaultCursor          = "text";
 var defaultDragCursor      = "move";
 var fetchClientMargin      = 200;
 
-var images_to_load         = {
+var images_to_load = {
     unloaded: "/static/unloaded.png"
-}
+};
 
 var keyConfig = {
     reset: "ESC",
@@ -108,16 +114,12 @@ var keyConfig = {
     cursorLeft: "LEFT+*",
     cursorRight: "RIGHT+*",
     copyRegion: "ALT+G"
-}
+};
 
 var clientOnload = [];
 window.addEventListener("load", function() {
     for(var i = 0; i < clientOnload.length; i++) clientOnload[i]();
-})
-
-function byId(a) {
-    return document.getElementById(a);
-}
+});
 
 function debugLog() {
     if(!Debug) return;
@@ -132,29 +134,32 @@ function debugLog() {
     }));
 }
 
-var loading = byId("loading");
-var coord_Y = byId("coord_Y");
-var coord_X = byId("coord_X");
-var chatbar = byId("chatbar");
-var color_input_form_input = byId("color_input_form_input");
-var protect_precision = byId("protect_precision");
-var announce = byId("announce");
-var announce_text = byId("announce_text");
-var announce_close = byId("announce_close");
-var tile_choice = byId("tile_choice");
-var char_choice = byId("char_choice");
-var menu_elm = byId("menu");
-var nav_elm = byId("nav");
-var coords = byId("coords");
-var chat_window = byId("chat_window");
-var confirm_js = byId("confirm_js");
-var confirm_js_code = byId("confirm_js_code");
-var main_view = byId("main_view");
-var random_color_link = byId("random_color_link");
+defineElements({ // elm[<name>]
+    loading: byId("loading"),
+    coord_Y: byId("coord_Y"),
+    coord_X: byId("coord_X"),
+    chatbar: byId("chatbar"),
+    color_input_form_input: byId("color_input_form_input"),
+    protect_precision: byId("protect_precision"),
+    announce: byId("announce"),
+    announce_text: byId("announce_text"),
+    announce_close: byId("announce_close"),
+    tile_choice: byId("tile_choice"),
+    char_choice: byId("char_choice"),
+    menu_elm: byId("menu"),
+    nav_elm: byId("nav"),
+    coords: byId("coords"),
+    chat_window: byId("chat_window"),
+    confirm_js: byId("confirm_js"),
+    confirm_js_code: byId("confirm_js_code"),
+    main_view: byId("main_view"),
+    random_color_link: byId("random_color_link"),
+    run_js_confirm_risk: byId("run_js_confirm_risk")
+});
 
 var jscolorInput;
 clientOnload.push(function() {
-    jscolorInput = byId("color_input_form_input").jscolor;
+    jscolorInput = elm.color_input_form_input.jscolor;
     jscolorInput.fromRGB(
         (YourWorld.Color >> 16) & 255, 
         (YourWorld.Color >> 8) & 255, 
@@ -167,7 +172,7 @@ function random_color() {
         Math.floor(Math.random() * 256));
 }
 
-random_color_link.onclick = random_color;
+elm.random_color_link.onclick = random_color;
 
 init_dom();
 
@@ -234,8 +239,8 @@ function draggable_element(dragger, dragged) {
     })
 }
 
-draggable_element(chat_window);
-draggable_element(confirm_js);
+draggable_element(elm.chat_window);
+draggable_element(elm.confirm_js);
 
 function getStoredNickname() {
     var nick = YourWorld.Nickname;
@@ -790,16 +795,16 @@ function adjust_scaling_DOM(ratio) {
     width = Math.round(window_width * ratio);
     height = Math.round(window_height * ratio);
     // make size of canvas the size of the inner browser screen-size
-    owot.width = Math.round(window_width * ratio);
-    owot.height = Math.round(window_height * ratio);
+    elm.owot.width = Math.round(window_width * ratio);
+    elm.owot.height = Math.round(window_height * ratio);
     // make the display size the size of the viewport
-    owot.style.width = window_width + "px";
-    owot.style.height = window_height + "px";
+    elm.owot.style.width = window_width + "px";
+    elm.owot.style.height = window_height + "px";
     // comments above apply below
-    textLayer.width = Math.round(window_width * ratio);
-    textLayer.height = Math.round(window_height * ratio);
-    textLayer.style.width = window_width + "px";
-    textLayer.style.height = window_height + "px";
+    elm.textLayer.width = Math.round(window_width * ratio);
+    elm.textLayer.height = Math.round(window_height * ratio);
+    elm.textLayer.style.width = window_width + "px";
+    elm.textLayer.style.height = window_height + "px";
 }
 
 function event_resize() {
@@ -893,11 +898,11 @@ function getCharInfoXY(x, y) {
 function event_keydown_copy_char(e) {
     if(w._state.uiModal) return;
     if(!worldFocused) return;
-    if(document.activeElement.tagName == "INPUT" && document.activeElement.type == "text" && document.activeElement != textInput) return;
+    if(document.activeElement.tagName == "INPUT" && document.activeElement.type == "text" && document.activeElement != elm.textInput) return;
     var textCursorCopy = checkKeyPress(e, keyConfig.copyCharacterText);
     var mouseCursorCopy = checkKeyPress(e, keyConfig.copyCharacterMouse);
     if(!textCursorCopy && !mouseCursorCopy) return;
-    textInput.value = "";
+    elm.textInput.value = "";
     // ctrl + c to copy characters where the text cursor is,
     // ctrl + m to copy characters where the mouse cursor is
     var pos_ref = cursorCoords;
@@ -919,7 +924,7 @@ document.addEventListener("keydown", event_keydown_copy_char);
 function event_keydown_copy_color(e) {
     if(!worldFocused) return;
     if(!checkKeyPress(e, keyConfig.copyColor)) return;
-    textInput.value = "";
+    elm.textInput.value = "";
     // alt + c to use color of text cell (where mouse cursor is) as main color
     var pos = currentPosition;
     if(!pos) return;
@@ -932,12 +937,12 @@ function event_keydown_copy_color(e) {
     localStorage.setItem("color", color);
     // update color textbox in "change color" menu
     if(!color) color = 0;
-    color_input_form_input.value = ("00000" + color.toString(16)).slice(-6);
+    elm.color_input_form_input.value = ("00000" + color.toString(16)).slice(-6);
 }
 document.addEventListener("keydown", event_keydown_copy_color);
 
-owot.width = width;
-owot.height = height;
+elm.owot.width = width;
+elm.owot.height = height;
 
 var cursorCoords = null; // [tileX, tileY, charX, charY]. if mouse is deselected, the value is null.
 var cursorCoordsCurrent = [0, 0, 0, 0, "NOT_INITTED"]; // cursorCoords that don't reset to null. [tileX, tileY, charX, charY]
@@ -965,16 +970,17 @@ Tile.delete = function(tileX, tileY) {
     tileCount--;
 }
 
-var ctx = owot.getContext("2d");
+var ctx = elm.owot.getContext("2d");
 ctx.fillStyle = "#eee";
 ctx.fillRect(0, 0, width, height);
 
-var textLayerCtx = textLayer.getContext("2d");
-textLayer.width = width;
-textLayer.height = height;
+var textLayerCtx = elm.textLayer.getContext("2d");
+elm.textLayer.width = width;
+elm.textLayer.height = height;
 
-if (!window.WebSocket && window.MozWebSocket)
+if (!window.WebSocket && window.MozWebSocket) {
     window.WebSocket = window.MozWebSocket;
+}
 
 var ws_path;
 function createWsPath() {
@@ -988,10 +994,10 @@ var menuStyle;
 function menu_color(color) {
     // change menu color
     if(!window.menuStyle) {
-        menuStyle = document.createElement("style")
-        document.head.appendChild(menuStyle)
+        menuStyle = document.createElement("style");
+        document.head.appendChild(menuStyle);
     }
-    menuStyle.innerHTML = "#menu.hover, #nav { background: " + color + "; }"
+    menuStyle.innerHTML = "#menu.hover, #nav { background: " + color + "; }";
 }
 
 function ajaxRequest(settings) {
@@ -1070,6 +1076,7 @@ window.onhashchange = function(e) {
 // begin OWOT's client
 function begin() {
     if(Debug) {
+        w.doAnnounce("Client is in debug mode");
         console.log("Client is in debug mode");
     }
     manageCoordHash();
@@ -1095,7 +1102,7 @@ function begin() {
             writability_styles = [styles.public, styles.member, styles.owner];
             createSocket();
         }
-    })
+    });
 }
 
 function stopLinkUI() {
@@ -1103,7 +1110,7 @@ function stopLinkUI() {
     if(!w.isLinking) return;
     w.isLinking = false;
     linkAuto.active = false;
-    owot.style.cursor = defaultCursor;
+    elm.owot.style.cursor = defaultCursor;
     var tileX = lastLinkHover[0];
     var tileY = lastLinkHover[1];
     var charX = lastLinkHover[2];
@@ -1134,10 +1141,10 @@ function removeTileProtectHighlight() {
 function stopTileUI() {
     if(!lastTileHover) return;
     if(!w.isProtecting) return;
-    protect_precision.style.display = "none";
+    elm.protect_precision.style.display = "none";
     w.isProtecting = false;
     tileProtectAuto.active = false;
-    owot.style.cursor = defaultCursor;
+    elm.owot.style.cursor = defaultCursor;
     removeTileProtectHighlight();
 }
 
@@ -1196,7 +1203,7 @@ function doProtect() {
         kind: "protect",
         data: data,
         action: action
-    }))
+    }));
 }
 
 function closest(element, parElement) {
@@ -1218,7 +1225,7 @@ var hasDragged = false;
 var draggingEnabled = true;
 function event_mousedown(e, arg_pageX, arg_pageY) {
     var target = e.target;
-    if(closest(target, getChatfield()) || target == chatbar) {
+    if(closest(target, getChatfield()) || target == elm.chatbar) {
         worldFocused = false;
     } else {
         worldFocused = true;
@@ -1228,7 +1235,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
     var pageY = Math.trunc(e.pageY * zoomRatio);
     if(arg_pageX != void 0) pageX = arg_pageX;
     if(arg_pageY != void 0) pageY = arg_pageY;
-    if(target != owot && target != linkDiv) {
+    if(target != elm.owot && target != linkDiv) {
         return;
     }
     if(draggingEnabled) {
@@ -1238,12 +1245,14 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
         dragPosY = positionY;
         isDragging = true;
     }
-    if(document.activeElement == textInput) textInput.focus(); // for mobile typing
+
+    e.preventDefault();
+    elm.textInput.focus(); // for mobile typing
 
     // stop paste
     clearInterval(pasteInterval);
     write_busy = false;
-    textInput.value = "";
+    elm.textInput.value = "";
 
     if(w.isLinking) {
         doLink();
@@ -1271,7 +1280,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
         pageX: pageX,
         pageY: pageY
     });
-    owot.style.cursor = defaultDragCursor;
+    elm.owot.style.cursor = defaultDragCursor;
 }
 document.addEventListener("mousedown", event_mousedown);
 
@@ -1363,7 +1372,7 @@ function removeCursor() {
 function stopDragging() {
     isDragging = false;
     hasDragged = false;
-    owot.style.cursor = defaultCursor;
+    elm.owot.style.cursor = defaultCursor;
 }
 
 // tileX, charX
@@ -1380,13 +1389,13 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
         draggable_element_mouseup[i](e, pageX, pageY);
     }
 
-    if(e.target != owot && e.target != linkDiv) return;
+    if(e.target != elm.owot && e.target != linkDiv) return;
 
     if(e.which == 3) { // right click
         if(ignoreCanvasContext) {
-            owot.style.pointerEvents = "none";
+            elm.owot.style.pointerEvents = "none";
             setTimeout(function() {
-                owot.style.pointerEvents = "";
+                elm.owot.style.pointerEvents = "";
             }, 1);
         }
         return;
@@ -1788,10 +1797,10 @@ function convertToDate(epoch) {
 var write_busy = false; // busy pasting
 var pasteInterval;
 var linkQueue = [];
-textInput.value = "";
+elm.textInput.value = "";
 var char_input_check = setInterval(function() {
     if(write_busy) return;
-    var value = textInput.value;
+    var value = elm.textInput.value;
     if(value == "") return;
     value = value.replace(/\r\n/g, "\n");
     value = value.replace(/\r/g, "\n");
@@ -1803,7 +1812,7 @@ var char_input_check = setInterval(function() {
         writeChar(value[0]);
     }
     if(value.length == 1) {
-        textInput.value = "";
+        elm.textInput.value = "";
         return;
     }
     if(Permissions.can_paste(state.userModel, state.worldModel)) {
@@ -1956,13 +1965,13 @@ var char_input_check = setInterval(function() {
                 index++;
             }
             if(index >= value.length) {
-                textInput.value = "";
+                elm.textInput.value = "";
                 clearInterval(pasteInterval);
                 write_busy = false;
             }
         }, 1);
     } else {
-        textInput.value = "";
+        elm.textInput.value = "";
     }
 }, 10);
 
@@ -1970,11 +1979,11 @@ function event_keydown(e) {
     var actElm = document.activeElement;
     if(!worldFocused) return;
     if(w._state.uiModal) return;
-    if(actElm == chatbar) return;
-    if(actElm.tagName == "INPUT" && actElm.type == "text" && actElm != textInput) return;
-    if(actElm != textInput) textInput.focus();
+    if(actElm == elm.chatbar) return;
+    if(actElm.tagName == "INPUT" && actElm.type == "text" && actElm != elm.textInput) return;
+    if(actElm != elm.textInput) elm.textInput.focus();
     // stop paste
-    textInput.value = "";
+    elm.textInput.value = "";
     clearInterval(pasteInterval);
     write_busy = false;
 
@@ -2125,8 +2134,8 @@ function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
 function alertJS(data) {
     if(js_alert_active) return;
     js_alert_active = true;
-    confirm_js.style.display = "";
-    confirm_js_code.innerText = data;
+    elm.confirm_js.style.display = "";
+    elm.confirm_js_code.innerText = data;
     run_js_confirm_risk.href = "javascript:confirmRunJsLink(\"" + escapeQuote(data) + "\");"
     run_js_confirm.href = "javascript:confirmRunJsLink(null, true);"
     confirm_js_cancel.onclick = closeJSAlert;
@@ -2136,7 +2145,7 @@ function alertJS(data) {
 function closeJSAlert() {
     if(!js_alert_active) return;
     js_alert_active = false;
-    confirm_js.style.display = "none";
+    elm.confirm_js.style.display = "none";
     run_js_confirm.href = "javascript:void 0;"
     run_js_confirm.innerText = "run";
     run_js_confirm_risk.style.display = "none";
@@ -2214,12 +2223,12 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
         draggable_element_mousemove[i](e, e.pageX, e.pageY);
     }
 
-    if(e.target != owot && e.target != linkDiv) return;
+    if(e.target != elm.owot && e.target != linkDiv) return;
     var link = is_link(tileX, tileY, charX, charY);
     if(hasDragged) link = false;
     if(link && linksEnabled && !regionSelectionsActive()) {
         var pos = tileAndCharsToWindowCoords(tileX, tileY, charX, charY);
-        owot.style.cursor = "pointer";
+        elm.owot.style.cursor = "pointer";
         linkElm.style.left = pos[0] + "px";
         linkElm.style.top = pos[1] + "px";
         linkElm.hidden = false;
@@ -2255,7 +2264,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             linkElm.target = "";
         }
     } else {
-        if(!linkElm.hidden) owot.style.cursor = defaultCursor;
+        if(!linkElm.hidden) elm.owot.style.cursor = defaultCursor;
         linkElm.style.top = "-1000px";
         linkElm.style.left = "-1000px";
         linkElm.hidden = true;
@@ -3332,8 +3341,8 @@ function renderTiles(redraw) {
     var tileCoordY = Math.floor(-positionY / tileH);
     var centerY = -Math.floor(tileCoordY / 4);
     var centerX = Math.floor(tileCoordX / 4);
-    coord_Y.innerText = centerY;
-    coord_X.innerText = centerX;
+    elm.coord_Y.innerText = centerY;
+    elm.coord_X.innerText = centerX;
 
     if(redraw) {
         for(var i in tiles) {
@@ -3371,19 +3380,19 @@ function protectPrecisionOption(option) { // 0 being tile and 1 being char
         case 1:
             charChoiceColor = "#FF6600";
     }
-    tile_choice.style.backgroundColor = tileChoiceColor;
-    char_choice.style.backgroundColor = charChoiceColor;
+    elm.tile_choice.style.backgroundColor = tileChoiceColor;
+    elm.char_choice.style.backgroundColor = charChoiceColor;
 }
 protectPrecisionOption(protectPrecision);
 
 var menu;
 function buildMenu() {
-    menu = new Menu(menu_elm, nav_elm);
+    menu = new Menu(elm.menu_elm, elm.nav_elm);
     menu.addEntry("<li><a href=\"/home/\" target=\"_blank\">More...&nbsp;<img src=\"/static/Icon_External_Link.png\"></a></li>");
     menu.addCheckboxOption(" Show coordinates", function() {
-        return coords.style.display = "";
+        return elm.coords.style.display = "";
     }, function() {
-        return coords.style.display = "none";
+        return elm.coords.style.display = "none";
     });
     if(Permissions.can_color_text(state.userModel, state.worldModel)) {
         menu.addOption("Change color", w.color);
@@ -3462,7 +3471,7 @@ function buildMenu() {
 
 document.onselectstart = function(e) {
     var target = e.target;
-    if(closest(target, getChatfield()) || target == chatbar || closest(target, confirm_js_code) || closest(target, announce_text)) {
+    if(closest(target, getChatfield()) || target == elm.chatbar || closest(target, elm.confirm_js_code) || closest(target, elm.announce_text)) {
         return true;
     }
     return w._state.uiModal;
@@ -3569,7 +3578,7 @@ function RegionSelection() {
         if(!this.lastSelectionHover) return;
         if(!this.isSelecting) return;
         this.isSelecting = false;
-        owot.style.cursor = defaultCursor;
+        elm.owot.style.cursor = defaultCursor;
         var tileX = this.lastSelectionHover[0];
         var tileY = this.lastSelectionHover[1];
         var charX = this.lastSelectionHover[2];
@@ -3604,7 +3613,7 @@ function RegionSelection() {
     }
     this.startSelection = function() {
         this.isSelecting = true;
-        owot.style.cursor = "cell";
+        elm.owot.style.cursor = "cell";
     }
     regionSelections.push(this);
     this.destroy = function() {
@@ -3635,17 +3644,25 @@ var w = {
     protect_type: null, // null = unprotect, 0 = public, 1 = member, 2 = owner
     protect_bg: "",
     nightMode: 0, // 0 = normal, 1 = night, 2 = night with normal background patterns
-    input: textInput,
+    input: elm.textInput,
     _state: state,
     _ui: {
-        announce: announce,
-        announce_text: announce_text,
-        announce_close: announce_close,
+        announce: elm.announce,
+        announce_text: elm.announce_text,
+        announce_close: elm.announce_close,
         coordinateInputModal: new CoordinateInputModal(),
         scrolling: null,
         urlInputModal: new URLInputModal(),
         colorInputModal: new ColorInputModal(),
         selectionModal: new SelectionModal()
+    },
+    doAnnounce: function(text) {
+        if(text) {
+            w._ui.announce_text.innerHTML = text;
+            w._ui.announce.style.display = "";
+        } else {
+            w._ui.announce.style.display = "none";
+        }
     },
     clipboard: {
         textarea: null,
@@ -3703,7 +3720,7 @@ var w = {
 
         if(w.isLinking || w.isProtecting) return;
         w.url_input = url;
-        owot.style.cursor = "pointer";
+        elm.owot.style.cursor = "pointer";
         w.isLinking = true;
         w.link_input_type = 0;
     },
@@ -3719,7 +3736,7 @@ var w = {
         if(w.isLinking || w.isProtecting) return;
         w.coord_input_x = x;
         w.coord_input_y = y;
-        owot.style.cursor = "pointer";
+        elm.owot.style.cursor = "pointer";
         w.isLinking = true;
         w.link_input_type = 1;
     },
@@ -3728,7 +3745,7 @@ var w = {
     },
     doProtect: function(protectType, unprotect) {
         // show the protection precision menu
-        protect_precision.style.display = "";
+        elm.protect_precision.style.display = "";
         tileProtectAuto.active = true;
         if(unprotect) { // default area protection
             tileProtectAuto.mode = 3;
@@ -3739,7 +3756,7 @@ var w = {
         }
 
         if(w.isLinking || w.isProtecting) return;
-        owot.style.cursor = "pointer";
+        elm.owot.style.cursor = "pointer";
         w.protect_bg = {
             "owner-only": "#ddd",
             "member-only": "#eee",
@@ -3931,21 +3948,21 @@ var w = {
         if(!speed) speed = 2;
         var rotation = 0;
         var rot = setInterval(function() {
-            main_view.style.transform = "perspective(900px) rotateY(" + rotation + "deg)";
+            elm.main_view.style.transform = "perspective(900px) rotateY(" + rotation + "deg)";
             rotation += speed;
             if(rotation >= 360) {
-                main_view.style.transform = "";
+                elm.main_view.style.transform = "";
                 clearInterval(rot);
             }
         }, 10);
     },
     hideChat: function() {
         chat_open.style.display = "none";
-        chat_window.style.display = "none";
+        elm.chat_window.style.display = "none";
     },
     showChat: function() {
         chat_open.style.display = "";
-        if(chatOpen) chat_window.style.display = "";
+        if(chatOpen) elm.chat_window.style.display = "";
     },
     disableDragging: function() {
         draggingEnabled = false;
@@ -4310,12 +4327,7 @@ var ws_functions = {
         updateUserCount();
     },
     announcement: function(data) {
-        if(data.text) {
-            w._ui.announce_text.innerHTML = data.text;
-            w._ui.announce.style.display = "";
-        } else {
-            w._ui.announce.style.display = "none";
-        }
+        w.doAnnounce(data.text);
     },
     ping: function(data) {
         if(data.time) {

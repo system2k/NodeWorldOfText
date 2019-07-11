@@ -11,32 +11,34 @@ var serverPingTime       = 0;
 var chatLimitCombChars   = true;
 var chatWriteTmpBuffer   = "";
 
-var chat_window      = document.getElementById("chat_window");
-var chat_open        = document.getElementById("chat_open");
-var chatsend         = document.getElementById("chatsend");
-var chatbar          = document.getElementById("chatbar");
-var chat_close       = document.getElementById("chat_close");
-var page_chatfield   = document.getElementById("page_chatfield");
-var global_chatfield = document.getElementById("global_chatfield");
-var chat_page_tab    = document.getElementById("chat_page_tab");
-var chat_global_tab  = document.getElementById("chat_global_tab");
-var usr_online       = document.getElementById("usr_online");
-var total_unread     = document.getElementById("total_unread");
-var page_unread      = document.getElementById("page_unread");
-var global_unread    = document.getElementById("global_unread");
+defineElements({ // elm[<name>]
+    chat_window: byId("chat_window"),
+    chat_open: byId("chat_open"),
+    chatsend: byId("chatsend"),
+    chatbar: byId("chatbar"),
+    chat_close: byId("chat_close"),
+    page_chatfield: byId("page_chatfield"),
+    global_chatfield: byId("global_chatfield"),
+    chat_page_tab: byId("chat_page_tab"),
+    chat_global_tab: byId("chat_global_tab"),
+    usr_online: byId("usr_online"),
+    total_unread: byId("total_unread"),
+    page_unread: byId("page_unread"),
+    global_unread: byId("global_unread")
+});
 
 if(state.userModel.is_staff) {
-    chatbar.maxLength = 3030;
+    elm.chatbar.maxLength = 3030;
 } else {
-    chatbar.maxLength = 400;
+    elm.chatbar.maxLength = 400;
 }
 
 var canChat = Permissions.can_chat(state.userModel, state.worldModel);
 if(!canChat) {
     selectedChatTab = 1;
-    chat_window.style.display = "none";
+    elm.chat_window.style.display = "none";
 } else {
-    chat_open.style.display = "";
+    elm.chat_open.style.display = "";
 }
 
 function api_chat_send(message, opts) {
@@ -202,8 +204,8 @@ var client_commands = {
 
 // Performs send-chat-operation on chatbox
 function sendChat() {
-    var chatText = chatbar.value;
-    chatbar.value = "";
+    var chatText = elm.chatbar.value;
+    elm.chatbar.value = "";
     var opts = {};
     if(defaultChatColor != null) {
         opts.color = "#" + ("00000" + defaultChatColor.toString(16)).slice(-6);
@@ -212,9 +214,9 @@ function sendChat() {
 }
 
 function updateUnread() {
-    var total = total_unread;
-    var page = page_unread;
-    var global = global_unread;
+    var total = elm.total_unread;
+    var page = elm.page_unread;
+    var global = elm.global_unread;
     var totalCount = chatPageUnread + chatGlobalUnread;
     total.style.display = "none";
     global.style.display = "none";
@@ -245,15 +247,15 @@ function event_on_chat(data) {
         data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, Date.now(), data.dataObj);
 }
 
-chatsend.addEventListener("click", function() {
+elm.chatsend.addEventListener("click", function() {
     sendChat();
 });
 
-chatbar.addEventListener("keypress", function(e) {
+elm.chatbar.addEventListener("keypress", function(e) {
     var keyCode = e.keyCode;
     if(keyCode == 13) { // Enter
         sendChat();
-        chatbar.blur();
+        elm.chatbar.blur();
     }
 });
 
@@ -269,29 +271,29 @@ function moveCaretEnd(elm) {
     }
 }
 
-chatbar.addEventListener("keydown", function(e) {
+elm.chatbar.addEventListener("keydown", function(e) {
     var keyCode = e.keyCode;
     // scroll through chat history that the client sent
     if(keyCode == 38) { // up
         // history modified
-        if(chatWriteHistoryIdx > -1 && chatbar.value != chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1]) {
-            chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1] = chatbar.value;
+        if(chatWriteHistoryIdx > -1 && elm.chatbar.value != chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1]) {
+            chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1] = elm.chatbar.value;
         }
-        if(chatWriteHistoryIdx == -1 && chatbar.value) {
-            chatWriteTmpBuffer = chatbar.value;
+        if(chatWriteHistoryIdx == -1 && elm.chatbar.value) {
+            chatWriteTmpBuffer = elm.chatbar.value;
         }
         chatWriteHistoryIdx++;
         if(chatWriteHistoryIdx >= chatWriteHistory.length) chatWriteHistoryIdx = chatWriteHistory.length - 1;
         var upVal = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
         if(!upVal) return;
-        chatbar.value = upVal;
+        elm.chatbar.value = upVal;
         // pressing up will move the cursor all the way to the left by default
         e.preventDefault();
-        moveCaretEnd(chatbar);
+        moveCaretEnd(elm.chatbar);
     } else if(keyCode == 40) { // down
         // history modified
-        if(chatWriteHistoryIdx > -1 && chatbar.value != chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1]) {
-            chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1] = chatbar.value;
+        if(chatWriteHistoryIdx > -1 && elm.chatbar.value != chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1]) {
+            chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1] = elm.chatbar.value;
         }
         chatWriteHistoryIdx--;
         if(chatWriteHistoryIdx < -1) {
@@ -305,75 +307,75 @@ chatbar.addEventListener("keydown", function(e) {
             if(chatWriteTmpBuffer) {
                 str = chatWriteTmpBuffer;
                 e.preventDefault();
-                moveCaretEnd(chatbar);
+                moveCaretEnd(elm.chatbar);
             }
         }
-        chatbar.value = str;
+        elm.chatbar.value = str;
         e.preventDefault();
-        moveCaretEnd(chatbar);
+        moveCaretEnd(elm.chatbar);
     }
 });
 
-chat_close.addEventListener("click", function() {
+elm.chat_close.addEventListener("click", function() {
     w.emit("chatClose");
-    chat_window.style.display = "none";
-    chat_open.style.display = "";
+    elm.chat_window.style.display = "none";
+    elm.chat_open.style.display = "";
     chatOpen = false;
 });
 
-chat_open.addEventListener("click", function() {
+elm.chat_open.addEventListener("click", function() {
     w.emit("chatOpen");
-    chat_window.style.display = "";
-    chat_open.style.display = "none";
+    elm.chat_window.style.display = "";
+    elm.chat_open.style.display = "none";
     chatOpen = true;
     if(selectedChatTab == 0) {
         chatPageUnread = 0;
         updateUnread();
         if(!initPageTabOpen) {
             initPageTabOpen = true;
-            page_chatfield.scrollTop = page_chatfield.scrollHeight;
+            elm.page_chatfield.scrollTop = elm.page_chatfield.scrollHeight;
         }
     } else {
         chatGlobalUnread = 0;
         updateUnread();
         if(!initGlobalTabOpen) {
             initGlobalTabOpen = true;
-            global_chatfield.scrollTop = global_chatfield.scrollHeight;
+            elm.global_chatfield.scrollTop = elm.global_chatfield.scrollHeight;
         }
     }
 });
 
-chat_page_tab.addEventListener("click", function() {
-    chat_global_tab.style.backgroundColor = "";
-    chat_global_tab.style.color = "";
-    chat_page_tab.style.backgroundColor = "#8c8c8c";
-    chat_page_tab.style.color = "white";
+elm.chat_page_tab.addEventListener("click", function() {
+    elm.chat_global_tab.style.backgroundColor = "";
+    elm.chat_global_tab.style.color = "";
+    elm.chat_page_tab.style.backgroundColor = "#8c8c8c";
+    elm.chat_page_tab.style.color = "white";
 
-    global_chatfield.style.display = "none";
-    page_chatfield.style.display=  "";
+    elm.global_chatfield.style.display = "none";
+    elm.page_chatfield.style.display=  "";
     selectedChatTab = 0;
     chatPageUnread = 0;
     updateUnread();
     if(!initPageTabOpen) {
         initPageTabOpen = true;
-        page_chatfield.scrollTop = page_chatfield.scrollHeight;
+        elm.page_chatfield.scrollTop = elm.page_chatfield.scrollHeight;
     }
 });
 
-chat_global_tab.addEventListener("click", function() {
-    chat_global_tab.style.backgroundColor = "#8c8c8c";
-    chat_global_tab.style.color = "white";
-    chat_page_tab.style.backgroundColor = "";
-    chat_page_tab.style.color = "";
+elm.chat_global_tab.addEventListener("click", function() {
+    elm.chat_global_tab.style.backgroundColor = "#8c8c8c";
+    elm.chat_global_tab.style.color = "white";
+    elm.chat_page_tab.style.backgroundColor = "";
+    elm.chat_page_tab.style.color = "";
 
-    global_chatfield.style.display = "";
-    page_chatfield.style.display = "none";
+    elm.global_chatfield.style.display = "";
+    elm.page_chatfield.style.display = "none";
     selectedChatTab = 1;
     chatGlobalUnread = 0;
     updateUnread();
     if(!initGlobalTabOpen) {
         initGlobalTabOpen = true;
-        global_chatfield.scrollTop = global_chatfield.scrollHeight;
+        elm.global_chatfield.scrollTop = elm.global_chatfield.scrollHeight;
     }
 });
 
@@ -394,9 +396,9 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     if(date) dateStr = convertToDate(date);
     var field;
     if(chatfield == "page") {
-        field = document.getElementById("page_chatfield");
+        field = elm.page_chatfield;
     } else if(chatfield == "global") {
-        field = document.getElementById("global_chatfield");
+        field = elm.global_chatfield;
     } else {
         field = getChatfield();
     }
@@ -516,16 +518,16 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 
 function getChatfield() {
     if(selectedChatTab == 0) {
-        return document.getElementById("page_chatfield");
+        return elm.page_chatfield;
     } else if(selectedChatTab == 1) {
-        return document.getElementById("global_chatfield");
+        return elm.global_chatfield;
     }
 }
 
 function updateUserCount() {
     var count = w.userCount;
     if(count == void 0) {
-        usr_online.innerText = "";
+        elm.usr_online.innerText = "";
         return;
     }
     var unit = "user";
@@ -536,7 +538,7 @@ function updateUserCount() {
     } else {
         current_unit = units;
     }
-    usr_online.innerText = count + " " + current_unit + " online";
+    elm.usr_online.innerText = count + " " + current_unit + " online";
 }
 
 function chatType(registered, nickname, realUsername) {
