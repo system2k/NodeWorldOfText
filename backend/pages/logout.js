@@ -5,8 +5,16 @@ module.exports.GET = async function(req, serve, vars) {
     var http_time = vars.http_time;
     var accountSystem = vars.accountSystem;
     var uvias = vars.uvias;
+    var query_data = vars.query_data;
     
+    var logoutReturn = query_data.return;
     if(accountSystem == "uvias") {
+        if(logoutReturn) {
+            return serve(null, null, {
+                cookie: "token=; expires=" + http_time(0) + "; path=/; HttpOnly;",
+                redirect: logoutReturn
+            });
+        }
         return serve(null, null, {
             redirect: uvias.logoutPath
         });

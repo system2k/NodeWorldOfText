@@ -15,6 +15,6 @@ module.exports = async function(ws, data, send, vars, evars) {
         send({
             accepted: do_write.accepted,
             rejected: do_write.rejected
-        })
+        });
     }
 }

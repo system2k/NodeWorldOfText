@@ -14,8 +14,7 @@ function init_dom() {
     textLayer.hidden = false;
     textLayer.style.pointerEvents = "none";
 
-    elm.coord_Y.innerText = "0";
-    elm.coord_X.innerText = "0";
+    updateCoordDisplay();
 
     defineElements({
         owot: owot,
@@ -174,6 +173,15 @@ function random_color() {
 
 elm.random_color_link.onclick = random_color;
 
+function updateCoordDisplay() {
+    var tileCoordX = Math.floor(-positionX / tileW);
+    var tileCoordY = Math.floor(-positionY / tileH);
+    var centerY = -Math.floor(tileCoordY / 4);
+    var centerX = Math.floor(tileCoordX / 4);
+    elm.coord_Y.innerText = centerY;
+    elm.coord_X.innerText = centerX;
+}
+
 init_dom();
 
 var draggable_element_mousemove = [];
@@ -200,7 +208,7 @@ function draggable_element(dragger, dragged) {
         dragging = true;
         clickX = e.pageX;
         clickY = e.pageY;
-    })
+    });
     // when the element is being dragged
     draggable_element_mousemove.push(function(e, arg_pageX, arg_pageY) {
         if(!dragging) return;
@@ -232,11 +240,11 @@ function draggable_element(dragger, dragged) {
             dragged.style.top = "";
             dragged.style.bottom = "0px";
         }
-    })
+    });
     // when the element is released
     draggable_element_mouseup.push(function() {
         dragging = false;
-    })
+    });
 }
 
 draggable_element(elm.chat_window);
@@ -657,7 +665,7 @@ function keydown_tileProtectAuto(e) {
             }
 
             if(idx >= keys.length) return;
-            setTimeout(step, 10);
+            setTimeout(step, 4);
         }
         step();
 
@@ -766,7 +774,7 @@ function keydown_linkAuto(e) {
             renderTile(tileX, tileY, true);
 
             if(idx >= keys.length) return;
-            setTimeout(step, 10);
+            setTimeout(step, 4);
         }
         step();
     } else {
@@ -1864,7 +1872,6 @@ var char_input_check = setInterval(function() {
                         var coordTileY = parseInt(buf[1].trim());
                         if(Permissions.can_coordlink(state.userModel, state.worldModel)) {
                             linkQueue.push(["coord", cursorCoords[0], cursorCoords[1], cursorCoords[2], cursorCoords[3], coordTileX, coordTileY]);
-                            pauseValue += 2;
                         }
                     } else if(lType == "u") {
                         var strPoint = index;
@@ -1899,7 +1906,6 @@ var char_input_check = setInterval(function() {
                         index = strPoint;
                         if(Permissions.can_urllink(state.userModel, state.worldModel)) {
                             linkQueue.push(["url", cursorCoords[0], cursorCoords[1], cursorCoords[2], cursorCoords[3], buf]);
-                            pauseValue += 2;
                         }
                     }
                 } else if(hCode == "P") { // contains area protections
@@ -1928,7 +1934,6 @@ var char_input_check = setInterval(function() {
                         },
                         action: "protect"
                     }));
-                    pauseValue += 2;
                 } else if(hCode == "\r" || hCode == "\n" || hCode == "\x1b") {
                     index++;
                     doWriteChar = true;
@@ -3336,13 +3341,7 @@ function renderTile(tileX, tileY, redraw) {
 }
 
 function renderTiles(redraw) {
-    // update coordinate display
-    var tileCoordX = Math.floor(-positionX / tileW);
-    var tileCoordY = Math.floor(-positionY / tileH);
-    var centerY = -Math.floor(tileCoordY / 4);
-    var centerX = Math.floor(tileCoordX / 4);
-    elm.coord_Y.innerText = centerY;
-    elm.coord_X.innerText = centerX;
+    updateCoordDisplay();
 
     if(redraw) {
         for(var i in tiles) {

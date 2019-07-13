@@ -356,7 +356,7 @@ if(testUviasIds) {
     uvias.private = false;
 }
 uvias.sso = "/accounts/sso";
-uvias.logout = "/home/";
+uvias.logout = "/accounts/logout/?return=" + "/home/";
 uvias.address = "https://uvias.com";
 uvias.loginPath = uvias.address + "/api/loginto/" + uvias.id;
 uvias.logoutPath = uvias.address + "/logoff?service=" + uvias.id;
@@ -915,13 +915,13 @@ async function initialize_server() {
     if(!init) {
         start_server();
     }
-};
+}
 
 function sendProcMsg(msg) {
     if(process.send) {
         process.send(msg);
     }
-};
+}
 
 (async function() {
     try {
@@ -946,7 +946,7 @@ async function initialize_edits_db() {
 
 var ranks_cache = {
     users: {}
-}
+};
 async function initialize_ranks_db() {
     if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='ranks'")) {
         await db_misc.run("CREATE TABLE 'ranks' (id INTEGER, level INTEGER, name TEXT, props TEXT)");
@@ -973,7 +973,7 @@ async function initialize_ranks_db() {
             level,
             name,
             chat_color: props.chat_color
-        }
+        };
         ranks_cache.ids.push(id);
     }
     ranks_cache.count = ranks.length;
@@ -1003,7 +1003,7 @@ var prompt_account_properties = {
             hidden: true
         }
     }
-}
+};
 
 var prompt_account_yesno = {
     properties: {
@@ -1011,7 +1011,7 @@ var prompt_account_yesno = {
             message: "You just installed the server,\nwhich means you don\'t have any superusers defined.\nWould you like to create one now? (yes/no):"
         }
     }
-}
+};
 
 var pw_encryption = "sha512WithRSAEncryption";
 const encryptHash = function(pass, salt) {
@@ -1021,7 +1021,7 @@ const encryptHash = function(pass, salt) {
     var hsh = crypto.createHmac(pw_encryption, salt).update(pass).digest("hex");
     var hash = pw_encryption + "$" + salt + "$" + hsh;
     return hash;
-};
+}
 
 const checkHash = function(hash, pass) {
     if(typeof pass !== "string") return false;
@@ -1102,7 +1102,7 @@ var prompt_command_input = {
             message: ">>"
         }
     }
-}
+};
 
 var prompt_password_new_account = {
     properties: {
@@ -1112,7 +1112,7 @@ var prompt_password_new_account = {
             hidden: true
         }
     }
-}
+};
 
 var ask_password = false;
 var account_to_create = "";
@@ -1326,7 +1326,7 @@ function wait_response_data(req, dispatch, binary_post_data, raise_limit) {
                 resolve(null);
             }
         });
-    })
+    });
 }
 
 function new_token(len) {
@@ -1610,7 +1610,7 @@ function transaction_obj(id) {
                 }
             }
         }
-    }
+    };
     return fc;
 }
 
@@ -2283,6 +2283,15 @@ async function uvias_init() {
     intv.session_check = setTimeout(session_check, 5000);
 }
 
+async function loadAnnouncement() {
+    announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
+    if(!announcement_cache) {
+        announcement_cache = "";
+    } else {
+        announcement_cache = announcement_cache.value;
+    }
+}
+
 var wss;
 async function initialize_server_components() {
     if(accountSystem == "uvias") {
@@ -2290,14 +2299,7 @@ async function initialize_server_components() {
     }
     beginReqLog();
 
-    await (async function() {
-        announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
-        if(!announcement_cache) {
-            announcement_cache = "";
-        } else {
-            announcement_cache = announcement_cache.value;
-        }
-    })();
+    await loadAnnouncement();
 
     bypass_key_cache = fs.readFileSync(settings.bypass_key).toString("utf8");
 
@@ -2363,7 +2365,7 @@ async function initialize_server_components() {
                 handle_error(e);
             }
         });
-    };
+    }
 
     tile_signal_update = function(world, x, y, content, properties, writability) {
         ws_broadcast({
@@ -2376,7 +2378,7 @@ async function initialize_server_components() {
                 }
             }
         }, world);
-    };
+    }
 
     global_data.ws_broadcast = ws_broadcast;
     global_data.tile_signal_update = tile_signal_update;
@@ -2480,7 +2482,7 @@ var ws_limits = { // [amount, per ms, minimum ms cooldown]
     cmd_opt:     [10, 1000, 0],
     cmd:         [256, 1000, 0],
     debug:       [10, 1000, 0],
-    fetch:       [5, 1000, 0],
+    fetch:       [256, 1000, 0],
     link:        [400, 1000, 0],
     protect:     [400, 1000, 0],
     set_tile:    [10, 1000, 0],
