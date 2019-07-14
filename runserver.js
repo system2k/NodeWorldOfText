@@ -5,6 +5,9 @@
 **  Released and renamed October 10, 2017
 **  This is the main file
 */
+/*
+    To figure out the structure of the server, follow the functions, starting from the bottom of this code.
+*/
 
 console.log("\x1b[36;1mStarting up...\x1b[0m");
 
@@ -83,25 +86,27 @@ console.log("Loaded libs");
 
 var DATA_PATH = "../data/";
 var DATA_PATH_TEST = DATA_PATH + "test/";
-
-// create the data folder that stores all of the server's data
-if(!fs.existsSync(DATA_PATH)) {
-    fs.mkdirSync(DATA_PATH, 0o777);
-}
-// directory used for storing data for the test server
-if(!fs.existsSync(DATA_PATH_TEST)) {
-    fs.mkdirSync(DATA_PATH_TEST, 0o777);
-}
-
 var SETTINGS_PATH = DATA_PATH + "settings.json";
 
-if(!fs.existsSync(SETTINGS_PATH)) {
-    fs.writeFileSync(SETTINGS_PATH, fs.readFileSync("./settings_example.json"));
-    console.log("Created the settings file at [" + SETTINGS_PATH + "]. You must configure the settings file and then start the server back up again.");
-    console.log("Full path of settings: " + path.resolve(SETTINGS_PATH));
-    sendProcMsg("EXIT");
-    process.exit();
+function initializeDirectoryStruct() {
+    // create the data folder that stores all of the server's data
+    if(!fs.existsSync(DATA_PATH)) {
+        fs.mkdirSync(DATA_PATH, 0o777);
+    }
+    // directory used for storing data for the test server
+    if(!fs.existsSync(DATA_PATH_TEST)) {
+        fs.mkdirSync(DATA_PATH_TEST, 0o777);
+    }
+    // initialize server configuration
+    if(!fs.existsSync(SETTINGS_PATH)) {
+        fs.writeFileSync(SETTINGS_PATH, fs.readFileSync("./settings_example.json"));
+        console.log("Created the settings file at [" + SETTINGS_PATH + "]. You must configure the settings file and then start the server back up again.");
+        console.log("Full path of settings: " + path.resolve(SETTINGS_PATH));
+        sendProcMsg("EXIT");
+        process.exit();
+    }
 }
+initializeDirectoryStruct();
 
 function normalize_ipv6(ip) {
     ip = ip.replace(/^:|:$/g, "");
@@ -122,8 +127,13 @@ function normalize_ipv6(ip) {
     return ip.join(":");
 }
 
-var cloudflare_ipv4_txt = fs.readFileSync("./backend/cloudflare_ipv4.txt").toString();
-var cloudflare_ipv6_txt = fs.readFileSync("./backend/cloudflare_ipv6.txt").toString();
+var cloudflare_ipv4_txt,
+    cloudflare_ipv6_txt;
+function loadCloudflareIpRanges() {
+    cloudflare_ipv4_txt = fs.readFileSync("./backend/cloudflare_ipv4.txt").toString();
+    cloudflare_ipv6_txt = fs.readFileSync("./backend/cloudflare_ipv6.txt").toString();
+}
+loadCloudflareIpRanges();
 
 var cloudflare_ipv4_int = [];
 var cloudflare_ipv6_int = [];
@@ -249,31 +259,34 @@ var testUviasIds = false;
 
 var intv = {}; // intervals and timeouts
 
-var args = process.argv;
-args.forEach(function(a) {
-    if(a == "--test-server") {
-        if(!isTestServer) console.log("\x1b[32;1mThis is a test server\x1b[0m");
-        isTestServer = true;
-    }
-    if(a == "--log") {
-        if(!debugLogging) console.log("\x1b[32;1mDebug logging enabled\x1b[0m");
-        debugLogging = true;
-    }
-    if(a == "--main-dirs") {
-        testServerMainDirs = true;
-    }
-    if(a == "--uvias-test-info") {
-        testUviasIds = true;
-    }
-    if(a == "--lt") {
-        if(!isTestServer) console.log("\x1b[32;1mThis is a test server\x1b[0m");
-        isTestServer = true;
-        if(!debugLogging) console.log("\x1b[32;1mDebug logging enabled\x1b[0m");
-        debugLogging = true;
-        testServerMainDirs = true;
-        testUviasIds = true;
-    }
-});
+function processArgs() {
+    var args = process.argv;
+    args.forEach(function(a) {
+        if(a == "--test-server") {
+            if(!isTestServer) console.log("\x1b[32;1mThis is a test server\x1b[0m");
+            isTestServer = true;
+        }
+        if(a == "--log") {
+            if(!debugLogging) console.log("\x1b[32;1mDebug logging enabled\x1b[0m");
+            debugLogging = true;
+        }
+        if(a == "--main-dirs") {
+            testServerMainDirs = true;
+        }
+        if(a == "--uvias-test-info") {
+            testUviasIds = true;
+        }
+        if(a == "--lt") {
+            if(!isTestServer) console.log("\x1b[32;1mThis is a test server\x1b[0m");
+            isTestServer = true;
+            if(!debugLogging) console.log("\x1b[32;1mDebug logging enabled\x1b[0m");
+            debugLogging = true;
+            testServerMainDirs = true;
+            testUviasIds = true;
+        }
+    });
+}
+processArgs();
 
 // console function
 function run(path) {
@@ -433,26 +446,35 @@ function doLogReq(data) {
     reqLogBuffer.push(data);
 }
 
-if(!fs.existsSync(settings.bypass_key)) {
-    var rand = "";
-    var key = "0123456789ABCDEF";
-    for(var i = 0; i < 50; i++) {
-        rand += key[Math.floor(Math.random() * 16)];
+var read_staticRaw,
+    write_staticRaw,
+    read_staticIdx,
+    write_staticIdx,
+    staticRaw_size,
+    staticIdx_size;
+function initializeStaticSys() {
+    if(!fs.existsSync(settings.bypass_key)) {
+        var rand = "";
+        var key = "0123456789ABCDEF";
+        for(var i = 0; i < 50; i++) {
+            rand += key[Math.floor(Math.random() * 16)];
+        }
+        fs.writeFileSync(settings.bypass_key, rand);
     }
-    fs.writeFileSync(settings.bypass_key, rand);
+    
+    if(!fs.existsSync(filesPath)) fs.mkdirSync(filesPath, 0o777);
+    if(!fs.existsSync(staticFilesRaw)) fs.writeFileSync(staticFilesRaw, "");
+    if(!fs.existsSync(staticFilesIdx)) fs.writeFileSync(staticFilesIdx, "");
+    
+    read_staticRaw = fs.openSync(staticFilesRaw, "r");
+    write_staticRaw = fs.createWriteStream(staticFilesRaw, { flags: "a" });
+    read_staticIdx = fs.openSync(staticFilesIdx, "r");
+    write_staticIdx = fs.createWriteStream(staticFilesIdx, { flags: "a" });
+    
+    staticRaw_size = fs.statSync(staticFilesRaw).size;
+    staticIdx_size = fs.statSync(staticFilesIdx).size;
 }
-
-if(!fs.existsSync(filesPath)) fs.mkdirSync(filesPath, 0o777);
-if(!fs.existsSync(staticFilesRaw)) fs.writeFileSync(staticFilesRaw, "");
-if(!fs.existsSync(staticFilesIdx)) fs.writeFileSync(staticFilesIdx, "");
-
-var read_staticRaw = fs.openSync(staticFilesRaw, "r");
-var write_staticRaw = fs.createWriteStream(staticFilesRaw, { flags: "a" });
-var read_staticIdx = fs.openSync(staticFilesIdx, "r");
-var write_staticIdx = fs.createWriteStream(staticFilesIdx, { flags: "a" });
-
-var staticRaw_size = fs.statSync(staticFilesRaw).size;
-var staticIdx_size = fs.statSync(staticFilesIdx).size;
+initializeStaticSys();
 
 async function staticRaw_append(data) {
     return new Promise(function(res) {
@@ -610,11 +632,19 @@ function static_fileData_append(data) {
     });
 }
 
-const database = new sql.Database(serverDB);
-const edits_db = new sql.Database(editsDB);
-const chat_history = new sql.Database(chatDB);
-const image_db = new sql.Database(imageDB);
-const misc_db = new sql.Database(miscDB);
+var database,
+    edits_db,
+    chat_history,
+    image_db,
+    misc_db;
+function setupDatabases() {
+    database = new sql.Database(serverDB);
+    edits_db = new sql.Database(editsDB);
+    chat_history = new sql.Database(chatDB);
+    image_db = new sql.Database(imageDB);
+    misc_db = new sql.Database(miscDB);
+}
+setupDatabases();
 
 var static_path = "./frontend/static/";
 var static_path_web = "static/";
@@ -653,21 +683,24 @@ var sql_indexes_init = "./backend/indexes.sql";
 var sql_edits_init = "./backend/edits.sql";
 
 var zip_file;
-if(!fs.existsSync(settings.ZIP_LOG_PATH)) {
-    zip_file = new zip();
-} else {
-    zip_file = new zip(settings.ZIP_LOG_PATH);
-}
-console.log("Handling previous error logs (if any)");
-if(fs.existsSync(settings.LOG_PATH)) {
-    var file = fs.readFileSync(settings.LOG_PATH);
-    if(file.length > 0) {
-        var log_data = fs.readFileSync(settings.LOG_PATH);
-        zip_file.addFile("NWOT_LOG_" + Date.now() + ".txt", log_data, "", 0644);
-        fs.truncateSync(settings.LOG_PATH);
+function setupZipLog() {
+    if(!fs.existsSync(settings.ZIP_LOG_PATH)) {
+        zip_file = new zip();
+    } else {
+        zip_file = new zip(settings.ZIP_LOG_PATH);
     }
+    console.log("Handling previous error logs (if any)");
+    if(fs.existsSync(settings.LOG_PATH)) {
+        var file = fs.readFileSync(settings.LOG_PATH);
+        if(file.length > 0) {
+            var log_data = fs.readFileSync(settings.LOG_PATH);
+            zip_file.addFile("NWOT_LOG_" + Date.now() + ".txt", log_data, "", 0644);
+            fs.truncateSync(settings.LOG_PATH);
+        }
+    }
+    zip_file.writeZip(settings.ZIP_LOG_PATH);
 }
-zip_file.writeZip(settings.ZIP_LOG_PATH);
+setupZipLog();
 
 // load all modules from directory. EG: "test.js" -> "test"
 function load_modules(default_dir) {
@@ -784,13 +817,19 @@ function asyncDbSystem(database) {
     return db;
 }
 
-const db = asyncDbSystem(database);
-const db_edits = asyncDbSystem(edits_db);
-const db_ch = asyncDbSystem(chat_history);
-const db_img = asyncDbSystem(image_db);
-const db_misc = asyncDbSystem(misc_db);
-
-prepare_chat_db({ db, db_ch, intv, handle_error });
+var db,
+    db_edits,
+    db_ch,
+    db_img,
+    db_misc
+function loadDbSystems() {
+    db = asyncDbSystem(database);
+    db_edits = asyncDbSystem(edits_db);
+    db_ch = asyncDbSystem(chat_history);
+    db_img = asyncDbSystem(image_db);
+    db_misc = asyncDbSystem(misc_db);
+}
+loadDbSystems();
 
 var transporter;
 var email_available = true;
@@ -886,6 +925,7 @@ var bypass_key_cache = "";
 
 async function initialize_server() {
     console.log("Starting server...");
+    prepare_chat_db({ db, db_ch, intv, handle_error });
     if(accountSystem == "local") {
         await loadEmail();
     }
@@ -923,14 +963,14 @@ function sendProcMsg(msg) {
     }
 }
 
-(async function() {
+async function main() {
     try {
         await initialize_server();
     } catch(e) {
         console.log("An error occurred during the initialization process:");
         console.log(e);
     }
-})();
+}
 
 async function initialize_misc_db() {
     if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='properties'")) {
@@ -1624,40 +1664,46 @@ process.on("uncaughtException", function(e) {
     process.exit(-1);
 });
 
-var server = https_reference.createServer(options, async function(req, res) {
-    req_id++;
-    var current_req_id = req_id;
-    try {
-        await process_request(req, res, current_req_id);
-    } catch(e) {
-        if(transaction_active) {
-            if(transaction_req_id == current_req_id && transaction_req_id > -1) {
-                transaction_active = false;
-                await db.run("COMMIT");
-            }
-        }
-        res.statusCode = 500;
-        var err500Temp = "";
+var server,
+    HTTPSockets,
+    HTTPSockketID;
+function setupHTTPServer() {
+    server = https_reference.createServer(options, async function(req, res) {
+        req_id++;
+        var current_req_id = req_id;
         try {
-            err500Temp = template_data["500.html"]();
+            await process_request(req, res, current_req_id);
         } catch(e) {
-            err500Temp = "An error has occurred while displaying the 500 internal server error page";
-            handle_error(e);
+            if(transaction_active) {
+                if(transaction_req_id == current_req_id && transaction_req_id > -1) {
+                    transaction_active = false;
+                    await db.run("COMMIT");
+                }
+            }
+            res.statusCode = 500;
+            var err500Temp = "";
+            try {
+                err500Temp = template_data["500.html"]();
+            } catch(e) {
+                err500Temp = "An error has occurred while displaying the 500 internal server error page";
+                handle_error(e);
+            }
+            res.end(err500Temp);
+            handle_error(e); // writes error to error log
         }
-        res.end(err500Temp);
-        handle_error(e); // writes error to error log
-    }
-});
-
-var HTTPSockets = {};
-var HTTPSockketID = 0;
-server.on("connection", function(socket) {
-    var sockID = HTTPSockketID++;
-    HTTPSockets[sockID] = socket;
-    socket.on("close", function() {
-        delete HTTPSockets[sockID];
     });
-});
+    
+    HTTPSockets = {};
+    HTTPSockketID = 0;
+    server.on("connection", function(socket) {
+        var sockID = HTTPSockketID++;
+        HTTPSockets[sockID] = socket;
+        socket.on("close", function() {
+            delete HTTPSockets[sockID];
+        });
+    });
+}
+setupHTTPServer();
 
 var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
 
@@ -2169,22 +2215,24 @@ async function clear_expired_sessions(no_timeout) {
 var client_ips = {};
 var closed_client_limit = 1000 * 60 * 60; // 1 hour
 // TODO: some leftover disconnected clients (although rare)
-intv.clear_closed_clients = setInterval(function() {
-    var curTime = Date.now();
-    for(var w in client_ips) {
-        var world = client_ips[w];
-        for(var c in world) {
-            var client = world[c];
-            if(client[2] && client[1] > -1 && client[1] + closed_client_limit <= curTime) {
-                delete world[c];
+function setupClearClosedClientsInterval() {
+    intv.clear_closed_clients = setInterval(function() {
+        var curTime = Date.now();
+        for(var w in client_ips) {
+            var world = client_ips[w];
+            for(var c in world) {
+                var client = world[c];
+                if(client[2] && client[1] > -1 && client[1] + closed_client_limit <= curTime) {
+                    delete world[c];
+                }
+            }
+            var keys = Object.keys(world);
+            if(keys.length == 0) {
+                delete client_ips[w];
             }
         }
-        var keys = Object.keys(world);
-        if(keys.length == 0) {
-            delete client_ips[w];
-        }
-    }
-}, 1000 * 60 * 10); // 10 minutes
+    }, 1000 * 60 * 10); // 10 minutes
+}
 
 // ping clients every 30 seconds
 function initPingAuto() {
@@ -2307,9 +2355,20 @@ async function initialize_server_components() {
         broadcastUserCount();
     }, 2000);
 
+    setupClearClosedClientsInterval();
+
     if(accountSystem == "local") {
         await clear_expired_sessions();
     }
+
+    await sysLoad();
+    await sintLoad();
+
+    await initialize_misc_db();
+    await initialize_ranks_db();
+    await initialize_edits_db();
+
+    initPingAuto();
 
     server.listen(serverPort, function() {
         var addr = server.address();
@@ -2334,15 +2393,6 @@ async function initialize_server_components() {
 
     wss = new WebSocket.Server({ server });
     global_data.wss = wss;
-
-    await sysLoad();
-    await sintLoad();
-
-    await initialize_misc_db();
-    await initialize_ranks_db();
-    await initialize_edits_db();
-
-    initPingAuto();
 
     ws_broadcast = function(data, world, opts) {
         if(!opts) opts = {};
@@ -2941,7 +2991,9 @@ function stopServer(restart, maintenance) {
 
         try {
             await updateChatLogData(true);
-            //await clear_expired_sessions(true);
+            if(accountSystem == "local") {
+                await clear_expired_sessions(true);
+            }
 
             for(var i in pages) {
                 var mod = pages[i];
@@ -3016,3 +3068,6 @@ function stopServer(restart, maintenance) {
         }
     })();
 }
+
+// ignite the server
+main();
