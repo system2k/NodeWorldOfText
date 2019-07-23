@@ -86,7 +86,7 @@ function api_chat_send(message, opts) {
         isCommand = true;
     }
 
-    socket.send(JSON.stringify({
+    w.socket.send(JSON.stringify({
         kind: "chat",
         nickname: nick,
         message: message,
@@ -129,7 +129,7 @@ var client_commands = {
     },
     ping: function() {
         serverPingTime = Date.now();
-        socket.send("2::@");
+        w.socket.send("2::@");
     },
     gridsize: function (args) {
         var size = args[0];
@@ -175,26 +175,20 @@ var client_commands = {
         positionY = 0;
         if(address.charAt(0) == "/") address = address.substr(1);
         state.worldModel.pathname = "/" + address;
-        createWsPath();
-        socket.close()
-        createSocket();
-        clearTiles(true);
-        clearInterval(fetchInterval);
+        ws_path = createWsPath();
+        w.changeSocket(ws_path);
         addChat(null, 0, "user", "[ Server ]", "Switching to world: \"" + address + "\"", "Server", false, false, false, null, Date.now());
     },
     warpserver: function(args) {
         var address = args[0];
         if(!address) {
-            createWsPath();
+            ws_path = createWsPath();
         } else {
             ws_path = address;
         }
         positionX = 0;
         positionY = 0;
-        socket.close()
-        createSocket();
-        clearTiles(true);
-        clearInterval(fetchInterval);
+        w.changeSocket(ws_path);
         addChat(null, 0, "user", "[ Server ]", "Switching to server: " + ws_path, "Server", false, false, false, null, Date.now());
     },
     night: function() {

@@ -50,7 +50,7 @@ var admclr = {
             tileX: x,
             tileY: y
         };
-        socket.send(JSON.stringify(data));
+        w.socket.send(JSON.stringify(data));
     }
 };
 
@@ -131,7 +131,7 @@ function enableServerPasting() {
             textInput.value = "";
             return;
         }
-        socket.send(JSON.stringify({
+        w.socket.send(JSON.stringify({
             kind: "paste",
             tileX: cursorCoords[0],
             tileY: cursorCoords[1],

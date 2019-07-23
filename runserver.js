@@ -21,10 +21,10 @@ const isIP        = require("net").isIP;
 const nodemailer  = require("nodemailer");
 const path        = require("path");
 const pg          = require("pg");
-const prompt      = require("./lib/prompt/prompt");
+const prompt      = require("./lib/prompt/prompt.js");
 const querystring = require("querystring");
 const sql         = require("sqlite3");
-const swig        = require("swig");
+const swig        = require("./lib/swig/swig.js");
 const url         = require("url");
 const WebSocket   = require("ws");
 const zip         = require("adm-zip");
@@ -730,11 +730,11 @@ function asyncDbSystem(database) {
                         return rej({
                             sqlite_error: process_error_arg(err),
                             input: { command, params }
-                        })
+                        });
                     }
                     r(res);
-                })
-            })
+                });
+            });
         },
         // runs a command (insert, update, etc...) and might return "lastID" if needed
         run: async function(command, params) {
@@ -752,8 +752,8 @@ function asyncDbSystem(database) {
                         lastID: this.lastID
                     }
                     r(info);
-                })
-            })
+                });
+            });
         },
         // gets multiple rows in one command
         all: async function(command, params) {
@@ -767,8 +767,8 @@ function asyncDbSystem(database) {
                         });
                     }
                     r(res);
-                })
-            })
+                });
+            });
         },
         // get multiple rows but execute a function for every row
         each: async function(command, params, callbacks) {
@@ -795,8 +795,8 @@ function asyncDbSystem(database) {
                     });
                     if(callback_error) return rej(cb_err_desc);
                     r(res);
-                })
-            })
+                });
+            });
         },
         // like run, but executes the command as a SQL file
         // (no comments allowed, and must be semicolon separated)
@@ -810,8 +810,8 @@ function asyncDbSystem(database) {
                         });
                     }
                     r(true);
-                })
-            })
+                });
+            });
         }
     };
     return db;
@@ -2161,7 +2161,7 @@ function getUserCountFromWorld(world) {
         if(NCaseCompare(user_world, world)) {
             counter++;
         }
-    })
+    });
     return counter;
 }
 
@@ -2174,7 +2174,7 @@ function topActiveWorlds(number) {
     }
     clientNumbers.sort(function(int1, int2) {
         return int2[0] - int1[0];
-    })
+    });
     return clientNumbers.slice(0, number);
 }
 
@@ -2361,15 +2361,6 @@ async function initialize_server_components() {
         await clear_expired_sessions();
     }
 
-    await sysLoad();
-    await sintLoad();
-
-    await initialize_misc_db();
-    await initialize_ranks_db();
-    await initialize_edits_db();
-
-    initPingAuto();
-
     server.listen(serverPort, function() {
         var addr = server.address();
 
@@ -2434,6 +2425,15 @@ async function initialize_server_components() {
     global_data.tile_signal_update = tile_signal_update;
 
     wss.on("connection", manageWebsocketConnection);
+
+    await sysLoad();
+    await sintLoad();
+
+    await initialize_misc_db();
+    await initialize_ranks_db();
+    await initialize_edits_db();
+
+    initPingAuto();
 
     serverLoaded = true;
     for(var i = 0; i < serverLoadWaitQueue.length; i++) {
@@ -2539,6 +2539,12 @@ var ws_limits = { // [amount, per ms, minimum ms cooldown]
     write:       [256, 1000, 0], // rate limited in another script
     paste:       [1, 1000, 0]
 };
+/*
+    fetch:
+        max 20 reqs every 500 MS
+        a large requests is 200+ tiles in a single request.
+        max 5 large requests every second.
+*/
 
 function can_process_req_kind(lims, kind) {
     if(!ws_limits[kind]) return true;

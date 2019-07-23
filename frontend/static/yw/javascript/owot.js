@@ -92,6 +92,7 @@ var pasteDirDown           = true;
 var defaultCursor          = "text";
 var defaultDragCursor      = "move";
 var fetchClientMargin      = 200;
+var classicTileProcessing  = false; // use content.split("") instead of advancedSplit(content)
 
 var images_to_load = {
     unloaded: "/static/unloaded.png"
@@ -650,7 +651,7 @@ function keydown_tileProtectAuto(e) {
                 kind: "protect",
                 data: data,
                 action: action
-            }))
+            }));
 
             autoTotal--;
             updateAutoProg();
@@ -891,7 +892,7 @@ function getCharInfo(tileX, tileY, charX, charY) {
         char: getChar(tileX, tileY, charX, charY),
         color: getCharColor(tileX, tileY, charX, charY),
         protection: getCharProtection(tileX, tileY, charX, charY)
-    }
+    };
 }
 
 function getCharInfoXY(x, y) {
@@ -990,11 +991,10 @@ if (!window.WebSocket && window.MozWebSocket) {
     window.WebSocket = window.MozWebSocket;
 }
 
-var ws_path;
 function createWsPath() {
-    ws_path = "ws" + (window.location.protocol === "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/";
+    return "ws" + (window.location.protocol === "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/";
 }
-createWsPath();
+var ws_path = createWsPath();
 
 var styles = {};
 
@@ -1485,6 +1485,9 @@ var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\
 // Split a string properly with surrogates and combining characters in mind
 function advancedSplit(str, noSurrog, noComb) {
     str += "";
+    if(classicTileProcessing) {
+        return str.split("");
+    }
     // look for surrogate pairs first. then look for combining characters. finally, look for the rest
     var data = str.match(splitRegex)
     if(data == null) return [];
@@ -1519,6 +1522,7 @@ function flushWrites() {
         kind: "write",
         edits: writeBuffer
     };
+    if(w.socket.socket.readyState != WebSocket.OPEN) return;
     w.socket.send(JSON.stringify(data));
     // clear buffer
     writeBuffer.splice(0);
@@ -2664,7 +2668,7 @@ function createSocket() {
         }, checkTileFetchInterval)
         if(timesConnected == 1) {
             if(Permissions.can_chat(state.userModel, state.worldModel)) {
-                socket.send(JSON.stringify({
+                w.socket.send(JSON.stringify({
                     kind: "chathistory"
                 }));
             }
@@ -3277,7 +3281,7 @@ function renderTile(tileX, tileY, redraw) {
     if(!tile) {
         drawGrid(ctx);
         return;
-    };
+    }
 
     // tile is already written
     // (force redraw if tile hasn't been drawn before and it's initted)
@@ -3301,7 +3305,7 @@ function renderTile(tileX, tileY, redraw) {
     textRender.clearRect(0, 0, tileW, tileH);
     if(images.background && backgroundEnabled) {
         var background_data = generateBackgroundPixels(tileX, tileY, images.background, true);
-        textRender.drawImage(background_data, 0, 0, tileW, tileH)
+        textRender.drawImage(background_data, 0, 0, tileW, tileH);
     }
 
     var content = tile.content;
@@ -3994,6 +3998,13 @@ var w = {
     },
     resetDragCursor: function() {
         defaultDragCursor = "move";
+    },
+    changeSocket: function(addr) {
+        ws_path = addr;
+        socket.close()
+        createSocket();
+        clearTiles(true);
+        clearInterval(fetchInterval);
     }
 }
 
