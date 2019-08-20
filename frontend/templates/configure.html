@@ -306,9 +306,39 @@
 				</p>
 				{% if user.superuser %}
 					<p>
-						Current Background:
-						<input name="world_background" value="{{ background_path }}">
-					</p>
+                        Current Background:
+                        <input name="world_background" value="{{ background_path }}">
+                    </p>
+                    <p>
+                        Background offset X:
+                        <input name="world_background_x" value="{{ background_x }}">
+                        <br>
+                        Background offset Y:
+                        <input name="world_background_y" value="{{ background_y }}">
+                    </p>
+                    <p>
+                        <span class="set_description">Use 0 to automatically find the width.</span>
+                        <br>
+						Background Width:
+                        <input name="world_background_w" value="{{ background_w }}">
+                        <br>
+                        Background Height:
+						<input name="world_background_h" value="{{ background_h }}">
+                    </p>
+                    <p>
+                        Background repeat mode:
+                        <select name="background_repeat_mode">
+                            <option value="0"{%if background_rmod==0%} selected{%endif%}>Tiled</option>
+                            <option value="1"{%if background_rmod==1%} selected{%endif%}>Center</option>
+                            <option value="2"{%if background_rmod==2%} selected{%endif%}>Singular</option>
+                        </select>
+                    </p>
+                    <p>
+                        <span class="set_description">Use -1 for no transparency</span>
+                        <br>
+                        Background Alpha Multiplier:
+                        <input name="background_alpha" value="{{ background_alpha }}">
+                    </p>
 				{% endif %}
 				<a href="javascript: showAdvancedMisc();" style="display: block; margin-bottom: 7px;">Advanced...</a>
 				<div id="advanced" style="display: none;">

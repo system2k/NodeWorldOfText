@@ -268,7 +268,7 @@ function storeNickname() {
 getStoredNickname();
 
 if(state.background) { // add the background image (if it already exists)
-    images_to_load.background = state.background;
+    images_to_load.background = state.background.path;
 }
 for(var i in images_to_load) { // add blank image object so that client knows it exists, but not loaded
     images[i] = null;
@@ -289,9 +289,17 @@ function loadImgPixelData(callback) {
         if(!error) {
             var width = loadImageElm.width;
             var height = loadImageElm.height;
+            if(img_key == "background") {
+                if(w.backgroundInfo.w) {
+                    width = w.backgroundInfo.w;
+                }
+                if(w.backgroundInfo.h) {
+                    height = w.backgroundInfo.h;
+                }
+            }
             imgToArrayCanvas.width = width;
             imgToArrayCanvas.height = height;
-            backImg.drawImage(loadImageElm, 0, 0);
+            backImg.drawImage(loadImageElm, 0, 0, width, height);
             images[img_key] = [backImg.getImageData(0, 0, width, height).data, width, height];
         } else {
             // failed to load. use gray color
@@ -2947,17 +2955,26 @@ function generateBackgroundPixels(tileX, tileY, image, returnCanvas) {
     if(image == images.unloaded && w.nightMode == 1) {
         invert = true;
     }
+    var alphaMult = w.backgroundInfo.alpha;
+    var repeatMode = w.backgroundInfo.rmod;
     var fromData = image[0]; // pixel data (RGBA)
     var img_width = image[1];
     var img_height = image[2];
-    // [pixels] where the tile starts in the client (offset relative to 0,0)
+    // where the tile starts in the client (offset relative to 0,0)
     var startX = tileX * tileWidth;
     var startY = tileY * tileHeight;
+    startX += w.backgroundInfo.x;
+    startY += w.backgroundInfo.y;
+    if(repeatMode == 1) {
+        startX += Math.floor(img_width / 2);
+        startY += Math.floor(img_height / 2);
+    }
     // start drawing the pixels
     for(var y = 0; y < tileHeight; y++) {
         for(var x = 0; x < tileWidth; x++) {
             var posX = startX + x;
             var posY = startY + y;
+            if((posX < 0 || posY < 0 || posX >= img_width || posY >= img_height) && (repeatMode == 1 || repeatMode == 2)) continue;
             // perform calculation to get chunk out of the image tiles
             posX = posX - Math.floor(posX / img_width) * img_width;
             posY = posY - Math.floor(posY / img_height) * img_height;
@@ -2967,6 +2984,11 @@ function generateBackgroundPixels(tileX, tileY, image, returnCanvas) {
             var G = fromData[index + 1];
             var B = fromData[index + 2];
             var A = fromData[index + 3];
+            if(alphaMult == -1) {
+                A = 255;
+            } else {
+                A *= alphaMult;
+            }
             if(invert) {
                 R = 255 - R;
                 G = 255 - G;
@@ -3659,6 +3681,14 @@ var w = {
         colorInputModal: new ColorInputModal(),
         selectionModal: new SelectionModal()
     },
+    backgroundInfo: {
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0,
+        rmod: 0,
+        alpha: 1
+    },
     doAnnounce: function(text) {
         if(text) {
             w._ui.announce_text.innerHTML = text;
@@ -4030,6 +4060,15 @@ buildMenu();
 w.clipboard.init();
 w.regionSelect.onselection(handleRegionSelection);
 w.regionSelect.init();
+
+if(state.background) {
+    w.backgroundInfo.x = ("x" in state.background) ? state.background.x : 0;
+    w.backgroundInfo.y = ("y" in state.background) ? state.background.y : 0;
+    w.backgroundInfo.w = ("w" in state.background) ? state.background.w : 0;
+    w.backgroundInfo.h = ("h" in state.background) ? state.background.h : 0;
+    w.backgroundInfo.rmod = ("rmod" in state.background) ? state.background.rmod : 0;
+    w.backgroundInfo.alpha = ("alpha" in state.background) ? state.background.alpha : 1;
+}
 
 w.on("tilesRendered", function() {
     for(var i = 0; i < regionSelections.length; i++) {

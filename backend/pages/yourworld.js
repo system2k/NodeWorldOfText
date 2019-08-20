@@ -79,7 +79,7 @@ module.exports.GET = async function(req, serve, vars, params) {
             array: query_data.array,
             content_only: query_data.content_only,
             concat: query_data.concat
-        }, vars)
+        }, vars);
         var tData;
         if(typeof tiles == "string") {
             tData = tiles;
@@ -88,7 +88,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         }
         serve(tData, null, {
             mime: "application/json; charset=utf-8"
-        })
+        });
     } else { // the HTML page
         if(!worldViews[world.id]) worldViews[world.id] = 0;
         worldViews[world.id]++;
@@ -129,7 +129,7 @@ module.exports.GET = async function(req, serve, vars, params) {
                 chat_permission,
                 color_text
             }
-        }
+        };
         if(CONST.tileRows != 8) {
             state.worldModel.tileRows = CONST.tileRows;
         }
@@ -153,7 +153,27 @@ module.exports.GET = async function(req, serve, vars, params) {
             state.worldModel.timemachine = true;
         }
         if(world_properties.background) {
-            state.background = world_properties.background;
+            state.background = {
+                path: world_properties.background
+            }
+            if(world_properties.background_x) {
+                state.background.x = world_properties.background_x;
+            }
+            if(world_properties.background_y) {
+                state.background.y = world_properties.background_y;
+            }
+            if(world_properties.background_w) {
+                state.background.w = world_properties.background_w;
+            }
+            if(world_properties.background_h) {
+                state.background.h = world_properties.background_h;
+            }
+            if(world_properties.background_rmod) {
+                state.background.rmod = world_properties.background_rmod;
+            }
+            if("background_alpha" in world_properties) {
+                state.background.alpha = world_properties.background_alpha;
+            }
         }
         var page_title = "Our World of Text";
         if(world.name) {

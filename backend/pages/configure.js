@@ -144,7 +144,13 @@ module.exports.GET = async function(req, serve, vars, params) {
         no_log_edits: !!properties.no_log_edits,
         half_chars:   !!properties.half_chars,
 
-        background_path: properties.background ? properties.background : "",
+        background_path: ("background" in properties) ? properties.background : "",
+        background_x: ("background_x" in properties) ? properties.background_x : "0",
+        background_y: ("background_y" in properties) ? properties.background_y : "0",
+        background_w: ("background_w" in properties) ? properties.background_w : "0",
+        background_h: ("background_h" in properties) ? properties.background_h : "0",
+        background_rmod: ("background_rmod" in properties) ? properties.background_rmod : "0",
+        background_alpha: ("background_alpha" in properties) ? properties.background_alpha : "1",
         meta_desc: properties.meta_desc
     };
 
@@ -172,6 +178,8 @@ module.exports.POST = async function(req, serve, vars) {
     var uvias = vars.uvias;
     var accountSystem = vars.accountSystem;
     var wss = vars.wss;
+    var san_nbr = vars.san_nbr;
+    var san_dp = vars.san_dp;
 
     if(!user.authenticated) {
         return serve();
@@ -363,6 +371,30 @@ module.exports.POST = async function(req, serve, vars) {
             properties_updated = true;
             delete properties.background;
         }
+        if((!post_data.world_background_x || post_data.world_background_x == "0") && user.superuser) {
+            properties_updated = true;
+            delete properties.background_x;
+        }
+        if((!post_data.world_background_y || post_data.world_background_y == "0") && user.superuser) {
+            properties_updated = true;
+            delete properties.background_y;
+        }
+        if((!post_data.world_background_w || post_data.world_background_w == "0") && user.superuser) {
+            properties_updated = true;
+            delete properties.background_w;
+        }
+        if((!post_data.world_background_h || post_data.world_background_h == "0") && user.superuser) {
+            properties_updated = true;
+            delete properties.background_h;
+        }
+        if((!post_data.background_repeat_mode || post_data.background_repeat_mode == "0") && user.superuser) {
+            properties_updated = true;
+            delete properties.background_rmod;
+        }
+        if((!post_data.background_alpha || post_data.background_alpha == "1") && user.superuser) {
+            properties_updated = true;
+            delete properties.background_alpha;
+        }
         if(!("nsfw_page" in post_data)) {
             properties_updated = true;
             delete properties.page_is_nsfw;
@@ -383,8 +415,8 @@ module.exports.POST = async function(req, serve, vars) {
             properties_updated = true;
             delete properties.meta_desc;
         }
-        var new_name = post_data.new_world_name + "";
-        if(new_name && new_name != world.name) { // changing world name
+        var new_name = post_data.new_world_name;
+        if(typeof new_name == "string" && new_name && new_name != world.name) { // changing world name
             var validate = await validate_claim_worldname(new_name, vars, true, world.id);
             if(validate.error) { // error with renaming
                 return await dispage("configure", {
@@ -399,6 +431,48 @@ module.exports.POST = async function(req, serve, vars) {
         if(post_data.world_background && user.superuser) {
             properties.background = post_data.world_background;
             properties_updated = true;
+        }
+        if(post_data.world_background_x && user.superuser) {
+            var bx = san_nbr(post_data.world_background_x);
+            if(bx != 0) {
+                properties.background_x = bx;
+                properties_updated = true;
+            }
+        }
+        if(post_data.world_background_y && user.superuser) {
+            var by = san_nbr(post_data.world_background_y);
+            if(by != 0) {
+                properties.background_y = by;
+                properties_updated = true;
+            }
+        }
+        if(post_data.world_background_w && user.superuser) {
+            var bw = san_nbr(post_data.world_background_w);
+            if(bw > 0 && bw <= 2500) { // if 0, use no value
+                properties.background_w = bw;
+                properties_updated = true;
+            }
+        }
+        if(post_data.world_background_h && user.superuser) {
+            var bh = san_nbr(post_data.world_background_h);
+            if(bh > 0 && bh <= 2500) { // if 0, use no value
+                properties.background_h = bh;
+                properties_updated = true;
+            }
+        }
+        if(post_data.background_alpha && user.superuser) {
+            var alpha = san_dp(post_data.background_alpha);
+            if((alpha >= 0 || alpha == -1) && alpha != 1) { // if 1, use no value
+                properties.background_alpha = alpha;
+                properties_updated = true;
+            }
+        }
+        if(post_data.background_repeat_mode && user.superuser) {
+            var rm = san_nbr(post_data.background_repeat_mode);
+            if(rm > 0 && rm <= 2) { // if 0, use no value
+                properties.background_rmod = rm;
+                properties_updated = true;
+            }
         }
         if("nsfw_page" in post_data) {
             properties.page_is_nsfw = true;
