@@ -800,6 +800,19 @@ function onKeyUp(e) {
     linkAuto.shiftDown = des;
     tileProtectAuto.ctrlDown = sel;
     tileProtectAuto.shiftDown = des;
+
+    if(checkKeyPress(e, keyConfig.cursorUp)) { // arrow up
+        autoArrowKeyMoveStop("up");
+    }
+    if(checkKeyPress(e, keyConfig.cursorDown)) { // arrow down
+        autoArrowKeyMoveStop("down");
+    }
+    if(checkKeyPress(e, keyConfig.cursorLeft)) { // arrow left
+        autoArrowKeyMoveStop("left");
+    }
+    if(checkKeyPress(e, keyConfig.cursorRight)) { // arrow right
+        autoArrowKeyMoveStop("right");
+    }
 }
 document.body.addEventListener("keyup", onKeyUp);
 
@@ -1992,6 +2005,114 @@ var char_input_check = setInterval(function() {
     }
 }, 10);
 
+var autoArrowKeyMoveInterval = null;
+var autoArrowKeyMoveActive = false;
+var autoArrowKeyMoveState = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+    x_t: 0,
+    y_t: 0,
+    prog_x: 0,
+    prog_y: 0
+};
+function autoArrowKeyMoveStart(dir) {
+    if(!autoArrowKeyMoveActive) {
+        autoArrowKeyMoveActive = true;
+        autoArrowKeyMoveInterval = setInterval(function() {
+            if(cursorCoords) {
+                clearInterval(autoArrowKeyMoveInterval);
+                autoArrowKeyMoveActive = false;
+                return;
+            }
+            var date = Date.now();
+            var s_up = autoArrowKeyMoveState.up;
+            var s_down = autoArrowKeyMoveState.down;
+            var s_left = autoArrowKeyMoveState.left;
+            var s_right = autoArrowKeyMoveState.right;
+            var x_t = autoArrowKeyMoveState.x_t;
+            var y_t = autoArrowKeyMoveState.y_t;
+            if(x_t) {
+                var diff = (date - x_t) / (1000 / 240);
+                if(s_right) {
+                    var addDiff = diff - autoArrowKeyMoveState.prog_x;
+                    autoArrowKeyMoveState.prog_x = diff;
+                    positionX -= addDiff;
+                    renderTiles();
+                }
+                if(s_left) {
+                    var addDiff = diff - autoArrowKeyMoveState.prog_x;
+                    autoArrowKeyMoveState.prog_x = diff;
+                    positionX += addDiff;
+                    renderTiles();
+                }
+            }
+            if(y_t) {
+                var diff = (date - y_t) / (1000 / 240);
+                if(s_up) {
+                    var addDiff = diff - autoArrowKeyMoveState.prog_y;
+                    autoArrowKeyMoveState.prog_y = diff;
+                    positionY += addDiff;
+                    renderTiles();
+                }
+                if(s_down) {
+                    var addDiff = diff - autoArrowKeyMoveState.prog_y;
+                    autoArrowKeyMoveState.prog_y = diff;
+                    positionY -= addDiff;
+                    renderTiles();
+                }
+            }
+        }, 10);
+    }
+    switch(dir) {
+        case "up":
+            autoArrowKeyMoveState.up = true;
+            if(autoArrowKeyMoveState.y_t == 0) autoArrowKeyMoveState.y_t = Date.now();
+            break;
+        case "down":
+            autoArrowKeyMoveState.down = true;
+            if(autoArrowKeyMoveState.y_t == 0) autoArrowKeyMoveState.y_t = Date.now();
+            break;
+        case "left":
+            autoArrowKeyMoveState.left = true;
+            if(autoArrowKeyMoveState.x_t == 0) autoArrowKeyMoveState.x_t = Date.now();
+            break;
+        case "right":
+            autoArrowKeyMoveState.right = true;
+            if(autoArrowKeyMoveState.x_t == 0) autoArrowKeyMoveState.x_t = Date.now();
+            break;
+    }
+}
+function autoArrowKeyMoveStop(dir) {
+    switch(dir) {
+        case "up":
+            autoArrowKeyMoveState.up = false;
+            autoArrowKeyMoveState.y_t = 0;
+            autoArrowKeyMoveState.prog_y = 0;
+            break;
+        case "down":
+            autoArrowKeyMoveState.down = false;
+            autoArrowKeyMoveState.y_t = 0;
+            autoArrowKeyMoveState.prog_y = 0;
+            break;
+        case "left":
+            autoArrowKeyMoveState.left = false;
+            autoArrowKeyMoveState.x_t = 0;
+            autoArrowKeyMoveState.prog_x = 0;
+            break;
+        case "right":
+            autoArrowKeyMoveState.right = false;
+            autoArrowKeyMoveState.x_t = 0;
+            autoArrowKeyMoveState.prog_x = 0;
+            break;
+    }
+    if(!autoArrowKeyMoveState.up && !autoArrowKeyMoveState.down && !autoArrowKeyMoveState.left && !autoArrowKeyMoveState.right) {
+        clearInterval(autoArrowKeyMoveInterval);
+        autoArrowKeyMoveActive = false;
+    }
+}
+
 function event_keydown(e) {
     var actElm = document.activeElement;
     if(!worldFocused) return;
@@ -2006,15 +2127,19 @@ function event_keydown(e) {
 
     if(checkKeyPress(e, keyConfig.cursorUp)) { // arrow up
         moveCursor("up");
+        if(!cursorCoords) autoArrowKeyMoveStart("up");
     }
     if(checkKeyPress(e, keyConfig.cursorDown)) { // arrow down
         moveCursor("down");
+        if(!cursorCoords) autoArrowKeyMoveStart("down");
     }
     if(checkKeyPress(e, keyConfig.cursorLeft)) { // arrow left
         moveCursor("left");
+        if(!cursorCoords) autoArrowKeyMoveStart("left");
     }
     if(checkKeyPress(e, keyConfig.cursorRight)) { // arrow right
         moveCursor("right");
+        if(!cursorCoords) autoArrowKeyMoveStart("right");
     }
     if(checkKeyPress(e, keyConfig.reset)) { // esc
         w.emit("esc");
@@ -3180,8 +3305,8 @@ function renderTile(tileX, tileY, redraw) {
         return;
     }
     var str = tileY + "," + tileX;
-    var offsetX = tileX * tileW + Math.trunc(width / 2) + positionX;
-    var offsetY = tileY * tileH + Math.trunc(height / 2) + positionY;
+    var offsetX = tileX * tileW + Math.trunc(width / 2) + Math.floor(positionX);
+    var offsetY = tileY * tileH + Math.trunc(height / 2) + Math.floor(positionY);
 
     // unloaded tiles
     if(!isTileLoaded(tileX, tileY)) {
