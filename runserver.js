@@ -925,6 +925,12 @@ var bypass_key_cache = "";
 
 async function initialize_server() {
     console.log("Starting server...");
+	
+    if(accountSystem == "uvias") {
+        await uvias_init();
+    }
+    beginReqLog();
+        
     prepare_chat_db({ db, db_ch, intv, handle_error });
     if(accountSystem == "local") {
         await loadEmail();
@@ -946,10 +952,16 @@ async function initialize_server() {
 
         await db.exec(tables);
         await db.exec(indexes);
+		
+        await initialize_misc_db();
+        await initialize_ranks_db();
+        await initialize_edits_db();
 
         init = true;
         if(accountSystem == "local") {
             account_prompt();
+        } else if(accountSystem == "uvias") {
+            account_prompt_uvias();
         }
     }
     if(!init) {
@@ -1027,32 +1039,6 @@ prompt.message   = ""; // do not display "prompt" before each question
 prompt.delimiter = ""; // do not display ":" after "prompt"
 prompt.colors    = false; // disable dark gray color in a black console
 
-var prompt_account_properties = {
-    properties: {
-        username: {
-            message: "Username: "
-        },
-        password: {
-            description: "Password: ",
-            replace: "*",
-            hidden: true
-        },
-        confirmpw: {
-            description: "Password (again): ",
-            replace: "*",
-            hidden: true
-        }
-    }
-};
-
-var prompt_account_yesno = {
-    properties: {
-        yes_no_account: {
-            message: "You just installed the server,\nwhich means you don\'t have any superusers defined.\nWould you like to create one now? (yes/no):"
-        }
-    }
-};
-
 var pw_encryption = "sha512WithRSAEncryption";
 const encryptHash = function(pass, salt) {
     if(!salt) {
@@ -1095,8 +1081,34 @@ function add(username, level) {
     })();
 }
 
+var prompt_account_yesno = {
+	properties: {
+		yes_no_account: {
+			message: "You just installed the server,\nwhich means you don\'t have any superusers defined.\nWould you like to create one now? (yes/no):"
+		}
+	}
+};
+
 function account_prompt() {
-    passFunc = function(err, result) {
+    var prompt_account_properties = {
+        properties: {
+            username: {
+                message: "Username: "
+            },
+            password: {
+                description: "Password: ",
+                replace: "*",
+                hidden: true
+            },
+            confirmpw: {
+                description: "Password (again): ",
+                replace: "*",
+                hidden: true
+            }
+        }
+    };
+
+	var passFunc = function(err, result) {
         var err = false;
         if(result["password"] !== result["confirmpw"]) {
             console.log("Error: Your passwords didn't match.");
@@ -1123,6 +1135,45 @@ function account_prompt() {
         var re = result["yes_no_account"];
         if(toUpper(re) === "YES") {
             prompt.get(prompt_account_properties, passFunc);
+        }
+        if(toUpper(re) === "NO") {
+            start_server();
+        }
+        if(toUpper(re) !== "YES" && toUpper(re) !== "NO") {
+            console.log("Please enter either \"yes\" or \"no\" (not case sensitive):");
+            prompt.get(prompt_account_yesno, yesNoAccount);
+        }
+    }
+    prompt.start();
+    prompt.get(prompt_account_yesno, yesNoAccount);
+}
+
+function account_prompt_uvias() {
+    var prompt_account_properties = {
+        properties: {
+            username: {
+                message: "Uvias Display Name: "
+            }
+        }
+    };
+    var uvAccountFunc = async function(err, result) {
+        var username = result["username"];
+        var db_user = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
+        if(!db_user) {
+            console.log("User not found.");
+            prompt.get(prompt_account_properties, uvAccountFunc);
+            return;
+        }
+        var uid = "x" + db_user.uid;
+        await db_misc.run("INSERT INTO admin_ranks VALUES(?, ?)", [uid, 3]);
+
+        console.log("Account successfully set as superuser.\n");
+        start_server();
+    }
+    yesNoAccount = function(err, result) {
+        var re = result["yes_no_account"];
+        if(toUpper(re) === "YES") {
+            prompt.get(prompt_account_properties, uvAccountFunc);
         }
         if(toUpper(re) === "NO") {
             start_server();
@@ -2342,11 +2393,6 @@ async function loadAnnouncement() {
 
 var wss;
 async function initialize_server_components() {
-    if(accountSystem == "uvias") {
-        await uvias_init();
-    }
-    beginReqLog();
-
     await loadAnnouncement();
 
     bypass_key_cache = fs.readFileSync(settings.bypass_key).toString("utf8");
@@ -2428,10 +2474,6 @@ async function initialize_server_components() {
 
     await sysLoad();
     await sintLoad();
-
-    await initialize_misc_db();
-    await initialize_ranks_db();
-    await initialize_edits_db();
 
     initPingAuto();
 
