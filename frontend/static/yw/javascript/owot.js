@@ -2385,9 +2385,11 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             linkElm.href = URL_Link;
             var linkProtocol = linkElm.protocol;
             if(linkProtocol == "javascript:") {
+                linkElm.target = "";
                 URL_Link = "javascript:runJsLink(\"" + escapeQuote(URL_Link) + "\");";
                 linkElm.href = URL_Link;
             } else if(linkProtocol == "com:") {
+                linkElm.target = "";
                 var com = URL_Link.split("com:")[1];
                 URL_Link = "javascript:w.broadcastCommand(\"" + escapeQuote(com) + "\");";
                 linkElm.href = URL_Link;
