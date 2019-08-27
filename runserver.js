@@ -361,7 +361,7 @@ if(testUviasIds) {
     uvias.id = "owottest";
     uvias.name = "Our World Of Text Test Server";
     uvias.domain = "testserver1.ourworldoftext.com";
-    uvias.private = false;
+    uvias.private = true;
 } else {
     uvias.id = "owot";
     uvias.name = "Our World Of Text";
