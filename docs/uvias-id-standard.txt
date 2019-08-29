@@ -1,0 +1,25 @@
+Storage of Uvias IDs on OWOT
+============================
+
+All IDs must be 64 bit.
+They must be in hexadecimal form.
+They must not be padded by zeros at the beginning.
+All characters in the IDs must be lower case.
+All IDs must start with "x" (Code 120, 0x78). The reason being that it's required for the database to be 100% sure the ID is a string. Some hex strings can be all base-10 digits, and those would confuse the database. The letter "x" seems suitable because it's commonly used as the letter to escape hex sequences.
+
+These mainly apply when referencing user ids in the database.
+If a user is deleted and cannot be found in the Uvias database, OWOT will refer to the IDs as "deleted~<ID>" (without quotes) on the website.
+It follows the same rules as above, but without the letter "x" at the beginning.
+
+Examples
+========
+
+References in database:
+    x112210f4b2d230a2       (123456789101112131 decimal)
+    x12d687                 (1234567 decimal)
+    xffffffffffffff85       (-123 decimal)
+
+When user is deleted (shown on website):
+    deleted~7fffffffffffffff        (9223372036854775807 decimal)
+    deleted~75bcd15                 (123456789 decimal)
+    deleted~ffffffffffffff9c        (-100 in deciamal)
