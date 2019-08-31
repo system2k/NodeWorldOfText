@@ -33,7 +33,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     
     
     serve(null, null, {
-        cookie: "token=" + token + "; expires=" + http_time(expires) + "; HttpOnly;",
+        cookie: "token=" + token + "; expires=" + http_time(expires) + "; path=/; HttpOnly;",
         redirect: "/accounts/profile/"
     });
 }
