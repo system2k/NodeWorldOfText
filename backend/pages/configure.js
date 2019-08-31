@@ -245,6 +245,7 @@ module.exports.POST = async function(req, serve, vars) {
         var readability = validatePerms(post_data.readability, 2);
         var writability = validatePerms(post_data.writability, 2);
         wss.clients.forEach(function(e) {
+            if(!e.userClient) return;
             if(e.world.id == world.id) {
                 if(readability == 1 && !e.is_member && !e.is_owner) {
                     e.close();
@@ -300,6 +301,7 @@ module.exports.POST = async function(req, serve, vars) {
         }
         if(id_to_remove) {
             wss.clients.forEach(function(e) {
+                if(!e.userClient) return;
                 if(e.user.id == id_to_remove) {
                     if(!e.is_owner) {
                         e.is_member = false;
@@ -329,6 +331,7 @@ module.exports.POST = async function(req, serve, vars) {
         // update properties in cached world objects for all clients
         var newProps = JSON.stringify(properties);
         wss.clients.forEach(function(e) {
+            if(!e.userClient) return;
             if(e.world_id == world.id) {
                 e.world.properties = newProps;
                 e.world.feature_go_to_coord = go_to_coord;
@@ -507,6 +510,7 @@ module.exports.POST = async function(req, serve, vars) {
 
         var newProps = JSON.stringify(properties);
         wss.clients.forEach(function(e) {
+            if(!e.userClient) return;
             if(e.world_id == world.id) {
                 e.world.properties = newProps;
             }
@@ -520,6 +524,7 @@ module.exports.POST = async function(req, serve, vars) {
             await db.run("UPDATE world SET owner_id=null WHERE id=?", world.id);
             if(id_to_remove) {
                 wss.clients.forEach(function(e) {
+                    if(!e.userClient) return;
                     if(e.user.id == user.id) {
                         e.is_owner = false;
                         e.is_member = false;

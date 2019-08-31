@@ -2356,30 +2356,6 @@ async function uvias_init() {
                 break;
         }
     });
-
-    var current_time = Math.floor(Date.now() / 1000);
-    async function session_check() {
-        try {
-            var ct = current_time;
-            current_time = Math.floor(Date.now() / 1000);
-            var list = await uvias.all("SELECT uid, creator_ip, created, creator_ua FROM accounts.sessions WHERE created >= TO_TIMESTAMP($1::BIGINT)", ct);
-            for(var i = 0; i < list.length; i++) {
-                var uid = list[i].uid;
-                var creator_ip = list[i].creator_ip;
-                var creator_ua = list[i].creator_ua;
-                var created = list[i].created;
-                var msg = "uvLogin;" + toHex64(uid).padStart(16, 0) + ";" + creator_ip + ";" + JSON.stringify(creator_ua) + ";" + created.getTime();
-                doLogReq(msg);
-                if(debugLogging) {
-                    console.log(msg);
-                }
-            }
-        } catch(e) {
-            handle_error(e);
-        }
-        if(!isStopping) intv.session_check = setTimeout(session_check, 5000);
-    }
-    intv.session_check = setTimeout(session_check, 5000);
 }
 
 async function loadAnnouncement() {

@@ -18,9 +18,10 @@ module.exports.GET = async function(req, serve, vars, params) {
     }
 
     var client_num = 0;
-    wss.clients.forEach(function() {
+    wss.clients.forEach(function(client) {
+        if(!client.userClient) return;
         client_num++;
-    })
+    });
 
     var custom_ranks = [
         { level: 0, name: "Default" },

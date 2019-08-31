@@ -40,6 +40,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     data = JSON.stringify(cdata);
     
     wss.clients.forEach(function(client) {
+        if(!client.userClient) return;
         try {
             if(client.readyState == 1 && NCaseCompare(client.world_name, world.name)) {
                 if(!client.handleCmdSockets) return;

@@ -107,6 +107,7 @@ async function retrieveChatHistory(world_id) {
             var row = JSON.parse(world_chats[a].data);
             row.date = world_chats[a].date;
             /* row.aid = world_chats[a].id; */
+            delete row.aid; // remove potentially-saved "aid"
             chat_cache[world_id].data.push(row);
         }
     }
@@ -131,7 +132,7 @@ async function add_to_chatlog(chatData, world_id) {
 
     var date = Date.now();
     chatData.date = date;
-    chatData.aid = chatAdditionId--;
+    /* chatData.aid = chatAdditionId--; */
 
     var history = await retrieveChatHistory(world_id);
 
@@ -204,7 +205,7 @@ async function doUpdateChatLogData() {
         }
         var cent = await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
             [date, def_channel, JSON.stringify(chatData)]);
-        chatData.aid = cent.lastID;
+        /* chatData.aid = cent.lastID; */
     }
 
     for(var i = 0; i < copy_global_chat_additions.length; i++) {
@@ -214,7 +215,7 @@ async function doUpdateChatLogData() {
         var global_channel = (await db_ch.get("SELECT id FROM channels WHERE name='global'")).id;
         var cent = await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
             [date, global_channel, JSON.stringify(data)]);
-        data.aid = cent.lastID;
+        /* data.aid = cent.lastID; */
     }
 
     await db_ch.run("COMMIT")
