@@ -16,7 +16,7 @@ module.exports.GET = async function(req, serve, vars, params) {
         return serve("Token is too long.");
     }
         
-    var dat = await uvias.get("SELECT uid, to_hex(uid) as uid_hex, session_id, accounts.build_token(uid, session_id) as token FROM accounts.get_and_del_sso_token(decode($1::CHAR(32), 'hex'))", token);
+    var dat = await uvias.get("SELECT uid, to_hex(uid) as uid_hex, session_id, accounts.build_token(uid, session_id) as token FROM accounts.get_and_del_sso_token(decode($1::CHAR(32), 'hex'), $2::text)", [token, uvias.id]);
 
     if(!dat) {
         return serve("Token not found. If you are seeing this message in error, please report this to the developers.");
