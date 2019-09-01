@@ -360,14 +360,14 @@ if(testUviasIds) {
     uvias.domain = "testserver1.ourworldoftext.com";
     uvias.private = true;
     uvias.only_verified = false;
-    uvias.custom_css_file_path = "";
+    uvias.custom_css_file_path = settings.uvias_custom_css_file_path;
 } else {
     uvias.id = "owot";
     uvias.name = "Our World Of Text";
     uvias.domain = "ourworldoftext.com";
     uvias.private = false;
     uvias.only_verified = false;
-    uvias.custom_css_file_path = "";
+    uvias.custom_css_file_path = settings.uvias_custom_css_file_path;
 }
 
 if(uvias.custom_css_file_path) {
