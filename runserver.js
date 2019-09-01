@@ -5,9 +5,6 @@
 **  Released and renamed October 10, 2017
 **  This is the main file
 */
-/*
-    To figure out the structure of the server, follow the functions, starting from the bottom of this code.
-*/
 
 console.log("\x1b[36;1mStarting up...\x1b[0m");
 
@@ -362,12 +359,21 @@ if(testUviasIds) {
     uvias.name = "Our World Of Text Test Server";
     uvias.domain = "testserver1.ourworldoftext.com";
     uvias.private = true;
+    uvias.only_verified = false;
+    uvias.custom_css_file_path = "";
 } else {
     uvias.id = "owot";
     uvias.name = "Our World Of Text";
     uvias.domain = "ourworldoftext.com";
     uvias.private = false;
+    uvias.only_verified = false;
+    uvias.custom_css_file_path = "";
 }
+
+if(uvias.custom_css_file_path) {
+    uvias.custom_css_file_path = path.resolve(uvias.custom_css_file_path);
+}
+
 uvias.sso = "/accounts/sso";
 uvias.logout = "/accounts/logout/?return=" + "/home/";
 uvias.address = "https://uvias.com";
@@ -2301,8 +2307,8 @@ function initPingAuto() {
 }
 
 async function uviasSendIdentifier() {
-    await uvias.run("SELECT accounts.set_service_info($1::text, $2::text, $3::text, $4::text, $5::text, $6::integer, $7::boolean);",
-        [uvias.id, uvias.name, uvias.domain, uvias.sso, uvias.logout, process.pid, uvias.private]);
+    await uvias.run("SELECT accounts.set_service_info($1::text, $2::text, $3::text, $4::text, $5::text, $6::integer, $7::boolean, $8::boolean $9::text);",
+        [uvias.id, uvias.name, uvias.domain, uvias.sso, uvias.logout, process.pid, uvias.private, uvias.only_verified, uvias.custom_css_file_path]);
     console.log("Sent service identifier");
 }
 

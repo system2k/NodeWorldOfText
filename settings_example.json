@@ -12,6 +12,7 @@
     "test_port": 9090,
 
     "accountSystem": "local",
+    "uvias_custom_css_file_path": "",
 
     "error_log": true,
 
