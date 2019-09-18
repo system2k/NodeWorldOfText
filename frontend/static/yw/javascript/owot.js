@@ -1310,6 +1310,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
         pageY: pageY
     });
     elm.owot.style.cursor = defaultDragCursor;
+    w.menu.hideNow();
 }
 document.addEventListener("mousedown", event_mousedown);
 
@@ -3540,6 +3541,7 @@ protectPrecisionOption(protectPrecision);
 var menu;
 function buildMenu() {
     menu = new Menu(elm.menu_elm, elm.nav_elm);
+    w.menu = menu;
     menu.addEntry("<li><a href=\"/home/\" target=\"_blank\">More...&nbsp;<img src=\"/static/Icon_External_Link.png\"></a></li>");
     menu.addCheckboxOption(" Show coordinates", function() {
         return elm.coords.style.display = "";
@@ -3797,6 +3799,7 @@ var w = {
     protect_bg: "",
     nightMode: 0, // 0 = normal, 1 = night, 2 = night with normal background patterns
     input: elm.textInput,
+    menu: null,
     _state: state,
     _ui: {
         announce: elm.announce,

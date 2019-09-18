@@ -1,8 +1,8 @@
 /*
 **  Our World of Text
-**  Est. November 19, 2016
+**  Est. May 1, 2016 as Your World of Text Node, and November 19, 2016 as Node World of Text
 **  Reprogrammed September 17, 2017
-**  Released and renamed October 10, 2017
+**  Released October 10, 2017 as Our World of Text
 **  This is the main file
 */
 

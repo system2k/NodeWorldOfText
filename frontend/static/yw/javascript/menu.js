@@ -100,6 +100,9 @@ var Menu = (function() {
 
         this.menuEl.onmouseenter = this.show;
         this.menuEl.onmouseleave = this.hide;
+        
+        this.titleEl.onclick = this.show;
+        this.menuEl.onclick = this.show;
     }
     return Menu;
 }());
