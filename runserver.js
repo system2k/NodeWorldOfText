@@ -1495,6 +1495,7 @@ async function get_user_info(cookies, is_websocket, include_cookies) {
         1: Staff
         0: regular user
     */
+    var date = Date.now();
     var user = {
         authenticated: false,
         username: "",
