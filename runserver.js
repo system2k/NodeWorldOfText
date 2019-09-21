@@ -1487,7 +1487,7 @@ function parseToken(token) {
     };
 }
 
-async function get_user_info(cookies, is_websocket) {
+async function get_user_info(cookies, is_websocket, include_cookies) {
     /*
         User Levels:
         3: Superuser (Operator)
@@ -1543,6 +1543,8 @@ async function get_user_info(cookies, is_websocket) {
 
     if(accountSystem == "uvias" && cookies.token) {
         var parsed = parseToken(cookies.token);
+        var success = false;
+        var has_refreshed = false;
         if(parsed) {
             var uid = parsed.uid;
             var session_id = parsed.session_id;
@@ -1550,6 +1552,17 @@ async function get_user_info(cookies, is_websocket) {
             if(session) {
                 var user_account = await uvias.get("SELECT to_hex(uid) as uid, username, rank_id FROM accounts.users WHERE uid=$1::bigint", uid);
                 if(user_account) {
+                    success = true;
+                    var session_expire = session.expires.getTime();
+                    var session_halfway = session_expire - (Day * 3.5);
+                    if(date >= session_halfway) { // refresh token if it is about to expire
+                        var ref_res = await uvias.get("SELECT * FROM accounts.refresh_session($1::bigint, $2::bytea)", [uid, session_id]);
+                        if(ref_res) {
+                            has_refreshed = true;
+                            var new_expiry_time = ref_res.new_expiry_time;
+                            var is_persistent = ref_res.is_persistent;
+                        }
+                    }
                     var links_local = await uvias.get("SELECT to_hex(uid) as uid, login_name, email, email_verified FROM accounts.links_local WHERE uid=$1::bigint", uid);
                     user.authenticated = true;
                     user.display_username = user_account.username;
@@ -1591,6 +1604,12 @@ async function get_user_info(cookies, is_websocket) {
 
                     user.session_key = cookies.token;
                 }
+            }
+        }
+        if(!success) {
+            // if the token is invalid, delete the cookie
+            if(include_cookies) {
+                include_cookies.push("sessionid=; expires=" + http_time(0) + "; path=/");
             }
         }
     }
@@ -1914,7 +1933,7 @@ async function process_request(req, res, current_req_id) {
                 if(no_login) {
                     user = {};
                 } else {
-                    user = await get_user_info(cookies);
+                    user = await get_user_info(cookies, false, include_cookies);
                     // check if user is logged in
                     if(!cookies.csrftoken) {
                         var token = new_token(32)

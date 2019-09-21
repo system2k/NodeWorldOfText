@@ -31,9 +31,8 @@ module.exports.GET = async function(req, serve, vars, params) {
     }
     var expires = session.expires.getTime();
     
-    
     serve(null, null, {
-        cookie: "token=" + token + "; expires=" + http_time(expires) + "; path=/; HttpOnly;",
+        cookie: "token=" + token + "; expires=" + http_time(expires + ms.Year) + "; path=/; HttpOnly;",
         redirect: "/accounts/profile/"
     });
 }
