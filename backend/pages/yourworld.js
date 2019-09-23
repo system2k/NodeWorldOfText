@@ -49,6 +49,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var announcement = vars.announcement();
     var HTML = vars.HTML;
     var san_nbr = vars.san_nbr;
+    var accountSystem = vars.accountSystem;
 
     var world_name = path;
     if(params.timemachine) {
@@ -105,9 +106,13 @@ module.exports.GET = async function(req, serve, vars, params) {
         if(!chat_permission) chat_permission = 0;
         var color_text = world_properties.color_text;
         if(!color_text) color_text = 0;
+        var username = user.username;
+        if(accountSystem == "uvias") {
+            username = user.display_username;
+        }
         var state = {
             userModel: {
-                username: user.username,
+                username: username,
                 is_superuser: user.superuser, // Admin of OWOT?
                 authenticated: user.authenticated,
                 is_member: read_permission.member || (user.superuser && world.name == ""), // Member of world?

@@ -2395,6 +2395,12 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
                 URL_Link = "javascript:w.broadcastCommand(\"" + escapeQuote(com) + "\");";
                 linkElm.href = URL_Link;
                 linkElm.title = "com:" + com;
+            } else if(linkProtocol == "comu:") {
+                    linkElm.target = "";
+                    var com = URL_Link.split("comu:")[1];
+                    URL_Link = "javascript:w.broadcastCommand(\"" + escapeQuote(com) + "\", true);";
+                    linkElm.href = URL_Link;
+                    linkElm.title = "comu:" + com;
             } else {
                 linkElm.rel = "noopener noreferrer";
             }
@@ -2809,6 +2815,9 @@ function createSocket() {
                 }));
             }
             timesConnected++;
+        }
+        if(w.receivingBroadcasts) {
+            w.broadcastReceive(true);
         }
     }
 
@@ -4001,8 +4010,8 @@ var w = {
         type = type.toLowerCase();
         return !!OWOT.events[type];
     },
-    broadcastReceive: function() {
-        if(w.receivingBroadcasts) return;
+    broadcastReceive: function(force) {
+        if(w.receivingBroadcasts && !force) return;
         w.receivingBroadcasts = true;
         w.socket.send(JSON.stringify({
             kind: "cmd_opt"

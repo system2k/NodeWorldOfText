@@ -17,7 +17,11 @@
             <div class="span-19">
                 <div id="topbar" class="span-19 last">
                     {% if user.authenticated %}
-                        Logged in as {{ user.username }}:
+                        {% if accountSystem == "uvias" %}
+                            Logged in as {{ user.username }}{% if user.username != user.display_username %}<b> ({{ user.display_username }})</b>{% endif %}:
+                        {% else %}
+                            Logged in as {{ user.username }}:
+                        {% endif %}
                     {% endif %}
                     <a href="/home/">Home</a>
                     {% if user.authenticated %}

@@ -17,29 +17,31 @@ module.exports.GET = async function(req, serve, vars, params) {
     
     var user_info;
     if(accountSystem == "uvias") {
-        var d_user = await uvias.get("SELECT uid as rawuid, to_hex(uid) as uid, login_name, email_verified FROM accounts.links_local WHERE lower(login_name)=lower($1::text)", username);
+        var d_user = await uvias.get("SELECT uid as rawuid, to_hex(uid) as uid, username, created, last_login FROM accounts.users WHERE lower(username)=lower($1::text)", username);
         if(!d_user) {
-            return "This user does not exist.";
+            return serve("This user does not exist.");
         }
-        
-        var d_inf = await uvias.get("SELECT username, created, last_login FROM accounts.users WHERE uid=$1::bigint", d_user.rawuid);
-        
+
+        var d_inf = await uvias.get("SELECT login_name, email_verified FROM accounts.links_local WHERE uid=$1::bigint", d_user.rawuid);
+
+        var login_name = "< none >";
+        var email_verified = false;
+
+        if(d_inf) {
+            login_name = d_inf.login_name;
+            email_verified = d_inf.email_verified;
+        }
+
         user_info = {
             id: "x" + d_user.uid,
-            username: d_user.login_name,
-            date_joined: 0,
-            last_login: 0,
+            username: login_name,
+            date_joined: d_user.created,
+            last_login: d_user.last_login,
             level: 0,
-            is_active: d_user.email_verified,
-            display_name: "< none >"
+            is_active: email_verified,
+            display_name: d_user.username
         };
-        
-        if(d_inf) {
-            user_info.date_joined = d_inf.created;
-            user_info.last_login = d_inf.last_login;
-            user_info.display_name = d_inf.username;
-        }
-        
+
         var level = await db_misc.get("SELECT level FROM admin_ranks WHERE id=?", [user_info.id]);
         if(level) {
             user_info.level = level.level;

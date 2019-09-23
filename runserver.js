@@ -958,10 +958,6 @@ async function initialize_server() {
 
         await db.exec(tables);
         await db.exec(indexes);
-		
-        await initialize_misc_db();
-        await initialize_ranks_db();
-        await initialize_edits_db();
 
         init = true;
         if(accountSystem == "local") {
@@ -2396,6 +2392,9 @@ async function loadAnnouncement() {
 var wss;
 async function initialize_server_components() {
     await loadAnnouncement();
+    await initialize_misc_db();
+    await initialize_ranks_db();
+    await initialize_edits_db();
 
     bypass_key_cache = fs.readFileSync(settings.bypass_key).toString("utf8");
 

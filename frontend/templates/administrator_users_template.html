@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
 {% block title %}
-	User Info for "{{ user_info.username }}" | Our World of Text
+	User Info for "{% if accountSystem == "uvias" %}{{ user_info.display_name }}{% else %}{{ user_info.username }}{% endif %}" | Our World of Text
 {% endblock %}
 
 {% block header %}
-	<h1>User Info for "{{ user_info.username }}"</h1>
+	<h1>User Info for "{% if accountSystem == "uvias" %}{{ user_info.display_name }}{% else %}{{ user_info.username }}{% endif %}"</h1>
 	<span><a href="/administrator/">« Back to Admin Panel</a></span>
 {% endblock %}
 
