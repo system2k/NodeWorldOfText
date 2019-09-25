@@ -2377,7 +2377,6 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 
     if(e.target != elm.owot && e.target != linkDiv) return;
     var link = is_link(tileX, tileY, charX, charY);
-    if(hasDragged) link = false;
     if(link && linksEnabled && !regionSelectionsActive()) {
         var pos = tileAndCharsToWindowCoords(tileX, tileY, charX, charY);
         elm.owot.style.cursor = "pointer";
