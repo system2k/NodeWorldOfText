@@ -15,6 +15,10 @@ function byId(a) {
     return document.getElementById(a);
 }
 
+function getDate() {
+    return Date.now();
+}
+
 // Element references
 var elm = {};
 function defineElements(list) {

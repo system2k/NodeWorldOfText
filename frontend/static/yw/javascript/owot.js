@@ -113,7 +113,7 @@ var keyConfig = {
     cursorDown: "DOWN+*",
     cursorLeft: "LEFT+*",
     cursorRight: "RIGHT+*",
-    copyRegion: "ALT+G"
+    copyRegion: ["ALT+G", "COMMAND+G"]
 };
 
 var clientOnload = [];
@@ -331,6 +331,7 @@ beginLoadingOWOT();
 
 function keydown_regionSelect(e) {
     if(!checkKeyPress(e, keyConfig.copyRegion) || regionSelectionsActive()) return;
+    e.preventDefault();
     w.regionSelect.startSelection();
 }
 document.addEventListener("keydown", keydown_regionSelect);
@@ -1635,7 +1636,7 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY) {
     // re-render
     renderTile(tileX, tileY, true);
 
-    var editArray = [tileY, tileX, charY, charX, Date.now(), char, nextObjId];
+    var editArray = [tileY, tileX, charY, charX, getDate(), char, nextObjId];
     if(tileFetchOffsetX || tileFetchOffsetY) {
         editArray[0] += tileFetchOffsetY;
         editArray[1] += tileFetchOffsetX;
@@ -1960,17 +1961,21 @@ var char_input_check = setInterval(function() {
                         },
                         action: "protect"
                     }));
-                } else if(hCode == "\r" || hCode == "\n" || hCode == "\x1b") {
+                } else if(hCode == "\r" || hCode == "\n" || hCode == "\x1b" || hCode == "r" || hCode == "n") {
                     index++;
                     doWriteChar = true;
-                    if(hCode == "\n") {
+                    if(hCode == "\n") { // paste newline character itself
                         chr = "\n";
                         noNewline = true;
-                    } else if(hCode == "\r") {
+                    } else if(hCode == "\r") { // paste carriage return character itself
                         chr = "\r";
                         noNewline = true;
-                    } else if(hCode == "\x1b") {
+                    } else if(hCode == "\x1b") { // paste ESC character itself
                         chr = "\x1b";
+                    } else if(hCode == "r") { // newline
+                        chr = "\r";
+                    } else if(hCode == "n") { // newline
+                        chr = "\n";
                     }
                 } else { // colored paste
                     var cCol = "";
@@ -2027,7 +2032,7 @@ function autoArrowKeyMoveStart(dir) {
                 autoArrowKeyMoveActive = false;
                 return;
             }
-            var date = Date.now();
+            var date = getDate();
             var s_up = autoArrowKeyMoveState.up;
             var s_down = autoArrowKeyMoveState.down;
             var s_left = autoArrowKeyMoveState.left;
@@ -2036,13 +2041,13 @@ function autoArrowKeyMoveStart(dir) {
             var y_t = autoArrowKeyMoveState.y_t;
             if(x_t) {
                 var diff = (date - x_t) / (1000 / 240);
-                if(s_right) {
+                if(s_right && !s_left) {
                     var addDiff = diff - autoArrowKeyMoveState.prog_x;
                     autoArrowKeyMoveState.prog_x = diff;
                     positionX -= addDiff;
                     renderTiles();
                 }
-                if(s_left) {
+                if(s_left && !s_right) {
                     var addDiff = diff - autoArrowKeyMoveState.prog_x;
                     autoArrowKeyMoveState.prog_x = diff;
                     positionX += addDiff;
@@ -2051,13 +2056,13 @@ function autoArrowKeyMoveStart(dir) {
             }
             if(y_t) {
                 var diff = (date - y_t) / (1000 / 240);
-                if(s_up) {
+                if(s_up && !s_down) {
                     var addDiff = diff - autoArrowKeyMoveState.prog_y;
                     autoArrowKeyMoveState.prog_y = diff;
                     positionY += addDiff;
                     renderTiles();
                 }
-                if(s_down) {
+                if(s_down && !s_up) {
                     var addDiff = diff - autoArrowKeyMoveState.prog_y;
                     autoArrowKeyMoveState.prog_y = diff;
                     positionY -= addDiff;
@@ -2069,19 +2074,19 @@ function autoArrowKeyMoveStart(dir) {
     switch(dir) {
         case "up":
             autoArrowKeyMoveState.up = true;
-            if(autoArrowKeyMoveState.y_t == 0) autoArrowKeyMoveState.y_t = Date.now();
+            if(autoArrowKeyMoveState.y_t == 0) autoArrowKeyMoveState.y_t = getDate();
             break;
         case "down":
             autoArrowKeyMoveState.down = true;
-            if(autoArrowKeyMoveState.y_t == 0) autoArrowKeyMoveState.y_t = Date.now();
+            if(autoArrowKeyMoveState.y_t == 0) autoArrowKeyMoveState.y_t = getDate();
             break;
         case "left":
             autoArrowKeyMoveState.left = true;
-            if(autoArrowKeyMoveState.x_t == 0) autoArrowKeyMoveState.x_t = Date.now();
+            if(autoArrowKeyMoveState.x_t == 0) autoArrowKeyMoveState.x_t = getDate();
             break;
         case "right":
             autoArrowKeyMoveState.right = true;
-            if(autoArrowKeyMoveState.x_t == 0) autoArrowKeyMoveState.x_t = Date.now();
+            if(autoArrowKeyMoveState.x_t == 0) autoArrowKeyMoveState.x_t = getDate();
             break;
     }
 }
@@ -2091,21 +2096,25 @@ function autoArrowKeyMoveStop(dir) {
             autoArrowKeyMoveState.up = false;
             autoArrowKeyMoveState.y_t = 0;
             autoArrowKeyMoveState.prog_y = 0;
+            if(autoArrowKeyMoveState.down) autoArrowKeyMoveState.y_t = getDate();
             break;
         case "down":
             autoArrowKeyMoveState.down = false;
             autoArrowKeyMoveState.y_t = 0;
             autoArrowKeyMoveState.prog_y = 0;
+            if(autoArrowKeyMoveState.up) autoArrowKeyMoveState.y_t = getDate();
             break;
         case "left":
             autoArrowKeyMoveState.left = false;
             autoArrowKeyMoveState.x_t = 0;
             autoArrowKeyMoveState.prog_x = 0;
+            if(autoArrowKeyMoveState.right) autoArrowKeyMoveState.x_t = getDate();
             break;
         case "right":
             autoArrowKeyMoveState.right = false;
             autoArrowKeyMoveState.x_t = 0;
             autoArrowKeyMoveState.prog_x = 0;
+            if(autoArrowKeyMoveState.left) autoArrowKeyMoveState.x_t = getDate();
             break;
     }
     if(!autoArrowKeyMoveState.up && !autoArrowKeyMoveState.down && !autoArrowKeyMoveState.left && !autoArrowKeyMoveState.right) {
@@ -2612,6 +2621,7 @@ function checkKeyPress(e, combination) {
             case "MINUS": map.key = "-"; break;
             case "ENTER": map.key = "Enter"; break;
             case "BACKSPACE": map.key = "Backspace"; break;
+            case "COMMAND": map.key = "Meta"; break;
             default: map.key = key;
         }
     }
@@ -2962,7 +2972,7 @@ function highlight(positions) {
             highlightFlash[tileY + "," + tileX][charY] = {};
         }
         if(!highlightFlash[tileY + "," + tileX][charY][charX]) {
-            highlightFlash[tileY + "," + tileX][charY][charX] = [Date.now(), 128];
+            highlightFlash[tileY + "," + tileX][charY][charX] = [getDate(), 128];
             highlightCount++;
         }
     }
@@ -2977,7 +2987,7 @@ var flashAnimateInterval = setInterval(function() {
                 var data = highlightFlash[tile][charY][charX];
                 var time = data[0];
                 // after 500 milliseconds
-                if(Date.now() - time >= 500) {
+                if(getDate() - time >= 500) {
                     delete highlightFlash[tile][charY][charX]
                     highlightCount--;
                 } else {
@@ -4519,7 +4529,7 @@ var ws_functions = {
     },
     ping: function(data) {
         if(data.time) {
-            var clientReceived = Date.now();
+            var clientReceived = getDate();
             // serverPingTime is from chat.js
             var pingMs = clientReceived - serverPingTime;
             addChat(null, 0, "user", "[ Server ]", "Ping: " + pingMs + " MS", "Server", false, false, false, null, clientReceived);

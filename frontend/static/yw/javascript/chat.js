@@ -106,7 +106,7 @@ function api_chat_send(message, opts) {
     var staff = opts.staff || state.userModel.is_staff;
 
     if(!isCommand) addChat(location, id, type, nickname,
-                            message, username, op, admin, staff, chatColor, Date.now());
+                            message, username, op, admin, staff, chatColor, getDate());
 }
 
 var client_commands = {
@@ -125,10 +125,10 @@ var client_commands = {
         } else {
             nickChangeMsg = "Removed nickname";
         }
-        addChat(null, 0, "user", "[ Server ]", nickChangeMsg, "Server", false, false, false, null, Date.now());
+        addChat(null, 0, "user", "[ Server ]", nickChangeMsg, "Server", false, false, false, null, getDate());
     },
     ping: function() {
-        serverPingTime = Date.now();
+        serverPingTime = getDate();
         w.socket.send("2::@");
     },
     gridsize: function (args) {
@@ -148,7 +148,7 @@ var client_commands = {
         updateScaleConsts();
         for(var i in tilePixelCache) delete tilePixelCache[i];
         renderTiles(true);
-        addChat(null, 0, "user", "[ Server ]", "Changed grid size to " + width + "x" + height, "Server", false, false, false, null, Date.now());
+        addChat(null, 0, "user", "[ Server ]", "Changed grid size to " + width + "x" + height, "Server", false, false, false, null, getDate());
     },
     color: function(args) {
         var color = args[0];
@@ -157,7 +157,7 @@ var client_commands = {
         if(!color) color = 0;
         YourWorld.Color = parseInt(color, 16);
         if(isNaN(color)) color = 0;
-        addChat(null, 0, "user", "[ Server ]", "Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase(), "Server", false, false, false, null, Date.now());
+        addChat(null, 0, "user", "[ Server ]", "Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase(), "Server", false, false, false, null, getDate());
     },
     chatcolor: function(args) {
         var color = args[0];
@@ -166,7 +166,7 @@ var client_commands = {
         if(!color) color = 0;
         defaultChatColor = parseInt(color, 16);
         if(isNaN(color)) color = 0;
-        addChat(null, 0, "user", "[ Server ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(), "Server", false, false, false, null, Date.now());
+        addChat(null, 0, "user", "[ Server ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(), "Server", false, false, false, null, getDate());
     },
     warp: function(args) {
         var address = args[0];
@@ -177,7 +177,7 @@ var client_commands = {
         state.worldModel.pathname = "/" + address;
         ws_path = createWsPath();
         w.changeSocket(ws_path);
-        addChat(null, 0, "user", "[ Server ]", "Switching to world: \"" + address + "\"", "Server", false, false, false, null, Date.now());
+        addChat(null, 0, "user", "[ Server ]", "Switching to world: \"" + address + "\"", "Server", false, false, false, null, getDate());
     },
     warpserver: function(args) {
         var address = args[0];
@@ -189,7 +189,7 @@ var client_commands = {
         positionX = 0;
         positionY = 0;
         w.changeSocket(ws_path);
-        addChat(null, 0, "user", "[ Server ]", "Switching to server: " + ws_path, "Server", false, false, false, null, Date.now());
+        addChat(null, 0, "user", "[ Server ]", "Switching to server: " + ws_path, "Server", false, false, false, null, getDate());
     },
     night: function() {
         w.night();
@@ -238,7 +238,7 @@ function event_on_chat(data) {
     }
     updateUnread()
     addChat(data.location, data.id, data.type,
-        data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, Date.now(), data.dataObj);
+        data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, getDate(), data.dataObj);
 }
 
 elm.chatsend.addEventListener("click", function() {

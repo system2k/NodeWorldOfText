@@ -130,12 +130,12 @@ function slideMenu(direction, element, speed) {
     element.style.display = "block";
     var destHeight = element.offsetHeight - menuMargin * 2;
     if(direction == "down") element.style.height = "0px";
-    var start = Date.now();
+    var start = getDate();
     var end = start + speed;
     var lapse = end - start;
     var int = setInterval(function() {
         element.style.display = "block";
-        var duration = Date.now() - start;
+        var duration = getDate() - start;
         if(duration >= lapse) {
             menuAnimationActive = false;
             clearInterval(int);
