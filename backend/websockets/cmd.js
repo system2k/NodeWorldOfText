@@ -6,6 +6,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     var NCaseCompare = vars.NCaseCompare;
     var world = vars.world;
     var user = vars.user;
+    var accountSystem = vars.accountSystem;
 
     // rate limit commands
     var msNow = Date.now();
@@ -34,7 +35,11 @@ module.exports = async function(ws, data, send, vars, evars) {
     };
 
     if(data.include_username && user.authenticated) {
-        cdata.username = user.username;
+        var username = user.username;
+        if(accountSystem == "uvias") {
+            username = user.display_username;
+        }
+        cdata.username = username;
     }
 
     data = JSON.stringify(cdata);
