@@ -40,6 +40,10 @@ module.exports = async function(ws, data, send, vars, evars) {
             username = user.display_username;
         }
         cdata.username = username;
+        cdata.id = user.id;
+        if(accountSystem == "uvias") {
+            cdata.id = cdata.id.substr(1).toUpperCase().padStart(16, "0");
+        }
     }
 
     data = JSON.stringify(cdata);

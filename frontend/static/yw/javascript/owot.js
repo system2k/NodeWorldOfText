@@ -2123,24 +2123,6 @@ function autoArrowKeyMoveStop(dir) {
     }
 }
 
-var keydownTable = {};
-function keydownTableDown(e) {
-    var key = e.key;
-    if(!key) return;
-    keydownTable[key] = 1;
-}
-function keydownTableUp(e) {
-    var key = e.key;
-    if(!key) return;
-    if(keydownTable[key]) {
-        delete keydownTable[key]
-    }
-}
-
-function event_keyup(e) {
-    keydownTableUp(e);
-}
-
 function event_keydown(e) {
     keydownTableDown(e);
     var actElm = document.activeElement;
@@ -2195,7 +2177,6 @@ function event_keydown(e) {
     w.emit("keyDown", e);
 }
 document.addEventListener("keydown", event_keydown);
-document.addEventListener("keyup", event_keyup);
 
 var colors = ["#660066", "#003366", "#ff9900", "#ff0066", "#003300", "#ff0000", "#3a3a3a", "#006666", "#3399ff", "#3333ff", "#000000"];
 function assignColor(username) {

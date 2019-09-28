@@ -19,6 +19,22 @@ function getDate() {
     return Date.now();
 }
 
+var keydownTable = {};
+function keydownTableDown(e) {
+    var key = e.key;
+    if(!key) return;
+    keydownTable[key] = 1;
+}
+function keydownTableUp(e) {
+    var key = e.key;
+    if(!key) return;
+    if(keydownTable[key]) {
+        delete keydownTable[key]
+    }
+}
+document.addEventListener("keydown", keydownTableDown);
+document.addEventListener("keyup", keydownTableUp);
+
 // Element references
 var elm = {};
 function defineElements(list) {
