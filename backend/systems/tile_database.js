@@ -533,6 +533,25 @@ async function flushQueue() {
             write_link(call_id, tile, t, data);
             t.createUndefTile = true;
 
+            var linkArch = {
+                kind: "link",
+                charX: data.charX,
+                charY: data.charY
+            };
+            if(data.type == "url") {
+                linkArch.link_type = 0;
+                linkArch.link_tileX = null;
+                linkArch.link_tileY = null;
+                linkArch.url = data.url;
+            } else if(data.type == "coord") {
+                linkArch.link_type = 1;
+                linkArch.link_tileX = data.link_tileX;
+                linkArch.link_tileY = data.link_tileY;
+                linkArch.url = "";
+            }
+            await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)",
+                [0, world.id, tileY, tileX, Date.now(), "@" + JSON.stringify(linkArch)]);
+
             prepareTileUpdate(updatedTiles, tileX, tileY, t);
             updatedTilesBroadcast = true;
         }
@@ -547,6 +566,16 @@ async function flushQueue() {
             var t = tData[1]; // data processed from tile database object
             protect_area(call_id, tile, t, data);
             t.createUndefTile = true;
+
+            var protArch = {
+                kind: "protect",
+                protect_type: data.protect_type,
+                precise: !!data.precise,
+                charX: data.charX,
+                charY: data.charY
+            };
+            await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)",
+                [0, world.id, tileY, tileX, Date.now(), "@" + JSON.stringify(protArch)]);
 
             prepareTileUpdate(updatedTiles, tileX, tileY, t);
             updatedTilesBroadcast = true;
@@ -904,15 +933,21 @@ async function flushQueue() {
 var cycleTimeout = Math.floor(1000 / 60);
 async function writeCycle() {
     if(queue.length) {
-        await g_transaction.begin();
-        await db_edits.run("BEGIN TRANSACTION");
         try {
-            await flushQueue();
+            await g_transaction.begin();
+            await db_edits.run("BEGIN TRANSACTION");
+            try {
+                await flushQueue();
+            } catch(e) {
+                handle_error(e);
+            }
+            await g_transaction.end();
+            await db_edits.run("COMMIT");
         } catch(e) {
+            // TODO: end transaction if already started
+            console.log("Cycle error on", Date.now());
             handle_error(e);
         }
-        await g_transaction.end();
-        await db_edits.run("COMMIT");
         intv.writeCycle = setTimeout(writeCycle, cycleTimeout);
     } else {
         intv.writeCycle = setTimeout(writeCycle, cycleTimeout);

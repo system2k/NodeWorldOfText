@@ -1,13 +1,8 @@
 Custom Roles Feature
 
-currently, there only exists 3 roles: Public, Member, and Owner.
-this feature would allow an owner of a world to create custom roles, each
-having their own permissions. owners can decide to give each role
-their own tile protection, or their own set of permissions. they can even
-give members permissions to grant permissions, grant roles, or to create more roles.
-this would be configurable in the world configuration page.
-worlds would be limited to 2048 custom roles as of now in case of technical limitations.
-each role will have a unique numeric id that is greater than 2 because
-the first 3 basic roles already exist. when a tile is protected to a specific custom role,
-it will store the id of the role. when a char is protected using precise char using
-custom roles, it will switch to a different format that can store the ids of the roles.
+There exist 3 states for users - Public, Member, Owner
+In order for a user to have a role, it must be a member of a world.
+Configurations on the world config page override all settings.
+Custom permissions can be set to each role, including managing roles, managing world, etc.
+Tile protections can be set to only one role type. Properties can be managed, such as who can type.
+Precise char requires special encoding for roles.

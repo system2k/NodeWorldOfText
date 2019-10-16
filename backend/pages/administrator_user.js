@@ -94,16 +94,6 @@ module.exports.POST = async function(req, serve, vars) {
         }, req, serve, vars);
     }
 
-    await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)",
-        [user.id, 0, 0, 0, Date.now(), "@" + JSON.stringify({
-            kind: "administrator_user",
-            user_edit: {
-                id: user_edit.id,
-                username: user_edit.username
-            },
-            post_data
-        })]);
-
     if(post_data.form == "rank") {
         var rank = -1;
         if(post_data.rank == "operator") rank = 3;
@@ -126,6 +116,15 @@ module.exports.POST = async function(req, serve, vars) {
             } else if(accountSystem == "local") {
                 await db.run("UPDATE auth_user SET level=? WHERE id=?", [rank, user_edit.id]);
             }
+            await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)",
+                [user.id, 0, 0, 0, Date.now(), "@" + JSON.stringify({
+                    kind: "administrator_user",
+                    user_edit: {
+                        id: user_edit.id,
+                        username: user_edit.username
+                    },
+                    rank: rank
+                })]);
         } else {
             return serve("Invalid rank");
         }

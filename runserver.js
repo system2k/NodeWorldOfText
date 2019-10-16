@@ -1737,6 +1737,11 @@ process.on("uncaughtException", function(e) {
     process.exit(-1);
 });
 
+process.on("unhandledRejection", function(reason) {
+    console.log("Unhandled promise rejection!\n" + Date.now());
+    console.log("Error:", reason);
+});
+
 var server,
     HTTPSockets,
     HTTPSockketID;
