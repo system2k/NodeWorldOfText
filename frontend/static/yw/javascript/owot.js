@@ -364,7 +364,7 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
                         link = link.link;
                         containsLink = true;
                         if(link.type == "url") {
-                            links.push("$u" + "\"" + escapeQuote(link.url) + "\"");
+                            links.push("$u" + "\"" + escapeURLQuote(link.url) + "\"");
                         } else if(link.type == "coord") {
                             links.push("$c" + "[" + link.link_tileX + "," + link.link_tileY + "]");
                         }
@@ -2289,7 +2289,7 @@ function alertJS(data) {
     js_alert_active = true;
     elm.confirm_js.style.display = "";
     elm.confirm_js_code.innerText = data;
-    run_js_confirm_risk.href = "javascript:confirmRunJsLink(\"" + escapeQuote(data) + "\");"
+    run_js_confirm_risk.href = "javascript:confirmRunJsLink(\"" + escapeURLQuote(data) + "\");"
     run_js_confirm.href = "javascript:confirmRunJsLink(null, true);"
     confirm_js_cancel.onclick = closeJSAlert;
     confirm_js_cancel_x.onclick = closeJSAlert;
@@ -2310,7 +2310,7 @@ function confirmRunJsLink(data, confirmWarning) {
         run_js_confirm.text = "run ▲";
         return; 
     }
-    var doRun = confirm("Are you sure you want to run this javascript link?\nPress cancel to NOT run it.\n\"" + escapeQuote(data.slice(0, 256)) + "\"");
+    var doRun = confirm("Are you sure you want to run this javascript link?\nPress cancel to NOT run it.\n\"" + escapeURLQuote(data.slice(0, 256)) + "\"");
     if(!doRun) return closeJSAlert();
     var link = document.createElement("a");
     link.href = data;
@@ -2332,6 +2332,15 @@ function runJsLink(data) {
 
 function escapeQuote(text) { // escapes " and ' and \
     return text.replace(/\\/g, "\\\\").replace(/\"/g, "\\\"").replace(/\'/g, "\\'");
+}
+
+function escapeURLQuote(url) {
+    try {
+        var decode = decodeURIComponent(url);
+    } catch(e) {
+        return "";
+    }
+    return encodeURIComponent(escapeQuote(decode));
 }
 
 var linkElm = document.createElement("a");
@@ -2396,18 +2405,18 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
             var linkProtocol = linkElm.protocol;
             if(linkProtocol == "javascript:") {
                 linkElm.target = "";
-                URL_Link = "javascript:runJsLink(\"" + escapeQuote(URL_Link) + "\");";
+                URL_Link = "javascript:runJsLink(\"" + escapeURLQuote(URL_Link) + "\");";
                 linkElm.href = URL_Link;
             } else if(linkProtocol == "com:") {
                 linkElm.target = "";
                 var com = URL_Link.split("com:")[1];
-                URL_Link = "javascript:w.broadcastCommand(\"" + escapeQuote(com) + "\");";
+                URL_Link = "javascript:w.broadcastCommand(\"" + escapeURLQuote(com) + "\");";
                 linkElm.href = URL_Link;
                 linkElm.title = "com:" + com;
             } else if(linkProtocol == "comu:") {
                     linkElm.target = "";
                     var com = URL_Link.split("comu:")[1];
-                    URL_Link = "javascript:w.broadcastCommand(\"" + escapeQuote(com) + "\", true);";
+                    URL_Link = "javascript:w.broadcastCommand(\"" + escapeURLQuote(com) + "\", true);";
                     linkElm.href = URL_Link;
                     linkElm.title = "comu:" + com;
             } else {
