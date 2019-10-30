@@ -430,28 +430,6 @@ const log_error = function(err) {
     }
 }
 
-var write_reqLog;
-var reqLogBuffer = [];
-function flushReqLogBuffer(stop) {
-    if(isStopping && !stop) return;
-    if(!reqLogBuffer.length) {
-        if(!stop) intv.flushReqLogBuffer = setTimeout(flushReqLogBuffer, 1000 * 5);
-        return;
-    }
-    var bdata = reqLogBuffer.join("\n") + "\n";
-    reqLogBuffer.splice(0);
-    write_reqLog.write(bdata, function() {
-        if(!stop) intv.flushReqLogBuffer = setTimeout(flushReqLogBuffer, 1000 * 5);
-    });
-}
-function beginReqLog() {
-    write_reqLog = fs.createWriteStream(settings.REQ_LOG_PATH, { flags: "a" });
-    flushReqLogBuffer();
-}
-function doLogReq(data) {
-    reqLogBuffer.push(data);
-}
-
 var read_staticRaw,
     write_staticRaw,
     read_staticIdx,
@@ -935,7 +913,6 @@ async function initialize_server() {
     if(accountSystem == "uvias") {
         await uvias_init();
     }
-    beginReqLog();
         
     prepare_chat_db({ db, db_ch, intv, handle_error });
     if(accountSystem == "local") {
@@ -1825,8 +1802,6 @@ async function process_request(req, res, current_req_id) {
     var remIp = req.socket.remoteAddress;
     var ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
 
-    doLogReq("http;" + JSON.stringify(req.method) + ";" + ipAddress + ";" + JSON.stringify(req.url) + ";" + JSON.stringify(req.headers["user-agent"]) + ";" + Date.now());
-
     function dispatch(data, status_code, params) {
         if(request_resolved) return; // if request is already sent
         request_resolved = true;
@@ -2348,7 +2323,6 @@ async function uvias_init() {
 
     pgConn.on("notification", async function(notif) {
         var channel = notif.channel;
-        doLogReq("uvSignal;" + channel + ";" + JSON.stringify(notif.payload) + ";" + Date.now());
         var data;
         try {
             data = JSON.parse(notif.payload);
@@ -3073,8 +3047,6 @@ function stopServer(restart, maintenance) {
             if(accountSystem == "uvias") {
                 pgConn.end();
             }
-
-            flushReqLogBuffer(true);
         } catch(e) {
             handle_error(e);
             if(!isTestServer) console.log(e);
