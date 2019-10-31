@@ -289,14 +289,6 @@ function loadImgPixelData(callback) {
         if(!error) {
             var width = loadImageElm.width;
             var height = loadImageElm.height;
-            if(img_key == "background") {
-                if(w.backgroundInfo.w) {
-                    width = w.backgroundInfo.w;
-                }
-                if(w.backgroundInfo.h) {
-                    height = w.backgroundInfo.h;
-                }
-            }
             imgToArrayCanvas.width = width;
             imgToArrayCanvas.height = height;
             backImg.drawImage(loadImageElm, 0, 0, width, height);
@@ -3095,7 +3087,7 @@ function getTileCanvas(str) {
     return [textRenderCanvas, textRender];
 }
 
-function generateBackgroundPixels(tileX, tileY, image, returnCanvas) {
+function generateBackgroundPixels(tileX, tileY, image, returnCanvas, isBackground) {
     var tileWidth = Math.trunc(tileW);
     var tileHeight = Math.trunc(tileH);
     if(returnCanvas) {
@@ -3111,16 +3103,24 @@ function generateBackgroundPixels(tileX, tileY, image, returnCanvas) {
     if(image == images.unloaded && w.nightMode == 1) {
         invert = true;
     }
-    var alphaMult = w.backgroundInfo.alpha;
-    var repeatMode = w.backgroundInfo.rmod;
+    var alphaMult = isBackground ? w.backgroundInfo.alpha : -1;
+    var repeatMode = isBackground ? w.backgroundInfo.rmod : 0;
     var fromData = image[0]; // pixel data (RGBA)
     var img_width = image[1];
     var img_height = image[2];
     // where the tile starts in the client (offset relative to 0,0)
     var startX = tileX * tileWidth;
     var startY = tileY * tileHeight;
-    startX += w.backgroundInfo.x;
-    startY += w.backgroundInfo.y;
+    if(isBackground) {
+        startX += w.backgroundInfo.x;
+        startY += w.backgroundInfo.y;
+        if(w.backgroundInfo.w) {
+            img_width = w.backgroundInfo.w;
+        }
+        if(w.backgroundInfo.h) {
+            img_height = w.backgroundInfo.h;
+        }
+    }
     if(repeatMode == 1) {
         startX += Math.floor(img_width / 2);
         startY += Math.floor(img_height / 2);
@@ -3348,7 +3348,7 @@ function renderTile(tileX, tileY, redraw) {
             return;
         }
         // generate tile background
-        var imgData = generateBackgroundPixels(tileX, tileY, images.unloaded, true);
+        var imgData = generateBackgroundPixels(tileX, tileY, images.unloaded, true, false);
         if(!imgData.tagName) return;
         // get main canvas of the tile
         var tileCanv = getTileCanvas(str);
@@ -3482,7 +3482,7 @@ function renderTile(tileX, tileY, redraw) {
     // first, clear text renderer canvas
     textRender.clearRect(0, 0, tileW, tileH);
     if(images.background && backgroundEnabled) {
-        var background_data = generateBackgroundPixels(tileX, tileY, images.background, true);
+        var background_data = generateBackgroundPixels(tileX, tileY, images.background, true, true);
         textRender.drawImage(background_data, 0, 0, tileW, tileH);
     }
 

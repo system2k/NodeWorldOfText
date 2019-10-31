@@ -2434,21 +2434,7 @@ async function initialize_server_components() {
         });
     }
 
-    tile_signal_update = function(world, x, y, content, properties, writability) {
-        ws_broadcast({
-            source: "signal",
-            kind: "tileUpdate",
-            tiles: {
-                [y + "," + x]: {
-                    content,
-                    properties: Object.assign(properties, { writability })
-                }
-            }
-        }, world);
-    }
-
     global_data.ws_broadcast = ws_broadcast;
-    global_data.tile_signal_update = tile_signal_update;
 
     wss.on("connection", manageWebsocketConnection);
 
@@ -2566,6 +2552,9 @@ var ws_limits = { // [amount, per ms, minimum ms cooldown]
         max 20 reqs every 500 MS
         a large requests is 200+ tiles in a single request.
         max 5 large requests every second.
+    write:
+        1000 characters per second
+        10 tiles per second
 */
 
 function can_process_req_kind(lims, kind) {

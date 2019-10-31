@@ -3,7 +3,6 @@
 module.exports = async function(data, vars) {
     var db = vars.db;
     var user = vars.user;
-    var tile_signal_update = vars.tile_signal_update;
     var san_nbr = vars.san_nbr;
     var san_dp = vars.san_dp;
     var decodeCharProt = vars.decodeCharProt;
