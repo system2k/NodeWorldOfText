@@ -45,12 +45,7 @@ var admclr = {
         }
     },
     handleClear: function(x, y) {
-        var data = {
-            kind: "clear_tile",
-            tileX: x,
-            tileY: y
-        };
-        w.socket.send(JSON.stringify(data));
+        network.clear_tile(x, y);
     }
 };
 
@@ -121,16 +116,6 @@ function enableServerPasting() {
         value = value.replace(/\r\n/g, "\n");
         value = value.replace(/\r/g, "\n");
         value = advancedSplit(value);
-        var index = 1;
-        if(value[0] == "\x1b") {
-            index--;
-        } else {
-            writeChar(value[0]);
-        }
-        if(value.length == 1) {
-            textInput.value = "";
-            return;
-        }
         w.socket.send(JSON.stringify({
             kind: "paste",
             tileX: cursorCoords[0],

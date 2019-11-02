@@ -81,6 +81,7 @@ module.exports.GET = async function(req, serve, vars, params) {
             content_only: query_data.content_only,
             concat: query_data.concat
         }, vars);
+        if("data" in tiles) tiles = tiles.data;
         var tData;
         if(typeof tiles == "string") {
             tData = tiles;

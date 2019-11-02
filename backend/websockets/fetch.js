@@ -3,6 +3,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     if(typeof tiles == "string") {
         return tiles;
     } else {
-        send({ tiles })
+        if("data" in tiles) tiles = tiles.data;
+        send({ tiles });
     }
 }

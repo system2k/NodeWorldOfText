@@ -1,5 +1,5 @@
 module.exports = async function(ws, data, send, vars, evars) {
-    return; // unstable
+    return;
     var db = vars.db;
     var user = vars.user;
     var world = vars.world;

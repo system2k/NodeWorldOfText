@@ -86,13 +86,7 @@ function api_chat_send(message, opts) {
         isCommand = true;
     }
 
-    w.socket.send(JSON.stringify({
-        kind: "chat",
-        nickname: nick,
-        message: message,
-        location: location,
-        color: chatColor
-    }));
+    network.chat(message, location, nick, chatColor);
 
     var registered = state.userModel.authenticated;
     var username = state.userModel.username;
@@ -105,8 +99,7 @@ function api_chat_send(message, opts) {
     var admin = opts.admin || state.userModel.is_superuser;
     var staff = opts.staff || state.userModel.is_staff;
 
-    if(!isCommand) addChat(location, id, type, nickname,
-                            message, username, op, admin, staff, chatColor, getDate());
+    if(!isCommand) addChat(location, id, type, nickname, message, username, op, admin, staff, chatColor, getDate());
 }
 
 var client_commands = {
@@ -129,7 +122,7 @@ var client_commands = {
     },
     ping: function() {
         serverPingTime = getDate();
-        w.socket.send("2::@");
+        network.ping(true);
     },
     gridsize: function (args) {
         var size = args[0];
@@ -471,7 +464,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
         idTag = "<span style=\"color: black; font-weight: normal;\">" + idTag + "</span>"
     }
 
-    if(idTag) idTag += "&nbsp;"; // space between id and name
+    if(idTag && type != "anon") idTag += "&nbsp;"; // space between id and name
 
     if(id == 0) {
         idTag = "";

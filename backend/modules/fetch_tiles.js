@@ -76,6 +76,7 @@ module.exports = async function(data, vars) {
     var o_editlog = data.editlog;
     var o_editlog_start = data.editlog_start;
 
+    // if not null, return special value instead of object containing tiles
     var alt_return_obj = null;
 
     var total_area = 0;
@@ -322,6 +323,10 @@ module.exports = async function(data, vars) {
         }
     }
 
-    if(alt_return_obj !== null) return alt_return_obj;
+    if(alt_return_obj !== null) {
+        return {
+            data: alt_return_obj
+        };
+    }
     return tiles;
 }

@@ -121,19 +121,6 @@ window.addEventListener("load", function() {
     for(var i = 0; i < clientOnload.length; i++) clientOnload[i]();
 });
 
-function debugLog() {
-    if(!Debug) return;
-    var args = [];
-    for(var i = 0; i < arguments.length; i++) {
-        args.push(arguments[i]);
-    }
-    args = JSON.stringify(args);
-    w.socket.send(JSON.stringify({
-        kind: "debug",
-        data: args
-    }));
-}
-
 defineElements({ // elm[<name>]
     loading: byId("loading"),
     coord_Y: byId("coord_Y"),
@@ -629,30 +616,21 @@ function keydown_tileProtectAuto(e) {
             var charX = selected[i][3][2];
             var charY = selected[i][3][3];
 
-            var data = {
+            var position = {
                 tileY: tileY,
                 tileX: tileX
             };
-
-            var action;
-            if(prot == 3) {
-                action = "unprotect";
-            } else {
-                action = "protect";
-                data.type = types[prot];
-            }
-
             if(precision == 1) {
-                data.charX = charX;
-                data.charY = charY;
-                data.precise = true;
+                position.charX = charX;
+                position.charY = charY;
             }
-
-            w.socket.send(JSON.stringify({
-                kind: "protect",
-                data: data,
-                action: action
-            }));
+            var type;
+            if(prot == 3) {
+                type = "unprotect";
+            } else {
+                type = types[prot];
+            }
+            network.protect(position, type);
 
             autoTotal--;
             updateAutoProg();
@@ -743,31 +721,24 @@ function keydown_linkAuto(e) {
             var mode = selected[i][4];
             var linkData = selected[i][5];
 
-            var data = {
-                tileY: tileY,
-                tileX: tileX,
-                charY: charY,
-                charX: charX
-            };
-
+            var data = {};
             var link_type;
             if(mode == 0) {
                 data.url = w.url_input;
                 link_type = "url";
                 data.url = linkData[0];
             } else if(mode == 1) {
-                data.link_tileX = w.coord_input_x;
-                data.link_tileY = w.coord_input_y;
                 link_type = "coord";
-                data.link_tileX = linkData[0];
-                data.link_tileY = linkData[1];
+                data.x = linkData[0];
+                data.y = linkData[1];
             }
 
-            w.socket.send(JSON.stringify({
-                kind: "link",
-                data: data,
-                type: link_type
-            }))
+            network.link({
+                tileY: tileY,
+                tileX: tileX,
+                charY: charY,
+                charX: charX
+            }, link_type, data);
 
             autoTotal--;
             updateAutoProg();
@@ -1177,26 +1148,22 @@ function doLink() {
     var tileY = lastLinkHover[1];
     var charX = lastLinkHover[2];
     var charY = lastLinkHover[3];
-    var data = {
-        tileY: tileY,
-        tileX: tileX,
-        charY: charY,
-        charX: charX
-    }
+    var data = {};
     var link_type;
     if(w.link_input_type == 0) {
         data.url = w.url_input;
         link_type = "url";
     } else if(w.link_input_type == 1) {
-        data.link_tileX = w.coord_input_x;
-        data.link_tileY = w.coord_input_y;
+        data.x = w.coord_input_x;
+        data.y = w.coord_input_y;
         link_type = "coord";
     }
-    w.socket.send(JSON.stringify({
-        kind: "link",
-        data: data,
-        type: link_type
-    }))
+    network.link({
+        tileY: tileY,
+        tileX: tileX,
+        charY: charY,
+        charX: charX
+    }, link_type, data);
 }
 
 function doProtect() {
@@ -1205,27 +1172,21 @@ function doProtect() {
     var tileX = lastTileHover[1];
     var tileY = lastTileHover[2];
     var types = ["public", "member-only", "owner-only"];
-    var data = {
+    var position = {
         tileY: tileY,
         tileX: tileX
-    }
+    };
     var action;
     if(w.protect_type == null) {
         action = "unprotect";
     } else {
-        action = "protect";
-        data.type = types[w.protect_type];
+        action = types[w.protect_type];
     }
     if(protectPrecision == 1) {
-        data.precise = true;
-        data.charX = lastTileHover[3];
-        data.charY = lastTileHover[4];
+        position.charX = lastTileHover[3];
+        position.charY = lastTileHover[4];
     }
-    w.socket.send(JSON.stringify({
-        kind: "protect",
-        data: data,
-        action: action
-    }));
+    network.protect(position, action);
 }
 
 function closest(element, parElement) {
@@ -1533,14 +1494,9 @@ var blankColor = (function() {
 var writeBuffer = [];
 
 function flushWrites() {
-    var data = {
-        kind: "write",
-        edits: writeBuffer
-    };
     if(w.socket.socket.readyState != WebSocket.OPEN) return;
-    w.socket.send(JSON.stringify(data));
-    // clear buffer
-    writeBuffer.splice(0);
+    network.write(writeBuffer);
+    writeBuffer.splice(0); // clear buffer
 }
 
 var writeInterval = setInterval(function() {
@@ -1864,7 +1820,7 @@ var char_input_check = setInterval(function() {
                     index += 2;
                     var lType = value[index];
                     index++;
-                    if(lType == "c") {
+                    if(lType == "c") { // coord
                         var strPoint = index;
                         var buf = "";
                         var mode = 0;
@@ -1892,7 +1848,7 @@ var char_input_check = setInterval(function() {
                         if(Permissions.can_coordlink(state.userModel, state.worldModel)) {
                             linkQueue.push(["coord", cursorCoords[0], cursorCoords[1], cursorCoords[2], cursorCoords[3], coordTileX, coordTileY]);
                         }
-                    } else if(lType == "u") {
+                    } else if(lType == "u") { // urllink
                         var strPoint = index;
                         var buf = "";
                         var quotMode = 0;
@@ -1941,18 +1897,12 @@ var char_input_check = setInterval(function() {
                             protType = 1; // member
                         }
                     }
-                    w.socket.send(JSON.stringify({
-                        kind: "protect",
-                        data: {
-                            tileY: cursorCoords[1],
-                            tileX: cursorCoords[0],
-                            charY: cursorCoords[3],
-                            charX: cursorCoords[2],
-                            type: ["public", "member-only", "owner-only"][protType],
-                            precise: true
-                        },
-                        action: "protect"
-                    }));
+                    network.protect({
+                        tileY: cursorCoords[1],
+                        tileX: cursorCoords[0],
+                        charY: cursorCoords[3],
+                        charX: cursorCoords[2]
+                    }, ["public", "member-only", "owner-only"][protType]);
                 } else if(hCode == "\r" || hCode == "\n" || hCode == "\x1b" || hCode == "r" || hCode == "n") {
                     index++;
                     doWriteChar = true;
@@ -2821,9 +2771,7 @@ function createSocket() {
         }, checkTileFetchInterval)
         if(timesConnected == 1) {
             if(Permissions.can_chat(state.userModel, state.worldModel)) {
-                w.socket.send(JSON.stringify({
-                    kind: "chathistory"
-                }));
+                network.chathistory();
             }
             timesConnected++;
         }
@@ -2884,10 +2832,7 @@ function getAndFetchTiles() {
         }
     }
     if(toFetch.length > 0) {
-        w.socket.send(JSON.stringify({
-            fetchRectangles: toFetch,
-            kind: "fetch"
-        }));
+        network.fetch(toFetch);
     }
 }
 
@@ -4032,16 +3977,10 @@ var w = {
     broadcastReceive: function(force) {
         if(w.receivingBroadcasts && !force) return;
         w.receivingBroadcasts = true;
-        w.socket.send(JSON.stringify({
-            kind: "cmd_opt"
-        }));
+        network.cmd_opt();
     },
     broadcastCommand: function(data, includeUsername) {
-        w.socket.send(JSON.stringify({
-            kind: "cmd",
-            data: data, // maximum length of 2048
-            include_username: includeUsername
-        }));
+        network.cmd(data, includeUsername);
     },
     jquery: function(callback) {
         if(window.jQuery) return;
@@ -4352,6 +4291,121 @@ function ReconnectingWebSocket(url) {
     return this;
 }
 
+var network = {
+    protect: function(position, type) {
+        // position: {tileX, tileY, [charX, charY]}
+        // type: <unprotect, public, member-only, owner-only>
+        var isPrecise = "charX" in position && "charY" in position;
+        var data = {
+            tileX: position.tileX,
+            tileY: position.tileY,
+            type: type == "unprotect" ? void 0 : type
+        };
+        if(isPrecise) {
+            data.charX = position.charX;
+            data.charY = position.charY;
+            if(!("tileX" in position || "tileY" in position)) {
+                data.tileX = Math.floor(data.charX / tileC);
+                data.tileY = Math.floor(data.charY / tileR);
+                data.charX = data.charX - Math.floor(data.charX / tileC) * tileC;
+                data.charY = data.charY - Math.floor(data.charY / tileR) * tileR;
+            }
+            data.precise = true;
+        }
+        w.socket.send(JSON.stringify({
+            kind: "protect",
+            data: data,
+            action: type == "unprotect" ? type : "protect"
+        }));
+    },
+    link: function(position, type, args) {
+        // position: {tileX, tileY, charX, charY}
+        // type: <url, coord>
+        // args: {url} or {x, y}
+        var data = {
+            tileY: position.tileY,
+            tileX: position.tileX,
+            charY: position.charY,
+            charX: position.charX
+        };
+        if(!("tileX" in position || "tileY" in position)) {
+            data.tileX = Math.floor(data.charX / tileC);
+            data.tileY = Math.floor(data.charY / tileR);
+            data.charX = data.charX - Math.floor(data.charX / tileC) * tileC;
+            data.charY = data.charY - Math.floor(data.charY / tileR) * tileR;
+        }
+        if(type == "url") {
+            data.url = args.url;
+        } else if(type == "coord") {
+            data.link_tileX = args.x;
+            data.link_tileY = args.y;
+        }
+        w.socket.send(JSON.stringify({
+            kind: "link",
+            data: data,
+            type: type
+        }));
+    },
+    cmd: function(data, include_username) {
+        w.socket.send(JSON.stringify({
+            kind: "cmd",
+            data: data, // maximum length of 2048
+            include_username: include_username
+        }));
+    },
+    cmd_opt: function() {
+        w.socket.send(JSON.stringify({
+            kind: "cmd_opt"
+        }));
+    },
+    write: function(edits, opts) {
+        if(!opts) opts = {};
+        w.socket.send(JSON.stringify({
+            kind: "write",
+            edits: edits,
+            public_only: opts.public_only,
+            preserve_links: opts.preserve_links
+        }));
+    },
+    chathistory: function() {
+        w.socket.send(JSON.stringify({
+            kind: "chathistory"
+        }));
+    },
+    fetch: function(fetches, opts) {
+        if(!opts) opts = {};
+        w.socket.send(JSON.stringify({
+            fetchRectangles: fetches,
+            kind: "fetch",
+            utf16: opts.utf16,
+            array: opts.array,
+            content_only: opts.content_only,
+            concat: opts.concat
+        }));
+    },
+    chat: function(message, location, nickname, color) {
+        w.socket.send(JSON.stringify({
+            kind: "chat",
+            nickname: nickname,
+            message: message,
+            location: location,
+            color: color
+        }));
+    },
+    ping: function(returnTime) {
+        var str = "2::";
+        if(returnTime) str += "@";
+        w.socket.send(str);
+    },
+    clear_tile: function(x, y) {
+        w.socket.send(JSON.stringify({
+            kind: "clear_tile",
+            tileX: x,
+            tileY: y
+        }));
+    }
+};
+
 var ws_functions = {
     fetch: function(data) {
         if(tileFetchOffsetX || tileFetchOffsetY) {
@@ -4490,30 +4544,19 @@ var ws_functions = {
                         if(queueItem[1] == tileX && queueItem[2] == tileY && queueItem[3] == charX && queueItem[4] == charY) {
                             var linkType = queueItem[0];
                             if(linkType == "url") {
-                                w.socket.send(JSON.stringify({
-                                    kind: "link",
-                                    data: {
-                                        tileY: tileY,
-                                        tileX: tileX,
-                                        charY: charY,
-                                        charX: charX,
-                                        url: queueItem[5]
-                                    },
-                                    type: "url"
-                                }));
+                                network.link({
+                                    tileY: tileY,
+                                    tileX: tileX,
+                                    charY: charY,
+                                    charX: charX
+                                }, "url", { url: queueItem[5] });
                             } else if(linkType == "coord") {
-                                w.socket.send(JSON.stringify({
-                                    kind: "link",
-                                    data: {
-                                        tileY: tileY,
-                                        tileX: tileX,
-                                        charY: charY,
-                                        charX: charX,
-                                        link_tileX: queueItem[5],
-                                        link_tileY: queueItem[6]
-                                    },
-                                    type: "coord"
-                                }));
+                                network.link({
+                                    tileY: tileY,
+                                    tileX: tileX,
+                                    charY: charY,
+                                    charX: charX
+                                }, "coord", { x: queueItem[5], y: queueItem[6] });
                             }
                             linkQueue.splice(r, 1);
                             break;
