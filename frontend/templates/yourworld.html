@@ -141,33 +141,47 @@
         <div id="chat_open" style="display: none;">
             <span>Chat&nbsp;<b id="total_unread" class="unread" style="display: none;">(-)</b></span>
         </div>
-        <div id="chat_window" style="display: none; bottom: 0px; left: 0px;">
-            <span style="position: absolute; top: 5px; left: 210px;" id="usr_online"></span>
-            <div class="chat_tab_button" style="background-color: #8c8c8c; color: white; left: 3px; width: 100px !important;" id="chat_page_tab">
-                This page&nbsp;<b id="page_unread" class="unread" style="display: none;">(-)</b>
-            </div>
-            <div class="chat_tab_button" style="left: 110px;" id="chat_global_tab">
-                Global&nbsp;<b id="global_unread" class="unread" style="display: none;">(-)</b>
-            </div>
-            <div id="chat_close">
-                X
-            </div>
-            <div class="chatfield" id="page_chatfield"></div>
-            <div class="chatfield" id="global_chatfield" style="display: none;"></div>
-            <div style="position: absolute; left: -1px; bottom: 0px;">
-                <table style="border-collapse: collapse; width: 394px; margin: 4px;">
-                    <tbody>
-                        <tr>
-                            <td style="padding-right: 8px;">
-                                <input style="width: 100%;" id="chatbar">
-                            </td>
-                            <td style="width: 1px;">
-                                <button id="chatsend">Send</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+        <div id="chat_window" style="width: 400px; height: 300px; bottom: 0px; left: 0px; display: none;">
+            <table style="width: 100%; height: 100%;">
+                <tbody>
+                    <tr style="height: 22px; margin-left: 6px;">
+                        <td style="padding-left: 1px;">
+                            <div class="chat_tab_button" id="chat_page_tab" style="background-color: #8c8c8c; color: white; width: 100px;">
+                                This page&nbsp;<b id="page_unread" class="unread" style="display: none;">(-)</b>
+                            </div>
+                        </td>
+                        <td style="padding-left: 3px;">
+                            <div class="chat_tab_button" id="chat_global_tab" style="width: 80px;">
+                                Global&nbsp;<b id="global_unread" class="unread" style="display: none;">(-)</b>
+                            </div>
+                        </td>
+                        <td id="usr_online_container" style="width: 100%; padding-top: 2px;">
+                            <span id="usr_online" style="padding-left: 16px;">
+                                1 User Online
+                            </span>
+                        </td>
+                        <td style="float: right; margin-right: 1px;">
+                            <div id="chat_close">
+                                X
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td id="chatfield_container" colspan="4" style="padding-left: 1px; padding-right: 3px; height: 245px;">
+                            <div class="chatfield" id="page_chatfield" style="height: 245px;"></div>
+                            <div class="chatfield" id="global_chatfield" style="display: none; height: 245px;"></div>
+                        </td>
+                    </tr>
+                    <tr style="height: 21px;">
+                        <td style="width: 100%; padding-left: 1px; padding-right: 5px;" colspan="3">
+                            <input style="width: 100%;" id="chatbar">
+                        </td>
+                        <td>
+                            <button id="chatsend">Send</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
         <div id="confirm_js" style="display: none; top: 50px; left: 100px;">
             <a href="javascript:void 0;" id="run_js_confirm_risk" style="display: none;">Accept the risk and run</a>

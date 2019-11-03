@@ -182,7 +182,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 
         html += "Command list:<br>";
 
-        html += "<div style=\"background-color: #dadada; font-family: monospace;\">";
+        html += "<div style=\"background-color: #dadada; font-family: monospace; font-size: 13px;\">";
 
         for(var i = 0; i < list.length; i++) {
             var row = list[i];

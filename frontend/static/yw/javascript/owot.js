@@ -141,7 +141,10 @@ defineElements({ // elm[<name>]
     confirm_js_code: byId("confirm_js_code"),
     main_view: byId("main_view"),
     random_color_link: byId("random_color_link"),
-    run_js_confirm_risk: byId("run_js_confirm_risk")
+    run_js_confirm_risk: byId("run_js_confirm_risk"),
+    usr_online: byId("usr_online"),
+    usr_online_container: byId("usr_online_container"),
+    chatfield_container: byId("chatfield_container")
 });
 
 var jscolorInput;
@@ -174,7 +177,7 @@ init_dom();
 
 var draggable_element_mousemove = [];
 var draggable_element_mouseup = [];
-function draggable_element(dragger, dragged) {
+function draggable_element(dragger, dragged, exclusions) {
     if(!dragged) {
         dragged = dragger;
     }
@@ -186,9 +189,15 @@ function draggable_element(dragger, dragged) {
 
     var clickX = 0;
     var clickY = 0;
-
     dragger.addEventListener("mousedown", function(e) {
-        if(e.target != dragger) return;
+        if(exclusions) {
+            for(var i = 0; i < exclusions.length; i++) {
+                if(closest(e.target, exclusions[i])) {
+                    return;
+                }
+            }
+        }
+        if(!closest(e.target, dragger)) return;
         elmX = dragged.offsetLeft;
         elmY = dragged.offsetTop;
         elmWidth = dragged.offsetWidth;
@@ -235,7 +244,18 @@ function draggable_element(dragger, dragged) {
     });
 }
 
-draggable_element(elm.chat_window);
+function resizeChat(width, height) {
+    // 400 x 300
+    elm.chat_window.style.width = width + "px";
+    elm.chat_window.style.height = height + "px";
+    elm.chatfield_container.style.height = (height - 55) + "px";
+    elm.page_chatfield.style.height = (height - 55) + "px";
+    elm.global_chatfield.style.height = (height - 55) + "px";
+}
+
+draggable_element(elm.chat_window, null, [
+    elm.chatbar, elm.chatsend, elm.chat_close, elm.chat_page_tab, elm.chat_global_tab, elm.chatfield_container
+]);
 draggable_element(elm.confirm_js);
 
 function getStoredNickname() {
