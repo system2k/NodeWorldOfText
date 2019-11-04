@@ -98,8 +98,6 @@ function api_chat_send(message, opts) {
     var op = opts.op || state.userModel.is_operator;
     var admin = opts.admin || state.userModel.is_superuser;
     var staff = opts.staff || state.userModel.is_staff;
-
-    if(!isCommand) addChat(location, id, type, nickname, message, username, op, admin, staff, chatColor, getDate());
 }
 
 var client_commands = {

@@ -55,6 +55,7 @@ var height          = getWndHeight();
 var js_alert_active = false; // js alert window open
 var worldFocused    = false;
 var Debug           = false;
+var chatResizing    = false;
 
 var positionX              = 0; // client position in pixels
 var positionY              = 0;
@@ -177,7 +178,7 @@ init_dom();
 
 var draggable_element_mousemove = [];
 var draggable_element_mouseup = [];
-function draggable_element(dragger, dragged, exclusions) {
+function draggable_element(dragger, dragged, exclusions, onDrag) {
     if(!dragged) {
         dragged = dragger;
     }
@@ -209,6 +210,10 @@ function draggable_element(dragger, dragged, exclusions) {
     // when the element is being dragged
     draggable_element_mousemove.push(function(e, arg_pageX, arg_pageY) {
         if(!dragging) return;
+
+        if(onDrag) {
+            if(onDrag()) return;
+        }
 
         dragged.style.top = "";
         dragged.style.bottom = "";
@@ -245,18 +250,115 @@ function draggable_element(dragger, dragged, exclusions) {
 }
 
 function resizeChat(width, height) {
-    // 400 x 300
+    // default: 400 x 300
+    if(width < 350) width = 350;
+    if(height < 56) height = 56;
     elm.chat_window.style.width = width + "px";
     elm.chat_window.style.height = height + "px";
     elm.chatfield_container.style.height = (height - 55) + "px";
     elm.page_chatfield.style.height = (height - 55) + "px";
     elm.global_chatfield.style.height = (height - 55) + "px";
+    elm.page_chatfield.style.width = (width - 8) + "px";
+    elm.global_chatfield.style.width = (width - 8) + "px";
+    return [width, height];
 }
 
 draggable_element(elm.chat_window, null, [
     elm.chatbar, elm.chatsend, elm.chat_close, elm.chat_page_tab, elm.chat_global_tab, elm.chatfield_container
-]);
+], function() {
+    if(chatResizing) {
+        return true;
+    }
+});
 draggable_element(elm.confirm_js);
+
+function resizable_chat() {
+    var state = 0;
+    var isDown = false;
+	var downX = 0;
+    var downY = 0;
+    var elmX = 0;
+    var elmY = 0;
+    var chatWidth = 0;
+    var chatHeight = 0;
+    chat_window.addEventListener("mousemove", function(e) {
+        if(isDown) return;
+        var posX = e.pageX - chat_window.offsetLeft;
+        var posY = e.pageY - chat_window.offsetTop;
+        var top = (posY) <= 4;
+        var left = (posX) <= 3;
+        var right = (chat_window.offsetWidth - posX) <= 4;
+        var bottom = (chat_window.offsetHeight - posY) <= 5;
+        var cursor = "";
+        if(left || right) cursor = "ew-resize";
+        if(top || bottom) cursor = "ns-resize";
+        if((top && left) || (right && bottom)) cursor = "nwse-resize";
+        if((bottom && left) || (top && right)) cursor = "nesw-resize";
+        chat_window.style.cursor = cursor;
+        state = bottom << 3 | right << 2 | left << 1 | top;
+    });
+    chat_window.addEventListener("mousedown", function(e) {
+		downX = e.pageX;
+		downY = e.pageY;
+        if(state) {
+            // subtract 2 for the borders
+            chatWidth = chat_window.offsetWidth - 2;
+            chatHeight = chat_window.offsetHeight - 2;
+            elmX = chat_window.offsetLeft;
+            elmY = chat_window.offsetTop;
+            isDown = true;
+            chatResizing = true;
+        }
+    });
+    document.addEventListener("mouseup", function() {
+        isDown = false;
+        chatResizing = false;
+    });
+    document.addEventListener("mousemove", function(e) {
+        if(!isDown) return;
+        var offX = e.pageX - downX;
+        var offY = e.pageY - downY;
+        switch(state) {
+            case 0x1: // top
+                var dimY = chatHeight - offY;
+                var res = resizeChat(chatWidth, dimY);
+                chat_window.style.top = (elmY + offY + (dimY - res[1])) + "px";
+                break;
+            case 0x2: // left
+                var dimX = chatWidth - offX;
+                var res = resizeChat(dimX, chatHeight);
+                chat_window.style.left = (elmX + offX + (dimX - res[0])) + "px";
+                break;
+            case 0x3: // top left
+                var dimX = chatWidth - offX;
+                var dimY = chatHeight - offY;
+                var res = resizeChat(dimX, dimY);
+                chat_window.style.left = (elmX + offX + (dimX - res[0])) + "px";
+                chat_window.style.top = (elmY + offY + (dimY - res[1])) + "px";
+                break;
+            case 0x4: // right
+                resizeChat(chatWidth + offX, chatHeight);
+                break;
+            case 0x5: // top right
+                var dimY = chatHeight - offY;
+                var res = resizeChat(chatWidth + offX, dimY);
+                chat_window.style.top = (elmY + offY + (dimY - res[1])) + "px";
+                break;
+            case 0x8: // bottom
+                resizeChat(chatWidth, chatHeight + offY);
+                break;
+            case 0xA: // bottom left
+                var dimX = chatWidth - offX;
+                var res = resizeChat(dimX, chatHeight + offY);
+                chat_window.style.left = (elmX + offX + (dimX - res[0])) + "px";
+                break;
+            case 0xC: // bottom right
+                resizeChat(chatWidth + offX, chatHeight + offY);
+                break;
+        }
+    });
+}
+resizable_chat();
 
 function getStoredNickname() {
     var nick = YourWorld.Nickname;
@@ -4619,7 +4721,6 @@ var ws_functions = {
         }
     },
     chat: function(data) {
-        if(data.channel == w.socketChannel) return;
         var type = chatType(data.registered, data.nickname, data.realUsername);
         OWOT.emit("chat", {
             location: data.location,
