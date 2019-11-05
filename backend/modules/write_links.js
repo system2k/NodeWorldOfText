@@ -45,7 +45,7 @@ module.exports = async function(data, vars) {
     }
 
     if(!can_link) {
-        return[true, "PERM"];
+        return [true, "PERM"];
     }
 
     // the x position going from 0 - 127 may be used at times

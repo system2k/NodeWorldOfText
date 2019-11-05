@@ -211,7 +211,7 @@ module.exports.POST = async function(req, serve, vars) {
     var world_get_or_create = vars.world_get_or_create;
     var can_view_world = vars.can_view_world;
 
-    var world = await world_get_or_create(path)
+    var world = await world_get_or_create(path);
     if(!world) return;
 
     var read_permission = await can_view_world(world, user, db);
@@ -225,7 +225,7 @@ module.exports.POST = async function(req, serve, vars) {
     try {
         edits_parsed = JSON.parse(post_data.edits);
     } catch(e) {
-        return serve(null, 418)
+        return serve(null, 418);
     }
 
     vars.user.stats = read_permission;
@@ -233,5 +233,5 @@ module.exports.POST = async function(req, serve, vars) {
         edits: edits_parsed
     }, vars);
 
-    serve(JSON.stringify(do_write.accepted))
+    serve(JSON.stringify(do_write.accepted));
 }

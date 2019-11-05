@@ -155,7 +155,6 @@ module.exports = async function(ws, data, send, vars, evars) {
         [0, "warp", ["world"], "go to another world"], // client-side
         [0, "warpserver", ["server"], "use a different server"], // client-side
         [0, "gridsize", ["WxH"], "change the size of cells"], // client-side
-        [0, "logout", null, "log your account off"],
         [0, "block", ["id"], "block chats from this user"],
         [0, "color", ["color code"], "change your text color"], // client-side
         [0, "chatcolor", ["color code"], "change only your chat color"], // client-side
@@ -231,7 +230,7 @@ module.exports = async function(ws, data, send, vars, evars) {
                 if(row[1] == "") {
                     row[1] = "(main)"
                 } else {
-                    row[1] = `<a href="/${row[1]}" style="color: blue; text-decoration: underline;">${row[1]}</a>`;
+                    row[1] = "/" + html_tag_esc(row[1]);
                 }
                 worldList += "-> " + row[1] + " [" + row[0] + "]";
                 if(i != lst.length - 1) worldList += "<br>"
@@ -246,23 +245,6 @@ module.exports = async function(ws, data, send, vars, evars) {
         },
         help: function() {
             return serverChatResponse(generate_command_list(), data.location);
-        },
-        logout: async function() {
-            if(accountSystem == "uvias") {
-                serverChatResponse("Please log out here:<br><a href=\"/accounts/logout/\">/accounts/logout/</a>", data.location);
-            } else if(accountSystem == "local") {
-                var sessionid = user.session_key;
-                var fromDb;
-                if(sessionid) {
-                    fromDb = await db.get("SELECT * FROM auth_session WHERE session_key=?", sessionid);
-                }
-                if(!fromDb) {
-                    return serverChatResponse("You are not logged in", data.location);
-                }
-                await db.run("DELETE FROM auth_session WHERE session_key=?", sessionid);
-                serverChatResponse("Logged out from: " + user.username, data.location);
-            }
-            return;
         },
         block: function(id) {
             if(id != "*") {
@@ -359,9 +341,6 @@ module.exports = async function(ws, data, send, vars, evars) {
             case "block":
                 com.block(args[1]);
                 return;
-            case "logout":
-                await com.logout();
-                return;
             case "getip":
                 com.getip(args[1]);
                 return;
@@ -369,7 +348,7 @@ module.exports = async function(ws, data, send, vars, evars) {
                 com.getclients();
                 return;
             default:
-                serverChatResponse("Invalid command: " + msg);
+                serverChatResponse("Invalid command: " + html_tag_esc(msg));
         }
     }
 

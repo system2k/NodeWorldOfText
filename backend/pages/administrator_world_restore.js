@@ -40,6 +40,8 @@ module.exports.POST = async function(req, serve, vars) {
             return serve("PARSE_ERR");
         }
 
+        if(!world_data.length) return serve();
+
         var world_name = post_data.world;
         if(!world_name) return serve("NO_NAME");
 
@@ -52,14 +54,13 @@ module.exports.POST = async function(req, serve, vars) {
         for(var i = 0; i < world_data.length; i++) {
             var tile = world_data[i];
             
-            var world_id = san_nbr(tile.world_id);
             var content = tile.content;
             var tileX = san_nbr(tile.tileX);
             var tileY = san_nbr(tile.tileY);
             var properties = tile.properties;
             var writability = tile.writability;
 
-            if(!world_id || !content || world_id < 1 || !properties || writability === void 0) {
+            if(!content || !properties || writability === void 0) {
                 continue;
             }
 

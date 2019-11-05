@@ -64,30 +64,30 @@ var subgridEnabled         = false; // character-level grid
 var linksEnabled           = true;
 var linksRendered          = true;
 var colorsEnabled          = true;
-var backgroundEnabled      = true; // if any
+var backgroundEnabled      = true; // render backgrounds if any
 var zoomRatio              = window.devicePixelRatio; // browser's zoom ratio
 var protectPrecision       = 0; // 0 being tile and 1 being char
 var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
 var zoom                   = decimal(100); // zoom value
-var unloadTilesAuto        = true;
+var unloadTilesAuto        = true; // automatically unload tiles to free up memory
 var images                 = {}; // { name: [data RGBA, width, height] }
 var useHighlight           = true; // highlight new edits
-var highlightLimit         = 10;
+var highlightLimit         = 10; // max chars to highlight at a time
 var ansiBlockFill          = true; // fill certain ansi block characters
 var colorizeLinks          = true;
-var brBlockFill            = false;
+var brBlockFill            = false; // render individual dots in braille characters as rectangles
 var tileFetchOffsetX       = 0; // offset added to tile fetching and sending coordinates
 var tileFetchOffsetY       = 0;
 var defaultChatColor       = null; // 24-bit Uint
 var ignoreCanvasContext    = true; // ignore canvas context menu when right clicking
-var elementSnapApprox      = 10;
-var mSpecRendering         = true;
+var elementSnapApprox      = 10; // snapping margin for draggable elements
+var mSpecRendering         = true; // render special properties if a certain combining character is included
 var combiningCharsEnabled  = true;
 var surrogateCharsEnabled  = true;
 var defaultCoordLinkColor  = "#008000";
 var defaultURLLinkColor    = "#0000FF";
-var secureJSLink           = true;
-var priorityOverwriteChar  = false;
+var secureJSLink           = true; // display warning prompt when clicking on javascript links
+var priorityOverwriteChar  = false; // render cells in the following order: Owner, Member, Public
 var pasteDirRight          = true;
 var pasteDirDown           = true;
 var defaultCursor          = "text";
@@ -337,22 +337,34 @@ function resizable_chat() {
                 chat_window.style.top = (elmY + offY + (dimY - res[1])) + "px";
                 break;
             case 0x4: // right
+                chat_window.style.left = chat_window.offsetLeft + "px";
+                chat_window.style.right = "";
                 resizeChat(chatWidth + offX, chatHeight);
                 break;
             case 0x5: // top right
+                chat_window.style.left = chat_window.offsetLeft + "px";
+                chat_window.style.right = "";
                 var dimY = chatHeight - offY;
                 var res = resizeChat(chatWidth + offX, dimY);
                 chat_window.style.top = (elmY + offY + (dimY - res[1])) + "px";
                 break;
             case 0x8: // bottom
+                chat_window.style.top = chat_window.offsetTop + "px";
+                chat_window.style.bottom = "";
                 resizeChat(chatWidth, chatHeight + offY);
                 break;
             case 0xA: // bottom left
+                chat_window.style.top = chat_window.offsetTop + "px";
+                chat_window.style.bottom = "";
                 var dimX = chatWidth - offX;
                 var res = resizeChat(dimX, chatHeight + offY);
                 chat_window.style.left = (elmX + offX + (dimX - res[0])) + "px";
                 break;
             case 0xC: // bottom right
+                chat_window.style.left = chat_window.offsetLeft + "px";
+                chat_window.style.right = "";
+                chat_window.style.top = chat_window.offsetTop + "px";
+                chat_window.style.bottom = "";
                 resizeChat(chatWidth + offX, chatHeight + offY);
                 break;
         }
@@ -1376,7 +1388,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
         }
     }
     if(foundActiveSelection) return;
-    var pos = getTileCoordsFromMouseCoords(pageX, pageY, true);
+    var pos = getTileCoordsFromMouseCoords(pageX, pageY);
     w.emit("mouseDown", {
         tileX: pos[0],
         tileY: pos[1],
@@ -1520,7 +1532,7 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
     if(foundActiveSelection) return;
 
     // set cursor
-    var pos = getTileCoordsFromMouseCoords(pageX, pageY, true);
+    var pos = getTileCoordsFromMouseCoords(pageX, pageY);
     w.emit("mouseUp", {
         tileX: pos[0],
         tileY: pos[1],
@@ -2255,11 +2267,7 @@ function assignColor(username) {
     return colors[(Math.abs(avg | 0)) % colLen];
 }
 
-function getTileCoordsFromMouseCoords(x, y, ignoreZoomRatio) {
-    if(!ignoreZoomRatio) {
-        x *= zoomRatio;
-        y *= zoomRatio;
-    }
+function getTileCoordsFromMouseCoords(x, y) {
     var tileX = 0;
     var tileY = 0;
     var charX = 0;
@@ -2306,29 +2314,29 @@ function getRange(x1, y1, x2, y2) {
 
 function getVisibleTiles(margin) {
     if(!margin) margin = 0;
-    var A = getTileCoordsFromMouseCoords(0 - margin, 0 - margin, true);
-    var B = getTileCoordsFromMouseCoords(width - 1 + margin, height - 1 + margin, true);
+    var A = getTileCoordsFromMouseCoords(0 - margin, 0 - margin);
+    var B = getTileCoordsFromMouseCoords(width - 1 + margin, height - 1 + margin);
     return getRange(A[0], A[1], B[0], B[1]);
 }
 
 function getWidth(margin) {
     if(!margin) margin = 0;
-    var A = getTileCoordsFromMouseCoords(0 - margin, 0, true);
-    var B = getTileCoordsFromMouseCoords(width - 1 + margin, 0, true);
+    var A = getTileCoordsFromMouseCoords(0 - margin, 0);
+    var B = getTileCoordsFromMouseCoords(width - 1 + margin, 0);
     return B[0] - A[0] + 1;
 }
 
 function getHeight(margin) {
     if(!margin) margin = 0;
-    var A = getTileCoordsFromMouseCoords(0, 0 - margin, true);
-    var B = getTileCoordsFromMouseCoords(0, height - 1 + margin, true);
+    var A = getTileCoordsFromMouseCoords(0, 0 - margin);
+    var B = getTileCoordsFromMouseCoords(0, height - 1 + margin);
     return B[1] - A[1] + 1;
 }
 
 function getArea(margin) {
     if(!margin) margin = 0;
-    var A = getTileCoordsFromMouseCoords(0 - margin, 0 - margin, true);
-    var B = getTileCoordsFromMouseCoords(width - 1 + margin, height - 1 + margin, true);
+    var A = getTileCoordsFromMouseCoords(0 - margin, 0 - margin);
+    var B = getTileCoordsFromMouseCoords(width - 1 + margin, height - 1 + margin);
     return (B[0] - A[0] + 1) * (B[1] - A[1] + 1);
 }
 
@@ -2429,7 +2437,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
     var pageY = e.pageY * zoomRatio;
     if(arg_pageX != void 0) pageX = arg_pageX;
     if(arg_pageY != void 0) pageY = arg_pageY;
-    var coords = getTileCoordsFromMouseCoords(pageX, pageY, true);
+    var coords = getTileCoordsFromMouseCoords(pageX, pageY);
     currentPosition = coords;
     currentPositionInitted = true;
     var tileX = coords[0];
