@@ -212,7 +212,7 @@ function draggable_element(dragger, dragged, exclusions, onDrag) {
         if(!dragging) return;
 
         if(onDrag) {
-            if(onDrag()) return;
+            if(onDrag() == -1) return;
         }
 
         dragged.style.top = "";
@@ -267,7 +267,7 @@ draggable_element(elm.chat_window, null, [
     elm.chatbar, elm.chatsend, elm.chat_close, elm.chat_page_tab, elm.chat_global_tab, elm.chatfield_container
 ], function() {
     if(chatResizing) {
-        return true;
+        return -1;
     }
 });
 draggable_element(elm.confirm_js);
@@ -960,7 +960,7 @@ function getChar(tileX, tileY, charX, charY) {
     }
     var tile = tiles[tileY + "," + tileX];
     if(!tile) return " ";
-    var content = advancedSplit(tile.content);
+    var content = w.split(tile.content);
     return content[charY * tileC + charX];
 }
 
@@ -1030,7 +1030,7 @@ function event_keydown_copy_char(e) {
     var textCursorCopy = checkKeyPress(e, keyConfig.copyCharacterText);
     var mouseCursorCopy = checkKeyPress(e, keyConfig.copyCharacterMouse);
     if(!textCursorCopy && !mouseCursorCopy) return;
-    elm.textInput.value = "";
+    stopPasting();
     // ctrl + c to copy characters where the text cursor is,
     // ctrl + m to copy characters where the mouse cursor is
     var pos_ref = cursorCoords;
@@ -1052,7 +1052,7 @@ document.addEventListener("keydown", event_keydown_copy_char);
 function event_keydown_copy_color(e) {
     if(!worldFocused) return;
     if(!checkKeyPress(e, keyConfig.copyColor)) return;
-    elm.textInput.value = "";
+    stopPasting();
     // alt + c to use color of text cell (where mouse cursor is) as main color
     var pos = currentPosition;
     if(!pos) return;
@@ -1061,11 +1061,7 @@ function event_keydown_copy_color(e) {
     var charX = pos[2];
     var charY = pos[3];
     var color = getCharColor(tileX, tileY, charX, charY)
-    YourWorld.Color = color;
-    localStorage.setItem("color", color);
-    // update color textbox in "change color" menu
-    if(!color) color = 0;
-    elm.color_input_form_input.value = ("00000" + color.toString(16)).slice(-6);
+    w.changeColor(color);
 }
 document.addEventListener("keydown", event_keydown_copy_color);
 
@@ -1365,12 +1361,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
 
     e.preventDefault();
     elm.textInput.focus(); // for mobile typing
-
-    // stop paste
-    clearInterval(pasteInterval);
-    write_busy = false;
-    elm.textInput.value = "";
-
+    stopPasting();
     if(w.isLinking) {
         doLink();
     }
@@ -1573,7 +1564,7 @@ function is_link(tileX, tileY, charX, charY) {
         var tile = tiles[tileY + "," + tileX]
         if(tile) {
             var props = tile.properties.cell_props;
-            if(!props) props = {};
+            if(!props) return false;
             if(props[charY]) {
                 if(props[charY][charX]) {
                     if(props[charY][charX].link) {
@@ -1710,7 +1701,7 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY) {
     tiles[tileY + "," + tileX].properties.cell_props = cell_props;
 
     var con = tiles[tileY + "," + tileX].content;
-    con = advancedSplit(con);
+    con = w.split(con);
     // replace character
     con[charY * tileC + charX] = char;
     // join splitted content string
@@ -1743,7 +1734,7 @@ function writeChar(char, doNotMoveCursor, temp_color, noNewline) {
     if(!cursor && (char == "\n" || char == "\r") && !noNewline) {
         cursor = cursorCoordsCurrent;
     }
-    char = advancedSplit(char);
+    char = w.split(char);
     char = char[0];
     if(char == void 0) return;
     if(!cursor) return; // cursor is not visible?
@@ -1918,10 +1909,10 @@ elm.textInput.value = "";
 var char_input_check = setInterval(function() {
     if(write_busy) return;
     var value = elm.textInput.value;
-    if(value == "") return;
+    if(!value) return;
     value = value.replace(/\r\n/g, "\n");
     value = value.replace(/\r/g, "\n");
-    value = advancedSplit(value);
+    value = w.split(value);
     var index = 1;
     if(value[0] == "\x1b") {
         index--;
@@ -2087,6 +2078,12 @@ var char_input_check = setInterval(function() {
     }
 }, 10);
 
+function stopPasting() {
+    if(write_busy) elm.textInput.value = "";
+    clearInterval(pasteInterval);
+    write_busy = false;
+}
+
 var autoArrowKeyMoveInterval = null;
 var autoArrowKeyMoveActive = false;
 var autoArrowKeyMoveState = {
@@ -2207,11 +2204,7 @@ function event_keydown(e) {
     if(actElm == elm.chatbar) return;
     if(actElm.tagName == "INPUT" && actElm.type == "text" && actElm != elm.textInput) return;
     if(actElm != elm.textInput) elm.textInput.focus();
-    // stop paste
-    elm.textInput.value = "";
-    clearInterval(pasteInterval);
-    write_busy = false;
-
+    stopPasting();
     if(checkKeyPress(e, keyConfig.cursorUp)) { // arrow up
         moveCursor("up");
         if(!cursorCoords) autoArrowKeyMoveStart("up");
@@ -2486,11 +2479,11 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
                 linkElm.href = URL_Link;
                 linkElm.title = "com:" + com;
             } else if(linkProtocol == "comu:") {
-                    linkElm.target = "";
-                    var com = URL_Link.split("comu:")[1];
-                    URL_Link = "javascript:w.broadcastCommand(\"" + escapeURLQuote(com) + "\", true);";
-                    linkElm.href = URL_Link;
-                    linkElm.title = "comu:" + com;
+                linkElm.target = "";
+                var com = URL_Link.split("comu:")[1];
+                URL_Link = "javascript:w.broadcastCommand(\"" + escapeURLQuote(com) + "\", true);";
+                linkElm.href = URL_Link;
+                linkElm.title = "comu:" + com;
             } else {
                 linkElm.rel = "noopener noreferrer";
             }
@@ -3569,7 +3562,7 @@ function renderTile(tileX, tileY, redraw) {
     var props = tile.properties.cell_props;
     if(!props) props = {};
 
-    content = advancedSplit(content);
+    content = w.split(content);
     if(priorityOverwriteChar && tile.properties.char) {
         for(var lev = 0; lev < 3; lev++) {
             for(var c = 0; c < tileArea; c++) {
@@ -3599,7 +3592,6 @@ function renderTile(tileX, tileY, redraw) {
 
 function renderTiles(redraw) {
     updateCoordDisplay();
-
     if(redraw) {
         for(var i in tiles) {
             if(tiles[i]) {
@@ -3607,7 +3599,6 @@ function renderTiles(redraw) {
             }
         }
     }
-
     ctx.fillStyle = "#ddd";
     // clear tile color layer
     ctx.fillRect(0, 0, width, height);
@@ -3620,7 +3611,6 @@ function renderTiles(redraw) {
         var tileY = visibleTiles[i][1];
         renderTile(tileX, tileY);
     }
-
     w.emit("tilesRendered");
 }
 
@@ -3959,7 +3949,7 @@ var w = {
             if(!this_color) {
                 this_color = 0;
             }
-            YourWorld.Color = this_color;
+            w.changeColor(this_color);
             localStorage.setItem("color", this_color);
         });
     },
@@ -4043,6 +4033,7 @@ var w = {
         w.doProtect("public", true);
     },
     typeChar: writeChar,
+    getChar: getChar,
     socketChannel: null,
     moveCursor: moveCursor,
     fetchUpdates: getAndFetchTiles,
@@ -4262,6 +4253,14 @@ var w = {
         createSocket();
         clearTiles(true);
         clearInterval(fetchInterval);
+    },
+    split: advancedSplit,
+    changeColor: function(color) {
+        if(!color) color = 0;
+        YourWorld.Color = color;
+        localStorage.setItem("color", color);
+        // update color textbox in "change color" menu
+        elm.color_input_form_input.value = ("00000" + color.toString(16)).slice(-6);
     }
 }
 
@@ -4618,8 +4617,8 @@ var ws_functions = {
             }
             var oldContent = tiles[tileKey].content;
             var oldColors = tiles[tileKey].properties.color.slice(0);
-            newContent = advancedSplit(newContent);
-            oldContent = advancedSplit(oldContent);
+            newContent = w.split(newContent);
+            oldContent = w.split(oldContent);
             var charX = 0;
             var charY = 0;
             // compare data
@@ -4692,7 +4691,6 @@ var ws_functions = {
                             break;
                         }
                     }
-
                     tellEdit.splice(x, 1);
                     // because the element has been removed, the length of the array is shorter
                     x--;

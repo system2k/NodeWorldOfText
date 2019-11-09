@@ -32,5 +32,5 @@ module.exports = async function(ws, data, send, vars, evars) {
     send({
         global_chat_prev: await retrieveChatHistory(0),
         page_chat_prev
-    })
+    });
 }

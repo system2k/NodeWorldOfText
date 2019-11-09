@@ -389,7 +389,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     }
 
     if(chatLimitCombChars) {
-        message = advancedSplit(message);
+        message = w.split(message);
         for(var i = 0; i < message.length; i++) {
             message[i] = message[i].slice(0, 5);
         }

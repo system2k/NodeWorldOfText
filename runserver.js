@@ -1881,7 +1881,7 @@ async function process_request(req, res, current_req_id) {
     dispatch.write = function(data) {
         return new Promise(function(resolve) {
             res.write(data, "utf8", resolve);
-        })
+        });
     }
 
     var vars = {};
@@ -2246,7 +2246,7 @@ function broadcastUserCount() {
             }, user_world, {
                 isChat: true,
                 clientId: 0,
-                chat_perm: -1 // cached
+                chat_perm: -1 // chat permission is cached in client object
             });
         }
     }
@@ -2583,32 +2583,12 @@ async function manageWebsocketConnection(ws, req) {
     if(!serverLoaded) await waitForServerLoad();
     if(isStopping) return;
     var socketTerminated = false;
-    var ipHeaderAddr = "Unknown";
     try {
-        var rnd = Math.floor(Math.random() * 1E4);
-        var forwd = req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"];
         var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
         var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
         var remIp = req.socket.remoteAddress;
-        var ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
-        var compIp = forwd || realIp || remIp || "Err" + rnd;
-        if(!forwd) forwd = "None;" + rnd;
-        if(!realIp) realIp = "None;" + rnd;
-        if(!remIp) remIp = "None;" + rnd;
-        if(!cfIp) cfIp = "None;" + rnd;
-        ipHeaderAddr = forwd + " & " + realIp + " & " + remIp;
-        ws.ipHeaderAddr = ipHeaderAddr;
-        ws.ipReal = realIp;
-        ws.ipRem = remIp;
-        ws.ipComp = compIp;
-        ws.ipCF = cfIp;
-        ws.ipAddress = ipAddress;
+        ws.ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
     } catch(e) {
-        var error_ip = "ErrC" + Math.floor(Math.random() * 1E4);
-        ws.ipHeaderAddr = error_ip;
-        ws.ipReal = error_ip;
-        ws.ipComp = error_ip;
-        ws.ipCF = error_ip;
         ws.ipAddress = "0.0.0.0";
         handle_error(e);
     }
@@ -2778,7 +2758,6 @@ async function manageWebsocketConnection(ws, req) {
             id: sentClientId,
             initial_user_count
         }));
-
         onMessage = async function(msg) {
             if(!can_process_req()) return;
             try {

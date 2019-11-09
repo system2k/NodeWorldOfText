@@ -251,7 +251,7 @@ var SelectionModal = (function() {
             var text = _this.textData.split("\n");
             var currentCol = -1;
             for(var y = 0; y < text.length; y++) {
-                text[y] = advancedSplit(text[y], o_rsurrog, o_rcomb);
+                text[y] = w.split(text[y], o_rsurrog, o_rcomb);
                 var colRow;
                 var linkRow;
                 var protRow;

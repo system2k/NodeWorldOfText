@@ -115,7 +115,7 @@ function enableServerPasting() {
         if(value == "") return;
         value = value.replace(/\r\n/g, "\n");
         value = value.replace(/\r/g, "\n");
-        value = advancedSplit(value);
+        value = w.split(value);
         w.socket.send(JSON.stringify({
             kind: "paste",
             tileX: cursorCoords[0],

@@ -1,0 +1,18 @@
+Dual account systems
+====================
+
+OWOT supports two account systems, but can only utilize one at a time.
+The systems are "uvias" and "local".
+
+The "local" system is the classic system that has an internal registering and login system. Account sessions, users, and registration tokens are stored in the OWOT databases.
+Ids are numerical and start at 1. There are no guests, and there is only one username which is both the display and login name.
+
+The "uvias" system is the newer system where you can login to the same account from many sites. No re-registration is required for each site.
+The uvias system uses a 64 bit id system that is random.
+The system offers a guest mode that has a few restrictions, such as not being able to claim a world.
+Guest accounts have a username in the "Guest-#" format (e.g. Guest-23).
+There are two kinds of usernames - display name and login name.
+A login name is the username that will be used to log in to an account and is private.
+A display name is the username that will be displayed publicly.
+A seperate login page is required to register and login to an account. A user will be redirected to the login page where he will then be redirected back to the site after logging in.
+Uvias lets users login directly to their Uvias accounts on uvias.com. Users could change their display name every 10 days, modify and verify their email address, and see other users.

@@ -10,7 +10,7 @@ module.exports = async function(ws, worldname, vars, evars) {
 
     var timemachine = {
         active: false
-    }
+    };
 
     var tm_check = worldname.split("/")
     if(tm_check[0] == "accounts" && tm_check[1] == "timemachine" && tm_check[3]) {
@@ -20,16 +20,16 @@ module.exports = async function(ws, worldname, vars, evars) {
 
     var world = await world_get_or_create(worldname)
     if(!world) {
-        return "World does not exist"
+        return "World does not exist";
     }
 
     if(timemachine.active && world.owner_id != user.id && !user.superuser) {
-        return "No permission to view the timemachine"
+        return "No permission to view the timemachine";
     }
 
     var permission = await can_view_world(world, user)
     if(!permission && !user.superuser) {
-        return "No permission to view this world"
+        return "No permission to view this world";
     }
 
     if(timemachine.active) {
