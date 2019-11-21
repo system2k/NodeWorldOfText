@@ -375,6 +375,7 @@ if(uvias.custom_css_file_path) {
 }
 
 uvias.sso = "/accounts/sso";
+// redirect to /accounts/logout/ to clear token cookie
 uvias.logout = "/accounts/logout/?return=" + "/home/";
 uvias.address = "https://uvias.com";
 uvias.loginPath = uvias.address + "/api/loginto/" + uvias.id;
@@ -1245,73 +1246,72 @@ var Decade = 315360345600;
 var ms = { Second, Minute, Hour, Day, Week, Month, Year, Decade };
 
 var url_regexp = [ // regexp , function/redirect to , options
-    ["^favicon\.ico[\\/]?$", "/static/favicon.png", { no_login: true }],
-    ["^robots.txt[\\/]?$", "/static/robots.txt", { no_login: true }],
-    ["^home[\\/]?$", pages.home],
+    [/^favicon\.ico[\/]?$/g, "/static/favicon.png", { no_login: true }],
+    [/^robots.txt[\/]?$/g, "/static/robots.txt", { no_login: true }],
+    [/^home[\/]?$/g, pages.home],
 
-    ["^accounts/login[\\/]?", pages.login],
-    ["^accounts/logout[\\/]?", pages.logout],
-    ["^accounts/register[\\/]?$", pages.register],
-    ["^accounts/profile[\\/]?$", pages.profile],
-    ["^accounts/private[\\/]?$", pages.private],
-    ["^accounts/configure[\\/]?$", pages.configure], // for front page configuring
-    ["^accounts/configure/(.*)/$", pages.configure],
-    ["^accounts/configure/(beta/\\w+)/$", pages.configure],
-    ["^accounts/member_autocomplete[\\/]?$", pages.member_autocomplete],
-    ["^accounts/timemachine/(.*)/$", pages.timemachine],
-    ["^accounts/register/complete[\\/]?$", pages.register_complete],
-    ["^accounts/verify/(.*)/$", pages.verify],
-    ["^accounts/download/$", pages.accounts_download], // for front page downloading
-    ["^accounts/download/(.*)/$", pages.accounts_download],
-    ["^accounts/password_change[\\/]?$", pages.password_change],
-    ["^accounts/password_change/done[\\/]?$", pages.password_change_done],
-    ["^accounts/nsfw/(.*)[\\/]?$", pages.accounts_nsfw],
-    ["^accounts/tabular[\\/]?$", pages.accounts_tabular],
-    ["^accounts/verify_email/(.*)[\\/]?$", pages.accounts_verify_email],
-    ["^accounts/sso[\\/]?$", pages.sso],
+    [/^accounts\/login[\/]?$/g, pages.login],
+    [/^accounts\/logout[\/]?$/g, pages.logout],
+    [/^accounts\/register[\/]?$/g, pages.register],
+    [/^accounts\/profile[\/]?$/g, pages.profile],
+    [/^accounts\/private[\/]?$/g, pages.private],
+    [/^accounts\/configure[\/]?$/g, pages.configure], // for front page configuring
+    [/^accounts\/configure\/(.*)\/$/g, pages.configure],
+    [/^accounts\/member_autocomplete[\/]?$/g, pages.member_autocomplete],
+    [/^accounts\/timemachine\/(.*)\/$/g, pages.timemachine],
+    [/^accounts\/register\/complete[\/]?$/g, pages.register_complete],
+    [/^accounts\/verify\/(.*)\/$/g, pages.verify],
+    [/^accounts\/download\/$/g, pages.accounts_download], // for front page downloading
+    [/^accounts\/download\/(.*)\/$/g, pages.accounts_download],
+    [/^accounts\/password_change[\/]?$/g, pages.password_change],
+    [/^accounts\/password_change\/done[\/]?$/g, pages.password_change_done],
+    [/^accounts\/nsfw\/(.*)[\/]?$/g, pages.accounts_nsfw],
+    [/^accounts\/tabular[\/]?$/g, pages.accounts_tabular],
+    [/^accounts\/verify_email\/(.*)[\/]?$/g, pages.accounts_verify_email],
+    [/^accounts\/sso[\/]?$/g, pages.sso],
 
-    ["^ajax/protect[\\/]?$", pages.protect],
-    ["^ajax/unprotect[\\/]?$", pages.unprotect],
-    ["^ajax/protect/char[\\/]?$", pages.protect_char],
-    ["^ajax/unprotect/char[\\/]?$", pages.unprotect_char],
-    ["^ajax/coordlink[\\/]?$", pages.coordlink],
-    ["^ajax/urllink[\\/]?$", pages.urllink],
+    [/^ajax\/protect[\/]?$/g, pages.protect],
+    [/^ajax\/unprotect[\/]?$/g, pages.unprotect],
+    [/^ajax\/protect\/char[\/]?$/g, pages.protect_char],
+    [/^ajax\/unprotect\/char[\/]?$/g, pages.unprotect_char],
+    [/^ajax\/coordlink[\/]?$/g, pages.coordlink],
+    [/^ajax\/urllink[\/]?$/g, pages.urllink],
     
-    ["^administrator/$", pages.administrator],
-    ["^administrator/edits/$", pages.administrator_edits], // for front page downloading
-    ["^administrator/edits/(.*)/$", pages.administrator_edits],
-    ["^administrator/user/(.*)/$", pages.administrator_user],
-    ["^administrator/users/by_username/(.*)[\\/]?$", pages.administrator_users_by_username],
-    ["^administrator/users/by_id/(.*)[\\/]?$", pages.administrator_users_by_id],
-    ["^administrator/world_restore[\\/]?$", pages.administrator_world_restore],
-    ["^administrator/backgrounds[\\/]?$", pages.administrator_backgrounds, { binary_post_data: true }],
-    ["^administrator/files[\\/]?$", pages.administrator_files, { binary_post_data: true }],
-    ["^administrator/manage_ranks[\\/]?$", pages.administrator_manage_ranks],
-    ["^administrator/set_custom_rank/(.*)/$", pages.administrator_set_custom_rank],
-    ["^administrator/user_list[\\/]?$", pages.administrator_user_list],
-    ["^administrator/file_list[\\/]?$", pages.administrator_file_list],
-    ["^administrator/monitor[\\/]?$", pages.monitor],
+    [/^administrator\/$/g, pages.administrator],
+    [/^administrator\/edits\/$/g, pages.administrator_edits], // for front page downloading
+    [/^administrator\/edits\/(.*)\/$/g, pages.administrator_edits],
+    [/^administrator\/user\/(.*)\/$/g, pages.administrator_user],
+    [/^administrator\/users\/by_username\/(.*)[\/]?$/g, pages.administrator_users_by_username],
+    [/^administrator\/users\/by_id\/(.*)[\/]?$/g, pages.administrator_users_by_id],
+    [/^administrator\/world_restore[\/]?$/g, pages.administrator_world_restore],
+    [/^administrator\/backgrounds[\/]?$/g, pages.administrator_backgrounds, { binary_post_data: true }],
+    [/^administrator\/files[\/]?$/g, pages.administrator_files, { binary_post_data: true }],
+    [/^administrator\/manage_ranks[\/]?$/g, pages.administrator_manage_ranks],
+    [/^administrator\/set_custom_rank\/(.*)\/$/g, pages.administrator_set_custom_rank],
+    [/^administrator\/user_list[\/]?$/g, pages.administrator_user_list],
+    [/^administrator\/file_list[\/]?$/g, pages.administrator_file_list],
+    [/^administrator\/monitor[\/]?$/g, pages.monitor],
 
-    ["^script_manager/$", pages.script_manager],
-    ["^script_manager/edit/(.*)/$", pages.script_edit],
-    ["^script_manager/view/(.*)/$", pages.script_view],
+    [/^script_manager\/$/g, pages.script_manager],
+    [/^script_manager\/edit\/(.*)\/$/g, pages.script_edit],
+    [/^script_manager\/view\/(.*)\/$/g, pages.script_view],
     
-    ["^world_style[\\/]?$", pages.world_style],
+    [/^world_style[\/]?$/g, pages.world_style],
 
-    ["^other/random_color[\\/]?$", pages.random_color, { no_login: true }],
-    ["^other/backgrounds/(.*)[\\/]?$", pages.load_backgrounds, { no_login: true }],
-    ["^other/chat/(.*)[\\/]?$", pages.other_chat],
-    ["^other/test/(.*)[\\/]?$", pages.other_test, { no_login: true }],
-    ["^other/forums/(.*)[\\/]?$", pages.other_forums, { no_login: true }],
-    ["^other/serverrequeststatus/(.*)[\\/]?$", pages.other_serverrequeststatus, { no_login: true }],
-    ["^other/info/(.*)[\\/]?$", pages.other_info, { no_login: true }],
-    ["^other/cd/(.*)[\\/]?$", pages.other_cd, { no_login: true }],
-    ["^other/ipaddress[\\/]?$", pages.ipaddress],
+    [/^other\/random_color[\/]?$/g, pages.random_color, { no_login: true }],
+    [/^other\/backgrounds\/(.*)[\/]?$/g, pages.load_backgrounds, { no_login: true }],
+    [/^other\/chat\/(.*)[\/]?$/g, pages.other_chat],
+    [/^other\/test\/(.*)[\/]?$/g, pages.other_test, { no_login: true }],
+    [/^other\/forums\/(.*)[\/]?$/g, pages.other_forums, { no_login: true }],
+    [/^other\/serverrequeststatus\/(.*)[\/]?$/g, pages.other_serverrequeststatus, { no_login: true }],
+    [/^other\/info\/(.*)[\/]?$/g, pages.other_info, { no_login: true }],
+    [/^other\/cd\/(.*)[\/]?$/g, pages.other_cd, { no_login: true }],
+    [/^other\/ipaddress[\/]?$/g, pages.ipaddress],
 
-    ["^static/(.*)[\\/]?$", pages.static, { no_login: true }],
-    ["^static\\?file=(.*)[\\/]?$", pages.static, { no_login: true, check_query: true }],
+    [/^static\/(.*)[\/]?$/g, pages.static, { no_login: true }],
+    [/^static[\/]?$/g, pages.static, { no_login: true }],
 
-    ["^([\\w\\/\\.\\-\\~]*)$", pages.yourworld, { remove_end_slash: true }]
+    [/^([\w\/\.\-\~]*)$/g, pages.yourworld, { remove_end_slash: true }]
 ];
 
 /*
@@ -1893,11 +1893,7 @@ async function process_request(req, res, current_req_id) {
         var options = row[2];
         if(!options) options = {};
         var matchCheck;
-        if(options.check_query) {
-            matchCheck = fullPath.match(row[0]);
-        } else {
-            matchCheck = URL.match(row[0]);
-        }
+        matchCheck = URL.match(row[0]);
         if(matchCheck) {
             found_url = true;
             if(typeof row[1] == "object") {
@@ -2387,7 +2383,7 @@ async function initialize_server_components() {
         await clear_expired_sessions();
     }
 
-    server.listen(serverPort, function() {
+    server.listen(serverPort, settings.ip, function() {
         var addr = server.address();
 
         var cWidth = 50;

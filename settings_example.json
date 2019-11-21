@@ -10,6 +10,7 @@
 
     "port": 8080,
     "test_port": 9090,
+    "ip": null,
 
     "accountSystem": "local",
     "uvias_custom_css_file_path": "",

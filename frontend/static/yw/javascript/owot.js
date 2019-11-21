@@ -21,6 +21,8 @@ function init_dom() {
         textInput: textInput,
         textLayer: textLayer
     });
+
+    generatePresetColors();
 }
 function getWndWidth() {
     return document.body.clientWidth;
@@ -145,7 +147,8 @@ defineElements({ // elm[<name>]
     run_js_confirm_risk: byId("run_js_confirm_risk"),
     usr_online: byId("usr_online"),
     usr_online_container: byId("usr_online_container"),
-    chatfield_container: byId("chatfield_container")
+    chatfield_container: byId("chatfield_container"),
+    preset_colors: byId("preset_colors")
 });
 
 var jscolorInput;
@@ -172,6 +175,18 @@ function updateCoordDisplay() {
     var centerX = Math.floor(tileCoordX / 4);
     elm.coord_Y.innerText = centerY;
     elm.coord_X.innerText = centerX;
+}
+
+function generatePresetColors() {
+    var colors = ["#000000", "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF", "#00B300"];
+    for(var i = 0; i < colors.length; i++) {
+        var button = document.createElement("div");
+        button.type = button;
+        var color = colors[i];
+        button.style.backgroundColor = color;
+        button.className = "presetColorButton";
+        elm.preset_colors.appendChild(button)
+    }
 }
 
 init_dom();
@@ -3254,28 +3269,41 @@ var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678
 
 /*
     Writability format (tiles and chars):
-        null: The parent's writability
+        null: Writability of parent tile
         0: public
         1: members
         2: owners
 */
 function decodeCharProt(str) {
-    if(str.charAt(0) != "@") {
-        console.error("Unrecognized char-protection format");
-        return;
-    }
     var res = new Array(tileArea).fill(0);
+    var encoding = str.charAt(0);
     str = str.substr(1);
-    for(var i = 0; i < str.length; i++) {
-        var code = base64table.indexOf(str.charAt(i));
-        var char1 = Math.trunc(code / (4*4) % 4);
-        var char2 = Math.trunc(code / (4) % 4);
-        var char3 = Math.trunc(code / (1) % 4);
-        res[i*3 + 0] = char1;
-        if(i*3 + 1 > tileArea - 1) break;
-        res[i*3 + 1] = char2;
-        if(i*3 + 2 > tileArea - 1) break;
-        res[i*3 + 2] = char3;
+    if(encoding == "@") {
+        for(var i = 0; i < str.length; i++) {
+            var code = base64table.indexOf(str.charAt(i));
+            var char1 = Math.trunc(code / (4*4) % 4);
+            var char2 = Math.trunc(code / (4) % 4);
+            var char3 = Math.trunc(code / (1) % 4);
+            res[i*3 + 0] = char1;
+            if(i*3 + 1 > tileArea - 1) break;
+            res[i*3 + 1] = char2;
+            if(i*3 + 2 > tileArea - 1) break;
+            res[i*3 + 2] = char3;
+        }
+    } else if(encoding == "#") {
+        var temp = str.split(",");
+        for(var i = 0; i < temp.length; i++) {
+            res[i] = parseInt(temp[i], 10);
+        }
+    } else if(encoding == "x") {
+        for(var i = 0; i < str.length; i++) {
+            var code = parseInt(str.charAt(i), 16);
+            var char1 = (code >> 2) % 4;
+            var char2 = code % 4;
+            res[i * 2] = char1;
+            if(i * 2 + 1 > tileArea - 1) break;
+            res[i * 2 + 1] = char2;
+        }
     }
     // convert from base64-format to writability-format
     for(var c = 0; c < res.length; c++) {
@@ -3288,27 +3316,50 @@ function decodeCharProt(str) {
     }
     return res;
 }
-function encodeCharProt(array) {
+function encodeCharProt(array, encoding) {
+    /*
+        encodings:
+            0: base64 - only 4 possible values
+            1: number values
+            2: hex values, values 0-255 only
+    */
+    var arrayCom = array.slice(0);
     // convert array from writability-format to base64-format
-    for(var c = 0; c < array.length; c++) {
-        switch(array[c]) {
-            case null: array[c] = 0; continue;
-            case 0: array[c] = 1; continue;
-            case 1: array[c] = 2; continue;
-            case 2: array[c] = 3; continue;
+    for(var c = 0; c < arrayCom.length; c++) {
+        switch(arrayCom[c]) {
+            case null: arrayCom[c] = 0; continue;
+            case 0: arrayCom[c] = 1; continue;
+            case 1: arrayCom[c] = 2; continue;
+            case 2: arrayCom[c] = 3; continue;
         }
     }
-    var str = "@";
-    var bytes = Math.ceil(tileArea / 3)
-    for(var i = 0; i < bytes; i++) {
-        var idx = i * 3;
-        var char1 = ((4*4)*array[idx + 0]);
-        var char2 = ((4)*array[idx + 1])
-        var char3 = ((1)*array[idx + 2])
-        if(idx + 1 > tileArea - 1) char2 = 0;
-        if(idx + 2 > tileArea - 1) char3 = 0;
-        var code = char1 + char2 + char3;
-        str += base64table.charAt(code)
+    var str = "";
+    if(!encoding) {
+        str = "@";
+        var bytes = Math.ceil(tileArea / 3);
+        for(var i = 0; i < bytes; i++) {
+            var idx = i * 3;
+            var char1 = ((4*4)*arrayCom[idx + 0]);
+            var char2 = ((4)*arrayCom[idx + 1]);
+            var char3 = ((1)*arrayCom[idx + 2]);
+            if(idx + 1 > tileArea - 1) char2 = 0;
+            if(idx + 2 > tileArea - 1) char3 = 0;
+            var code = char1 + char2 + char3;
+            str += base64table.charAt(code);
+        }
+    } else if(encoding == 1) {
+        str = "#" + arrayCom.join(",");
+    } else if(encoding == 2) {
+        str = "x";
+        var len = Math.ceil(tileArea / 2);
+        for(var i = 0; i < len; i++) {
+            var idx = i * 2;
+            var char1 = arrayCom[idx + 0] << 2;
+            var char2 = arrayCom[idx + 1];
+            if(idx + 1 > tileArea - 1) char2 = 0;
+            var code = char1 | char2;
+            str += code.toString(16).toUpperCase();
+        }
     }
     return str;
 }
