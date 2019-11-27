@@ -21,8 +21,6 @@ function init_dom() {
         textInput: textInput,
         textLayer: textLayer
     });
-
-    generatePresetColors();
 }
 function getWndWidth() {
     return document.body.clientWidth;
@@ -147,8 +145,7 @@ defineElements({ // elm[<name>]
     run_js_confirm_risk: byId("run_js_confirm_risk"),
     usr_online: byId("usr_online"),
     usr_online_container: byId("usr_online_container"),
-    chatfield_container: byId("chatfield_container"),
-    preset_colors: byId("preset_colors")
+    chatfield_container: byId("chatfield_container")
 });
 
 var jscolorInput;
@@ -175,18 +172,6 @@ function updateCoordDisplay() {
     var centerX = Math.floor(tileCoordX / 4);
     elm.coord_Y.innerText = centerY;
     elm.coord_X.innerText = centerX;
-}
-
-function generatePresetColors() {
-    var colors = ["#000000", "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF", "#00B300"];
-    for(var i = 0; i < colors.length; i++) {
-        var button = document.createElement("div");
-        button.type = button;
-        var color = colors[i];
-        button.style.backgroundColor = color;
-        button.className = "presetColorButton";
-        elm.preset_colors.appendChild(button)
-    }
 }
 
 init_dom();
@@ -1685,7 +1670,7 @@ function moveCursor(direction, do_not_change_enter_x) {
     if(!do_not_change_enter_x) {
         lastX = [cSCopy[0], cSCopy[2]];
     }
-    renderCursor(cSCopy);
+    return renderCursor(cSCopy);
 }
 
 // place a character
@@ -2118,6 +2103,10 @@ function autoArrowKeyMoveStart(dir) {
             if(cursorCoords) {
                 clearInterval(autoArrowKeyMoveInterval);
                 autoArrowKeyMoveActive = false;
+                autoArrowKeyMoveState.y_t = 0;
+                autoArrowKeyMoveState.prog_y = 0;
+                autoArrowKeyMoveState.x_t = 0;
+                autoArrowKeyMoveState.prog_x = 0;
                 return;
             }
             var date = getDate();
@@ -2999,30 +2988,6 @@ function getPos(ref) {
     return [parseInt(ref[0]), parseInt(ref[1])];
 }
 
-// fixes cases where characters can break String.charAt() : https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/charAt
-function fixedCharAt(str, idx) {
-    var ret = "";
-    str += "";
-    var end = str.length;
-    var surrogatePairs = /[\uD800-\uDBFF][\uDC00-\uDFFF]/g;
-    while ((surrogatePairs.exec(str)) != null) {
-        var li = surrogatePairs.lastIndex;
-        if (li - 2 < idx) {
-            idx++;
-        } else {
-            break;
-        }
-    }
-    if (idx >= end || idx < 0) {
-        return "";
-    }
-    ret += str.charAt(idx);
-    if (/[\uD800-\uDBFF]/.test(ret) && /[\uDC00-\uDFFF]/.test(str.charAt(idx + 1))) {
-        ret += str.charAt(idx + 1);
-    }
-    return ret;
-}
-
 function newColorArray() {
     var ar = [];
     for(var i = 0; i < tileArea; i++) {
@@ -3296,13 +3261,9 @@ function decodeCharProt(str) {
             res[i] = parseInt(temp[i], 10);
         }
     } else if(encoding == "x") {
-        for(var i = 0; i < str.length; i++) {
-            var code = parseInt(str.charAt(i), 16);
-            var char1 = (code >> 2) % 4;
-            var char2 = code % 4;
-            res[i * 2] = char1;
-            if(i * 2 + 1 > tileArea - 1) break;
-            res[i * 2 + 1] = char2;
+        for(var i = 0; i < str.length / 2; i++) {
+            var code = parseInt(str.charAt(i * 2) + str.charAt(i * 2 + 1), 16);
+            res[i] = code;
         }
     }
     // convert from base64-format to writability-format
@@ -3351,14 +3312,9 @@ function encodeCharProt(array, encoding) {
         str = "#" + arrayCom.join(",");
     } else if(encoding == 2) {
         str = "x";
-        var len = Math.ceil(tileArea / 2);
-        for(var i = 0; i < len; i++) {
-            var idx = i * 2;
-            var char1 = arrayCom[idx + 0] << 2;
-            var char2 = arrayCom[idx + 1];
-            if(idx + 1 > tileArea - 1) char2 = 0;
-            var code = char1 | char2;
-            str += code.toString(16).toUpperCase();
+        for(var i = 0; i < tileArea; i++) {
+            var chr = arrayCom[i];
+            str += chr.toString(16).padStart(2, 0).toUpperCase();
         }
     }
     return str;
@@ -4312,6 +4268,17 @@ var w = {
         localStorage.setItem("color", color);
         // update color textbox in "change color" menu
         elm.color_input_form_input.value = ("00000" + color.toString(16)).slice(-6);
+    },
+    fetchUpdates: function(margin) {
+        if(!margin) margin = 0;
+        var top_left = getTileCoordsFromMouseCoords(0 - margin, 0 - margin, true);
+        var bottom_right = getTileCoordsFromMouseCoords(width - 1 + margin, height - 1 + margin, true);
+        network.fetch({
+            minX: top_left[0],
+            minY: top_left[1],
+            maxX: bottom_right[0],
+            maxY: bottom_right[1]
+        });
     }
 }
 
@@ -4554,6 +4521,7 @@ var network = {
     },
     fetch: function(fetches, opts) {
         if(!opts) opts = {};
+        if(typeof fetches == "object" && !Array.isArray(fetches)) fetches = [fetches];
         w.socket.send(JSON.stringify({
             fetchRectangles: fetches,
             kind: "fetch",

@@ -601,14 +601,9 @@ function encodeCharProt(array, encoding) {
         str = "#" + arrayCom.join(",");
     } else if(encoding == 2) {
         str = "x";
-        var len = Math.ceil(CONST.tileArea / 2);
-        for(var i = 0; i < len; i++) {
-            var idx = i * 2;
-            var char1 = arrayCom[idx + 0] << 2;
-            var char2 = arrayCom[idx + 1];
-            if(idx + 1 > CONST.tileArea - 1) char2 = 0;
-            var code = char1 | char2;
-            str += code.toString(16).toUpperCase();
+        for(var i = 0; i < CONST.tileArea; i++) {
+            var chr = arrayCom[i];
+            str += chr.toString(16).padStart(2, 0).toUpperCase();
         }
     }
     return str;
@@ -636,13 +631,9 @@ function decodeCharProt(str) {
             res[i] = parseInt(temp[i], 10);
         }
     } else if(encoding == "x") {
-        for(var i = 0; i < str.length; i++) {
-            var code = parseInt(str.charAt(i), 16);
-            var char1 = (code >> 2) % 4;
-            var char2 = code % 4;
-            res[i * 2] = char1;
-            if(i * 2 + 1 > CONST.tileArea - 1) break;
-            res[i * 2 + 1] = char2;
+        for(var i = 0; i < str.length / 2; i++) {
+            var code = parseInt(str.charAt(i * 2) + str.charAt(i * 2 + 1), 16);
+            res[i] = code;
         }
     }
     // convert from base64-format to writability-format

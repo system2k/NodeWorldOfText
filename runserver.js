@@ -1247,7 +1247,7 @@ var ms = { Second, Minute, Hour, Day, Week, Month, Year, Decade };
 
 var url_regexp = [ // regexp , function/redirect to , options
     [/^favicon\.ico[\/]?$/g, "/static/favicon.png", { no_login: true }],
-    [/^robots.txt[\/]?$/g, "/static/robots.txt", { no_login: true }],
+    [/^robots\.txt[\/]?$/g, "/static/robots.txt", { no_login: true }],
     [/^home[\/]?$/g, pages.home],
 
     [/^accounts\/login[\/]?$/g, pages.login],
@@ -2963,6 +2963,9 @@ function stopPrompt() {
 
 // systemctl
 process.once("SIGTERM", function() {
+    stopServer();
+});
+process.once("SIGINT", function() {
     stopServer();
 });
 
