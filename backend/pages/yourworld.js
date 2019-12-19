@@ -121,7 +121,7 @@ module.exports.GET = async function(req, serve, vars, params) {
                 is_staff: user.staff, // Staff of OWOT?
                 is_operator: user.operator // Operator of OWOT?
             },
-            worldModel: {
+            worldModel: { // mirror to world_props.js
                 feature_membertiles_addremove: !!world.feature_membertiles_addremove,
                 writability: world.writability,
                 feature_url_link: world.feature_url_link,

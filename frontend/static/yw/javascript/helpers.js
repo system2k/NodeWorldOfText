@@ -11,6 +11,12 @@ function intmax(ints) {
     return true;
 }
 
+function clipIntMax(x) {
+    if(x < Number.MIN_SAFE_INTEGER) x = Number.MIN_SAFE_INTEGER;
+    if(x > Number.MAX_SAFE_INTEGER) x = Number.MAX_SAFE_INTEGER;
+    return x;
+}
+
 function byId(a) {
     return document.getElementById(a);
 }
@@ -76,3 +82,196 @@ function html_tag_esc(str, non_breaking_space) {
     str = str.replace(/\>/g, "&gt;");
     return str;
 }
+
+if (!Math.trunc) {
+    Math.trunc = function(v) {
+        v = +v;
+        return (v - v % 1) || (!isFinite(v) || v === 0 ? v : v < 0 ? -0 : 0);
+    };
+}
+
+if (typeof Object.assign != "function") {
+    Object.defineProperty(Object, "assign", {
+        value: function assign(target, varArgs) {
+            "use strict";
+            if (target == null) {
+                throw new TypeError("Cannot convert undefined or null to object");
+            }
+            var to = Object(target);
+            for (var index = 1; index < arguments.length; index++) {
+                var nextSource = arguments[index];
+                if (nextSource != null) {
+                    for (var nextKey in nextSource) {
+                        if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
+                            to[nextKey] = nextSource[nextKey];
+                        }
+                    }
+                }
+            }
+            return to;
+        },
+        writable: true,
+        configurable: true
+    });
+}
+
+if(!Array.prototype.fill) {
+    Array.prototype.fill = function(val) {
+        var ar = this;
+        for(var i = 0; i < ar.length; i++) {
+            ar[i] = val;
+        }
+        return ar;
+    }
+}
+
+if (!String.prototype.startsWith) {
+    String.prototype.startsWith = function(search, pos) {
+        return this.substr(!pos || pos < 0 ? 0 : +pos, search.length) === search;
+    };
+}
+
+function ReconnectingWebSocket(url) {
+    this.binaryType = "blob";
+    this.onopen = null;
+    this.onclose = null;
+    this.onmessage = null;
+    this.onerror = null;
+    var closed = false;
+    var self = this;
+    function connect() {
+        self.socket = new WebSocket(url);
+        self.socket.onclose = function(r) {
+            if(self.onclose) self.onclose(r);
+            if(closed) return;
+            setTimeout(connect, 1000);
+        }
+        self.socket.onopen = function(e) {
+            self.socket.onmessage = self.onmessage;
+            self.socket.onerror = self.onerror;
+            self.socket.binaryType = self.binaryType;
+            if(self.onopen) self.onopen(e);
+        }
+    }
+    connect();
+    this.send = function(data) {
+        this.socket.send(data);
+    }
+    this.close = function() {
+        closed = true;
+        this.socket.close();
+    }
+    this.refresh = function() {
+        this.socket.close();
+    }
+    return this;
+}
+
+var surrogateRegexStr = "([\\uD800-\\uDBFF][\\uDC00-\\uDFFF])";
+var surrogateRegex = new RegExp(surrogateRegexStr, "g");
+var combiningRegexStr = "(([\\0-\\u02FF\\u0370-\\u1DBF\\u1E00-\\u20CF\\u2100-\\uD7FF\\uDC00-\\uFE1F\\uFE30-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF])([\\u0300-\\u036F\\u1DC0-\\u1DFF\\u20D0-\\u20FF\\uFE20-\\uFE2F]+))";
+var combiningRegex = new RegExp(combiningRegexStr, "g");
+var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\n|\\r|\\u2028|\\u2029", "g");
+
+// Split a string properly with surrogates and combining characters in mind
+function advancedSplit(str, noSurrog, noComb) {
+    str += "";
+    if(classicTileProcessing) {
+        return str.split("");
+    }
+    // look for surrogate pairs first. then look for combining characters. finally, look for the rest
+    var data = str.match(splitRegex)
+    if(data == null) return [];
+    for(var i = 0; i < data.length; i++) {
+        // contains surrogates without second character?
+        if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
+            data.splice(i, 1);
+            i--;
+        }
+        if((!surrogateCharsEnabled || noSurrog) && data[i].match(surrogateRegex)) {
+            data[i] = "?";
+        }
+        if((!combiningCharsEnabled || noComb) && data[i].match(combiningRegex)) {
+            data[i] = data[i].charAt(0);
+        }
+    }
+    return data;
+}
+
+var w = {
+    loadScript: function(url, callback) {
+        var script = document.createElement("script");
+        if(callback === true) {
+            // synchronous
+            ajaxRequest({
+                type: "GET",
+                url: url,
+                async: true,
+                done: function(e) {
+                    script.innerText = e;
+                    document.head.appendChild(script);
+                }
+            });
+        } else {
+            script.src = url;
+            document.head.appendChild(script);
+            script.onload = callback;
+        }
+    },
+    clipboard: {
+        textarea: null,
+        init: function() {
+            var area = document.createElement("textarea");
+            area.value = ""
+            area.style.width = "1px";
+            area.style.height = "1px";
+            area.style.position = "absolute";
+            area.style.left = "-1000px";
+            document.body.appendChild(area);
+            w.clipboard.textarea = area;
+        },
+        copy: function(string) {
+            w.clipboard.textarea.value = string;
+            w.clipboard.textarea.select();
+            document.execCommand("copy");
+            w.clipboard.textarea.value = "";
+        }
+    },
+    events: {},
+    on: function(type, call) {
+        if(typeof call != "function") {
+            throw "Callback is not a function";
+        }
+        type = type.toLowerCase();
+        if(!OWOT.events[type]) {
+            OWOT.events[type] = [];
+        }
+        OWOT.events[type].push(call);
+    },
+    off: function(type, call) {
+        type = type.toLowerCase();
+        if(!OWOT.events[type]) return;
+        while(true) {
+            var idx = OWOT.events[type].indexOf(call);
+            if(idx == -1) break;
+            OWOT.events[type].splice(idx, 1);
+        }
+    },
+    emit: function(type, data) {
+        type = type.toLowerCase();
+        var evt = OWOT.events[type];
+        if(!evt) return;
+        for(var e = 0; e < evt.length; e++) {
+            var func = evt[e];
+            func(data);
+        }
+    },
+    listening: function(type) {
+        type = type.toLowerCase();
+        return !!OWOT.events[type];
+    },
+    split: advancedSplit
+};
+
+var OWOT = w;
+w.clipboard.init();

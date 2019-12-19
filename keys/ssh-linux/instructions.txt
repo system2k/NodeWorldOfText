@@ -1,9 +1,0 @@
-eval $(ssh-agent -s)
-
-ssh-add ./.ssh/id_rsa
-
-passcode: 469ju63894w689hw37896893n8w457u98yyu46
-
-git clone git@bitbucket.org:SystemTwentyone/nodeworldoftext.git
-or
-git pull git@bitbucket.org:SystemTwentyone/nodeworldoftext.git

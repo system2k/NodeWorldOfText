@@ -1,5 +1,3 @@
-var url = require("url");
-
 function generateDiag(text, tileX, tileY) {
     var str = "";
     for(var y = 0; y < CONST.tileRows; y++) {
@@ -72,9 +70,6 @@ module.exports = async function(data, vars) {
     var q_array = data.array;
     var q_content_only = data.content_only;
     var q_concat = data.concat; // only if content_only is enabled
-
-    var o_editlog = data.editlog;
-    var o_editlog_start = data.editlog_start;
 
     // if not null, return special value instead of object containing tiles
     var alt_return_obj = null;
@@ -204,97 +199,13 @@ module.exports = async function(data, vars) {
                     if(typeof tiles[z].content == "object") tiles[z].content = tiles[z].content.join("");
                 }
             }
-        } else if(o_editlog && user.superuser) {
-            o_editlog_start = san_nbr(o_editlog_start);
-            if(o_editlog_start < 0) o_editlog_start = 0;
-            var tileX = rect.tileX;
-            var tileY = rect.tileY;
-            var chunkSize = 500;
-            var chunkIdx = 0;
-            while(true) {
-                var hist = await db_edits.all("SELECT time, content FROM edit WHERE time <= ? AND world_id=? AND tileX=? AND tileY=? ORDER BY rowid DESC LIMIT ?,?",
-                    [o_editlog_start, world.id, tileX, tileY, chunkIdx * chunkSize, chunkSize]);
-                chunkIdx++;
-                if(hist.length == 0) break;
-                var fillData = " ".repeat(CONST.tileArea);
-                var fillColor = new Uint32Array(CONST.tileArea);
-                var fillTable = new Uint8Array(CONST.tileArea);
-                var fillTableCount = 0;
-                var brkWhileLoop = false;
-                for(var i = 0; i < hist.length; i++) {
-                    var row = hist[i];
-                    var time = row.time;
-                    var content = row.content;
-                    if(content[0] == "@") {
-                        content = JSON.parse(content.substr(1));
-                        if(content.kind == "tile_clear") break;
-                    } else {
-                        content = JSON.parse(content);
-                        var brkHist = false;
-                        for(var e = 0; e < content.length; e++) {
-                            var edit = content[e];
-
-                            // input types
-                            var charX = san_nbr(edit[3]);
-                            var charY = san_nbr(edit[2]);
-                            if(typeof edit[5] != "string") edit[5] = "";
-                            var char = advancedSplit(edit[5]);
-                            var color = san_nbr(edit[7]);
-
-                            // input values
-                            var area = charY * 16 + charX;
-                            if(area < 0) area = 0;
-                            if(area > 127) area = 127;
-                            charX = area % 16;
-                            charY = Math.floor(area / 16);
-                            char = char[0];
-                            if(!char) char = " ";
-                            if(char == "\n" || char == "\r" || char == "\x1b") char = " ";
-                            if(color < 0) color = 0;
-                            if(color >= 16777216) color = 16777215;
-
-                            // apply inputs
-                            var pos = charY * 16 + charX;
-                            if(!fillTable[pos]) {
-                                fillTable[pos] = 1;
-                                fillTableCount++;
-                                fillColor[pos] = color;
-                                fillData = insert_char_at_index(fillData, char, pos);
-                            }
-
-                            if(fillTableCount >= 128) {
-                                brkHist = true;
-                                break;
-                            }
-                        }
-                        if(brkHist) {
-                            brkWhileLoop = true;
-                            break;
-                        }
-                    }
-                    if(time >= o_editlog_start) {
-                        brkWhileLoop = true;
-                    }
-                }
-                if(brkWhileLoop) break;
-                if(hist.length < chunkSize) break;
-            }
-            for(var i in tiles) {
-                delete tiles[i];
-            }
-            tiles[tileY + "," + tileX] = {
-                content: fillData,
-                properties: {
-                    color: Array.from(fillColor),
-                    writability: 0
-                }
-            }
-            break;
         } else {
-            await db.each("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?", 
-                [world.id, minY, minX, maxY, maxX], function(data) {
-                var properties = JSON.parse(data.properties);
-                var content = data.content;
+            var db_tiles = await db.all("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?",
+                [world.id, minY, minX, maxY, maxX]);
+            for(var t = 0; t < db_tiles.length; t++) {
+                var tdata = db_tiles[t];
+                var properties = JSON.parse(tdata.properties);
+                var content = tdata.content;
                 if(q_utf16) content = filterUTF16(content);
                 if(q_array) content = advancedSplitCli(content);
                 if(q_concat && q_content_only) {
@@ -313,13 +224,13 @@ module.exports = async function(data, vars) {
                         tileRes = {
                             content,
                             properties: Object.assign(properties, {
-                                writability: data.writability
+                                writability: tdata.writability
                             })
                         };
                     }
-                    tiles[data.tileY + "," + data.tileX] = tileRes;
+                    tiles[tdata.tileY + "," + tdata.tileX] = tileRes;
                 }
-            });
+            }
         }
     }
 

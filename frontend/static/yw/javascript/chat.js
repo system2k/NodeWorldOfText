@@ -227,7 +227,7 @@ function event_on_chat(data) {
     if((!chatOpen || selectedChatTab == 0) && data.location == "global") {
         chatGlobalUnread++;
     }
-    updateUnread()
+    updateUnread();
     addChat(data.location, data.id, data.type,
         data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, getDate(), data.dataObj);
 }

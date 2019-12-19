@@ -6,10 +6,6 @@
 
 {% block endhead %}
     <script>
-        function goto_edits() {
-            window.location.pathname = "/administrator/edits/" + worldname.value + "/";
-            return false;
-        }
         function goto_config() {
             window.location.pathname = "/accounts/configure/" + worldname_config.value + "/";
             return false;
@@ -133,17 +129,6 @@
 {% endblock %}
 
 {% block content %}
-    <div class="content_set">
-        <div class="content_set_title">Download Raw Edits</div>
-        <div class="content_set_content">
-            <form onsubmit="return goto_edits();">
-				World name: 
-				<input type="text" name="worldname" id="worldname" value="">
-				<input type="submit" value="Download">
-			</form>
-        </div>
-    </div>
-
     <div class="content_set">
         <div class="content_set_title">Edit World Config</div>
         <div class="content_set_content">

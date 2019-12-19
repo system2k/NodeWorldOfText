@@ -13,9 +13,6 @@ var get_bypass_key;
 var encodeCharProt;
 var advancedSplit;
 
-// Tile Animation Password
-var NOT_SO_SECRET = "@^&$%!#*%^#*)~@$^*#!)~*%38259`25equfahgrqieavkj4bh8ofweieagrHG*FNV#@#OIFENUOGIVEOSFKNL<CDOLFKEWNSCOIEAFM:COGPEWWRG>BVPZL:MBGOEWSV";
-
 module.exports.main = function(vars) {
     db = vars.db;
     db_edits = vars.db_edits;
@@ -32,9 +29,7 @@ module.exports.main = function(vars) {
     encodeCharProt = vars.encodeCharProt;
     advancedSplit = vars.advancedSplit;
 
-    NOT_SO_SECRET += get_bypass_key();
-
-    writeCycle();
+    //writeCycle();
 
     intv.clear_tdb_ratelims = setInterval(function() {
         var now = Date.now();
@@ -136,52 +131,9 @@ function write_edits(tile, t, accepted, rejected, edit, data, editLog) {
         }
     }
 
-    // animation --> [notSoSecret, changeInterval, repeat, frames]
-    // notSoSecret must be the value of NOT_SO_SECRET, changeInterval is in milliseconds (1/1000 of a second) and repeat is a boolean (true/false)
-    // frames --> [frame0, frame1, ..., frameN], maximum 999 frames
-    // frame --> [TEXT, COLORS] where TEXT is a 128 character string, and COLORS is an array of 128 colors
-    var incAnimationEditLog = false; // valid animation with valid password
-    if(Array.isArray(animation) && (animation.length === 4)) {
-        // Animation code.
-        var notSoSecret = animation[0];
-        if ((typeof notSoSecret == "string") && (notSoSecret === NOT_SO_SECRET)) {
-            incAnimationEditLog = true;
-            var changeInterval = san_nbr(animation[1]);
-            if (changeInterval < 500) changeInterval = 500; // so it won't be very very fast
-            var repeat = animation[2];
-            if (typeof repeat != "boolean") {
-                repeat = false;
-            }
-            var frames = animation[3];
-            if (Array.isArray(frames) && (frames.length > 0) && (frames.length < 1000)) { // 999 is maximum frames
-                var okFrames = [];
-                for (var f = 0; f < frames.length; f++) {
-                    var frame = frames[f];
-                    var frameText = frame[0];
-                    var frameColors = fixColors(frame[1]);
-                    if ((typeof frameText == "string") && (frameText.length == CONST.tileArea)) {
-                        okFrames.push([frameText, frameColors]);
-                    }
-                }
-                if (okFrames.length) {
-                    t.properties.animation = {
-                        changeInterval,
-                        repeat,
-                        frames: okFrames
-                    };
-                }
-            }
-        }
-    }
-
     if(!no_log_edits && editLog) {
         var ar = [tileY, tileX, charY, charX, time, char, editId];
         if(color) ar.push(color);
-        if(incAnimationEditLog) { // if animation is passed in edit
-            if(ar.length == 7) ar.push(0); // keep elements aligned
-            ar.push(animation)
-        }
-
         editLog.push(ar);
     }
 }
@@ -446,7 +398,10 @@ function prepareTileUpdate(updatedTiles, tileX, tileY, t) {
     }
 }
 
-var queue = [];
+var tile_queue = [];
+var publicclear_queue = [];
+var paste_queue = [];
+
 async function flushQueue() {
     for(var i in cids) {
         cids[i][2] = true;
@@ -666,9 +621,6 @@ async function flushQueue() {
                 idx++;
             }
         }
-        if(type == types.settile) {
-            cids[call_id][0] = "COMPLETE";
-        }
         if(type == types.paste) {
             var tileX = data.tileX;
             var tileY = data.tileY;
@@ -883,7 +835,7 @@ async function flushQueue() {
                         handle_error(e);
                     }
                 }
-            })
+            });
         }
     }
 
@@ -930,7 +882,7 @@ async function flushQueue() {
     }
 }
 
-var cycleTimeout = Math.floor(1000 / 60);
+/*var cycleTimeout = Math.floor(1000 / 60);
 async function writeCycle() {
     if(queue.length) {
         try {
@@ -952,7 +904,69 @@ async function writeCycle() {
     } else {
         intv.writeCycle = setTimeout(writeCycle, cycleTimeout);
     }
-}
+}*/
+
+setInterval(function() {
+    var len = tile_queue.length;
+    for(var i = 0; i < len; i++) {
+        var object = tile_queue[0];
+        tile_queue.shift();
+        
+        var call_id = object[0];
+        var type = object[1];
+        var data = object[2];
+
+        switch(type) {
+            case types.write:
+                var date = data.date;
+                var user = data.user;
+                var world = data.world;
+                var is_owner = data.is_owner;
+                var is_member = data.is_member;
+                var can_color_text = data.can_color_text;
+                var public_only = data.public_only;
+                var no_log_edits = data.no_log_edits;
+                var preserve_links = data.preserve_links;
+                var channel = data.channel;
+
+                console.log(call_id, type, date, user, world, is_owner, is_member, can_color_text, public_only, no_log_edits, preserve_links, channel)
+                break;
+            case types.link:
+                var tileX = data.tileX;
+                var tileY = data.tileY;
+                var charX = data.charX;
+                var charY = data.charY;
+                var user = data.user;
+                var world = data.world;
+                var is_member = data.is_member;
+                var is_owner = data.is_owner;
+                var type = data.type;
+                var url = data.url;
+                var link_tileX = data.link_tileX;
+                var link_tileY = data.link_tileY;
+
+                console.log(tileX, tileY, charX, charY, user, world, is_member, is_owner, type, url, link_tileX, link_tileY);
+                break;
+            case types.protect:
+                var tileX = data.tileX;
+                var tileY = data.tileY;
+                var charX = data.charX;
+                var charY = data.charY;
+                var user = data.user;
+                var world = data.user;
+                var is_member = data.is_member;
+                var is_owner = data.is_owner;
+                var type = data.type;
+                var precise = data.precise;
+                var protect_type = data.protect_type;
+
+                console.log(tileX, tileY, charX, charY, user, world, is_member, is_owner, type, precise, protect_type);
+                break;
+            case types.clear:
+                break;
+        }
+    }
+}, 1000)
 
 module.exports.editResponse = async function(id) {
     return new Promise(function(res) {
@@ -961,11 +975,26 @@ module.exports.editResponse = async function(id) {
         } else {
             console.log("An error occurred while sending back an edit response");
         }
-    })
+    });
 }
 
 module.exports.write = function(call_id, type, data) {
-    queue.push([call_id, type, data]);
+    //queue.push([call_id, type, data]);
+    //console.log(call_id, type, data)
+    switch(call_id) {
+        case types.write:
+        case types.link:
+        case types.protect:
+        case types.clear:
+            tile_queue.push([call_id, type, data]);
+            break;
+        case types.publicclear:
+            publicclear_queue.push([call_id, type, data]);
+            break;
+        case types.paste:
+            paste_queue.push([call_id, type, data]);
+            break;
+    }
 }
 
 module.exports.reserveCallId = function(id) {
@@ -983,8 +1012,7 @@ var types = {
     protect: 2,
     clear: 3,
     publicclear: 4,
-    settile: 5,
-    paste: 6
-}
+    paste: 5
+};
 
 module.exports.types = types;

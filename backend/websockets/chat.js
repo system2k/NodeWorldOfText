@@ -105,7 +105,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     if(!msg) return;
 
     data.color += "";
-    if(!user.staff) data.color = sanitizeColor(data.color);
+    data.color = sanitizeColor(data.color);
     if(!data.color) data.color = "#000000";
     data.color = data.color.slice(0, 20);
     data.color = data.color.trim();
@@ -142,23 +142,24 @@ module.exports = async function(ws, data, send, vars, evars) {
 
     var chatIdBlockLimit = 1280;
 
+    // [rank, name, args, description, example]
     var command_list = [
-        [3, "uptime", null, "get uptime of server"],
+        [3, "uptime", null, "get uptime of server", null],
 
-        [2, "worlds", null, "list all worlds"],
-        [2, "getip", ["id"], "retrieve the IP address"],
-        [2, "getclients", null, "get list of all connected clients"],
+        [2, "worlds", null, "list all worlds", null],
+        [2, "getip", ["id"], "retrieve the IP address", "1024"],
+        [2, "getclients", null, "get list of all connected clients", null],
 
-        [0, "help", null, "lists all commands"],
-        [0, "nick", ["nickname"], "changes your nickname"], // client-side
-        [0, "ping", null, "check the latency"],
-        [0, "warp", ["world"], "go to another world"], // client-side
-        [0, "warpserver", ["server"], "use a different server"], // client-side
-        [0, "gridsize", ["WxH"], "change the size of cells"], // client-side
-        [0, "block", ["id"], "block chats from this user"],
-        [0, "color", ["color code"], "change your text color"], // client-side
-        [0, "chatcolor", ["color code"], "change only your chat color"], // client-side
-        [0, "night", null, "enable night mode"] // client-side
+        [0, "help", null, "list all commands", null],
+        [0, "nick", ["nickname"], "change your nickname", "JohnDoe"], // client-side
+        [0, "ping", null, "check the latency", null],
+        [0, "warp", ["world"], "go to another world", "forexample"], // client-side
+        [0, "warpserver", ["server"], "use a different server", "wss://www.yourworldoftext.com/~help/ws/"], // client-side
+        [0, "gridsize", ["WxH"], "change the size of cells", "10x20"], // client-side
+        [0, "block", ["id"], "mute a user", "1024"],
+        [0, "color", ["color code"], "change your text color", "#FF00FF"], // client-side
+        [0, "chatcolor", ["color code"], "change your chat color", "#FF00FF"], // client-side
+        [0, "night", null, "enable night mode", null] // client-side
     ];
 
     function generate_command_list() {
@@ -178,16 +179,14 @@ module.exports = async function(ws, data, send, vars, evars) {
         });
 
         var html = "";
-
         html += "Command list:<br>";
-
-        html += "<div style=\"background-color: #dadada; font-family: monospace; font-size: 13px;\">";
-
+        html += "<div style=\"background-color: #DADADA; font-family: monospace; font-size: 13px;\">";
         for(var i = 0; i < list.length; i++) {
             var row = list[i];
             var command = row[1];
             var args = row[2];
             var desc = row[3];
+            var example = row[4];
 
             // display arguments for this command
             var arg_desc = "";
@@ -195,7 +194,7 @@ module.exports = async function(ws, data, send, vars, evars) {
                 arg_desc += html_tag_esc("<");
                 for(var v = 0; v < args.length; v++) {
                     var arg = args[v];
-                    arg_desc += "<span style=\"font-style: italic\">" + arg + "</span>";
+                    arg_desc += "<span style=\"font-style: italic\">" + html_tag_esc(arg) + "</span>";
                     if(v != args.length - 1) {
                         arg_desc += ", ";
                     }
@@ -203,13 +202,18 @@ module.exports = async function(ws, data, send, vars, evars) {
                 arg_desc += html_tag_esc(">");
             }
 
-            command = "<span style=\"color: #00006f\">" + html_tag_esc(command) + "</span>";
+            var exampleElm = "";
+            if(example && args) {
+                exampleElm = "title=\"" + html_tag_esc("Example: /" + command + " " + example) +"\"";
+            }
+
+            command = "<span " + exampleElm + "style=\"color: #00006F\">" + html_tag_esc(command) + "</span>";
 
             var help_row = html_tag_esc("-> /") + command + " " + arg_desc + " :: " + html_tag_esc(desc);
 
             // alternating stripes
             if(i % 2 == 1) {
-                help_row = "<div style=\"background-color: #c3c3c3\">" + help_row + "</div>";
+                help_row = "<div style=\"background-color: #C3C3C3\">" + help_row + "</div>";
             }
 
             html += help_row;
@@ -236,7 +240,7 @@ module.exports = async function(ws, data, send, vars, evars) {
                 if(i != lst.length - 1) worldList += "<br>"
             }
             var listWrapper = `
-                <div style="background-color: #dadada; font-family: monospace;">
+                <div style="background-color: #DADADA; font-family: monospace;">
                     ${worldList}
                 </div>
             `;
@@ -263,7 +267,7 @@ module.exports = async function(ws, data, send, vars, evars) {
         getip: function(id) {
             id = san_nbr(id);
             if(id < 0) id = 0;
-            var res = "Client [" + id + "]:<br><div style=\"background-color: #c0c0c0\">";
+            var res = "Client [" + id + "]:<br><div style=\"background-color: #C0C0C0\">";
             var clientsFound = 0;
 
             if(data.location == "page") {
@@ -295,7 +299,7 @@ module.exports = async function(ws, data, send, vars, evars) {
             serverChatResponse(res, data.location);
         },
         getclients: function() {
-            var res = "Clients:<br><div style=\"background-color: #c0c0c0\">";
+            var res = "Clients:<br><div style=\"background-color: #C0C0C0\">";
             var clientsFound = 0;
             wss.clients.forEach(function(ws) {
                 if(!ws.userClient) return;

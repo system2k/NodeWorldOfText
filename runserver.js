@@ -23,13 +23,12 @@ const querystring = require("querystring");
 const sql         = require("sqlite3");
 const swig        = require("./lib/swig/swig.js");
 const url         = require("url");
-const WebSocket   = require("ws");
+const WebSocket   = require("./lib/ws/ws.js");
 const zip         = require("adm-zip");
 const zlib        = require("zlib");
 
 const chat_mgr   = require("./backend/utils/chat_mgr.js");
 const bin_packet = require("./backend/utils/bin_packet.js");
-const dump_dir   = require("./backend/dump_dir");
 const utils      = require("./backend/utils/utils.js");
 
 var trimHTML             = utils.trimHTML;
@@ -63,6 +62,7 @@ var html_tag_esc         = utils.html_tag_esc;
 var sanitize_color       = utils.sanitize_color;
 var fixColors            = utils.fixColors;
 var parseAcceptEncoding  = utils.parseAcceptEncoding;
+var dump_dir             = utils.dump_dir;
 
 var prepare_chat_db     = chat_mgr.prepare_chat_db;
 var init_chat_history   = chat_mgr.init_chat_history;
@@ -401,8 +401,7 @@ function toInt64(n) {
     return a[0];
 }
 
-Error.stackTraceLimit = Infinity;
-if(!global.AsyncFunction) var AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+Error.stackTraceLimit = 1024;
 
 var intv = {}; // intervals and timeouts
 
@@ -1188,9 +1187,10 @@ var prompt_password_new_account = {
 var ask_password = false;
 var account_to_create = "";
 var prompt_stopped = false;
+var prompt_await = false;
 
 function command_prompt() {
-    function on_input(err, input) {
+    async function on_input(err, input) {
         if(err) return console.log(err);
         var code = input.input;
         if(code == "stop") {
@@ -1207,8 +1207,14 @@ function command_prompt() {
             command_prompt();
             return;
         }
+        // REPL
         try {
-            console.dir(eval(code), { colors: true });
+            if(prompt_await) {
+                eval("var afnc = async function() {return " + code + "};");
+                console.dir(await afnc(), { colors: true });
+            } else {
+                console.dir(eval(code), { colors: true });
+            }
         } catch(e) {
             console.dir(e, { colors: true });
         }
@@ -1278,8 +1284,6 @@ var url_regexp = [ // regexp , function/redirect to , options
     [/^ajax\/urllink[\/]?$/g, pages.urllink],
     
     [/^administrator\/$/g, pages.administrator],
-    [/^administrator\/edits\/$/g, pages.administrator_edits], // for front page downloading
-    [/^administrator\/edits\/(.*)\/$/g, pages.administrator_edits],
     [/^administrator\/user\/(.*)\/$/g, pages.administrator_user],
     [/^administrator\/users\/by_username\/(.*)[\/]?$/g, pages.administrator_users_by_username],
     [/^administrator\/users\/by_id\/(.*)[\/]?$/g, pages.administrator_users_by_id],
@@ -1297,6 +1301,7 @@ var url_regexp = [ // regexp , function/redirect to , options
     [/^script_manager\/view\/(.*)\/$/g, pages.script_view],
     
     [/^world_style[\/]?$/g, pages.world_style],
+    [/^world_props[\/]?$/g, pages.world_props],
 
     [/^other\/random_color[\/]?$/g, pages.random_color, { no_login: true }],
     [/^other\/backgrounds\/(.*)[\/]?$/g, pages.load_backgrounds, { no_login: true }],
@@ -2528,6 +2533,8 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
     return [ipAddress, ipAddressFam];
 }
 
+var ip_address_conn_limit = {}; // "<IP>": <Count>
+
 var ws_req_per_second = 1024;
 var ws_limits = { // [amount, per ms, minimum ms cooldown]
     chat:        [10, 1000, 0], // rate limited further handled in another script
@@ -2575,6 +2582,26 @@ function can_process_req_kind(lims, kind) {
     return true;
 }
 
+var connections_per_ip = 20;
+function can_connect_ip_address(ip) {
+    if(!ip_address_conn_limit[ip] || !ip || ip == "0.0.0.0") return true;
+    if(ip_address_conn_limit[ip] >= connections_per_ip) return false;
+    return true;
+}
+
+function add_ip_address_connection(ip) {
+    if(!ip) return;
+    if(!(ip in ip_address_conn_limit)) ip_address_conn_limit[ip] = 0;
+    ip_address_conn_limit[ip]++;
+}
+
+function remove_ip_address_connection(ip) {
+    if(!ip) return;
+    if(!ip_address_conn_limit[ip]) return; // undefined or 0
+    ip_address_conn_limit[ip]--;
+    if(!ip_address_conn_limit[ip]) delete ip_address_conn_limit[ip];
+}
+
 async function manageWebsocketConnection(ws, req) {
     if(!serverLoaded) await waitForServerLoad();
     if(isStopping) return;
@@ -2583,11 +2610,24 @@ async function manageWebsocketConnection(ws, req) {
         var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
         var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
         var remIp = req.socket.remoteAddress;
-        ws.ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
+        var evalIp = evaluateIpAddress(remIp, realIp, cfIp);
+        ws.ipAddress = evalIp[0];
+        ws.ipAddressFam = evalIp[1];
     } catch(e) {
         ws.ipAddress = "0.0.0.0";
+        ws.ipAddressFam = 4;
         handle_error(e);
     }
+    if(!can_connect_ip_address(ws.ipAddress)) {
+        try {
+            ws.send(JSON.stringify({
+                kind: "error",
+                message: "Too many connections"
+            }));
+        } catch(e) {}
+        return ws.close();
+    }
+    add_ip_address_connection(ws.ipAddress);
     var reqs_second = 0; // requests received at current second
     var current_second = Math.floor(Date.now() / 1000);
     function can_process_req() { // limit requests per second
@@ -2620,6 +2660,7 @@ async function manageWebsocketConnection(ws, req) {
             }
             sendMonitorEvents(ws);
             ws.on("close", function() {
+                remove_ip_address_connection(ws.ipAddress);
                 removeMonitorEvents(ws);
             });
             ws.monitorSocket = true;
@@ -2644,6 +2685,7 @@ async function manageWebsocketConnection(ws, req) {
         });
         var status, clientId = void 0, worldObj;
         ws.on("close", function() {
+            remove_ip_address_connection(ws.ipAddress);
             socketTerminated = true;
             if(status && clientId != void 0) {
                 if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
@@ -2660,9 +2702,7 @@ async function manageWebsocketConnection(ws, req) {
             if(ws.readyState === WebSocket.OPEN) {
                 try {
                     ws.send(data); // not protected by callbacks
-                } catch(e) {
-                    handle_error(e);
-                }
+                } catch(e) {}
             }
         }
         if(location.match(/(\/ws\/$)/)) {

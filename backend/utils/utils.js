@@ -1,3 +1,5 @@
+var fs = require("fs");
+
 function trimHTML(html) {
     // ensure all lines are \r\n instead of just \n (consistent)
     html = html.replace(/\r\n/g, "\n");
@@ -331,6 +333,28 @@ function uptime(custom_ms_ago) {
         }
     }
     return milliseconds_ago + " " + _data + extra;
+}
+
+// recursive directory dumper
+function dump_dir(addr, MP, dsu, po, opt) { // object, file path, web path, path only, options
+    if(!opt) opt = {};
+    var con = fs.readdirSync(MP)
+    for(var i in con) {
+        var currentPath = MP + con[i]
+        if(!fs.lstatSync(currentPath).isDirectory()) {
+            if(!po) {
+                addr[dsu + con[i]] = fs.readFileSync(currentPath)
+            } else {
+                addr[dsu + con[i]] = currentPath;
+            }
+        } else {
+            // Omitted folder? Cancel scanning folder
+            if(con[i] == opt.omit_folder) {
+                return;
+            }
+            dump_dir(addr, MP + con[i] + "/", dsu + con[i] + "/", po)
+        }
+    }
 }
 
 function compareNoCase(str1, str2) {
@@ -810,5 +834,6 @@ module.exports = {
     html_tag_esc,
     sanitize_color,
     fixColors,
-    parseAcceptEncoding
+    parseAcceptEncoding,
+    dump_dir
 }
