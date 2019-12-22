@@ -58,6 +58,7 @@ var encodeCharProt       = utils.encodeCharProt;
 var decodeCharProt       = utils.decodeCharProt;
 var advancedSplit        = utils.advancedSplit;
 var insert_char_at_index = utils.insert_char_at_index;
+var change_char_in_array = utils.change_char_in_array;
 var html_tag_esc         = utils.html_tag_esc;
 var sanitize_color       = utils.sanitize_color;
 var fixColors            = utils.fixColors;
@@ -78,6 +79,9 @@ CONST = {};
 CONST.tileCols = 16;
 CONST.tileRows = 8;
 CONST.tileArea = CONST.tileCols * CONST.tileRows;
+
+// tile cache for fetching and updating
+var memTileCache = {};
 
 console.log("Loaded libs");
 
@@ -2903,6 +2907,7 @@ function start_server() {
 var worldViews = {};
 
 var global_data = {
+    memTileCache,
     isTestServer,
     announcement: function() { return announcement_cache },
     get_bypass_key: function() { return bypass_key_cache },
@@ -2945,6 +2950,7 @@ var global_data = {
     decodeCharProt,
     advancedSplit,
     insert_char_at_index,
+    change_char_in_array,
     add_to_chatlog,
     getWorldData,
     clearChatlog,

@@ -56,6 +56,8 @@ module.exports = async function(data, vars) {
     var advancedSplit = vars.advancedSplit;
     var timemachine = vars.timemachine;
     var insert_char_at_index = vars.insert_char_at_index;
+    var memTileCache = vars.memTileCache;
+    var encodeCharProt = vars.encodeCharProt;
     if(!timemachine) timemachine = {};
 
     var tiles = {};
@@ -204,6 +206,19 @@ module.exports = async function(data, vars) {
                 [world.id, minY, minX, maxY, maxX]);
             for(var t = 0; t < db_tiles.length; t++) {
                 var tdata = db_tiles[t];
+
+                if(memTileCache[world.id] && memTileCache[world.id][tdata.tileY] && memTileCache[world.id][tdata.tileY][tdata.tileX]) {
+                    var memTile = memTileCache[world.id][tdata.tileY][tdata.tileX];
+                    // TODO
+                    tdata.properties = JSON.stringify({
+                        color: memTile.prop_color,
+                        char: encodeCharProt(memTile.prop_char),
+                        cell_props: memTile.prop_cell_props
+                    });
+                    tdata.content = memTile.content.join("");
+                    tdata.writability = memTile.writability;
+                }
+
                 var properties = JSON.parse(tdata.properties);
                 var content = tdata.content;
                 if(q_utf16) content = filterUTF16(content);

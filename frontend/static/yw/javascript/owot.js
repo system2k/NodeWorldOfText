@@ -3660,7 +3660,14 @@ var menu;
 function buildMenu() {
     menu = new Menu(elm.menu_elm, elm.nav_elm);
     w.menu = menu;
-    menu.addEntry("<li><a href=\"/home/\" target=\"_blank\">More...&nbsp;<img src=\"/static/Icon_External_Link.png\"></a></li>");
+    var homeLink = document.createElement("a");
+    var homeLinkIcon = document.createElement("img");
+    homeLink.href = "/home";
+    homeLink.target = "_blank";
+    homeLink.innerHTML = "More...&nbsp";
+    homeLinkIcon.src = "/static/Icon_External_Link.png";
+    homeLink.appendChild(homeLinkIcon);
+    menu.addEntry(homeLink);
     menu.addCheckboxOption(" Show coordinates", function() {
         return elm.coords.style.display = "";
     }, function() {

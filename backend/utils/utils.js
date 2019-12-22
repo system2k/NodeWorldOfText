@@ -708,6 +708,21 @@ function advancedSplit(str) {
     return data;
 }
 
+var reg_non_comb = /([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])/g;
+var reg_comb = /([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+)/g;
+
+function change_char_in_array(arr, char, index) {
+    if(!char) return false;
+    char = advancedSplit(char);
+    char = char[0];
+    if(!char) return false;
+    if(char.indexOf("\0") > -1) return false;
+    if(reg_comb.test(char) && !reg_non_comb.test(char)) char = " ";
+    if(arr[index] == char) return false;
+    arr[index] = char;
+    return true;
+}
+
 function insert_char_at_index(string, char, index) {
     string += "";
     char += "";
@@ -831,6 +846,7 @@ module.exports = {
     decodeCharProt,
     advancedSplit,
     insert_char_at_index,
+    change_char_in_array,
     html_tag_esc,
     sanitize_color,
     fixColors,

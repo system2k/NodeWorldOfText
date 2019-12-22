@@ -12,6 +12,8 @@ var fixColors;
 var get_bypass_key;
 var encodeCharProt;
 var advancedSplit;
+var change_char_in_array;
+var memTileCache;
 
 module.exports.main = function(vars) {
     db = vars.db;
@@ -28,8 +30,11 @@ module.exports.main = function(vars) {
     get_bypass_key = vars.get_bypass_key;
     encodeCharProt = vars.encodeCharProt;
     advancedSplit = vars.advancedSplit;
+    change_char_in_array = vars.change_char_in_array;
+    memTileCache = vars.memTileCache;
 
     //writeCycle();
+    databaseClock();
 
     intv.clear_tdb_ratelims = setInterval(function() {
         var now = Date.now();
@@ -906,87 +911,422 @@ async function writeCycle() {
     }
 }*/
 
-setInterval(function() {
-    var len = tile_queue.length;
-    for(var i = 0; i < len; i++) {
-        var object = tile_queue[0];
-        tile_queue.shift();
-        
-        var call_id = object[0];
-        var type = object[1];
-        var data = object[2];
+async function loadTileCacheData(world_id, tileX, tileY) {
+    var tile = await db.get("SELECT * FROM tile WHERE tileX=? AND tileY=? AND world_id=?", [tileX, tileY, world_id]);
+    var t = {
+        //charProt: null,
+        //properties: null,
+        //tile_data: null,
+        //writability: null,
+        //oldWritability: null,
+        //createUndefTile: false
+    };
+    if(tile) {
+        t.properties = JSON.parse(tile.properties);
+        if(!t.properties.color) {
+            t.properties.color = Array(CONST.tileArea).fill(0);
+        }
+        if(t.properties.char) {
+            t.charProt = decodeCharProt(t.properties.char);
+        } else {
+            t.charProt = new Array(CONST.tileArea).fill(null);
+        }
+        t.tile_data = advancedSplit(tile.content);
+        t.writability = tile.writability;
+    } else {
+        // tile does not exist. this is an empty tile
+        t.properties = {
+            color: Array(CONST.tileArea).fill(0)
+        };
+        t.charProt = new Array(CONST.tileArea).fill(null);
+        t.tile_data = new Array(CONST.tileArea).fill(" ");
+        t.writability = null;
+    }
+    //t.oldWritability = t.writability;
+    //tileCache[tileUID] = [tile, t];
+    //return tileCache[tileUID];
+    return t;
+}
 
-        switch(type) {
-            case types.write:
-                var date = data.date;
-                var user = data.user;
-                var world = data.world;
-                var is_owner = data.is_owner;
-                var is_member = data.is_member;
-                var can_color_text = data.can_color_text;
-                var public_only = data.public_only;
-                var no_log_edits = data.no_log_edits;
-                var preserve_links = data.preserve_links;
-                var channel = data.channel;
+async function loadTileCacheData(world_id, tileX, tileY) {
+    var tile = await db.get("SELECT rowid as rowid, content, properties, writability FROM tile WHERE tileX=? AND tileY=? AND world_id=?", [tileX, tileY, world_id]);
+    var t = {
+        tile_id: null, // rowid; id must be set once inserted to database. null if does not exist yet.
+        tile_exists: false, // is set to true once the tile is added to database
+        content: null,
+        writability: null,
+        prop_color: null,
+        prop_char: null,
+        prop_cell_props: null,
+        props_updated: false,
+        content_updated: false,
+        writability_updated: false,
+        last_accessed: 0 // todo
+    };
+    if(tile) {
+        var parsed_props = JSON.parse(tile.properties);
+        if(parsed_props.color) {
+            t.prop_color = parsed_props.color;
+        } else {
+            t.prop_color = new Array(CONST.tileArea).fill(0);
+        }
+        if(parsed_props.char) {
+            t.prop_char = decodeCharProt(parsed_props.char);
+        } else {
+            t.prop_char = new Array(CONST.tileArea).fill(null);
+        }
+        if(parsed_props.cell_props) {
+            t.prop_cell_props = parsed_props.cell_props;
+        } else {
+            t.prop_cell_props = {};
+        }
+        t.tile_exists = true;
+        t.content = advancedSplit(tile.content);
+        t.writability = tile.writability;
+        t.tile_id = tile.rowid;
+    } else {
+        t.prop_color = new Array(CONST.tileArea).fill(0);
+        t.prop_char = new Array(CONST.tileArea).fill(null);
+        t.prop_cell_props = {};
+        t.tile_exists = false;
+        t.content = new Array(CONST.tileArea).fill(" ");
+        t.writability = null;
+        t.tile_id = null;
+    }
+    return t;
+}
 
-                console.log(call_id, type, date, user, world, is_owner, is_member, can_color_text, public_only, no_log_edits, preserve_links, channel)
-                break;
-            case types.link:
-                var tileX = data.tileX;
-                var tileY = data.tileY;
-                var charX = data.charX;
-                var charY = data.charY;
-                var user = data.user;
-                var world = data.world;
-                var is_member = data.is_member;
-                var is_owner = data.is_owner;
-                var type = data.type;
-                var url = data.url;
-                var link_tileX = data.link_tileX;
-                var link_tileY = data.link_tileY;
+var fetch_tile_queue = [];
+// Unique tile id tuple: "world_id,tile_y,_tile_x"
 
-                console.log(tileX, tileY, charX, charY, user, world, is_member, is_owner, type, url, link_tileX, link_tileY);
-                break;
-            case types.protect:
-                var tileX = data.tileX;
-                var tileY = data.tileY;
-                var charX = data.charX;
-                var charY = data.charY;
-                var user = data.user;
-                var world = data.user;
-                var is_member = data.is_member;
-                var is_owner = data.is_owner;
-                var type = data.type;
-                var precise = data.precise;
-                var protect_type = data.protect_type;
+function lookupTileQueue(tileUID) {
+    for(var i = 0; i < fetch_tile_queue.length; i++) {
+        if(fetch_tile_queue[i][0] == tileUID) return fetch_tile_queue[i];
+    }
+    return null;
+}
 
-                console.log(tileX, tileY, charX, charY, user, world, is_member, is_owner, type, precise, protect_type);
-                break;
-            case types.clear:
-                break;
+function IOProgress(callID) {
+    if(!cids[callID]) return;
+    cids[callID][4]++;
+    if(cids[callID][4] >= cids[callID][3] && cids[callID][0]) {
+        var response = cids[callID][0];
+        var completion = cids[callID][2];
+        response(cids[callID][1]);
+        if(completion) {
+            completion();
+        }
+        delete cids[callID];
+    }
+}
+
+function processTileEdit(worldID, tileX, tileY, editData) {
+    var cacheTile = isTileDIM(worldID, tileX, tileY);
+    for(var i = 0; i < editData.length; i++) {
+        var editObj = editData[i];
+        var editArray = editObj[0];
+        var data = editObj[1];
+        var sharedObj = editObj[2];
+        var callID = editObj[3];
+
+        var accepted = cids[callID][1][0];
+        var rejected = cids[callID][1][1];
+
+        var tileY = editArray[0];
+        var tileX = editArray[1];
+        var charY = editArray[2];
+        var charX = editArray[3];
+        var time = editArray[4];
+        var char = editArray[5];
+        var editID = editArray[6];
+        var color = editArray[7];
+
+        var world = data.world;
+        var user = data.user;
+        var public_only = data.public_only;
+        var preserve_links = data.preserve_links;
+        var can_color_text = data.can_color_text;
+        var no_log_edits = data.no_log_edits;
+        var is_owner = data.is_owner || (user.superuser && world.name == "");
+        var is_member = data.is_member || (user.superuser && world.name == "");
+
+        var index = charY * CONST.tileCols + charX;
+        var char_writability = cacheTile.prop_char[index];
+
+        // permission checking - compute the writability of the cell, accounting for tile and world writing permissions
+        if(char_writability == null) char_writability = cacheTile.writability;
+        if(char_writability == null) char_writability = world.writability;
+
+        // tile is owner-only, but user is not owner
+        if(char_writability == 2 && !is_owner) {
+            if(rejected) rejected[editId] = "NO_TILE_PERM";
+            IOProgress(callID);
+            return;
+        }
+        // tile is member-only, but user is not member (nor owner)
+        if(char_writability == 1 && !is_owner && !is_member) {
+            if(rejected) rejected[editId] = "NO_TILE_PERM";
+            IOProgress(callID);
+            return;
+        }
+
+        // this edit request is only allowed to write on public areas
+        if(public_only && char_writability != 0) {
+            if(rejected) rejected[editId] = "NO_TILE_PERM";
+            IOProgress(callID);
+            return;
+        }
+
+        var char_updated = change_char_in_array(cacheTile.content, char, index);
+        if(char_updated) {
+            cacheTile.content_updated = true;
+        }
+
+        if(!can_color_text) color = 0;
+        if(color !== -1) {
+            var prevCol = cacheTile.prop_color[index];
+            cacheTile.prop_color[index] = color;
+            if(prevCol != color) cacheTile.props_updated = true;
+        }
+
+        // detect overriden links
+        if(!preserve_links) {
+            if(cacheTile.prop_cell_props[charY]) {
+                // clear properties for this char
+                if(cacheTile.prop_cell_props[charY][charX]) {
+                    delete cacheTile.prop_cell_props[charY][charX];
+                    cacheTile.props_updated = true;
+                }
+                // the row for this tile is empty
+                if(Object.keys(cacheTile.prop_cell_props[charY]).length == 0) {
+                    delete cacheTile.prop_cell_props[charY];
+                    cacheTile.props_updated = true;
+                }
+            }
+        }
+
+        if(accepted) {
+            accepted.push(editID);
+        }
+        if(!no_log_edits && sharedObj.editLog) {
+            var ar = [tileY, tileX, charY, charX, time, char, editID];
+            if(color) ar.push(color);
+            sharedObj.editLog.push(ar);
+        }
+        IOProgress(callID);
+    }
+
+   // console.log(cacheTile)
+}
+
+function appendToUnloadedTileCache(worldID, tileX, tileY, editData) {
+    var tile_uid = worldID + "," + tileY + "," + tileX;
+    var qList = lookupTileQueue(tile_uid);
+    if(qList) {
+        qList[1].push(editData);
+    } else {
+        fetch_tile_queue.push([tile_uid, [editData]]);
+    }
+}
+
+setInterval(async function() {
+    if(!fetch_tile_queue.length) return;
+    var qData = fetch_tile_queue[0];
+    fetch_tile_queue.shift();
+    var tile_uid = qData[0];
+    var pending_edits = qData[1];
+
+    var tile_vec3 = tile_uid.split(",");
+    var world_id = parseInt(tile_vec3[0]);
+    var tile_y = parseInt(tile_vec3[1]);
+    var tile_x = parseInt(tile_vec3[2]);
+
+    var tile = await loadTileCacheData(world_id, tile_x, tile_y);
+
+    addTileMem(world_id, tile_x, tile_y, tile);
+    
+    processTileEdit(world_id, tile_x, tile_y, pending_edits);
+}, 250);
+
+// 3 levels: world_id -> tile_y -> tile_x
+
+function arrayIsEntirely(arr, elm) {
+    for(var i = 0; i < arr.length; i++) {
+        if(arr[i] != elm) return false;
+    }
+    return true;
+}
+
+async function iterateDatabaseChanges() {
+    for(var worldID in memTileCache) {
+        for(var tileY in memTileCache[worldID]) {
+            for(var tileX in memTileCache[worldID][tileY]) {
+                var tile = memTileCache[worldID][tileY][tileX];
+                if(!tile.props_updated && !tile.content_updated && !tile.writability_updated) continue;
+
+
+                if(tile.tile_exists) {
+                    if(tile.props_updated) {
+                        tile.props_updated = false;
+                        var propObj = {};
+                        if(!arrayIsEntirely(tile.prop_color, 0)) {
+                            propObj.color = tile.prop_color;
+                        }
+                        if(!arrayIsEntirely(tile.prop_char, null)) {
+                            propObj.char = encodeCharProt(tile.prop_char);
+                        }
+                        if(Object.keys(tile.prop_cell_props).length > 0) {
+                            propObj.cell_props = tile.prop_cell_props;
+                        }
+                        await db.run("UPDATE tile SET properties=? WHERE rowid=?", [JSON.stringify(propObj), tile.tile_id]);
+                    }
+                    if(tile.content_updated) {
+                        tile.content_updated = false;
+                        await db.run("UPDATE tile SET content=? WHERE rowid=?", [tile.content.join(""), tile.tile_id]);
+                    }
+                    if(tile.writability_updated) {
+                        tile.writability_updated = false;
+                        await db.run("UPDATE tile SET writability=? WHERE rowid=?", [tile.writability, tile.tile_id]);
+                    }
+                } else {
+                    tile.props_updated = false;
+                    tile.content_updated = false;
+                    tile.writability_updated = false;
+                    var propObj = {};
+                    if(!arrayIsEntirely(tile.prop_color, 0)) {
+                        propObj.color = tile.prop_color;
+                    }
+                    if(!arrayIsEntirely(tile.prop_char, null)) {
+                        propObj.char = encodeCharProt(tile.prop_char);
+                    }
+                    if(Object.keys(tile.prop_cell_props).length > 0) {
+                        propObj.cell_props = tile.prop_cell_props;
+                    }
+                    var newTile = await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?, ?)",
+                        [worldID, tile.content.join(""), tileY, tileX, JSON.stringify(propObj), tile.writability, Date.now()]);
+                    var lastID = newTile.lastID;
+                    tile.tile_exists = true;
+                    tile.tile_id = lastID;
+                }
+                console.log("DETECT CHANGE", worldID, tileX, tileY);
+            }
         }
     }
-}, 1000)
+}
+
+async function databaseClock() {
+    await db.run("BEGIN TRANSACTION");
+    try {
+        await iterateDatabaseChanges();
+    } catch(e) {
+        handle_error(e);
+    }
+    await db.run("COMMIT");
+    setTimeout(databaseClock, 1000 * 5);
+}
+
+function isTileDIM(worldID, tileX, tileY) {
+    if(!memTileCache[worldID]) return false;
+    if(!memTileCache[worldID][tileY]) return false;
+    if(!memTileCache[worldID][tileY][tileX]) return false;
+    return memTileCache[worldID][tileY][tileX];
+}
+function addTileMem(worldID, tileX, tileY, cacheTileData) {
+    if(!memTileCache[worldID]) {
+        memTileCache[worldID] = {};
+    }
+    if(!memTileCache[worldID][tileY]) {
+        memTileCache[worldID][tileY] = {};
+    }
+    if(!memTileCache[worldID][tileY][tileX]) {
+        memTileCache[worldID][tileY][tileX] = cacheTileData;
+    }
+}
+
+function processTileIORequest(call_id, type, data) {
+    switch(type) {
+        case types.write:
+            var tile_edits = data.tile_edits;
+            var world = data.world;
+            cids[call_id][1] = [[], {}];
+            cids[call_id][3] = tile_edits.length;
+            var sharedObj = {
+                editLog: []
+            };
+            cids[call_id][2] = function() {
+                console.log(sharedObj)
+            }
+            for(var e = 0; e < tile_edits.length; e++) {
+                var edit = tile_edits[e];
+                var tileY = edit[0];
+                var tileX = edit[1];
+                if(isTileDIM(world.id, tileX, tileY)) {
+                    processTileEdit(world.id, tileX, tileY, [[edit, data, sharedObj, call_id]]);
+                } else {
+                    appendToUnloadedTileCache(world.id, tileX, tileY, [edit, data, sharedObj, call_id]);
+                }
+            }
+            break;
+        case types.link:
+            var tileX = data.tileX;
+            var tileY = data.tileY;
+            var charX = data.charX;
+            var charY = data.charY;
+            var user = data.user;
+            var world = data.world;
+            var is_member = data.is_member;
+            var is_owner = data.is_owner;
+            var type = data.type;
+            var url = data.url;
+            var link_tileX = data.link_tileX;
+            var link_tileY = data.link_tileY;
+
+            console.log(tileX, tileY, charX, charY, user, world, is_member, is_owner, type, url, link_tileX, link_tileY);
+            break;
+        case types.protect:
+            var tileX = data.tileX;
+            var tileY = data.tileY;
+            var charX = data.charX;
+            var charY = data.charY;
+            var user = data.user;
+            var world = data.user;
+            var is_member = data.is_member;
+            var is_owner = data.is_owner;
+            var type = data.type;
+            var precise = data.precise;
+            var protect_type = data.protect_type;
+
+            console.log(tileX, tileY, charX, charY, user, world, is_member, is_owner, type, precise, protect_type);
+            break;
+        case types.clear:
+            break;
+    }
+}
 
 module.exports.editResponse = async function(id) {
     return new Promise(function(res) {
-        if(cids[id]) {
-            cids[id][1] = res;
+        if(!cids[id]) {
+            return console.log("An error occurred while sending back an edit response");
+        }
+        if(cids[id][3] && cids[id][4] >= cids[id][3]) { // I/O is already completed
+            res(cids[id][1]);
+            if(cids[id][2]) { // completion callback
+                cids[id][2]();
+            }
+            delete cids[id];
         } else {
-            console.log("An error occurred while sending back an edit response");
+            cids[id][0] = res;
         }
     });
 }
 
 module.exports.write = function(call_id, type, data) {
-    //queue.push([call_id, type, data]);
-    //console.log(call_id, type, data)
-    switch(call_id) {
+    switch(type) {
         case types.write:
         case types.link:
         case types.protect:
         case types.clear:
-            tile_queue.push([call_id, type, data]);
+            processTileIORequest(call_id, type, data);
             break;
         case types.publicclear:
             publicclear_queue.push([call_id, type, data]);
@@ -998,7 +1338,9 @@ module.exports.write = function(call_id, type, data) {
 }
 
 module.exports.reserveCallId = function(id) {
-    if(!cids[id]) cids[id] = [null, null, false];
+    // [response_callback, response_data, completion_callback, total_units, current_units]
+    // total_units must be >0
+    if(!cids[id]) cids[id] = [null, null, null, 0, 0];
 }
 
 var current_call_id = 0;
