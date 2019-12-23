@@ -81,6 +81,7 @@ CONST.tileRows = 8;
 CONST.tileArea = CONST.tileCols * CONST.tileRows;
 
 // tile cache for fetching and updating
+// 3 levels: world_id -> tile_y -> tile_x
 var memTileCache = {};
 
 console.log("Loaded libs");

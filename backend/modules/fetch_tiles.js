@@ -204,6 +204,26 @@ module.exports = async function(data, vars) {
         } else {
             var db_tiles = await db.all("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?",
                 [world.id, minY, minX, maxY, maxX]);
+            for(var t in tiles) {
+                if(tiles[t] == null) {
+                    var pos = t.split(",");
+                    var tileY = parseInt(pos[0]);
+                    var tileX = parseInt(pos[1]);
+
+                    if(memTileCache[world.id] && memTileCache[world.id][tileY] && memTileCache[world.id][tileY][tileX]) {
+                        var memTile = memTileCache[world.id][tileY][tileX];
+                        // TODO
+                        tiles[t] = {};
+                        tiles[t].properties = {
+                            color: memTile.prop_color,
+                            char: encodeCharProt(memTile.prop_char),
+                            cell_props: memTile.prop_cell_props,
+                            writability: memTile.writability
+                        };
+                        tiles[t].content = memTile.content.join("");
+                    }
+                }
+            }
             for(var t = 0; t < db_tiles.length; t++) {
                 var tdata = db_tiles[t];
 
