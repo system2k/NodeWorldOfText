@@ -169,7 +169,6 @@ module.exports.POST = async function(req, serve, vars) {
     var world_get_or_create = vars.world_get_or_create;
     var ws_broadcast = vars.ws_broadcast;
     var validate_claim_worldname = vars.validate_claim_worldname;
-    var transaction = vars.transaction;
     var advancedSplit = vars.advancedSplit;
     var decodeCharProt = vars.decodeCharProt;
     var encodeCharProt = vars.encodeCharProt;
@@ -542,7 +541,9 @@ module.exports.POST = async function(req, serve, vars) {
             tileCount = tileCount.cnt;
             // tile limit of 30000
             if(tileCount <= 30000) {
-                tile_database.write(null, tile_database.types.publicclear, {
+                var call_id = tile_database.newCallId();
+                tile_database.reserveCallId(call_id);
+                tile_database.write(call_id, tile_database.types.publicclear, {
                     date: Date.now(),
                     world,
                     user

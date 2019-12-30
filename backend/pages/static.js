@@ -27,6 +27,7 @@ module.exports.GET = async function(req, serve, vars) {
     var static_retrieve = vars.static_retrieve;
     var filename_sanitize = vars.filename_sanitize;
     var http_time = vars.http_time;
+    var HTML = vars.HTML;
 
     var file = query_data.file;
     if(file) {
@@ -37,7 +38,7 @@ module.exports.GET = async function(req, serve, vars) {
         if(isNaN(file) || !Number.isInteger(file)) return serve(null, 404);
         var fileData = await static_retrieve(file, range);
         if(fileData === 0) {
-            return serve(null, 403);
+            return serve(HTML("403.html"), 403);
         }
         if(!fileData) {
             return serve(null, 404);
@@ -79,7 +80,7 @@ module.exports.GET = async function(req, serve, vars) {
     var parse = url.parse(req.url).pathname.substr(1);
     parse = removeLastSlash(parse);
     var mime_type = mime(parse.replace(/.*[\.\/\\]/, "").toLowerCase());
-    if(parse in static_data) {
+    if(static_data.hasOwnProperty(parse)) {
         serve(static_data[parse], 200, { mime: mime_type });
     } else {
         return;

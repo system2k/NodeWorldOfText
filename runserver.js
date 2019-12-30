@@ -6,7 +6,7 @@
 **  This is the main file
 */
 
-console.log("\x1b[36;1mStarting up...\x1b[0m");
+console.log("Starting up...");
 
 var serverLoaded = false;
 
@@ -265,11 +265,11 @@ function processArgs() {
     var args = process.argv;
     args.forEach(function(a) {
         if(a == "--test-server") {
-            if(!isTestServer) console.log("\x1b[32;1mThis is a test server\x1b[0m");
+            if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
             isTestServer = true;
         }
         if(a == "--log") {
-            if(!debugLogging) console.log("\x1b[32;1mDebug logging enabled\x1b[0m");
+            if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
             debugLogging = true;
         }
         if(a == "--main-dirs") {
@@ -279,9 +279,9 @@ function processArgs() {
             testUviasIds = true;
         }
         if(a == "--lt") {
-            if(!isTestServer) console.log("\x1b[32;1mThis is a test server\x1b[0m");
+            if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
             isTestServer = true;
-            if(!debugLogging) console.log("\x1b[32;1mDebug logging enabled\x1b[0m");
+            if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
             debugLogging = true;
             testServerMainDirs = true;
             testUviasIds = true;
@@ -1212,6 +1212,11 @@ function command_prompt() {
             command_prompt();
             return;
         }
+        if(code == "help") {
+            console.log("stop: close server\nres: restart\nmaint: maintenance mode\nsta: reload templates and static files");
+            command_prompt();
+            return;
+        }
         // REPL
         try {
             if(prompt_await) {
@@ -1433,13 +1438,13 @@ function manage_https() {
     }
 
     if(https_disabled) {
-        console.log("\x1b[32;1mRunning server in HTTP mode\x1b[0m");
+        console.log("\x1b[31;1mRunning server in HTTP mode\x1b[0m");
         http.createServer = function(opt, func) {
             return prev_cS(func);
         }
         https_reference = http;
     } else {
-        console.log("\x1b[32;1mDetected HTTPS keys. Running server in HTTPS mode\x1b[0m");
+        console.log("\x1b[31;1mDetected HTTPS keys. Running server in HTTPS mode\x1b[0m");
         options = {
             key:  fs.readFileSync(private_key),
             cert: fs.readFileSync(cert),
@@ -1671,49 +1676,6 @@ async function can_view_world(world, user) {
     return permissions;
 }
 
-var transaction_active = false;
-var is_switching_mode = false; // is the sql engine (asynchronous) finished with switching transaction mode?
-var on_switched;
-var transaction_req_id = 0;
-var req_id = 0;
-
-function transaction_obj(id) {
-    var req_id = id;
-    var fc = {
-        // start or end transactions safely
-        begin: async function(id) {
-            if(!transaction_active && !is_switching_mode) {
-                transaction_active = true;
-                is_switching_mode = true;
-                transaction_req_id = req_id;
-                await db.run("BEGIN TRANSACTION")
-                is_switching_mode = false;
-                if(on_switched) on_switched();
-            } else if(is_switching_mode) { // the signal hasn't reached, so wait
-                on_switched = function() {
-                    on_switched = null;
-                    fc.begin(); // now begin after the signal completed
-                }
-            }
-        },
-        end: async function() {
-            if(transaction_active && !is_switching_mode) {
-                transaction_active = false;
-                is_switching_mode = true;
-                await db.run("COMMIT")
-                is_switching_mode = false;
-                if(on_switched) on_switched();
-            } else if(is_switching_mode) {
-                on_switched = function() {
-                    on_switched = null;
-                    fc.end();
-                }
-            }
-        }
-    };
-    return fc;
-}
-
 process.on("uncaughtException", function(e) {
     try {
         err = JSON.stringify(process_error_arg(e));
@@ -1734,17 +1696,9 @@ var server,
     HTTPSockketID;
 function setupHTTPServer() {
     server = https_reference.createServer(options, async function(req, res) {
-        req_id++;
-        var current_req_id = req_id;
         try {
-            await process_request(req, res, current_req_id);
+            await process_request(req, res);
         } catch(e) {
-            if(transaction_active) {
-                if(transaction_req_id == current_req_id && transaction_req_id > -1) {
-                    transaction_active = false;
-                    await db.run("COMMIT");
-                }
-            }
             res.statusCode = 500;
             var err500Temp = "";
             try {
@@ -1774,7 +1728,7 @@ var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
 
 var valid_subdomains = ["test", "forums", "serverrequeststatus", "info", "chat", "cd", "random_color", "backgrounds"];
 
-async function process_request(req, res, current_req_id) {
+async function process_request(req, res) {
     if(!serverLoaded) await waitForServerLoad();
     if(isStopping) return;
     var hostname = req.headers.host;
@@ -1802,8 +1756,6 @@ async function process_request(req, res, current_req_id) {
 
     // server will return cookies to the client if it needs to
     var include_cookies = [];
-
-    var transaction = transaction_obj(current_req_id);
 
     var acceptEncoding = parseAcceptEncoding(req.headers["accept-encoding"]);
 
@@ -1976,7 +1928,6 @@ async function process_request(req, res, current_req_id) {
                     user,
                     redirect,
                     referer: req.headers.referer,
-                    transaction,
                     broadcast: global_data.ws_broadcast,
                     HTML,
                     ipAddress
@@ -2396,19 +2347,9 @@ async function initialize_server_components() {
     server.listen(serverPort, settings.ip, function() {
         var addr = server.address();
 
-        var cWidth = 50;
-        var cHeight = 7;
-
-        var tmg = new TerminalMessage(cWidth, cHeight);
-
-        tmg.setSquare(0, 0, 25, cHeight - 1, "bright_cyan");
-        tmg.setText("OWOT Server is running", 2, 1, "bright_white");
-        tmg.setText("Address:", 2, 2, "bright_white");
-        tmg.setText(addr.address + "", 4, 3, "cyan");
-        tmg.setText("Port:", 2, 4, "bright_white");
-        tmg.setText(addr.port + "", 4, 5, "cyan");
-
-        console.log(tmg.render());
+        console.log("\x1b[92;1mOWOT Server is running\x1b[0m");
+        console.log("Address: " + addr.address);
+        console.log("Port: " + addr.port);
 
         // start listening for commands
         command_prompt();
@@ -2814,8 +2755,6 @@ async function manageWebsocketConnection(ws, req) {
                 handle_error(e);
                 return;
             }
-            req_id++;
-            var current_req_id = req_id;
             try {
                 // This is a ping
                 if(msg.startsWith("2::")) {
@@ -2865,7 +2804,6 @@ async function manageWebsocketConnection(ws, req) {
                         ws_broadcast(data, world_name, opts);
                     }
                     var res = await websockets[kind](ws, msg, send, vars, {
-                        transaction: transaction_obj(current_req_id),
                         broadcast,
                         clientId: ws.clientId,
                         ws
@@ -2965,7 +2903,6 @@ var global_data = {
     modify_bypass_key,
     trimHTML,
     tile_database: systems.tile_database,
-    g_transaction: transaction_obj(-1),
     intv,
     WebSocket,
     fixColors,
@@ -3022,7 +2959,10 @@ var isStopping = false;
 function stopServer(restart, maintenance) {
     if(isStopping) return;
     isStopping = true;
-    console.log("\x1b[32mStopping server...\x1b[0m");
+    console.log("\x1b[31;1mStopping server...\x1b[0m");
+    if(!restart && !maintenance) {
+        sendProcMsg("EXIT");
+    }
     (async function() {
         stopPrompt();
         for(var i in intv) {
@@ -3065,7 +3005,6 @@ function stopServer(restart, maintenance) {
             handle_error(e);
             if(!isTestServer) console.log(e);
         }
-
         var handles = process._getActiveHandles();
 
         for(var i = 0; i < handles.length; i++) {
@@ -3103,8 +3042,6 @@ function stopServer(restart, maintenance) {
             sendProcMsg("RESTART");
         } else if(maintenance) {
             sendProcMsg("MAINT");
-        } else {
-            sendProcMsg("EXIT");
         }
     })();
 }

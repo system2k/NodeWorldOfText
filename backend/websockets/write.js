@@ -1,6 +1,4 @@
 module.exports = async function(ws, data, send, vars, evars) {
-    var transaction = evars.transaction;
-
     var db = vars.db;
     var user = vars.user;
     var world = vars.world;

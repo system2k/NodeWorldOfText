@@ -76,7 +76,7 @@ function api_chat_send(message, opts) {
         var args = message.substr(1).split(" ");
         var command = args[0].toLowerCase();
         args.shift();
-        if(client_commands[command]) {
+        if(client_commands.hasOwnProperty(command)) {
             client_commands[command](args);
             return;
         }

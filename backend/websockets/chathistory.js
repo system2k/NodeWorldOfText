@@ -1,5 +1,4 @@
 module.exports = async function(ws, data, send, vars, evars) {
-    var transaction = evars.transaction;
     var broadcast = evars.broadcast; // broadcast to current world
     var clientId = evars.clientId;
 

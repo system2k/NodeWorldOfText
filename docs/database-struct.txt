@@ -1,0 +1,19 @@
+The "properties" column of the "world" table is as follows:
+{
+    views: number,
+    chat_permission: number,
+    color_text: number,
+    custom_menu_color: string,
+    page_is_nsfw: bool,
+    square_chars: bool,
+    no_log_edits: bool,
+    half_chars: bool,
+    background: string,
+    background_x: number,
+    background_y: number,
+    background_w: number,
+    background_h: number,
+    background_rmod: number,
+    background_alpha: number,
+    meta_desc: string
+}

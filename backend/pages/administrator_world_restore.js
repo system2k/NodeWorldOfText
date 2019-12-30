@@ -16,6 +16,7 @@ module.exports.GET = async function(req, serve, vars) {
 }
 
 module.exports.POST = async function(req, serve, vars) {
+    return;
     var db = vars.db;
     var post_data = vars.post_data;
     var user = vars.user;

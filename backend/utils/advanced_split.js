@@ -67,6 +67,7 @@ function advancedSplit(str) {
 var test_cases = [
     "",
     "A",
+    "ABCDEF",
     "😃",
     "\u0315",
     "Test123",
