@@ -550,10 +550,13 @@ module.exports.POST = async function(req, serve, vars) {
                 });
             }
         } else if("clear_all" in post_data) {
-            // small command, big impact
-            await db.run("DELETE FROM tile WHERE world_id=?", world.id);
-            await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)",
-                [user.id, world.id, 0, 0, Date.now(), "@{\"kind\":\"clear_all\"}"]);
+            var call_id = tile_database.newCallId();
+            tile_database.reserveCallId(call_id);
+            tile_database.write(call_id, tile_database.types.eraseworld, {
+                date: Date.now(),
+                world,
+                user
+            });
         } else if("clear_chat_hist" in post_data) {
             clearChatlog(world.id);
         }

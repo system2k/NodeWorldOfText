@@ -74,7 +74,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     }
     
     var can_chat = false;
-    if(chat_perm == 0 || chat_perm == undefined) can_chat = true;
+    if(!chat_perm) can_chat = true;
     if(chat_perm === 1 && (is_member || is_owner)) can_chat = true;
     if(chat_perm === 2 && is_owner) can_chat = true;
 
@@ -139,6 +139,11 @@ module.exports = async function(ws, data, send, vars, evars) {
         msg = msg.slice(0, 3030);
     }
 
+    var username_to_display = user.username;
+    if(accountSystem == "uvias") {
+        username_to_display = user.display_username;
+    }
+
     var chatIdBlockLimit = 1280;
 
     // [rank, name, args, description, example]
@@ -146,7 +151,7 @@ module.exports = async function(ws, data, send, vars, evars) {
         [3, "uptime", null, "get uptime of server", null],
 
         [2, "worlds", null, "list all worlds", null],
-        [2, "getip", ["id"], "retrieve the IP address", "1024"],
+        [2, "getip", ["id"], "retrieve the IP address", "1220"],
         [2, "getclients", null, "get list of all connected clients", null],
 
         [0, "help", null, "list all commands", null],
@@ -155,10 +160,12 @@ module.exports = async function(ws, data, send, vars, evars) {
         [0, "warp", ["world"], "go to another world", "forexample"], // client-side
         [0, "warpserver", ["server"], "use a different server", "wss://www.yourworldoftext.com/~help/ws/"], // client-side
         [0, "gridsize", ["WxH"], "change the size of cells", "10x20"], // client-side
-        [0, "block", ["id"], "mute a user", "1024"],
+        [0, "block", ["id"], "mute a user", "1220"],
         [0, "color", ["color code"], "change your text color", "#FF00FF"], // client-side
         [0, "chatcolor", ["color code"], "change your chat color", "#FF00FF"], // client-side
-        [0, "night", null, "enable night mode", null] // client-side
+        [0, "night", null, "enable night mode", null], // client-side
+        [0, "day", null, "disable night mode", null], // client-side
+        [0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"]
     ];
 
     function generate_command_list() {
@@ -309,9 +316,9 @@ module.exports = async function(ws, data, send, vars, evars) {
                         clientsFound++;
                     }
                 } else if(data.location == "global") {
-                        if(clientsFound != 0) res += "<br>";
-                        res += "[id: " + ws.clientId + ", world: " + ws.world_id + "] " + ws.ipAddress;
-                        clientsFound++;
+                    if(clientsFound != 0) res += "<br>";
+                    res += "[id: " + ws.clientId + ", world: " + ws.world_id + "] " + ws.ipAddress;
+                    clientsFound++;
                 }
             });
             res += "</div>";
@@ -319,13 +326,74 @@ module.exports = async function(ws, data, send, vars, evars) {
                 res = "No clients found";
             }
             serverChatResponse(res, data.location);
+        },
+        tell: function(id, message) {
+            id += "";
+            message += "";
+            message = message.trim();
+            if(!id) {
+                return serverChatResponse("No id given", data.location);
+            }
+            if(!message) {
+                return serverChatResponse("No message given", data.location);
+            }
+            id = parseInt(id, 10);
+            if(isNaN(id)) {
+                return serverChatResponse("Invalid ID format", data.location);
+            }
+            id = san_nbr(id);
+            var clientFound = false;
+            wss.clients.forEach(function(ws) {
+                if(clientFound) return;
+                if(!ws.userClient) return;
+                if(ws.clientId == id && ws.world.id == world.id && ws.can_chat) {
+                    clientFound = true;
+                    var privateMessage = {
+                        nickname: nick,
+                        realUsername: username_to_display,
+                        id: clientId,
+                        message: message,
+                        registered: user.authenticated,
+                        location: data.location,
+                        op: user.operator,
+                        admin: user.superuser,
+                        staff: user.staff,
+                        color: data.color,
+                        kind: "chat",
+                        privateMessage: "to_me"
+                    };
+                    if(user.authenticated && user.id in ranks_cache.users) {
+                        var rank = ranks_cache[ranks_cache.users[user.id]];
+                        privateMessage.rankName = rank.name;
+                        privateMessage.rankColor = rank.chat_color;
+                    }
+                    ws.send(JSON.stringify(privateMessage));
+                    send({
+                        nickname: "",
+                        realUsername: "",
+                        id: ws.clientId,
+                        message: message,
+                        registered: false,
+                        location: data.location,
+                        op: false,
+                        admin: false,
+                        staff: false,
+                        color: "#000000",
+                        kind: "chat",
+                        privateMessage: "from_me"
+                    });
+                }
+            });
+            if(!clientFound) {
+                return serverChatResponse("User not found", data.location);
+            }
         }
     }
 
     // This is a command
     if(msg[0] == "/") {
-        var args = msg.toLowerCase().substr(1).split(" ");
-        var command = args[0];
+        var args = msg.substr(1).split(" ");
+        var command = args[0].toLowerCase();
 
         var operator  = user.operator;
         var superuser = user.superuser;
@@ -350,15 +418,14 @@ module.exports = async function(ws, data, send, vars, evars) {
             case "getclients":
                 com.getclients();
                 return;
+            case "tell":
+                com.tell(args[1], args.slice(2).join(" "));
+                return;
             default:
                 serverChatResponse("Invalid command: " + html_tag_esc(msg));
         }
     }
 
-    var username_to_display = user.username;
-    if(accountSystem == "uvias") {
-        username_to_display = user.display_username;
-    }
     var chatData = {
         nickname: nick,
         realUsername: username_to_display,

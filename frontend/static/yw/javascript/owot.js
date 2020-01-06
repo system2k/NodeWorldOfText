@@ -1113,7 +1113,7 @@ function createWsPath() {
 }
 var ws_path = createWsPath();
 
-var styles = {};
+var styles = null;
 
 var menuStyle;
 function menu_color(color) {
@@ -1726,6 +1726,7 @@ function writeCharToXY(char, charColor, x, y) {
 
 // type a character
 function writeChar(char, doNotMoveCursor, temp_color, noNewline) {
+    char += "";
     var charColor = temp_color || YourWorld.Color;
     if(temp_color == 0) charColor = 0;
     var cursor = cursorCoords;
@@ -4152,13 +4153,27 @@ Object.assign(w, {
         if(ignoreUnloadedPattern) w.nightMode = 2;
         w.redraw();
     },
-    day: function() {
+    day: function(reloadStyle) {
         w.nightMode = 0;
-        styles.member = "#EEE";
-        styles.owner = "#DDD";
-        styles.public = "#FFF";
-        styles.text = "#000";
-        w.redraw();
+        if(reloadStyle) {
+            getWorldProps(state.worldModel.name, "style", function(style, error) {
+                if(!error) {
+                    styles.member = style.member;
+                    styles.owner = style.owner;
+                    styles.public = style.public;
+                    styles.text = style.text;
+                }
+                menu_color(styles.menu);
+                w.redraw();
+            });
+        } else {
+            var def = defaultStyles();
+            styles.member = def.member;
+            styles.owner = def.owner;
+            styles.public = def.public;
+            styles.text = def.text;
+            w.redraw();
+        }
     },
     rotate: function(speed) {
         if(!speed) speed = 2;

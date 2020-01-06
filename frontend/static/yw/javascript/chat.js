@@ -184,6 +184,9 @@ var client_commands = {
     },
     night: function() {
         w.night();
+    },
+    day: function() {
+        w.day(true);
     }
 }
 
@@ -387,6 +390,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     } else {
         field = getChatfield();
     }
+    var pm = dataObj.privateMessage;
 
     if(chatLimitCombChars) {
         message = w.split(message);
@@ -473,8 +477,19 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 
     if(dateStr) nickTitle.push("(" + dateStr + ")");
 
-    nickDom.innerHTML = nickname + ":";
+    nickDom.innerHTML = nickname + (pm == "to_me" ? "" : ":");
     if(nickTitle.length) nickDom.title = nickTitle.join("; ");
+
+    var pmDom = null;
+    if(pm) {
+        pmDom = document.createElement("div");
+        pmDom.style.display = "inline";
+        if(pm == "to_me") {
+            pmDom.innerText = " -> Me:";
+        } else if(pm == "from_me") {
+            pmDom.innerText = "Me -> ";
+        }
+    }
 
     var msgDom = document.createElement("span");
     msgDom.innerHTML = "&nbsp;" + message;
@@ -487,10 +502,20 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
     }
 
     var chatGroup = document.createElement("div");
-    if(hasTagDom) {
-        chatGroup.appendChild(tagDom);
+    if(!pm && hasTagDom) chatGroup.appendChild(tagDom);
+    if(pmDom) {
+        if(pm == "to_me") {
+            if(hasTagDom) chatGroup.appendChild(tagDom);
+            chatGroup.appendChild(nickDom);
+            chatGroup.appendChild(pmDom);
+        } else if(pm == "from_me") {
+            chatGroup.appendChild(pmDom);
+            if(hasTagDom) chatGroup.appendChild(tagDom);
+            chatGroup.appendChild(nickDom);
+        }
+    } else {
+        chatGroup.appendChild(nickDom);
     }
-    chatGroup.appendChild(nickDom);
     chatGroup.appendChild(msgDom);
 
     field.appendChild(chatGroup);

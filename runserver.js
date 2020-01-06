@@ -711,14 +711,14 @@ const systems    = load_modules("./backend/systems/");
 function asyncDbSystem(database) {
     const db = {
         // gets data from the database (only 1 row at a time)
-        get: async function(command, params) {
-            if(params == void 0 || params == null) params = []
+        get: function(command, args) {
+            if(args == void 0 || args == null) args = []
             return new Promise(function(r, rej) {
-                database.get(command, params, function(err, res) {
+                database.get(command, args, function(err, res) {
                     if(err) {
                         return rej({
                             sqlite_error: process_error_arg(err),
-                            input: { command, params }
+                            input: { command, args }
                         });
                     }
                     r(res);
@@ -726,33 +726,33 @@ function asyncDbSystem(database) {
             });
         },
         // runs a command (insert, update, etc...) and might return "lastID" if needed
-        run: async function(command, params) {
-            if(params == void 0 || params == null) params = [];
-            var err = false;
+        run: function(command, args) {
+            if(args == void 0 || args == null) args = [];
             return new Promise(function(r, rej) {
-                database.run(command, params, function(err, res) {
+                database.run(command, args, function(err, res) {
                     if(err) {
                         return rej({
                             sqlite_error: process_error_arg(err),
-                            input: { command, params }
+                            input: { command, args }
                         });
                     }
                     var info = {
-                        lastID: this.lastID
+                        lastID: this.lastID,
+                        changes: this.changes
                     }
                     r(info);
                 });
             });
         },
         // gets multiple rows in one command
-        all: async function(command, params) {
-            if(params == void 0 || params == null) params = [];
+        all: function(command, args) {
+            if(args == void 0 || args == null) args = [];
             return new Promise(function(r, rej) {
-                database.all(command, params, function(err, res) {
+                database.all(command, args, function(err, res) {
                     if(err) {
                         return rej({
                             sqlite_error: process_error_arg(err),
-                            input: { command, params }
+                            input: { command, args }
                         });
                     }
                     r(res);
@@ -760,10 +760,10 @@ function asyncDbSystem(database) {
             });
         },
         // get multiple rows but execute a function for every row
-        each: async function(command, params, callbacks) {
-            if(typeof params == "function") {
-                callbacks = params;
-                params = [];
+        each: function(command, args, callbacks) {
+            if(typeof args == "function") {
+                callbacks = args;
+                args = [];
             }
             var def = callbacks;
             var callback_error = false;
@@ -777,10 +777,10 @@ function asyncDbSystem(database) {
                 }
             }
             return new Promise(function(r, rej) {
-                database.each(command, params, callbacks, function(err, res) {
+                database.each(command, args, callbacks, function(err, res) {
                     if(err) return rej({
                         sqlite_error: process_error_arg(err),
-                        input: { command, params }
+                        input: { command, args }
                     });
                     if(callback_error) return rej(cb_err_desc);
                     r(res);
@@ -789,7 +789,7 @@ function asyncDbSystem(database) {
         },
         // like run, but executes the command as a SQL file
         // (no comments allowed, and must be semicolon separated)
-        exec: async function(command) {
+        exec: function(command) {
             return new Promise(function(r, rej) {
                 database.exec(command, function(err) {
                     if(err) {
@@ -2358,7 +2358,7 @@ async function initialize_server_components() {
     wss = new WebSocket.Server({ server });
     global_data.wss = wss;
 
-    ws_broadcast = function(data, world, opts) {
+    var ws_broadcast = function(data, world, opts) {
         if(!opts) opts = {};
         data = JSON.stringify(data);
         wss.clients.forEach(function each(client) {
@@ -2702,6 +2702,7 @@ async function manageWebsocketConnection(ws, req) {
         ws.chat_permission = chat_permission;
 
         var can_chat = chat_permission == 0 || (chat_permission == 1 && status.permission.member) || (chat_permission == 2 && status.permission.owner);
+        ws.can_chat = can_chat;
 
         worldObj = getWorldData(world_name);
         if(!socketTerminated && !ws.hide_user_count) {
@@ -2801,7 +2802,7 @@ async function manageWebsocketConnection(ws, req) {
                     }
                     function broadcast(data, opts) {
                         data.source = kind;
-                        ws_broadcast(data, world_name, opts);
+                        global_data.ws_broadcast(data, world_name, opts);
                     }
                     var res = await websockets[kind](ws, msg, send, vars, {
                         broadcast,

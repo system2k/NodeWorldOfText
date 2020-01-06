@@ -18,7 +18,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     var is_owner = user.stats.owner;
 
     var can_chat = false;
-    if(chat_perm == 0 || chat_perm == undefined) can_chat = true;
+    if(!chat_perm) can_chat = true;
     if(chat_perm === 1 && (is_member || is_owner)) can_chat = true;
     if(chat_perm === 2 && is_owner) can_chat = true;
 
