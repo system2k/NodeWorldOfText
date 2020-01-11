@@ -171,7 +171,7 @@ async function doUpdateChatLogData() {
     world_chat_additions = [];
     chatIsCleared = {};
 
-    await db_ch.run("BEGIN TRANSACTION");
+    await db_ch.run("BEGIN");
 
     for(var i in copy_chatIsCleared) {
         var worldId = i;

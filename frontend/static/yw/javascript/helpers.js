@@ -17,6 +17,34 @@ function clipIntMax(x) {
     return x;
 }
 
+function lineGen(x0, y0, x1, y1, max) {
+    if(!max) max = 2000;
+    var list = [];
+    var x0 = Math.floor(x0);
+    var y0 = Math.floor(y0);
+    var x1 = Math.floor(x1);
+    var y1 = Math.floor(y1);
+    var dx = Math.abs(x1 - x0);
+    var dy = Math.abs(y1 - y0);
+    var sx = (x0 < x1) ? 1 : -1;
+    var sy = (y0 < y1) ? 1 : -1;
+    var err = dx - dy;
+    for(var i = 0; i < max; i++) {
+        list.push([x0, y0]);
+        if ((x0 == x1) && (y0 == y1)) break;
+        var e2 = 2 * err;
+        if (e2 > -dy) {
+            err -= dy;
+            x0 += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            y0 += sy;
+        }
+    }
+    return list;
+}
+
 function byId(a) {
     return document.getElementById(a);
 }

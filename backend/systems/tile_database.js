@@ -53,6 +53,49 @@ module.exports.server_exit = async function() {
     await databaseClock();
 }
 
+function prepareTileUpdateMessage(tileObj, worldObj, channel) {
+    var updObj = {};
+    if(!channel) channel = "00000000000000";
+    for(var i = 0; i < tileObj.length; i++) {
+        var tileElm = tileObj[i];
+        var tile = tileElm.tile;
+        var tileX = tileElm.tileX;
+        var tileY = tileElm.tileY;
+        var content = tile.content.join("");
+        var properties = {
+            writability: tile.writability
+        };
+        if(!arrayIsEntirely(tile.prop_char, null)) {
+            properties.char = encodeCharProt(tile.prop_char);
+        }
+        if(!arrayIsEntirely(tile.prop_color, 0)) {
+            properties.color = tile.prop_color;
+        }
+        if(Object.keys(tile.prop_cell_props).length > 0) {
+            properties.cell_props = tile.prop_cell_props;
+        }
+        updObj[tileY + "," + tileX] = {
+            content,
+            properties
+        };
+    }
+    wss.clients.forEach(function(client) {
+        if(!client.userClient) return;
+        if(client.world_id == worldObj.id && client.readyState == WebSocket.OPEN) {
+            try {
+                client.send(JSON.stringify({
+                    channel: channel,
+                    kind: "tileUpdate",
+                    source: "write",
+                    tiles: updObj
+                }));
+            } catch(e) {
+                handle_error(e);
+            }
+        }
+    });
+}
+
 // caller ids. this returns information to a request that uploaded the edits to the server
 // [response_callback, response_data, completion_callback, total_units, current_units]
 // total_units must be >0
@@ -105,7 +148,7 @@ function normalize_tile(tile_db_data) {
         props_updated: false,
         content_updated: false,
         writability_updated: false,
-        last_accessed: 0 // todo
+        last_accessed: -1
     };
     if(tile_db_data) {
         var parsed_props = JSON.parse(tile_db_data.properties);
@@ -148,17 +191,15 @@ async function loadTileCacheData(world_id, tileX, tileY) {
 var fetch_tile_queue = [];
 // Unique tile id tuple: "world_id,tile_y,_tile_x"
 var tileIterationTempMem = {};
-var tilesPendingDeletion = {}; // tile_tuple -> cancel_deletion (bool)
+var tilesPendingDeletion = {}; // tile_tuple -> true
+
+function performCacheInvalidation() {
+
+}
 
 function tileIsPendingDeletion(worldID, tileX, tileY) {
     var tup = worldID + "," + tileY + "," + tileX;
     return tup in tilesPendingDeletion;
-}
-
-function unmarkTilePendingDeletion(worldID, tileX, tileY) {
-    if(!tileIsPendingDeletion(worldID, tileX, tileY)) return false;
-    tilesPendingDeletion[worldID + "," + tileY + "," + tileX] = false;
-    return true;
 }
 
 function lookupTileQueue(tileUID) {
@@ -243,7 +284,10 @@ function tileWriteEdits(cacheTile, editObj) {
     if(color !== -1) {
         var prevCol = cacheTile.prop_color[index];
         cacheTile.prop_color[index] = color;
-        if(prevCol != color) cacheTile.props_updated = true;
+        if(prevCol != color) {
+            cacheTile.props_updated = true;
+            char_updated = true;
+        }
     }
 
     // detect overriden links
@@ -253,6 +297,7 @@ function tileWriteEdits(cacheTile, editObj) {
             if(cacheTile.prop_cell_props[charY][charX]) {
                 delete cacheTile.prop_cell_props[charY][charX];
                 cacheTile.props_updated = true;
+                char_updated = true;
             }
             // the row for this tile is empty
             if(Object.keys(cacheTile.prop_cell_props[charY]).length == 0) {
@@ -269,6 +314,7 @@ function tileWriteEdits(cacheTile, editObj) {
         var ar = [tileY, tileX, charY, charX, Date.now(), char, editID];
         if(color) ar.push(color);
         sharedObj.editLog.push(ar);
+        cacheTile.last_accessed = Date.now();
     }
     if(char_updated) {
         sharedObj.tileUpdates[tileY + "," + tileX] = cacheTile;
@@ -335,6 +381,7 @@ function tileWriteLinks(cacheTile, editObj) {
         }
     }
     cacheTile.props_updated = true;
+    cacheTile.last_accessed = Date.now();
 
     respData[0] = false;
     respData[1] = true;
@@ -405,12 +452,13 @@ function tileWriteProtections(cacheTile, editObj) {
             cacheTile.props_updated = true;
         }
         if(cacheTile.prop_char[0] != null && is_consistent(cacheTile.prop_char)) {
-            cacheTile.writability = charProt[0];
+            cacheTile.writability = cacheTile.prop_char[0];
             for(var i = 0; i < cacheTile.prop_char.length; i++) {
                 cacheTile.prop_char[i] = null;
             }
             has_modified = true;
             cacheTile.props_updated = true;
+            cacheTile.writability_updated = true;
         }
     } else {
         var full_protection_complete = true;
@@ -466,6 +514,8 @@ function tileWriteProtections(cacheTile, editObj) {
         }
     }
 
+    cacheTile.last_accessed = Date.now();
+
     // no permission to modify
     if(!has_modified) {
         respData[0] = true;
@@ -501,6 +551,7 @@ function tileWriteClear(cacheTile, editObj) {
 
     cacheTile.content_updated = true;
     cacheTile.props_updated = true;
+    cacheTile.last_accessed = Date.now();
 
     sharedObj.tile = cacheTile;
     IOProgress(callID);
@@ -580,32 +631,34 @@ function appendToEditLogQueue(tileX, tileY, userID, data, worldID, date) {
     editLogQueue.push([tileX, tileY, userID, data, worldID, date]);
 }
 
+async function flushBulkWriteQueue() {
+    await db.run("BEGIN");
+    var elm = bulkWriteQueue[0];
+    bulkWriteQueue.shift();
+    var edits = elm[0];
+    var response = elm[1];
+    for(var i = 0; i < edits.length; i++) {
+        var command = edits[i];
+        var sql = command[0];
+        var params = command[1];
+        var callback = command[2];
+        var resp = await db.run(sql, params);
+        if(callback) callback(resp);
+    }
+    await db.run("COMMIT");
+    bulkWriteBusy = false;
+    if(bulkWriteQueue.length) {
+        stimulateBulkWriteQueue();
+    }
+    response();
+}
+
 var bulkWriteQueue = [];
 var bulkWriteBusy = false;
 function stimulateBulkWriteQueue() {
     if(bulkWriteBusy) return;
     bulkWriteBusy = true;
-    (async function() {
-        await db.run("BEGIN TRANSACTION");
-        var elm = bulkWriteQueue[0];
-        bulkWriteQueue.shift();
-        var edits = elm[0];
-        var response = elm[1];
-        for(var i = 0; i < edits.length; i++) {
-            var command = edits[i];
-            var sql = command[0];
-            var params = command[1];
-            var callback = command[2];
-            var resp = await db.run(sql, params);
-            if(callback) callback(resp);
-        }
-        await db.run("COMMIT");
-        bulkWriteBusy = false;
-        if(bulkWriteQueue.length) {
-            stimulateBulkWriteQueue();
-        }
-        response();
-    })();
+    flushBulkWriteQueue();
 }
 function bulkWriteEdits(edits) {
     return new Promise(function(res) {
@@ -619,9 +672,6 @@ async function iterateDatabaseChanges() {
     for(var worldID in memTileCache) {
         for(var tileY in memTileCache[worldID]) {
             for(var tileX in memTileCache[worldID][tileY]) {
-                if(unmarkTilePendingDeletion(worldID, tileX, tileY)) {
-                    continue;
-                }
                 let tile = memTileCache[worldID][tileY][tileX];
                 if(!tile.props_updated && !tile.content_updated && !tile.writability_updated) continue;
                 if(tile.tile_exists) {
@@ -675,6 +725,9 @@ async function iterateDatabaseChanges() {
         await bulkWriteEdits(writeQueue);
     }
     var eLogLen = editLogQueue.length;
+    var editTransaction = false;
+    if(eLogLen > 1) editTransaction = true;
+    if(editTransaction) await db_edits.run("BEGIN TRANSACTION");
     for(var i = 0; i < eLogLen; i++) {
         var edit = editLogQueue[0];
         editLogQueue.shift();
@@ -686,15 +739,24 @@ async function iterateDatabaseChanges() {
         var date = edit[5];
         await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)", [user, worldID, tileY, tileX, date, data]);
     }
+    if(editTransaction) await db_edits.run("COMMIT");
 }
 
-async function databaseClock() {
+var databaseBusy = false;
+async function databaseClock(serverExit) {
+    if(databaseBusy) return;
+    databaseBusy = true;
     try {
         await iterateDatabaseChanges();
     } catch(e) {
         handle_error(e);
     }
-    if(!server_exiting) intv.database_clock = setTimeout(databaseClock, 1000 * 5);
+    databaseBusy = false;
+    if(server_exiting) {
+        if(!serverExit) await databaseClock(true);
+    } else {
+        intv.database_clock = setTimeout(databaseClock, 1000 * 5);
+    }
 }
 
 function isTileDIM(worldID, tileX, tileY) {
@@ -741,34 +803,19 @@ function processTileIORequest(call_id, type, data) {
             };
             cids[call_id][2] = function() {
                 if(Object.keys(sharedObj.tileUpdates).length > 0) {
-                    var updTile = {};
+                    var updTile = [];
                     for(var i in sharedObj.tileUpdates) {
+                        var pos = i.split(",");
+                        var tileX = parseInt(pos[1]);
+                        var tileY = parseInt(pos[0]);
                         var tile = sharedObj.tileUpdates[i];
-                        updTile[i] = {
-                            content: tile.content.join(""),
-                            properties: {
-                                color: tile.prop_color,
-                                char: encodeCharProt(tile.prop_char),
-                                cell_props: tile.prop_cell_props,
-                                writability: tile.writability
-                            }
-                        };
+                        updTile.push({
+                            tileX,
+                            tileY,
+                            tile
+                        });
                     }
-                    wss.clients.forEach(function(client) {
-                        if(!client.userClient) return;
-                        if(client.world_id == world.id && client.readyState == WebSocket.OPEN) {
-                            try {
-                                client.send(JSON.stringify({
-                                    channel: data.channel,
-                                    kind: "tileUpdate",
-                                    source: "write",
-                                    tiles: updTile
-                                }));
-                            } catch(e) {
-                                handle_error(e);
-                            }
-                        }
-                    });
+                    prepareTileUpdateMessage(updTile, world, data.channel);
                 }
                 var tileGroups = {};
                 for(var i = 0; i < sharedObj.editLog.length; i++) {
@@ -782,7 +829,7 @@ function processTileIORequest(call_id, type, data) {
                     var pos = i.split(",");
                     var tileX = parseInt(pos[1]);
                     var tileY = parseInt(pos[0]);
-                    appendToEditLogQueue(tileX, tileY, 0, tileGroups[i], world.id, tileGroups[i][0][4]);
+                    appendToEditLogQueue(tileX, tileY, 0, JSON.stringify(tileGroups[i]), world.id, tileGroups[i][0][4]);
                 }
             }
             for(var e = 0; e < tile_edits.length; e++) {
@@ -810,31 +857,7 @@ function processTileIORequest(call_id, type, data) {
             };
             cids[call_id][2] = function() {
                 if(sharedObj.tile) {
-                    wss.clients.forEach(function(client) {
-                        if(!client.userClient) return;
-                        if(client.world_id == world.id && client.readyState == WebSocket.OPEN) {
-                            try {
-                                client.send(JSON.stringify({
-                                    channel: data.channel,
-                                    kind: "tileUpdate",
-                                    source: "write",
-                                    tiles: {
-                                        [tileY + "," + tileX]: {
-                                            content: sharedObj.tile.content.join(""),
-                                            properties: {
-                                                color: sharedObj.tile.prop_color,
-                                                char: encodeCharProt(sharedObj.tile.prop_char),
-                                                cell_props: sharedObj.tile.prop_cell_props,
-                                                writability: sharedObj.tile.writability
-                                            }
-                                        }
-                                    }
-                                }));
-                            } catch(e) {
-                                handle_error(e);
-                            }
-                        }
-                    });
+                    prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
                     var linkArch = {
                         kind: "link",
                         charX: data.charX,
@@ -876,31 +899,7 @@ function processTileIORequest(call_id, type, data) {
             };
             cids[call_id][2] = function() {
                 if(sharedObj.tile) {
-                    wss.clients.forEach(function(client) {
-                        if(!client.userClient) return;
-                        if(client.world_id == world.id && client.readyState == WebSocket.OPEN) {
-                            try {
-                                client.send(JSON.stringify({
-                                    channel: data.channel,
-                                    kind: "tileUpdate",
-                                    source: "write",
-                                    tiles: {
-                                        [tileY + "," + tileX]: {
-                                            content: sharedObj.tile.content.join(""),
-                                            properties: {
-                                                color: sharedObj.tile.prop_color,
-                                                char: encodeCharProt(sharedObj.tile.prop_char),
-                                                cell_props: sharedObj.tile.prop_cell_props,
-                                                writability: sharedObj.tile.writability
-                                            }
-                                        }
-                                    }
-                                }));
-                            } catch(e) {
-                                handle_error(e);
-                            }
-                        }
-                    });
+                    prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
                     var protArch = {
                         kind: "protect",
                         protect_type: data.protect_type,
@@ -930,31 +929,7 @@ function processTileIORequest(call_id, type, data) {
                 tile: null
             };
             cids[call_id][2] = function() {
-                wss.clients.forEach(function(client) {
-                    if(!client.userClient) return;
-                    if(client.world_id == world.id && client.readyState == WebSocket.OPEN) {
-                        try {
-                            client.send(JSON.stringify({
-                                channel: data.channel,
-                                kind: "tileUpdate",
-                                source: "write",
-                                tiles: {
-                                    [tileY + "," + tileX]: {
-                                        content: sharedObj.tile.content.join(""),
-                                        properties: {
-                                            color: sharedObj.tile.prop_color,
-                                            char: encodeCharProt(sharedObj.tile.prop_char),
-                                            cell_props: sharedObj.tile.prop_cell_props,
-                                            writability: sharedObj.tile.writability
-                                        }
-                                    }
-                                }
-                            }));
-                        } catch(e) {
-                            handle_error(e);
-                        }
-                    }
-                });
+                prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, null);
             }
 
             if(isTileDIM(world.id, tileX, tileY)) {
@@ -984,7 +959,7 @@ async function beginTileIterationsLoop() {
             continue;
         }
         var context = activeTileIterationsQueue[tileIterationsIndex];
-        // [world obj, call id, type, index, suspended, user obj]
+        // context: [world obj, call id, type, index, suspended, user obj]
 
         var chunkSize = 2048;
         var world = context[0];
@@ -993,7 +968,6 @@ async function beginTileIterationsLoop() {
         var suspended = context[4];
         var user = context[5];
 
-        // is suspended
         if(suspended) {
             activeTileIterationsQueue.splice(tileIterationsIndex, 1);
             IOProgress(callID);
@@ -1052,6 +1026,7 @@ async function beginTileIterationsLoop() {
                             }
                         }
                     }
+                    dimTile.last_accessed = Date.now();
                 } else {
                     if(lookupTileQueue(world.id + "," + tileX + "," + tileY)) {
                         continue;
@@ -1131,37 +1106,32 @@ async function beginTileIterationsLoop() {
                 localTiles[tileY + "," + tileX] = 1;
                 writeQueue.push(["DELETE FROM tile WHERE world_id=? AND tileX=? and tileY=?", [world.id, tileX, tileY]]);
             }
-            if(writeQueue.length) {
-                await bulkWriteEdits(writeQueue);
-            }
+            // begin to delete tiles from memory
             for(var i in localTiles) {
                 var tup = world.id + "," + i;
                 var pos = i.split(",");
                 var tileX = parseInt(pos[1]);
                 var tileY = parseInt(pos[0]);
                 if(tup in tilesPendingDeletion) {
-                    var state = tilesPendingDeletion[tup];
-                    var ctile = isTileDIM(world.id, tileX, tileY);
-                    if(ctile) {
-                        if(state) {
-                            deleteTileDIM(world.id, tileX, tileY);
-                        } else {
-                            ctile.tile_exists = false;
-                            ctile.tile_id = null;
-                            ctile.prop_cell_props = {};
-                            for(var x = 0; x < CONST.tileArea; x++) {
-                                ctile.content[x] = " ";
-                                ctile.prop_char[x] = null;
-                                ctile.prop_color[x] = 0;
-                                ctile.writability = null;
-                            }
-                            ctile.content_updated = true;
-                            ctile.writability_updated = true;
-                            ctile.props_updated = true;
-                        }
-                    }
                     delete tilesPendingDeletion[tup];
+                    var ctile = isTileDIM(world.id, tileX, tileY);
+                    if(!ctile) continue;
+                    ctile.tile_exists = false;
+                    ctile.tile_id = null;
+                    ctile.prop_cell_props = {};
+                    for(var x = 0; x < CONST.tileArea; x++) {
+                        ctile.content[x] = " ";
+                        ctile.prop_char[x] = null;
+                        ctile.prop_color[x] = 0;
+                        ctile.writability = null;
+                    }
+                    ctile.content_updated = true;
+                    ctile.writability_updated = true;
+                    ctile.props_updated = true;
                 }
+            }
+            if(writeQueue.length) {
+                await bulkWriteEdits(writeQueue);
             }
         }
     
@@ -1223,9 +1193,6 @@ function processTileIteration(call_id, type, data) {
                 var queue = activeTileIterationsQueue[i];
                 if(queue[0].id == world.id) {
                     if(queue[2] == types.publicclear) {
-                        /*IOProgress(queue[1]);
-                        activeTileIterationsQueue.splice(i, 1);
-                        i--;*/
                         queue[4] = true; // suspended
                     } else {
                         return IOProgress(call_id);

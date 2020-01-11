@@ -18,6 +18,8 @@ module.exports = async function(data, vars) {
     var precise = data.precise;
     var type = data.type;
 
+    var channel = data.channel;
+
     var protect_type = void 0;
     if(type == "owner-only") {
         protect_type = 2;
@@ -50,7 +52,8 @@ module.exports = async function(data, vars) {
     tile_database.write(call_id, tile_database.types.protect, {
         tileX, tileY, charX, charY,
         user, world, is_member, is_owner,
-        type, precise, protect_type
+        type, precise, protect_type,
+        channel
     });
 
     var resp = await tile_database.editResponse(call_id);

@@ -1,4 +1,4 @@
-// includes support for coord links
+// both url links and coordinate links
 module.exports.POST = async function(req, serve, vars, params) {
     var user = vars.user;
     var post_data = vars.post_data;
@@ -22,7 +22,7 @@ module.exports.POST = async function(req, serve, vars, params) {
     var type = "url";
     if(params.coordlink) {
         type = "coord";
-    } 
+    }
 
     var do_link = await modules.write_links({
         type: type,

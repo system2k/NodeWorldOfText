@@ -23,6 +23,8 @@ module.exports = async function(data, vars) {
     var link_tileX = san_dp(data.link_tileX);
     var link_tileY = san_dp(data.link_tileY);
 
+    var channel = data.channel;
+
     var can_link = false;
     var feature_mode;
 
@@ -63,7 +65,8 @@ module.exports = async function(data, vars) {
     tile_database.write(call_id, tile_database.types.link, {
         tileX, tileY, charX, charY,
         user, world, is_member, is_owner,
-        type, url, link_tileX, link_tileY
+        type, url, link_tileX, link_tileY,
+        channel
     });
 
     var resp = await tile_database.editResponse(call_id);

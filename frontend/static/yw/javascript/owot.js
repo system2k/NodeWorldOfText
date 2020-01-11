@@ -644,6 +644,9 @@ var tileProtectAuto = {
     selectedTile: null,
     xPos: 0,
     yPos: 0,
+    charXPos: 0,
+    charYPos: 0,
+    lastPos: null,
     mode: 0,
     ctrlDown: false,
     shiftDown: false,
@@ -688,27 +691,55 @@ function mousemove_tileProtectAuto() {
     var tileY = currentPosition[1];
     var charX = currentPosition[2];
     var charY = currentPosition[3];
+    var lastPos = tileProtectAuto.lastPos;
     tileProtectAuto.xPos = tileX;
     tileProtectAuto.yPos = tileY;
     tileProtectAuto.charXPos = charX;
     tileProtectAuto.charYPos = charY;
     if(tileProtectAuto.ctrlDown) {
-        var mode = tileProtectAuto.mode;
-        if(protectPrecision == 0) {
-            tileProtectAuto.selected[tileY + "," + tileX] =
-                [protectPrecision, mode, tile, currentPosition];
-        } else if(protectPrecision == 1) {
-            tileProtectAuto.selected[tileY + "," + tileX + "," + charY + "," + charX] =
-                [protectPrecision, mode, tile, currentPosition];
+        var line = null;
+        var absX = tileX * tileC + charX;
+        var absY = tileY * tileR + charY;
+        if(tileProtectAuto.lastPos) {
+            var labsX = lastPos[0] * tileC + lastPos[2];
+            var labsY = lastPos[1] * tileR + lastPos[3];
+            line = lineGen(labsX, labsY, absX, absY, 1000);
+        } else {
+            line = [[absX, absY]];
         }
-        var colors = ["red", "green", "blue", "teal"];
-        var color = colors[mode];
-        if(protectPrecision == 0) {
-            tile.backgroundColor = color;
-        } else if(protectPrecision == 1) {
-            colorChar(tileX, tileY, charX, charY, w.protect_bg, true);
+        tileProtectAuto.lastPos = [tileX, tileY, charX, charY];
+        var updTiles = {};
+        for(var i = 0; i < line.length; i++) {
+            var chr = line[i];
+            var x = chr[0];
+            var y = chr[1];
+            var ctileX = Math.floor(x / tileC);
+            var ctileY = Math.floor(y / tileR);
+            var ccharX = x - ctileX * tileC;
+            var ccharY = y - ctileY * tileR;
+            var mode = tileProtectAuto.mode;
+            if(protectPrecision == 0) {
+                tileProtectAuto.selected[ctileY + "," + ctileX] =
+                    [protectPrecision, mode, tile];
+            } else if(protectPrecision == 1) {
+                tileProtectAuto.selected[ctileY + "," + ctileX + "," + ccharY + "," + ccharX] =
+                    [protectPrecision, mode, tile];
+            }
+            var colors = ["red", "green", "blue", "teal"];
+            var color = colors[mode];
+            if(protectPrecision == 0) {
+                tile.backgroundColor = color;
+            } else if(protectPrecision == 1) {
+                colorChar(ctileX, ctileY, ccharX, ccharY, w.protect_bg, true);
+            }
+            updTiles[ctileY + "," + ctileX] = 1;
         }
-        renderTile(tileX, tileY, true);
+        for(var i in updTiles) {
+            var pos = i.split(",");
+            var tileX = parseInt(pos[1]);
+            var tileY = parseInt(pos[0]);
+            renderTile(tileX, tileY, true);
+        }
     }
     if(tileProtectAuto.shiftDown) {
         var pos = tileY + "," + tileX;
@@ -750,8 +781,8 @@ function keydown_tileProtectAuto(e) {
 
             var tileX = pos[1];
             var tileY = pos[0];
-            var charX = selected[i][3][2];
-            var charY = selected[i][3][3];
+            var charX = pos[3];
+            var charY = pos[2];
 
             var position = {
                 tileY: tileY,
@@ -785,10 +816,13 @@ function keydown_tileProtectAuto(e) {
             setTimeout(step, 4);
         }
         step();
-
     } else {
+        var ctrlState = tileProtectAuto.ctrlDown;
         tileProtectAuto.ctrlDown = checkKeyPress(e, keyConfig.autoSelect);
         tileProtectAuto.shiftDown = checkKeyPress(e, keyConfig.autoDeselect);
+        if(!ctrlState && tileProtectAuto.ctrlDown) {
+            tileProtectAuto.lastPos = null;
+        }
     }
 }
 document.body.addEventListener("keydown", keydown_tileProtectAuto)
@@ -1286,6 +1320,7 @@ function stopTileUI() {
     elm.protect_precision.style.display = "none";
     w.isProtecting = false;
     tileProtectAuto.active = false;
+    tileProtectAuto.lastPos = null;
     elm.owot.style.cursor = defaultCursor;
     removeTileProtectHighlight();
 }
@@ -2241,6 +2276,7 @@ function event_keydown(e) {
         }
         removeCursor();
         tileProtectAuto.active = false;
+        tileProtectAuto.lastPos = null;
         linkAuto.active = false;
     }
     if(checkKeyPress(e, "CTRL+ENTER")) {
@@ -3907,6 +3943,304 @@ function RegionSelection() {
     return this;
 }
 
+var networkHTTP = {
+    fetch: function(x1, y1, x2, y2, opts, callback) {
+        if(typeof opts == "function") {
+            callback = opts;
+        } else if(!opts) {
+            opts = {};
+        }
+        if(typeof callback != "function") {
+            throw "Callback is not a function";
+        }
+        var temp;
+        if(x1 > x2) {
+            temp = x1;
+            x1 = x2;
+            x2 = temp;
+        }
+        if(y1 > y2) {
+            temp = y1;
+            y1 = y2;
+            y2 = temp;
+        }
+        var data = {
+            fetch: 1,
+            min_tileX: x1,
+            min_tileY: y1,
+            max_tileX: x2,
+            max_tileY: y2
+        };
+        if(opts.public_only) data.public_only = true;
+        if(opts.array) data.array = true;
+        if(opts.content_only) data.content_only = true;
+        if(opts.concat) data.concat = true;
+        ajaxRequest({
+            type: "GET",
+            url: window.location.pathname,
+            data: data,
+            done: function(data) {
+                if(callback) callback(JSON.parse(data));
+            },
+            error: function() {
+                if(callback) callback(null);
+            }
+        });
+    },
+    write: function(edits, opts, callback) {
+        if(typeof opts == "function") {
+            callback = opts;
+        } else if(!opts) {
+            opts = {};
+        }
+        if(typeof callback != "function") {
+            throw "Callback is not a function";
+        }
+        var data = {
+            edits: JSON.stringify(edits)
+        };
+        if(opts.utf16) data.utf16 = true;
+        if(opts.preserve_links) data.preserve_links = true;
+        ajaxRequest({
+            type: "POST",
+            url: window.location.pathname,
+            data: data,
+            done: function(data) {
+                if(callback) callback(JSON.parse(data));
+            },
+            error: function() {
+                if(callback) callback(null);
+            }
+        });
+    },
+    urllink: function(tileX, tileY, charX, charY, url, callback) {
+        if(typeof callback != "function") {
+            throw "Callback is not a function";
+        }
+        ajaxRequest({
+            type: "POST",
+            url: "/ajax/urllink/",
+            data: {
+                world: state.worldModel.name,
+                tileX: tileX,
+                tileY: tileY,
+                charX: charX,
+                charY: charY,
+                url: url
+            },
+            done: function(data) {
+                if(callback) callback(data);
+            },
+            error: function() {
+                if(callback) callback(null);
+            }
+        });
+    },
+    coordlink: function(tileX, tileY, charX, charY, link_tileX, link_tileY, callback) {
+        if(typeof callback != "function") {
+            throw "Callback is not a function";
+        }
+        ajaxRequest({
+            type: "POST",
+            url: "/ajax/coordlink/",
+            data: {
+                world: state.worldModel.name,
+                tileX: tileX,
+                tileY: tileY,
+                charX: charX,
+                charY: charY,
+                link_tileX: link_tileX,
+                link_tileY: link_tileY
+            },
+            done: function(data) {
+                if(callback) callback(data);
+            },
+            error: function() {
+                if(callback) callback(null);
+            }
+        });
+    },
+    protect: function(tileX, tileY, type, callback) {
+        // type: unprotect, public, member-only, owner-only
+        if(typeof callback != "function") {
+            throw "Callback is not a function";
+        }
+        var data = {
+            world: state.worldModel.name,
+            tileX: tileX,
+            tileY: tileY
+        };
+        var url = "/ajax/protect/";
+        if(type == "unprotect") {
+            url = "/ajax/unprotect/";
+        } else {
+            data.type = type;
+        }
+        ajaxRequest({
+            type: "POST",
+            url: url,
+            data: data,
+            done: function(data) {
+                if(callback) callback(data);
+            },
+            error: function() {
+                if(callback) callback(null);
+            }
+        });
+    },
+    protectchar: function(tileX, tileY, charX, charY, type, callback) {
+        if(typeof callback != "function") {
+            throw "Callback is not a function";
+        }
+        // type: unprotect, public, member-only, owner-only
+        if(typeof callback != "function") {
+            throw "Callback is not a function";
+        }
+        var data = {
+            world: state.worldModel.name,
+            tileX: tileX,
+            tileY: tileY,
+            charX: charX,
+            charY: charY
+        };
+        var url = "/ajax/protect/char/";
+        if(type == "unprotect") {
+            url = "/ajax/unprotect/char/";
+        } else {
+            data.type = type;
+        }
+        ajaxRequest({
+            type: "POST",
+            url: url,
+            data: data,
+            done: function(data) {
+                if(callback) callback(data);
+            },
+            error: function() {
+                if(callback) callback(null);
+            }
+        });
+    }
+};
+
+var network = {
+    http: networkHTTP,
+    protect: function(position, type) {
+        // position: {tileX, tileY, [charX, charY]}
+        // type: <unprotect, public, member-only, owner-only>
+        var isPrecise = "charX" in position && "charY" in position;
+        var data = {
+            tileX: position.tileX,
+            tileY: position.tileY,
+            type: type == "unprotect" ? void 0 : type
+        };
+        if(isPrecise) {
+            data.charX = position.charX;
+            data.charY = position.charY;
+            if(!("tileX" in position || "tileY" in position)) {
+                data.tileX = Math.floor(data.charX / tileC);
+                data.tileY = Math.floor(data.charY / tileR);
+                data.charX = data.charX - Math.floor(data.charX / tileC) * tileC;
+                data.charY = data.charY - Math.floor(data.charY / tileR) * tileR;
+            }
+            data.precise = true;
+        }
+        w.socket.send(JSON.stringify({
+            kind: "protect",
+            data: data,
+            action: type == "unprotect" ? type : "protect"
+        }));
+    },
+    link: function(position, type, args) {
+        // position: {tileX, tileY, charX, charY}
+        // type: <url, coord>
+        // args: {url} or {x, y}
+        var data = {
+            tileY: position.tileY,
+            tileX: position.tileX,
+            charY: position.charY,
+            charX: position.charX
+        };
+        if(!("tileX" in position || "tileY" in position)) {
+            data.tileX = Math.floor(data.charX / tileC);
+            data.tileY = Math.floor(data.charY / tileR);
+            data.charX = data.charX - Math.floor(data.charX / tileC) * tileC;
+            data.charY = data.charY - Math.floor(data.charY / tileR) * tileR;
+        }
+        if(type == "url") {
+            data.url = args.url;
+        } else if(type == "coord") {
+            data.link_tileX = args.x;
+            data.link_tileY = args.y;
+        }
+        w.socket.send(JSON.stringify({
+            kind: "link",
+            data: data,
+            type: type
+        }));
+    },
+    cmd: function(data, include_username) {
+        w.socket.send(JSON.stringify({
+            kind: "cmd",
+            data: data, // maximum length of 2048
+            include_username: include_username
+        }));
+    },
+    cmd_opt: function() {
+        w.socket.send(JSON.stringify({
+            kind: "cmd_opt"
+        }));
+    },
+    write: function(edits, opts) {
+        if(!opts) opts = {};
+        w.socket.send(JSON.stringify({
+            kind: "write",
+            edits: edits,
+            public_only: opts.public_only,
+            preserve_links: opts.preserve_links
+        }));
+    },
+    chathistory: function() {
+        w.socket.send(JSON.stringify({
+            kind: "chathistory"
+        }));
+    },
+    fetch: function(fetches, opts) {
+        if(!opts) opts = {};
+        if(typeof fetches == "object" && !Array.isArray(fetches)) fetches = [fetches];
+        var fetchReq = {
+            fetchRectangles: fetches,
+            kind: "fetch",
+            utf16: opts.utf16,
+            array: opts.array,
+            content_only: opts.content_only,
+            concat: opts.concat
+        };
+        w.socket.send(JSON.stringify(fetchReq));
+    },
+    chat: function(message, location, nickname, color) {
+        w.socket.send(JSON.stringify({
+            kind: "chat",
+            nickname: nickname,
+            message: message,
+            location: location,
+            color: color
+        }));
+    },
+    ping: function(returnTime) {
+        var str = "2::";
+        if(returnTime) str += "@";
+        w.socket.send(str);
+    },
+    clear_tile: function(x, y) {
+        w.socket.send(JSON.stringify({
+            kind: "clear_tile",
+            tileX: x,
+            tileY: y
+        }));
+    }
+};
+
 // [tileX, tileY, charX, charY]
 var lastLinkHover = null;
 // [type, tileX, tileY, (charX, charY)]
@@ -3915,6 +4249,7 @@ var lastTileHover = null;
 Object.assign(w, {
     userCount: -1,
     clientId: -1,
+    net: network,
     isLinking: false,
     isProtecting: false,
     url_input: "",
@@ -4378,122 +4713,6 @@ function tile_offset_object(data, tileOffX, tileOffY) {
         data[new_key] = refs[tkp];
     }
 }
-
-var network = {
-    protect: function(position, type) {
-        // position: {tileX, tileY, [charX, charY]}
-        // type: <unprotect, public, member-only, owner-only>
-        var isPrecise = "charX" in position && "charY" in position;
-        var data = {
-            tileX: position.tileX,
-            tileY: position.tileY,
-            type: type == "unprotect" ? void 0 : type
-        };
-        if(isPrecise) {
-            data.charX = position.charX;
-            data.charY = position.charY;
-            if(!("tileX" in position || "tileY" in position)) {
-                data.tileX = Math.floor(data.charX / tileC);
-                data.tileY = Math.floor(data.charY / tileR);
-                data.charX = data.charX - Math.floor(data.charX / tileC) * tileC;
-                data.charY = data.charY - Math.floor(data.charY / tileR) * tileR;
-            }
-            data.precise = true;
-        }
-        w.socket.send(JSON.stringify({
-            kind: "protect",
-            data: data,
-            action: type == "unprotect" ? type : "protect"
-        }));
-    },
-    link: function(position, type, args) {
-        // position: {tileX, tileY, charX, charY}
-        // type: <url, coord>
-        // args: {url} or {x, y}
-        var data = {
-            tileY: position.tileY,
-            tileX: position.tileX,
-            charY: position.charY,
-            charX: position.charX
-        };
-        if(!("tileX" in position || "tileY" in position)) {
-            data.tileX = Math.floor(data.charX / tileC);
-            data.tileY = Math.floor(data.charY / tileR);
-            data.charX = data.charX - Math.floor(data.charX / tileC) * tileC;
-            data.charY = data.charY - Math.floor(data.charY / tileR) * tileR;
-        }
-        if(type == "url") {
-            data.url = args.url;
-        } else if(type == "coord") {
-            data.link_tileX = args.x;
-            data.link_tileY = args.y;
-        }
-        w.socket.send(JSON.stringify({
-            kind: "link",
-            data: data,
-            type: type
-        }));
-    },
-    cmd: function(data, include_username) {
-        w.socket.send(JSON.stringify({
-            kind: "cmd",
-            data: data, // maximum length of 2048
-            include_username: include_username
-        }));
-    },
-    cmd_opt: function() {
-        w.socket.send(JSON.stringify({
-            kind: "cmd_opt"
-        }));
-    },
-    write: function(edits, opts) {
-        if(!opts) opts = {};
-        w.socket.send(JSON.stringify({
-            kind: "write",
-            edits: edits,
-            public_only: opts.public_only,
-            preserve_links: opts.preserve_links
-        }));
-    },
-    chathistory: function() {
-        w.socket.send(JSON.stringify({
-            kind: "chathistory"
-        }));
-    },
-    fetch: function(fetches, opts) {
-        if(!opts) opts = {};
-        if(typeof fetches == "object" && !Array.isArray(fetches)) fetches = [fetches];
-        w.socket.send(JSON.stringify({
-            fetchRectangles: fetches,
-            kind: "fetch",
-            utf16: opts.utf16,
-            array: opts.array,
-            content_only: opts.content_only,
-            concat: opts.concat
-        }));
-    },
-    chat: function(message, location, nickname, color) {
-        w.socket.send(JSON.stringify({
-            kind: "chat",
-            nickname: nickname,
-            message: message,
-            location: location,
-            color: color
-        }));
-    },
-    ping: function(returnTime) {
-        var str = "2::";
-        if(returnTime) str += "@";
-        w.socket.send(str);
-    },
-    clear_tile: function(x, y) {
-        w.socket.send(JSON.stringify({
-            kind: "clear_tile",
-            tileX: x,
-            tileY: y
-        }));
-    }
-};
 
 var ws_functions = {
     fetch: function(data) {

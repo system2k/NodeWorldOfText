@@ -1,18 +1,19 @@
 var Menu = (function() {
     function Menu(titleEl, menuEl) {
-        var _this = this;
+        var self = this;
         this.titleEl = titleEl;
         this.menuEl = menuEl;
         this._SPEED = 250;
+        this.entries = [];
         this.addOption = function(text, action) {
             var s;
             s = document.createElement("div");
             s.innerText = text;
             s.onclick = function() {
                 action();
-                _this.hideNow();
+                self.hideNow();
             }
-            _this.addEntry(s);
+            self.addEntry(s);
         }
         this.addCheckboxOption = function(text, checkedAction, uncheckedAction, checked) {
             var i, s;
@@ -33,29 +34,29 @@ var Menu = (function() {
                     uncheckedAction();
                 }
             }
-            _this.addEntry(s);
+            self.addEntry(s);
         }
         this.hideNow = function() {
-            slideMenu("up", _this.menuEl, _this._SPEED);
-            _this.titleEl.classList.remove("hover");
+            slideMenu("up", self.menuEl, self._SPEED);
+            self.titleEl.classList.remove("hover");
         }
         this.cancelHide = false;
         this.hide = function() {
-            _this.cancelHide = false;
+            self.cancelHide = false;
             setTimeout((function() {
-                if (!_this.cancelHide) {
-                    _this.hideNow();
+                if (!self.cancelHide) {
+                    self.hideNow();
                 }
             }), 500);
         }
         this.show = function() {
-            _this.cancelHide = true;
-            slideMenu("down", _this.menuEl, _this._SPEED)
-            _this.titleEl.classList.add("hover");
+            self.cancelHide = true;
+            slideMenu("down", self.menuEl, self._SPEED)
+            self.titleEl.classList.add("hover");
         }
         this.addEntry = function(liContents) {
             var newItem;
-            var menuEl = _this.menuEl.children;
+            var menuEl = self.menuEl.children;
             for(var i = 0; i < menuEl.length; i++) {
                 var elm = menuEl[i];
                 if(elm.tagName == "UL") {
@@ -79,11 +80,16 @@ var Menu = (function() {
                 var ch = lcDiv.children;
                 var len = ch.length;
                 for(var r = 0; r < len; r++) {
-                    newItem.appendChild(ch[0]);
+                    var elm = ch[0];
+                    newItem.appendChild(elm);
                 }
             } else {
                 newItem.appendChild(liContents);
             }
+            this.entries.push({
+                element: newItem,
+                content: liContents
+            });
             newItem.onmouseenter = function() {
                 this.classList.add("hover");
             }

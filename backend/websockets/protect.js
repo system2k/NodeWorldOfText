@@ -2,6 +2,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     var modules = vars.modules;
 
     var sData = data.data;
+    var channel = vars.channel;
 
     if(!sData) return;
 
@@ -19,6 +20,7 @@ module.exports = async function(ws, data, send, vars, evars) {
         tileX, tileY,
         charX, charY,
         precise,
-        type
+        type,
+        channel
     }, vars);
 }
