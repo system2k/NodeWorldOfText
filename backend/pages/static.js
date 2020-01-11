@@ -78,7 +78,7 @@ module.exports.GET = async function(req, serve, vars) {
     }
 
     var parse = url.parse(req.url).pathname.substr(1);
-    parse = removeLastSlash(parse);
+    parse = removeLastSlash(parse).toLowerCase();
     var mime_type = mime(parse.replace(/.*[\.\/\\]/, "").toLowerCase());
     if(static_data.hasOwnProperty(parse)) {
         serve(static_data[parse], 200, { mime: mime_type });

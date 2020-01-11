@@ -652,10 +652,10 @@ function load_static() {
     }
     
     console.log("Loading static files...");
-    dump_dir(static_data, static_path, static_path_web, null);
+    dump_dir(static_data, static_path, static_path_web, false, null, true);
 
     console.log("Loading HTML templates...");
-    dump_dir(template_data, templates_path, "", true);
+    dump_dir(template_data, templates_path, "", true, null, true);
 
     // clear swig's cache
     swig.invalidateCache();

@@ -336,16 +336,18 @@ function uptime(custom_ms_ago) {
 }
 
 // recursive directory dumper
-function dump_dir(addr, MP, dsu, po, opt) { // object, file path, web path, path only, options
+function dump_dir(addr, MP, dsu, po, opt, lc) { // object, file path, web path, path only, options, lower case
     if(!opt) opt = {};
     var con = fs.readdirSync(MP)
     for(var i in con) {
-        var currentPath = MP + con[i]
+        var currentPath = MP + con[i];
         if(!fs.lstatSync(currentPath).isDirectory()) {
+            var pname = dsu + con[i];
+            if(lc) pname = pname.toLowerCase();
             if(!po) {
-                addr[dsu + con[i]] = fs.readFileSync(currentPath)
+                addr[pname] = fs.readFileSync(currentPath)
             } else {
-                addr[dsu + con[i]] = currentPath;
+                addr[pname] = currentPath;
             }
         } else {
             // Omitted folder? Cancel scanning folder
