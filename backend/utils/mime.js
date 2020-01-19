@@ -837,7 +837,7 @@ var mime = {
 	"video/quicktime": ["qt", "mov"],
 	"video/webm": ["webm"],
 	"application/wasm": ["wasm"]
-}
+};
 
 module.exports = function(ext) {
 	for(var i in mime) {

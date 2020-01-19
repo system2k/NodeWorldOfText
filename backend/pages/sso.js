@@ -33,7 +33,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var expires = session.expires.getTime();
     
     serve(null, null, {
-        cookie: "token=" + token + "; expires=" + http_time(expires + ms.Year) + "; path=/; HttpOnly;",
+        cookie: "token=" + token + "; expires=" + http_time(expires + ms.year) + "; path=/; HttpOnly;",
         redirect: "/accounts/profile/"
     });
 }

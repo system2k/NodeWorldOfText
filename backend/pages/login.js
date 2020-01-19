@@ -57,7 +57,7 @@ module.exports.POST = async function(req, serve, vars, params) {
     }
 
     var date_now = Date.now();
-    var expires = date_now + ms.Month;
+    var expires = date_now + ms.month;
 
     var sessionid = new_token(32);
     var new_cookie = "sessionid=" + sessionid + "; expires=" + http_time(expires) + "; path=/;";

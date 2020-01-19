@@ -125,6 +125,13 @@ window.addEventListener("load", function() {
     for(var i = 0; i < clientOnload.length; i++) clientOnload[i]();
 });
 
+// on chrome, tiles may not render if tab is not selected
+document.addEventListener("visibilitychange", function() {
+    if(!document.hidden) {
+        w.redraw();
+    }
+});
+
 defineElements({ // elm[<name>]
     loading: byId("loading"),
     coord_Y: byId("coord_Y"),
@@ -667,6 +674,7 @@ var linkAuto = {
     url: "",
     coordTileX: 0,
     coordTileY: 0,
+    lastPos: null,
     active: false
 }
 
@@ -700,14 +708,22 @@ function mousemove_tileProtectAuto() {
         var line = null;
         var absX = tileX * tileC + charX;
         var absY = tileY * tileR + charY;
-        if(tileProtectAuto.lastPos) {
+        if(protectPrecision == 0) {
+            absX = tileX;
+            absY = tileY;
+        }
+        if(lastPos && lastPos[4] == protectPrecision) {
             var labsX = lastPos[0] * tileC + lastPos[2];
             var labsY = lastPos[1] * tileR + lastPos[3];
+            if(protectPrecision == 0) {
+                labsX = lastPos[0];
+                labsY = lastPos[1];
+            }
             line = lineGen(labsX, labsY, absX, absY, 1000);
         } else {
             line = [[absX, absY]];
         }
-        tileProtectAuto.lastPos = [tileX, tileY, charX, charY];
+        tileProtectAuto.lastPos = [tileX, tileY, charX, charY, protectPrecision];
         var updTiles = {};
         for(var i = 0; i < line.length; i++) {
             var chr = line[i];
@@ -717,18 +733,23 @@ function mousemove_tileProtectAuto() {
             var ctileY = Math.floor(y / tileR);
             var ccharX = x - ctileX * tileC;
             var ccharY = y - ctileY * tileR;
-            var mode = tileProtectAuto.mode;
             if(protectPrecision == 0) {
+                ctileX = x;
+                ctileY = y;
+            }
+            var tempTile = tiles[ctileY + "," + ctileX];
+            var mode = tileProtectAuto.mode;
+            if(protectPrecision == 0 && tempTile) {
                 tileProtectAuto.selected[ctileY + "," + ctileX] =
-                    [protectPrecision, mode, tile];
-            } else if(protectPrecision == 1) {
+                    [protectPrecision, mode, tempTile];
+            } else if(protectPrecision == 1 && tempTile) {
                 tileProtectAuto.selected[ctileY + "," + ctileX + "," + ccharY + "," + ccharX] =
-                    [protectPrecision, mode, tile];
+                    [protectPrecision, mode, tempTile];
             }
             var colors = ["red", "green", "blue", "teal"];
             var color = colors[mode];
             if(protectPrecision == 0) {
-                tile.backgroundColor = color;
+                if(tempTile) tempTile.backgroundColor = color;
             } else if(protectPrecision == 1) {
                 colorChar(ctileX, ctileY, ccharX, ccharY, w.protect_bg, true);
             }
@@ -834,13 +855,11 @@ function mousemove_linkAuto() {
     if(!tile) return;
     if(!tile.initted) return;
     
-    var tileX, tileY, charX, charY;
-    
-    tileX = currentPosition[0];
-    tileY = currentPosition[1];
-    
-    charX = currentPosition[2];
-    charY = currentPosition[3];
+    var tileX = currentPosition[0];
+    var tileY = currentPosition[1];
+    var charX = currentPosition[2];
+    var charY = currentPosition[3];
+    var lastPos = linkAuto.lastPos;
     
     var color = "blue";
     if(linkAuto.mode == 1) {
@@ -848,15 +867,43 @@ function mousemove_linkAuto() {
     }
 
     if(linkAuto.ctrlDown) {
-        colorChar(tileX, tileY, charX, charY, color);
-        renderTile(tileX, tileY, true);
-        var ar = [tileX, tileY, charX, charY, linkAuto.mode];
-        if(linkAuto.mode == 0) {
-            ar.push([linkAuto.url])
-        } else if(linkAuto.mode == 1) {
-            ar.push([linkAuto.coordTileX, linkAuto.coordTileY]);
+        var line = null;
+        var absX = tileX * tileC + charX;
+        var absY = tileY * tileR + charY;
+        if(lastPos) {
+            var labsX = lastPos[0] * tileC + lastPos[2];
+            var labsY = lastPos[1] * tileR + lastPos[3];
+            line = lineGen(labsX, labsY, absX, absY, 1000);
+        } else {
+            line = [[absX, absY]];
         }
-        linkAuto.selected[tileY + "," + tileX + "," + charY + "," + charX] = ar;
+        linkAuto.lastPos = [tileX, tileY, charX, charY];
+        var updTiles = {};
+        for(var i = 0; i < line.length; i++) {
+            var chr = line[i];
+            var x = chr[0];
+            var y = chr[1];
+            var ctileX = Math.floor(x / tileC);
+            var ctileY = Math.floor(y / tileR);
+            var ccharX = x - ctileX * tileC;
+            var ccharY = y - ctileY * tileR;
+
+            colorChar(ctileX, ctileY, ccharX, ccharY, color);
+            updTiles[ctileY + "," + ctileX] = 1;
+            var ar = [ctileX, ctileY, ccharX, ccharY, linkAuto.mode];
+            if(linkAuto.mode == 0) {
+                ar.push([linkAuto.url])
+            } else if(linkAuto.mode == 1) {
+                ar.push([linkAuto.coordTileX, linkAuto.coordTileY]);
+            }
+            linkAuto.selected[ctileY + "," + ctileX + "," + ccharY + "," + ccharX] = ar;
+        }
+        for(var i in updTiles) {
+            var pos = i.split(",");
+            var tileX = parseInt(pos[1]);
+            var tileY = parseInt(pos[0]);
+            renderTile(tileX, tileY, true);
+        }
     }
     if(linkAuto.shiftDown) {
         var elm = linkAuto.selected[tileY + "," + tileX + "," + charY + "," + charX];
@@ -922,8 +969,12 @@ function keydown_linkAuto(e) {
         }
         step();
     } else {
+        var ctrlState = linkAuto.ctrlDown;
         linkAuto.ctrlDown = checkKeyPress(e, keyConfig.autoSelect);
         linkAuto.shiftDown = checkKeyPress(e, keyConfig.autoDeselect);
+        if(!ctrlState && linkAuto.ctrlDown) {
+            linkAuto.lastPos = null;
+        }
     }
 }
 document.body.addEventListener("keydown", keydown_linkAuto);
@@ -1143,7 +1194,9 @@ if (!window.WebSocket && window.MozWebSocket) {
 }
 
 function createWsPath() {
-    return "ws" + (window.location.protocol === "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/";
+    var search = window.location.search;
+    if(!search) search = "";
+    return "ws" + (window.location.protocol == "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/" + search;
 }
 var ws_path = createWsPath();
 
@@ -3702,7 +3755,7 @@ function buildMenu() {
     homeLink.href = "/home";
     homeLink.target = "_blank";
     homeLink.innerHTML = "More...&nbsp";
-    homeLinkIcon.src = "/static/Icon_External_Link.png";
+    homeLinkIcon.src = "/static/external_link.png";
     homeLink.appendChild(homeLinkIcon);
     menu.addEntry(homeLink);
     menu.addCheckboxOption(" Show coordinates", function() {
@@ -3993,9 +4046,6 @@ var networkHTTP = {
         } else if(!opts) {
             opts = {};
         }
-        if(typeof callback != "function") {
-            throw "Callback is not a function";
-        }
         var data = {
             edits: JSON.stringify(edits)
         };
@@ -4014,9 +4064,6 @@ var networkHTTP = {
         });
     },
     urllink: function(tileX, tileY, charX, charY, url, callback) {
-        if(typeof callback != "function") {
-            throw "Callback is not a function";
-        }
         ajaxRequest({
             type: "POST",
             url: "/ajax/urllink/",
@@ -4037,9 +4084,6 @@ var networkHTTP = {
         });
     },
     coordlink: function(tileX, tileY, charX, charY, link_tileX, link_tileY, callback) {
-        if(typeof callback != "function") {
-            throw "Callback is not a function";
-        }
         ajaxRequest({
             type: "POST",
             url: "/ajax/coordlink/",
@@ -4062,9 +4106,6 @@ var networkHTTP = {
     },
     protect: function(tileX, tileY, type, callback) {
         // type: unprotect, public, member-only, owner-only
-        if(typeof callback != "function") {
-            throw "Callback is not a function";
-        }
         var data = {
             world: state.worldModel.name,
             tileX: tileX,
@@ -4089,13 +4130,7 @@ var networkHTTP = {
         });
     },
     protectchar: function(tileX, tileY, charX, charY, type, callback) {
-        if(typeof callback != "function") {
-            throw "Callback is not a function";
-        }
         // type: unprotect, public, member-only, owner-only
-        if(typeof callback != "function") {
-            throw "Callback is not a function";
-        }
         var data = {
             world: state.worldModel.name,
             tileX: tileX,

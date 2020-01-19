@@ -1,7 +1,7 @@
 var url = require("url");
 var utils = require("../utils/utils.js");
 var removeLastSlash = utils.removeLastSlash;
-var mime = require("../mime.js");
+var mime = require("../utils/mime.js");
 
 function parseRange(range) {
     if(!range) return false;

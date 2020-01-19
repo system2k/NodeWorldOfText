@@ -37,8 +37,8 @@ function queue_chat_cache(world_id) {
     return new Promise(function(res) {
         chat_cache[world_id].queue.push(function(data) {
             res(data);
-        })
-    })
+        });
+    });
 }
 
 // safely delete the chat cache to free up memory
@@ -165,7 +165,7 @@ function clearChatlog(world_id) {
 async function doUpdateChatLogData() {
     var copy_global_chat_additions = global_chat_additions.slice(0);
     var copy_world_chat_additions = world_chat_additions.slice(0);
-    var copy_chatIsCleared = Object.assign(chatIsCleared, {})
+    var copy_chatIsCleared = Object.assign(chatIsCleared, {});
 
     global_chat_additions = [];
     world_chat_additions = [];
@@ -175,10 +175,10 @@ async function doUpdateChatLogData() {
 
     for(var i in copy_chatIsCleared) {
         var worldId = i;
-        var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId)
+        var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId);
         if(!def_channel) continue;
-        def_channel = def_channel.channel_id
-        await db_ch.run("DELETE FROM entries WHERE channel=?", def_channel)
+        def_channel = def_channel.channel_id;
+        await db_ch.run("DELETE FROM entries WHERE channel=?", def_channel);
     }
 
     for(var i = 0; i < copy_world_chat_additions.length; i++) {
@@ -189,16 +189,16 @@ async function doUpdateChatLogData() {
         var worldName = await db.get("SELECT name FROM world WHERE id=?", worldId);
         if(!worldName) continue;
         worldName = worldName.name;
-        var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId)
+        var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId);
         if(!def_channel) {
             var channelDesc = "Channel - \"" + worldName + "\"";
             if(!worldName) { // "" = front page
-                channelDesc = "Front page channel"
+                channelDesc = "Front page channel";
             }
             var world_channel = await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
-                ["_" + worldName, "{}", channelDesc, Date.now(), worldId])
+                ["_" + worldName, "{}", channelDesc, Date.now(), worldId]);
             var new_def_channel = await db_ch.run("INSERT INTO default_channels VALUES(?, ?)",
-                [world_channel.lastID, worldId])
+                [world_channel.lastID, worldId]);
             def_channel = world_channel.lastID;
         } else {
             def_channel = def_channel.channel_id;
@@ -218,7 +218,7 @@ async function doUpdateChatLogData() {
         /* data.aid = cent.lastID; */
     }
 
-    await db_ch.run("COMMIT")
+    await db_ch.run("COMMIT");
 }
 
 async function updateChatLogData(no_timeout) {

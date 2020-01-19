@@ -20,6 +20,9 @@ module.exports = async function(data, vars) {
 
     var channel = data.channel;
 
+    var properties = JSON.parse(world.properties);
+    var no_log_edits = !!properties.no_log_edits;
+
     var protect_type = void 0;
     if(type == "owner-only") {
         protect_type = 2;
@@ -53,7 +56,7 @@ module.exports = async function(data, vars) {
         tileX, tileY, charX, charY,
         user, world, is_member, is_owner,
         type, precise, protect_type,
-        channel
+        channel, no_log_edits
     });
 
     var resp = await tile_database.editResponse(call_id);

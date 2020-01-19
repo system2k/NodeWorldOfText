@@ -23,16 +23,6 @@ CREATE TABLE "registration_registrationprofile" (
     "activation_key" varchar(40) NOT NULL
 );
 
-CREATE TABLE "edit" (
-    "id" integer NOT NULL PRIMARY KEY,
-    "user_id" integer REFERENCES "auth_user" ("id"),
-    "world_id" integer NOT NULL REFERENCES "world" ("id"),
-    "tileY" integer NOT NULL,
-    "tileX" integer NOT NULL,
-    "time" integer NOT NULL,
-    "content" text NOT NULL
-);
-
 CREATE TABLE "tile" (
     "id" integer NOT NULL PRIMARY KEY,
     "world_id" integer NOT NULL REFERENCES "world" ("id"),

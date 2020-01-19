@@ -149,6 +149,8 @@ module.exports = async function(data, vars, evars) {
         }
     }
 
+    if(!tile_edits.length) return emptyWriteResponse;
+
     // send to tile database manager
     tile_database.write(call_id, tile_database.types.write, {
         date: DateNow,

@@ -772,15 +772,28 @@ function insert_char_at_index(string, char, index) {
     return string.join("");
 }
 
-function html_tag_esc(str, non_breaking_space) {
+function html_tag_esc(str, non_breaking_space, newline_br) {
+    str += "";
     str = str.replace(/\&/g, "&amp;");
-    str = str.replace(/\"/g, "&quot;");
-    str = str.replace(/\'/g, "&#39;");
-    if(non_breaking_space) { // replace spaces with non-breaking space html tags
-        str = str.replace(/\u0020/g, "&nbsp;");
-    }
     str = str.replace(/\</g, "&lt;");
     str = str.replace(/\>/g, "&gt;");
+    str = str.replace(/\0/g, " ");
+    if(newline_br) {
+        str = str.replace(/\r\n/g, "<br>");
+        str = str.replace(/\n/g, "<br>");
+        str = str.replace(/\r/g, "<br>");
+    } else {
+        str = str.replace(/\r/g, " ");
+        str = str.replace(/\n/g, " ");
+    }
+    str = str.replace(/\"/g, "&quot;");
+    str = str.replace(/\'/g, "&#39;");
+    str = str.replace(/\`/g, "&#96;");
+    str = str.replace(/\//g, "&#x2F;");
+    str = str.replace(/\\/g, "&#x5C;");
+    str = str.replace(/\=/g, "&#61;");
+    if(non_breaking_space) str = str.replace(/\u0020/g, "&nbsp;");
+    if(str.indexOf(">") > -1 || str.indexOf("<") > -1) return "";
     return str;
 }
 

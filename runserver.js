@@ -334,7 +334,7 @@ function makePgClient() {
     });
 }
 if(accountSystem == "uvias") {
-    pg.defaults.user = "fp";
+    pg.defaults.user = "owot";
     pg.defaults.host = "/var/run/postgresql";
     pg.defaults.database = "uvias";
     makePgClient();
@@ -1250,16 +1250,17 @@ function command_prompt() {
 }
 
 //Time in milliseconds
-var Second = 1000;
-var Minute = 60000;
-var Hour   = 3600000;
-var Day    = 86400000;
-var Week   = 604800000;
-var Month  = 2628002880;
-var Year   = 31536034560;
-var Decade = 315360345600;
-
-var ms = { Second, Minute, Hour, Day, Week, Month, Year, Decade };
+var ms = {
+    millisecond: 1,
+    second: 1000,
+    minute: 60000,
+    hour: 3600000,
+    day: 86400000,
+    week: 604800000,
+    month: 2629746000,
+    year: 31556952000,
+    decade: 315569520000
+};
 
 var url_regexp = [ // regexp , function/redirect to , options
     [/^favicon\.ico[\/]?$/g, "/static/favicon.png", { no_login: true }],
@@ -1543,7 +1544,7 @@ async function get_user_info(cookies, is_websocket, include_cookies) {
                 if(user_account) {
                     success = true;
                     var session_expire = session.expires.getTime();
-                    var session_halfway = session_expire - (Day * 3.5);
+                    var session_halfway = session_expire - (ms.day * 3.5);
                     if(date >= session_halfway) { // refresh token if it is about to expire
                         var ref_res = await uvias.get("SELECT * FROM accounts.refresh_session($1::bigint, $2::bytea)", [uid, session_id]);
                         if(ref_res) {
@@ -1862,7 +1863,7 @@ async function process_request(req, res) {
                 var no_login = options.no_login;
                 var method = req.method.toUpperCase();
                 var post_data = {};
-                var query_data = querystring.parse(url.parse(req.url).query)
+                var query_data = querystring.parse(url.parse(req.url).query);
                 var cookies = parseCookie(req.headers.cookie);
                 var user;
                 if(no_login) {
@@ -1873,7 +1874,7 @@ async function process_request(req, res) {
                     if(!cookies.csrftoken) {
                         var token = new_token(32)
                         var date = Date.now();
-                        include_cookies.push("csrftoken=" + token + "; expires=" + http_time(date + Year) + "; path=/;");
+                        include_cookies.push("csrftoken=" + token + "; expires=" + http_time(date + ms.year) + "; path=/;");
                         user.csrftoken = token;
                     } else {
                         user.csrftoken = cookies.csrftoken;
@@ -2214,12 +2215,12 @@ async function clear_expired_sessions(no_timeout) {
     await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
     // clear expired registration keys
     await db.each("SELECT id FROM auth_user WHERE is_active=0 AND ? - date_joined >= ? AND (SELECT COUNT(*) FROM registration_registrationprofile WHERE user_id=auth_user.id) > 0",
-        [Date.now(), Day * settings.activation_key_days_expire], async function(data) {
+        [Date.now(), ms.day * settings.activation_key_days_expire], async function(data) {
         var id = data.id;
         await db.run("DELETE FROM registration_registrationprofile WHERE user_id=?", id);
     });
 
-    if(!no_timeout) intv.clearExpiredSessions = setTimeout(clear_expired_sessions, Minute);
+    if(!no_timeout) intv.clearExpiredSessions = setTimeout(clear_expired_sessions, ms.minute);
 }
 
 var client_ips = {};
@@ -2528,7 +2529,7 @@ function can_process_req_kind(lims, kind) {
     return true;
 }
 
-var connections_per_ip = 20;
+var connections_per_ip = 50;
 function can_connect_ip_address(ip) {
     if(!ip_address_conn_limit[ip] || !ip || ip == "0.0.0.0") return true;
     if(ip_address_conn_limit[ip] >= connections_per_ip) return false;
@@ -2593,7 +2594,9 @@ async function manageWebsocketConnection(ws, req) {
     }
     var kindLimits = {};
     try {
-        var location = url.parse(req.url).pathname;
+        var parsedURL = url.parse(req.url);
+        var location = parsedURL.pathname;
+        var search = querystring.parse(parsedURL.query);
         // must be at the top before any async calls (errors would occur before this event declaration)
         ws.on("error", function(err) {
             handle_error(JSON.stringify(process_error_arg(err)));
@@ -2611,8 +2614,8 @@ async function manageWebsocketConnection(ws, req) {
             });
             ws.monitorSocket = true;
             var msCount = 0;
-            wss.clients.forEach(function(ms) {
-                if(ms.monitorSocket) {
+            wss.clients.forEach(function(msock) {
+                if(msock.monitorSocket) {
                     msCount++;
                 }
             });
@@ -2671,11 +2674,43 @@ async function manageWebsocketConnection(ws, req) {
             channel
         });
 
-        if(cookies.hide_user_count == "1") {
+        if(cookies.hide_user_count == "1" || search.hide == "1") {
             ws.hide_user_count = true;
         }
 
-        status = await websockets.Main(ws, world_name, vars);
+        var timemachine = {
+            active: false,
+            time: 0
+        };
+    
+        var tm_check = world_name.split("/")
+        if(tm_check[0] == "accounts" && tm_check[1] == "timemachine" && tm_check[3]) {
+            world_name = tm_check[2];
+            timemachine.active = true;
+        }
+    
+        var world = await world_get_or_create(world_name);
+        if(!world) {
+            return ws.close();
+        }
+    
+        if(timemachine.active && world.owner_id != user.id && !user.superuser) {
+            return ws.close();
+        }
+    
+        var permission = await can_view_world(world, user);
+        if(!permission && !user.superuser) {
+            return ws.close();
+        }
+    
+        if(timemachine.active) {
+            timemachine.time = san_nbr(tm_check[3]);
+    
+            if(timemachine.time < 0) timemachine.time = 0;
+            if(timemachine.time > 1000000) timemachine.time = 1000000;
+        }
+    
+        status = { permission, world, timemachine };
 
         if(typeof status == "string") { // error
             return ws.close();
@@ -2757,8 +2792,11 @@ async function manageWebsocketConnection(ws, req) {
                 return;
             }
             try {
-                // This is a ping
-                if(msg.startsWith("2::")) {
+                if(msg.startsWith("1::") && isTestServer) { // debug statement
+                    console.log(msg.substr(3));
+                    return;
+                }
+                if(msg.startsWith("2::")) { // ping
                     var args = msg.substr(3);
                     var res = {
                         kind: "ping",
@@ -2786,14 +2824,11 @@ async function manageWebsocketConnection(ws, req) {
                 kind += "";
                 kind = kind.toLowerCase();
                 var requestID = null;
-                if(typeof msg.request == "string" || typeof msg.request == "number") {
-                    requestID = msg.request;
-                    if(typeof requestID == "string" && requestID.length > 256) {
-                        requestID = requestID.slice(0, 256);
-                    }
+                if(typeof msg.request == "number") {
+                    requestID = san_nbr(msg.request);
                 }
                 // Begin calling a websocket function for the necessary request
-                if(websockets[kind]) {
+                if(websockets.hasOwnProperty(kind)) {
                     if(!can_process_req_kind(kindLimits, kind)) return;
                     function send(msg) {
                         msg.kind = kind;

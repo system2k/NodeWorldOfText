@@ -1,4 +1,4 @@
-var mime = require("../mime.js");
+var mime = require("../utils/mime.js");
 
 module.exports.GET = async function(req, serve, vars) {
     var HTML = vars.HTML;
