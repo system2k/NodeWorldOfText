@@ -80,7 +80,7 @@ var colorizeLinks          = true;
 var brBlockFill            = false; // render individual dots in braille characters as rectangles
 var tileFetchOffsetX       = 0; // offset added to tile fetching and sending coordinates
 var tileFetchOffsetY       = 0;
-var defaultChatColor       = null; // 24-bit Uint
+var defaultChatColor       = window.localStorage ? parseInt(localStorage.getItem("chatcolor")) : null; // 24-bit Uint
 var ignoreCanvasContext    = true; // ignore canvas context menu when right clicking
 var elementSnapApprox      = 10; // snapping margin for draggable elements
 var mSpecRendering         = true; // render special properties if a certain combining character is included
@@ -2060,8 +2060,8 @@ var char_input_check = setInterval(function() {
                         }
                         index = strPoint;
                         buf = buf.split(",");
-                        var coordTileX = parseInt(buf[0].trim());
-                        var coordTileY = parseInt(buf[1].trim());
+                        var coordTileX = parseFloat(buf[0].trim());
+                        var coordTileY = parseFloat(buf[1].trim());
                         if(Permissions.can_coordlink(state.userModel, state.worldModel)) {
                             linkQueue.push(["coord", cursorCoords[0], cursorCoords[1], cursorCoords[2], cursorCoords[3], coordTileX, coordTileY]);
                         }
@@ -4003,9 +4003,6 @@ var networkHTTP = {
         } else if(!opts) {
             opts = {};
         }
-        if(typeof callback != "function") {
-            throw "Callback is not a function";
-        }
         var temp;
         if(x1 > x2) {
             temp = x1;
@@ -4159,8 +4156,9 @@ var networkHTTP = {
 };
 
 var network = {
+    latestID: 0,
     http: networkHTTP,
-    protect: function(position, type) {
+    protect: function(position, type, callback) {
         // position: {tileX, tileY, [charX, charY]}
         // type: <unprotect, public, member-only, owner-only>
         var isPrecise = "charX" in position && "charY" in position;
@@ -4186,7 +4184,7 @@ var network = {
             action: type == "unprotect" ? type : "protect"
         }));
     },
-    link: function(position, type, args) {
+    link: function(position, type, args, callback) {
         // position: {tileX, tileY, charX, charY}
         // type: <url, coord>
         // args: {url} or {x, y}
@@ -4226,14 +4224,18 @@ var network = {
             kind: "cmd_opt"
         }));
     },
-    write: function(edits, opts) {
+    write: function(edits, opts, callback) {
         if(!opts) opts = {};
-        w.socket.send(JSON.stringify({
+        var writeReq = {
             kind: "write",
             edits: edits,
             public_only: opts.public_only,
             preserve_links: opts.preserve_links
-        }));
+        };
+        if(callback) {
+            writeReq.request = network.latestID++;
+        }
+        w.socket.send(JSON.stringify(writeReq));
     },
     chathistory: function() {
         w.socket.send(JSON.stringify({

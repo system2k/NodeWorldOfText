@@ -46,9 +46,9 @@ module.exports.main = function(vars) {
                 }
             }
         }
-    }, 1000 * 60 * 5);
+    }, 1000 * 60 * 0.5);
 
-    intv.tile_cache_invalidation = setTimeout(function() {
+    intv.tile_cache_invalidation = setInterval(function() {
         try {
             performCacheInvalidation();
         } catch(e) {
@@ -200,15 +200,14 @@ async function loadTileCacheData(world_id, tileX, tileY) {
 var fetch_tile_queue = [];
 // Unique tile id tuple: "world_id,tile_y,_tile_x"
 var tileIterationTempMem = {};
-var tilesPendingDeletion = {}; // tile_tuple -> true
 
-var tileCacheLim = 1000 * 60 * 7;
+var tileCacheLim = 1000 * 60 * 1;
 function performCacheInvalidation() {
     var date = Date.now();
     for(var worldID in memTileCache) {
         for(var tileY in memTileCache[worldID]) {
             for(var tileX in memTileCache[worldID][tileY]) {
-                let tile = memTileCache[worldID][tileY][tileX];
+                var tile = memTileCache[worldID][tileY][tileX];
                 if(tile.props_updated || tile.content_updated || tile.writability_updated) continue;
                 if(date - tile.last_accessed > tileCacheLim) {
                     delete memTileCache[worldID][tileY][tileX];
@@ -222,11 +221,6 @@ function performCacheInvalidation() {
             }
         }
     }
-}
-
-function tileIsPendingDeletion(worldID, tileX, tileY) {
-    var tup = worldID + "," + tileY + "," + tileX;
-    return tup in tilesPendingDeletion;
 }
 
 function lookupTileQueue(tileUID) {
@@ -985,50 +979,43 @@ function asyncWait(ms) {
     });
 }
 
-var loopStarted = false;
+var tileIterationsLoopStarted = false;
 async function beginTileIterationsLoop() {
-    if(loopStarted) return;
-    loopStarted = true;
+    if(tileIterationsLoopStarted) return;
+    tileIterationsLoopStarted = true;
+    var chunkSize = 2048;
     while(true) {
         if(server_exiting) break;
         if(!activeTileIterationsQueue.length) {
-            await asyncWait(50);
-            continue;
+            tileIterationsLoopStarted = false;
+            break;
         }
         var context = activeTileIterationsQueue[tileIterationsIndex];
-        // context: [world obj, call id, type, index, suspended, user obj]
 
-        var chunkSize = 2048;
-        var world = context[0];
-        var callID = context[1];
-        var type = context[2];
-        var suspended = context[4];
-        var user = context[5];
-
-        if(suspended) {
+        if(context.suspended) {
             activeTileIterationsQueue.splice(tileIterationsIndex, 1);
-            IOProgress(callID);
+            IOProgress(context.call_id);
             if(tileIterationsIndex >= activeTileIterationsQueue.length) {
                 tileIterationsIndex = 0;
             }
             continue;
         }
     
-        if(context[3] == 0) {
-            if(type == types.publicclear) {
-                appendToEditLogQueue(0, 0, user.id, "@{\"kind\":\"clear_public\"}", world.id, Date.now());
-            } else if(type == types.eraseworld) {
-                appendToEditLogQueue(0, 0, user.id, "@{\"kind\":\"clear_all\"}", world.id, Date.now());
+        if(context.index == 0) {
+            if(context.type == types.publicclear) {
+                appendToEditLogQueue(0, 0, context.user.id, "@{\"kind\":\"clear_public\"}", context.world.id, Date.now());
+            } else if(context.type == types.eraseworld) {
+                appendToEditLogQueue(0, 0, context.user.id, "@{\"kind\":\"clear_all\"}", context.world.id, Date.now());
             }
         }
 
         var writeQueue = [];
-        if(type == types.publicclear) {
+        if(context.type == types.publicclear) {
             var data = await db.all("SELECT rowid as rowid, content, tileX, tileY, properties, writability FROM tile WHERE world_id=? LIMIT ?,?",
-                [world.id, context[3] * chunkSize, chunkSize]);
+                [context.world.id, context.index * chunkSize, chunkSize]);
             if(!data || data.length == 0) {
                 activeTileIterationsQueue.splice(tileIterationsIndex, 1);
-                IOProgress(callID);
+                IOProgress(context.call_id);
                 if(tileIterationsIndex >= activeTileIterationsQueue.length) {
                     tileIterationsIndex = 0;
                 }
@@ -1040,14 +1027,14 @@ async function beginTileIterationsLoop() {
                 var tileObj = normalize_tile(tile);
                 var tileX = tile.tileX;
                 var tileY = tile.tileY;
-                var dimTile = isTileDIM(world.id, tileX, tileY);
+                var dimTile = isTileDIM(context.world.id, tileX, tileY);
                 if(dimTile) {
                     for(var i = 0; i < dimTile.content.length; i++) {
                         var charX = i % CONST.tileCols;
                         var charY = Math.floor(i / CONST.tileCols);
                         var cellProt = dimTile.prop_char[i];
                         if(cellProt == null) cellProt = dimTile.writability;
-                        if(cellProt == null) cellProt = world.writability;
+                        if(cellProt == null) cellProt = context.world.writability;
                         if(cellProt == 0) {
                             dimTile.content[i] = " ";
                             dimTile.prop_color[i] = 0;
@@ -1065,17 +1052,17 @@ async function beginTileIterationsLoop() {
                     }
                     dimTile.last_accessed = Date.now();
                 } else {
-                    if(lookupTileQueue(world.id + "," + tileX + "," + tileY)) {
+                    if(lookupTileQueue(context.world.id + "," + tileX + "," + tileY)) {
                         continue;
                     }
-                    tileIterationTempMem[world.id + "," + tileY + "," + tileX] = tileObj;
+                    tileIterationTempMem[context.world.id + "," + tileY + "," + tileX] = tileObj;
                     tempTileCache[tileY + "," + tileX] = tileObj;
                     for(var i = 0; i < tileObj.content.length; i++) {
                         var charX = i % CONST.tileCols;
                         var charY = Math.floor(i / CONST.tileCols);
                         var cellProt = tileObj.prop_char[i];
                         if(cellProt == null) cellProt = tileObj.writability;
-                        if(cellProt == null) cellProt = world.writability;
+                        if(cellProt == null) cellProt = context.world.writability;
                         if(cellProt == 0) {
                             tileObj.content[i] = " ";
                             tileObj.prop_color[i] = 0;
@@ -1121,11 +1108,11 @@ async function beginTileIterationsLoop() {
             for(var i in tileIterationTempMem) {
                 delete tileIterationTempMem[i];
             }
-        } else if(type == types.eraseworld) {
-            var data = await db.all("SELECT tileX, tileY FROM tile WHERE world_id=? LIMIT ?,?", [world.id, context[3] * chunkSize, chunkSize]);
+        } else if(context.type == types.eraseworld) {
+            var data = await db.all("SELECT tileX, tileY FROM tile WHERE world_id=? LIMIT ?,?", [context.world.id, context.index * chunkSize, chunkSize]);
             if(!data || data.length == 0) {
                 activeTileIterationsQueue.splice(tileIterationsIndex, 1);
-                IOProgress(callID);
+                IOProgress(context.call_id);
                 if(tileIterationsIndex >= activeTileIterationsQueue.length) {
                     tileIterationsIndex = 0;
                 }
@@ -1136,43 +1123,38 @@ async function beginTileIterationsLoop() {
                 var coords = data[i];
                 var tileX = coords.tileX;
                 var tileY = coords.tileY;
-                if(lookupTileQueue(world.id + "," + tileX + "," + tileY)) {
+                if(lookupTileQueue(context.world.id + "," + tileX + "," + tileY)) {
                     continue;
                 }
-                tilesPendingDeletion[world.id + "," + tileY + "," + tileX] = false;
                 localTiles[tileY + "," + tileX] = 1;
-                writeQueue.push(["DELETE FROM tile WHERE world_id=? AND tileX=? and tileY=?", [world.id, tileX, tileY]]);
+                writeQueue.push(["DELETE FROM tile WHERE world_id=? AND tileX=? and tileY=?", [context.world.id, tileX, tileY]]);
             }
             // begin to delete tiles from memory
             for(var i in localTiles) {
-                var tup = world.id + "," + i;
                 var pos = i.split(",");
                 var tileX = parseInt(pos[1]);
                 var tileY = parseInt(pos[0]);
-                if(tup in tilesPendingDeletion) {
-                    delete tilesPendingDeletion[tup];
-                    var ctile = isTileDIM(world.id, tileX, tileY);
-                    if(!ctile) continue;
-                    ctile.tile_exists = false;
-                    ctile.tile_id = null;
-                    ctile.prop_cell_props = {};
-                    for(var x = 0; x < CONST.tileArea; x++) {
-                        ctile.content[x] = " ";
-                        ctile.prop_char[x] = null;
-                        ctile.prop_color[x] = 0;
-                        ctile.writability = null;
-                    }
-                    ctile.content_updated = true;
-                    ctile.writability_updated = true;
-                    ctile.props_updated = true;
+                var ctile = isTileDIM(context.world.id, tileX, tileY);
+                if(!ctile) continue;
+                ctile.tile_exists = false;
+                ctile.tile_id = null;
+                ctile.prop_cell_props = {};
+                for(var x = 0; x < CONST.tileArea; x++) {
+                    ctile.content[x] = " ";
+                    ctile.prop_char[x] = null;
+                    ctile.prop_color[x] = 0;
+                    ctile.writability = null;
                 }
+                ctile.content_updated = true;
+                ctile.writability_updated = true;
+                ctile.props_updated = true;
             }
             if(writeQueue.length) {
                 await bulkWriteEdits(writeQueue);
             }
         }
     
-        context[3]++;
+        context.index++;
         tileIterationsIndex++;
         if(tileIterationsIndex >= activeTileIterationsQueue.length) {
             tileIterationsIndex = 0;
@@ -1187,8 +1169,15 @@ var activeTileIterationsQueue = [];
 var tileIterationsIndex = 0;
 // interleaved
 function appendToTileIterationsQueue(world, callID, type, user) {
-    activeTileIterationsQueue.push([world, callID, type, 0, false, user]);
-    if(!loopStarted) {
+    activeTileIterationsQueue.push({
+        world,
+        call_id: callID,
+        type,
+        index: 0,
+        suspended: false,
+        user
+    });
+    if(!tileIterationsLoopStarted) {
         beginTileIterationsLoop();
     }
 }
@@ -1208,7 +1197,7 @@ function processTileIteration(call_id, type, data) {
             // if any tile iteration operation is occuring, cancel
             for(var i = 0; i < activeTileIterationsQueue.length; i++) {
                 var queue = activeTileIterationsQueue[i];
-                if(queue[0].id == world.id) {
+                if(queue.world.id == world.id) {
                     IOProgress(call_id);
                     return;
                 }
@@ -1228,9 +1217,9 @@ function processTileIteration(call_id, type, data) {
             // cancel if full-world erasing is in operation. suspend any public clear operation.
             for(var i = 0; i < activeTileIterationsQueue.length; i++) {
                 var queue = activeTileIterationsQueue[i];
-                if(queue[0].id == world.id) {
-                    if(queue[2] == types.publicclear) {
-                        queue[4] = true; // suspended
+                if(queue.world.id == world.id) {
+                    if(queue.type == types.publicclear) {
+                        queue.suspended = true;
                     } else {
                         return IOProgress(call_id);
                     }

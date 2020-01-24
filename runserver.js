@@ -27,9 +27,10 @@ const WebSocket   = require("./lib/ws/ws.js");
 const zip         = require("adm-zip");
 const zlib        = require("zlib");
 
-const chat_mgr   = require("./backend/utils/chat_mgr.js");
-const bin_packet = require("./backend/utils/bin_packet.js");
-const utils      = require("./backend/utils/utils.js");
+const chat_mgr       = require("./backend/utils/chat_mgr.js");
+const bin_packet     = require("./backend/utils/bin_packet.js");
+const utils          = require("./backend/utils/utils.js");
+const parse_textcode = require("./backend/utils/parse_textcode.js");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -71,6 +72,10 @@ var retrieveChatHistory = chat_mgr.retrieveChatHistory;
 var add_to_chatlog      = chat_mgr.add_to_chatlog;
 var clearChatlog        = chat_mgr.clearChatlog;
 var updateChatLogData   = chat_mgr.updateChatLogData;
+
+parse_textcode.initialize({
+    advancedSplit
+});
 
 var gzipEnabled = true;
 
@@ -1379,12 +1384,10 @@ function wait_response_data(req, dispatch, binary_post_data, raise_limit) {
         req.on("data", function(data) {
             if(error) return;
             try {
-                if(data.length <= 250000) { // limit of individual packets
-                    if(binary_post_data) {
-                        queryData = Buffer.concat([queryData, data]);
-                    } else {
-                        queryData += data;
-                    }
+                if(binary_post_data) {
+                    queryData = Buffer.concat([queryData, data]);
+                } else {
+                    queryData += data;
                 }
                 if (queryData.length > sizeLimit) { // hard limit
                     if(binary_post_data) {

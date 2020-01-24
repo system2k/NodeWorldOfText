@@ -152,12 +152,24 @@ var client_commands = {
     },
     chatcolor: function(args) {
         var color = args[0];
-        if(!color) color = "000000";
+        var reset = false;
+        if(!color) {
+            color = "000000";
+            reset = true;
+        }
         if(color.charAt(0) == "#") color = color.substr(1);
         if(!color) color = 0;
-        defaultChatColor = parseInt(color, 16);
-        if(isNaN(color)) color = 0;
-        addChat(null, 0, "user", "[ Server ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(), "Server", false, false, false, null, getDate());
+        if(reset) {
+            localStorage.removeItem("chatcolor");
+            defaultChatColor = null;
+            addChat(null, 0, "user", "[ Server ]", "Reset chat color", "Server", false, false, false, null, getDate());
+        } else {
+            defaultChatColor = parseInt(color, 16);
+            localStorage.setItem("chatcolor", defaultChatColor);
+            if(isNaN(color)) color = 0;
+            addChat(null, 0, "user", "[ Server ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(),
+                "Server", false, false, false, null, getDate());
+        }
     },
     warp: function(args) {
         var address = args[0];
