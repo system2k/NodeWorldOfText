@@ -710,8 +710,8 @@ function advancedSplit(str) {
     return data;
 }
 
-var reg_non_comb = /([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])/g;
-var reg_comb = /([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+)/g;
+var reg_non_comb = /([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])/;
+var reg_comb = /([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+)/;
 
 function change_char_in_array(arr, char, index) {
     if(!char) return false;
@@ -723,53 +723,6 @@ function change_char_in_array(arr, char, index) {
     if(arr[index] == char) return false;
     arr[index] = char;
     return true;
-}
-
-function insert_char_at_index(string, char, index) {
-    string += "";
-    char += "";
-    string = advancedSplit(string);
-    var stringPrev = string.slice(0);
-    char = advancedSplit(char);
-    if(char.length == 0) return string.join("");
-    if(char.length > 1) char = char.slice(0, 1);
-    char = char[0];
-    
-    if(char == "\0") return string.join("");
-    
-    var c1 = /([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])/g;
-
-    var c2 = /([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+)/g;
-
-    var ex1 = char.match(c1);
-    var ex2 = char.match(c2);
-
-    if(ex2 && !ex1) { // combining char without the first char?
-        char = "@";
-    }
-    
-    string[index] = char;
-    
-    string = string.join("");
-    
-    string = advancedSplit(string);
-    
-    for(var i = 0; i < CONST.tileArea; i++) {
-        var char1 = stringPrev[i];
-        var char2 = string[i];
-        
-        if(i == index) continue;
-        if(char1 != char2) {
-            stringPrev[index] = "!";
-            string = stringPrev;
-        }
-    }
-    
-    // make sure content is exactly 128
-    if(string.length > CONST.tileArea) string = string.slice(0, CONST.tileArea);
-    if(string.length < CONST.tileArea) string = string.concat(Array(CONST.tileArea).fill(" ")).slice(0, CONST.tileArea);
-    
-    return string.join("");
 }
 
 function html_tag_esc(str, non_breaking_space, newline_br) {
@@ -833,6 +786,36 @@ function parseAcceptEncoding(str) {
     return res;
 }
 
+function arrayIsEntirely(arr, elm) {
+    for(var i = 0; i < arr.length; i++) {
+        if(arr[i] != elm) return false;
+    }
+    return true;
+}
+
+// convert cached tile object into format client uses
+function normalizeCacheTile(ctile) {
+    if(!ctile.tile_exists && !tile.props_updated && !tile.content_updated && !tile.writability_updated) {
+        return null;
+    }
+    var tile = {
+        content: ctile.content.join(""),
+        properties: {
+            writability: ctile.writability
+        }
+    };
+    if(!arrayIsEntirely(ctile.prop_color, 0)) {
+        tile.properties.color = ctile.prop_color;
+    }
+    if(!arrayIsEntirely(ctile.prop_char, null)) {
+        tile.properties.char = encodeCharProt(ctile.prop_char);
+    }
+    if(Object.keys(ctile.prop_cell_props).length > 0) {
+        tile.properties.cell_props = ctile.prop_cell_props;
+    }
+    return tile;
+}
+
 module.exports = {
     trimHTML,
     create_date,
@@ -860,11 +843,12 @@ module.exports = {
     encodeCharProt,
     decodeCharProt,
     advancedSplit,
-    insert_char_at_index,
     change_char_in_array,
     html_tag_esc,
     sanitize_color,
     fixColors,
     parseAcceptEncoding,
-    dump_dir
-}
+    dump_dir,
+    arrayIsEntirely,
+    normalizeCacheTile
+};

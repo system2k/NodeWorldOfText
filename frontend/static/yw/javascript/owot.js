@@ -80,7 +80,6 @@ var colorizeLinks          = true;
 var brBlockFill            = false; // render individual dots in braille characters as rectangles
 var tileFetchOffsetX       = 0; // offset added to tile fetching and sending coordinates
 var tileFetchOffsetY       = 0;
-var defaultChatColor       = window.localStorage ? parseInt(localStorage.getItem("chatcolor")) : null; // 24-bit Uint
 var ignoreCanvasContext    = true; // ignore canvas context menu when right clicking
 var elementSnapApprox      = 10; // snapping margin for draggable elements
 var mSpecRendering         = true; // render special properties if a certain combining character is included

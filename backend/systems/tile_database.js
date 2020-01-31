@@ -1,7 +1,6 @@
 var db;
 var db_edits;
 var decodeCharProt;
-var insert_char_at_index;
 var handle_error;
 var intv;
 var wss;
@@ -21,7 +20,6 @@ module.exports.main = function(vars) {
     db = vars.db;
     db_edits = vars.db_edits;
     decodeCharProt = vars.decodeCharProt;
-    insert_char_at_index = vars.insert_char_at_index;
     handle_error = vars.handle_error;
     intv = vars.intv;
     wss = vars.wss;
@@ -202,6 +200,7 @@ var fetch_tile_queue = [];
 var tileIterationTempMem = {};
 
 var tileCacheLim = 1000 * 60 * 1;
+// delete all in-memory tiles if they haven't been written to in a while
 function performCacheInvalidation() {
     var date = Date.now();
     for(var worldID in memTileCache) {
@@ -223,6 +222,7 @@ function performCacheInvalidation() {
     }
 }
 
+// determine if a tile is in queue to be loaded
 function lookupTileQueue(tileUID) {
     for(var i = 0; i < fetch_tile_queue.length; i++) {
         if(fetch_tile_queue[i][0] == tileUID) return fetch_tile_queue[i];

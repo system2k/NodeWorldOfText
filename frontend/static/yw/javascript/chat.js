@@ -10,6 +10,13 @@ var chatWriteHistoryIdx  = -1; // location in chat write history
 var serverPingTime       = 0;
 var chatLimitCombChars   = true;
 var chatWriteTmpBuffer   = "";
+var defaultChatColor     = window.localStorage ? parseInt(localStorage.getItem("chatcolor")) : null; // 24-bit Uint
+
+if(isNaN(defaultChatColor)) {
+    defaultChatColor = 0;
+}
+if(defaultChatColor < 0) defaultChatColor = 0;
+if(defaultChatColor > 16777215) defaultChatColor = 16777215;
 
 defineElements({ // elm[<name>]
     chat_window: byId("chat_window"),
@@ -114,7 +121,7 @@ var client_commands = {
         if(newDisplayName) {
             nickChangeMsg = "Set nickname to `" + newDisplayName + "`";
         } else {
-            nickChangeMsg = "Removed nickname";
+            nickChangeMsg = "Nickname reset";
         }
         addChat(null, 0, "user", "[ Server ]", nickChangeMsg, "Server", false, false, false, null, getDate());
     },
@@ -162,7 +169,7 @@ var client_commands = {
         if(reset) {
             localStorage.removeItem("chatcolor");
             defaultChatColor = null;
-            addChat(null, 0, "user", "[ Server ]", "Reset chat color", "Server", false, false, false, null, getDate());
+            addChat(null, 0, "user", "[ Server ]", "Chat color reset", "Server", false, false, false, null, getDate());
         } else {
             defaultChatColor = parseInt(color, 16);
             localStorage.setItem("chatcolor", defaultChatColor);
@@ -202,7 +209,6 @@ var client_commands = {
     }
 }
 
-// Performs send-chat-operation on chatbox
 function sendChat() {
     var chatText = elm.chatbar.value;
     elm.chatbar.value = "";

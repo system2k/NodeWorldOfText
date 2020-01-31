@@ -58,13 +58,14 @@ var TerminalMessage      = utils.TerminalMessage;
 var encodeCharProt       = utils.encodeCharProt;
 var decodeCharProt       = utils.decodeCharProt;
 var advancedSplit        = utils.advancedSplit;
-var insert_char_at_index = utils.insert_char_at_index;
 var change_char_in_array = utils.change_char_in_array;
 var html_tag_esc         = utils.html_tag_esc;
 var sanitize_color       = utils.sanitize_color;
 var fixColors            = utils.fixColors;
 var parseAcceptEncoding  = utils.parseAcceptEncoding;
 var dump_dir             = utils.dump_dir;
+var arrayIsEntirely      = utils.arrayIsEntirely;
+var normalizeCacheTile   = utils.normalizeCacheTile;
 
 var prepare_chat_db     = chat_mgr.prepare_chat_db;
 var init_chat_history   = chat_mgr.init_chat_history;
@@ -1275,9 +1276,10 @@ var url_regexp = [ // regexp , function/redirect to , options
     [/^accounts\/login[\/]?$/g, pages.login],
     [/^accounts\/logout[\/]?$/g, pages.logout],
     [/^accounts\/register[\/]?$/g, pages.register],
+    [/^accounts\/profile$/g, "/accounts/profile/"],
     [/^accounts\/profile[\/]?$/g, pages.profile],
     [/^accounts\/private[\/]?$/g, pages.private],
-    [/^accounts\/configure[\/]?$/g, pages.configure], // for front page configuring
+    [/^accounts\/configure\/$/g, pages.configure], // for front page configuring
     [/^accounts\/configure\/(.*)\/$/g, pages.configure],
     [/^accounts\/member_autocomplete[\/]?$/g, pages.member_autocomplete],
     [/^accounts\/timemachine\/(.*)\/$/g, pages.timemachine],
@@ -2228,7 +2230,6 @@ async function clear_expired_sessions(no_timeout) {
 
 var client_ips = {};
 var closed_client_limit = 1000 * 60 * 60; // 1 hour
-// TODO: some leftover disconnected clients (although rare)
 function setupClearClosedClientsInterval() {
     intv.clear_closed_clients = setInterval(function() {
         var curTime = Date.now();
@@ -2824,7 +2825,7 @@ async function manageWebsocketConnection(ws, req) {
                     return;
                 }
                 var kind = msg.kind;
-                kind += "";
+                if(typeof kind != "string") return;
                 kind = kind.toLowerCase();
                 var requestID = null;
                 if(typeof msg.request == "number") {
@@ -2927,7 +2928,6 @@ var global_data = {
     encodeCharProt,
     decodeCharProt,
     advancedSplit,
-    insert_char_at_index,
     change_char_in_array,
     add_to_chatlog,
     getWorldData,
@@ -2958,7 +2958,9 @@ var global_data = {
     staticIdx_full_buffer,
     static_retrieve_raw_header,
     broadcastMonitorEvent,
-    monitorEventSockets
+    monitorEventSockets,
+    arrayIsEntirely,
+    normalizeCacheTile
 };
 
 async function sysLoad() {

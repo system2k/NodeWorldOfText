@@ -1,52 +1,39 @@
 - script manager scripts stored in localstorage
 - cursor coords in coords bar
 - accept/deny membership requests (blocking included)
-- make time machine easier to use, with a toggle to make it publicly accessible or not
 - Binary format
-- better frontend code
-- Make it usable on phones
 - erase spam from chat
-- tile caching in backend to prevent overloading
 - option to enable or disable javascript links
-- large scale erasing
 - (worlds) change title of page
 - (worlds) change favicon to characters
-- combine sql queries on fetch requests with multiple ranges
-- list of clients on world pages
 - do not receive write updates from far places
 - better crsftoken and csrfmiddlewaretoken utilization
 - rate limit chat based on ip connections [partially implemented, but bad ip system]
-- fix edit signal duplication checking / bulking
-- rate limit if sending way too many edits (probably to the point of server slowing down)
-- admin clearing tools: filter by area protection, url/coord links, etc...
 - links inside telledit
 - garbage collect chat ip limitter object
 - smooth zooming on mobile
-- ourworldoftext.com email domain, if possible at all
-- better Content-Type information
 - DOM rendering mode
-- password recovery via email
-- logging thousands of errors in a short time will make the server non-responsive due to blocking I/O
-- setting to disable chat completely
 - invalid world color syntax causes graphical glitches
 - warning when clicking on urls
 - when zoomed out, client is slow
 - reduced calls for drawImage on tiles
 - multiple custom user roles
 - world owners can delete individual messages in chatbox. admins can delete from global
-- http2 (and ssl on the server's side (not cloudflare's), and redirection to https)
 - menu too big? some scrollbar if longer than screen height
 - language settings?
 - a more memory-efficient server
 - garbage-collect world data objects (objects that store temporary information like a list of clients)
-- option to limit world size
 - cache user sessions to speed up page load times
-- uploading custom CSS for a world
-- rate limit fetch requests
-- superuser feature: option to disable saving new edits to the database, and to allow a range of tiles to have their edits saved in-memory
-- 2-factor authentication
-- world favorites and user profiles with claimed worlds with thumbnail previews of them
 - select an area to move
-- sharing coordinates in chat
-- complete control over edits/chats in the event of a raid or spam attack
-- ability to limit rate/speed of edits and chats
+- owot guest cursors
+- owot momentum
+- checkKeyPatterns
+- world_props complete
+- admin world restore
+- put adm-zip in /lib
+- classic account system :: fix up storing sessions, uses json
+- revise ugly 403 page?
+- race condition world name changing
+- tile offset buffers
+- /warp chatlog
+- owot Mobile Test Pages
