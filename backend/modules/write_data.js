@@ -18,7 +18,7 @@ module.exports = async function(data, vars, evars) {
     var public_only = data.public_only;
     var preserve_links = data.preserve_links;
 
-    var edits_limit = 500;
+    var edits_limit = 512;
     if(user.superuser) {
         edits_limit = 1280;
     }
@@ -157,7 +157,8 @@ module.exports = async function(data, vars, evars) {
         tile_edits,
         user, world, is_owner, is_member,
         can_color_text, public_only, no_log_edits, preserve_links,
-        channel
+        channel,
+        no_update: false
     });
 
     var resp = await tile_database.editResponse(call_id);

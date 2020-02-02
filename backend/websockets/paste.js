@@ -1,5 +1,4 @@
 module.exports = async function(ws, data, send, vars, evars) {
-    return;
     var db = vars.db;
     var user = vars.user;
     var world = vars.world;
@@ -26,15 +25,17 @@ module.exports = async function(ws, data, send, vars, evars) {
 
     var call_id = tile_database.newCallId();
 
+    var is_owner = user.id == world.owner_id || (user.superuser && world.name == "");
+    var is_member = user.stats.member || is_owner || (user.superuser && world.name == "");
+
     tile_database.reserveCallId(call_id);
     tile_database.write(call_id, tile_database.types.paste, {
         world, user,
-        is_owner: user.id == world.owner_id,
-        is_member: user.stats.member,
+        is_owner, is_member,
         tileX, tileY, charX, charY,
         can_color_text: true,
         text
     });
 
-    var resp = await tile_database.editResponse(call_id);
+    await tile_database.editResponse(call_id);
 }

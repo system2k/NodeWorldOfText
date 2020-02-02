@@ -2144,6 +2144,9 @@ var char_input_check = setInterval(function() {
                     if(hCode == "x") {
                         cCol = "000000";
                         index += 2;
+                    } else if(hCode == "X") {
+                        cCol = "-1";
+                        index += 2;
                     } else {
                         var code = hex.indexOf(hCode);
                         if(code > -1) {

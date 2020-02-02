@@ -1,6 +1,8 @@
 var advancedSplit;
+var san_nbr;
 function initialize(vars) {
     advancedSplit = vars.advancedSplit;
+    san_nbr = vars.san_nbr;
 }
 
 function parse(tcode) {
@@ -123,6 +125,9 @@ function parse(tcode) {
                 if(hCode == "x") {
                     cCol = "000000";
                     index += 2;
+                } else if(hCode == "X") {
+                    cCol = "-1";
+                    index += 2;
                 } else {
                     var code = hex.indexOf(hCode);
                     if(code > -1) {
@@ -136,6 +141,9 @@ function parse(tcode) {
         }
         if(doWriteChar) {
             textData.push(chr);
+            pasteColor = san_nbr(pasteColor);
+            if(pasteColor > 16777215) pasteColor = 16777215;
+            if(pasteColor < -1) pasteColor = -1;
             colorData.push(pasteColor);
             charX++;
             if(charX >= CONST.tileCols) {
@@ -143,6 +151,8 @@ function parse(tcode) {
                 tileX++;
             }
             if((chr == "\r" || chr == "\n") && !noNewline) {
+                charX = 0;
+                tileX = 0;
                 charY++;
                 if(charY >= CONST.tileRows) {
                     charY = 0;

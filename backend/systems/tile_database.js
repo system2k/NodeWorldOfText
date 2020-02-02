@@ -12,9 +12,10 @@ var encodeCharProt;
 var advancedSplit;
 var change_char_in_array;
 var memTileCache;
+var parse_textcode;
 
 var server_exiting = false;
-var editlog_cell_props = true;
+var editlog_cell_props = false;
 
 module.exports.main = function(vars) {
     db = vars.db;
@@ -31,6 +32,7 @@ module.exports.main = function(vars) {
     advancedSplit = vars.advancedSplit;
     change_char_in_array = vars.change_char_in_array;
     memTileCache = vars.memTileCache;
+    parse_textcode = vars.parse_textcode;
 
     databaseClock();
 
@@ -251,8 +253,8 @@ function tileWriteEdits(cacheTile, editObj) {
     var accepted = cids[callID][1][0];
     var rejected = cids[callID][1][1];
 
-    var tileY = editArray[0];
-    var tileX = editArray[1];
+    var tileY = san_nbr(editArray[0]);
+    var tileX = san_nbr(editArray[1]);
     var charY = editArray[2];
     var charX = editArray[3];
     var time = editArray[4];
@@ -425,7 +427,6 @@ function tileWriteProtections(cacheTile, editObj) {
     var world = data.user;
     var is_member = data.is_member || (user.superuser && world.name == "");
     var is_owner = data.is_owner || (user.superuser && world.name == "");
-    var type = data.type;
     var precise = data.precise;
     var protect_type = data.protect_type;
 
@@ -607,37 +608,29 @@ function appendToUnloadedTileCache(worldID, tileX, tileY, editData) {
     if(qList) {
         qList[1].push(editData);
     } else {
-        fetch_tile_queue.push([tile_uid, [editData]]);
+        doFetchTile([tile_uid, [editData]]);
     }
 }
 
-async function doShiftTileQueue() {
-    if(!fetch_tile_queue.length) return;
-    var qData = fetch_tile_queue[0];
-    fetch_tile_queue.shift();
-    var tile_uid = qData[0];
-    var pending_edits = qData[1];
+function doFetchTile(queueArray) {
+    fetch_tile_queue.push(queueArray);
+
+    var tile_uid = queueArray[0];
+    var pending_edits = queueArray[1];
 
     var tile_vec3 = tile_uid.split(",");
     var world_id = parseInt(tile_vec3[0]);
     var tile_y = parseInt(tile_vec3[1]);
     var tile_x = parseInt(tile_vec3[2]);
 
-    var tile = await loadTileCacheData(world_id, tile_x, tile_y);
-    addTileMem(world_id, tile_x, tile_y, tile);
-    processTileEdit(world_id, tile_x, tile_y, pending_edits);
-}
-
-var shiftTileQueueBusy = false;
-async function stimulateTileQueue() {
-    if(!fetch_tile_queue.length) return;
-    if(shiftTileQueueBusy) return;
-    shiftTileQueueBusy = true;
-    while(true) {
-        if(!fetch_tile_queue.length) break;
-        await doShiftTileQueue();
-    }
-    shiftTileQueueBusy = false;
+    loadTileCacheData(world_id, tile_x, tile_y).then(function(tile) {
+        var idx = fetch_tile_queue.indexOf(queueArray);
+        if(idx > -1) {
+            fetch_tile_queue.splice(idx, 1);
+        }
+        addTileMem(world_id, tile_x, tile_y, tile);
+        processTileEdit(world_id, tile_x, tile_y, pending_edits);
+    });
 }
 
 function arrayIsEntirely(arr, elm) {
@@ -824,7 +817,7 @@ function processTileIORequest(call_id, type, data) {
                 tileUpdates: {}
             };
             cids[call_id][2] = function() {
-                if(Object.keys(sharedObj.tileUpdates).length > 0) {
+                if(!data.no_update && Object.keys(sharedObj.tileUpdates).length > 0) {
                     var updTile = [];
                     for(var i in sharedObj.tileUpdates) {
                         var pos = i.split(",");
@@ -864,7 +857,6 @@ function processTileIORequest(call_id, type, data) {
                     processTileEdit(world.id, tileX, tileY, [[types.write, edit, data, sharedObj, call_id]]);
                 } else {
                     appendToUnloadedTileCache(world.id, tileX, tileY, [types.write, edit, data, sharedObj, call_id]);
-                    stimulateTileQueue();
                 }
             }
             break;
@@ -881,7 +873,9 @@ function processTileIORequest(call_id, type, data) {
             };
             cids[call_id][2] = function() {
                 if(sharedObj.tile) {
-                    prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
+                    if(!data.no_update) {
+                        prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
+                    }
                     if(!data.no_log_edits && editlog_cell_props) {
                         var linkArch = {
                             kind: "link",
@@ -909,7 +903,6 @@ function processTileIORequest(call_id, type, data) {
                 processTileEdit(world.id, tileX, tileY, [[types.link, data, sharedObj, call_id]]);
             } else {
                 appendToUnloadedTileCache(world.id, tileX, tileY, [types.link, data, sharedObj, call_id]);
-                stimulateTileQueue();
             }
             break;
         case types.protect:
@@ -925,7 +918,9 @@ function processTileIORequest(call_id, type, data) {
             };
             cids[call_id][2] = function() {
                 if(sharedObj.tile) {
-                    prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
+                    if(!data.no_update) {
+                        prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
+                    }
                     if(!data.no_log_edits && editlog_cell_props) {
                         var protArch = {
                             kind: "protect",
@@ -944,7 +939,6 @@ function processTileIORequest(call_id, type, data) {
                 processTileEdit(world.id, tileX, tileY, [[types.protect, data, sharedObj, call_id]]);
             } else {
                 appendToUnloadedTileCache(world.id, tileX, tileY, [types.protect, data, sharedObj, call_id]);
-                stimulateTileQueue();
             }
             break;
         case types.clear:
@@ -967,7 +961,6 @@ function processTileIORequest(call_id, type, data) {
                 processTileEdit(world.id, tileX, tileY, [[types.clear, data, sharedObj, call_id]]);
             } else {
                 appendToUnloadedTileCache(world.id, tileX, tileY, [types.clear, data, sharedObj, call_id]);
-                stimulateTileQueue();
             }
             break;
     }
@@ -1230,6 +1223,162 @@ function processTileIteration(call_id, type, data) {
     }
 }
 
+function coordinateAdd(tileX1, tileY1, charX1, charY1, tileX2, tileY2, charX2, charY2) {
+    return [
+        tileX1 + tileX2 + Math.floor((charX1 + charX2) / 16),
+        tileY1 + tileY2 + Math.floor((charY1 + charY2) / 8),
+        (charX1 + charX2) % 16,
+        (charY1 + charY2) % 8
+    ];
+}
+
+function processComplexRequest(call_id, type, data) {
+    switch(type) {
+        case types.paste:
+            var world = data.world;
+            var user = data.user;
+
+            var is_owner = data.is_owner;
+            var is_member = data.is_member;
+            var tileX = data.tileX;
+            var tileY = data.tileY;
+            var charX = data.charX;
+            var charY = data.charY;
+            var can_color_text = data.can_color_text;
+            var text = data.text;
+
+            var parsed_text = parse_textcode.parse(text);
+            var promiseList = [];
+            var modifiedTiles = {};
+
+            var editList = [];
+            var len = parsed_text.text.length;
+            var text = parsed_text.text;
+            var color = parsed_text.color;
+            var cur_tileX = tileX;
+            var cur_tileY = tileY;
+            var cur_charX = charX;
+            var cur_charY = charY;
+            var date = Date.now();
+            var editIdx = 1;
+            for(var x = 0; x < len; x++) {
+                var chr = text[x];
+                var col = color[x];
+                if(chr != "\n" && chr != "\r") {
+                    if(chr.length > 0) {
+                        modifiedTiles[cur_tileY + "," + cur_tileX] = 1;
+                        editList.push([cur_tileY, cur_tileX, cur_charY, cur_charX, date, chr, editIdx++, col]);
+                    }
+                    cur_charX++;
+                    if(cur_charX >= CONST.tileCols) {
+                        cur_charX = 0;
+                        cur_tileX++;
+                    }
+                } else {
+                    cur_tileX = tileX;
+                    cur_charX = charX;
+                    cur_charY++;
+                    if(cur_charY >= CONST.tileRows) {
+                        cur_charY = 0;
+                        cur_tileY++;
+                    }
+                }
+            }
+
+            var writeCallID = module.exports.newCallId();
+            module.exports.reserveCallId(writeCallID);
+            module.exports.write(writeCallID, types.write, {
+                date,
+                tile_edits: editList,
+                user, world, is_owner, is_member,
+                can_color_text,
+                public_only: false,
+                no_log_edits: false,
+                preserve_links: false,
+                channel: "00000000000000",
+                no_update: true
+            });
+            promiseList.push(module.exports.editResponse(writeCallID));
+
+            for(var i = 0; i < parsed_text.prot.length; i++) {
+                var prot = parsed_text.prot[i];
+                var pcid = module.exports.newCallId();
+                module.exports.reserveCallId(pcid);
+                modifiedTiles[prot[2] + "," + prot[1]] = 1;
+                var pos = coordinateAdd(tileX, tileY, charX, charY, prot[1], prot[2], prot[3], prot[4]);
+                module.exports.write(pcid, types.protect, {
+                    tileX: san_nbr(pos[0]),
+                    tileY: san_nbr(pos[1]),
+                    charX: pos[2],
+                    charY: pos[3],
+                    user, world, is_member, is_owner,
+                    precise: true,
+                    protect_type: prot[0],
+                    channel: "00000000000000",
+                    no_log_edits: false,
+                    no_update: true
+                });
+                promiseList.push(module.exports.editResponse(pcid));
+            }
+
+            for(var i = 0; i < parsed_text.link.length; i++) {
+                var link = parsed_text.link[i];
+                var pcid = module.exports.newCallId();
+                module.exports.reserveCallId(pcid);
+                modifiedTiles[link[2] + "," + link[1]] = 1;
+                var pos = coordinateAdd(tileX, tileY, charX, charY, link[1], link[2], link[3], link[4]);
+                var l_type = link[0];
+                var l_url = void 0;
+                var l_link_tileX = void 0;
+                var l_link_tileY = void 0;
+                if(l_type == "url") {
+                    l_url = link[5];
+                } else if(l_type == "coord") {
+                    l_link_tileX = link[5];
+                    l_link_tileY = link[6];
+                }
+                module.exports.write(pcid, types.link, {
+                    tileX: san_nbr(pos[0]),
+                    tileY: san_nbr(pos[1]),
+                    charX: pos[2],
+                    charY: pos[3],
+                    user, world, is_member, is_owner,
+                    type: l_type,
+                    url: l_url,
+                    link_tileX: l_link_tileX,
+                    link_tileY: l_link_tileY,
+                    channel: "00000000000000",
+                    no_log_edits: false,
+                    no_update: true
+                });
+                promiseList.push(module.exports.editResponse(pcid));
+            }
+
+            Promise.all(promiseList).then(function(e) {
+                var updatedTiles = [];
+                for(var coord in modifiedTiles) {
+                    var pos = coord.split(",");
+                    var tileY = parseInt(pos[0]);
+                    var tileX = parseInt(pos[1]);
+                    var dimTile = isTileDIM(world.id, tileX, tileY);
+                    if(!dimTile) continue;
+                    updatedTiles.push({
+                        tileX,
+                        tileY,
+                        tile: dimTile
+                    });
+                }
+                if(updatedTiles.length > 0) {
+                    prepareTileUpdateMessage(updatedTiles, world, "00000000000000");
+                }
+                IOProgress(call_id);
+            }).catch(function(e) {
+                handle_error(e);
+                IOProgress(call_id);
+            });
+    }
+}
+
 module.exports.editResponse = async function(id) {
     return new Promise(function(res) {
         if(!cids[id]) {
@@ -1266,6 +1415,7 @@ module.exports.write = function(call_id, type, data) {
             processTileIteration(call_id, type, data);
             break;
         case types.paste:
+            processComplexRequest(call_id, type, data);
             break;
         default:
             break;

@@ -15,6 +15,12 @@
     "accountSystem": "local",
     "uvias_custom_css_file_path": "",
 
+    "pg_db": {
+        "user": "",
+        "host": "",
+        "database": ""
+    },
+
     "error_log": true,
 
     "FILES_PATH": "../data/files",

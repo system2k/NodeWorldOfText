@@ -75,7 +75,8 @@ var clearChatlog        = chat_mgr.clearChatlog;
 var updateChatLogData   = chat_mgr.updateChatLogData;
 
 parse_textcode.initialize({
-    advancedSplit
+    advancedSplit,
+    san_nbr
 });
 
 var gzipEnabled = true;
@@ -340,9 +341,9 @@ function makePgClient() {
     });
 }
 if(accountSystem == "uvias") {
-    pg.defaults.user = "owot";
-    pg.defaults.host = "/var/run/postgresql";
-    pg.defaults.database = "uvias";
+    pg.defaults.user = settings.pg_db.user || "owot";
+    pg.defaults.host = settings.pg_db.host || "/var/run/postgresql";
+    pg.defaults.database = settings.pg_db.database || "uvias";
     makePgClient();
 }
 
@@ -2960,7 +2961,8 @@ var global_data = {
     broadcastMonitorEvent,
     monitorEventSockets,
     arrayIsEntirely,
-    normalizeCacheTile
+    normalizeCacheTile,
+    parse_textcode
 };
 
 async function sysLoad() {
