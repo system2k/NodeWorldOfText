@@ -85,7 +85,7 @@ function maintenanceMode() {
             var text = "<html>" +
                 "<head><title>Maintenance</title></head>" +
                 "<span>Our World Of Text is currently down for maintenance.</span><br>" +
-                "<span>Maintenance has been started on " + timeStr + "</span>"
+                "<span>Maintenance has been started on " + timeStr + "</span>" +
             "</html>";
             res.write(text);
             res.end();

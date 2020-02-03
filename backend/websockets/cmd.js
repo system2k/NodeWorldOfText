@@ -14,16 +14,16 @@ module.exports = async function(ws, data, send, vars, evars) {
     var second = Math.floor(msNow / 1000);
     var commandsEverySecond = 192;
 
-    if(ws.lastCmdSecond != second) {
-        ws.lastCmdSecond = second;
-        ws.cmdsSentInSecond = 0;
+    if(ws.sdata.lastCmdSecond != second) {
+        ws.sdata.lastCmdSecond = second;
+        ws.sdata.cmdsSentInSecond = 0;
     } else {
-        if(ws.cmdsSentInSecond >= commandsEverySecond) {
+        if(ws.sdata.cmdsSentInSecond >= commandsEverySecond) {
             if(!user.operator) {
                 return;
             }
         } else {
-            ws.cmdsSentInSecond++;
+            ws.sdata.cmdsSentInSecond++;
         }
     }
 
@@ -49,10 +49,10 @@ module.exports = async function(ws, data, send, vars, evars) {
     data = JSON.stringify(cdata);
     
     wss.clients.forEach(function(client) {
-        if(!client.userClient) return;
+        if(!client.sdata.userClient) return;
         try {
-            if(client.readyState == 1 && NCaseCompare(client.world_name, world.name)) {
-                if(!client.handleCmdSockets) return;
+            if(client.readyState == 1 && NCaseCompare(client.sdata.world_name, world.name)) {
+                if(!client.sdata.handleCmdSockets) return;
                 client.send(data);
             }
         } catch(e) {}

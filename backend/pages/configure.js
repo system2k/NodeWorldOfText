@@ -244,18 +244,18 @@ module.exports.POST = async function(req, serve, vars) {
         var readability = validatePerms(post_data.readability, 2);
         var writability = validatePerms(post_data.writability, 2);
         wss.clients.forEach(function(e) {
-            if(!e.userClient) return;
-            if(e.world.id == world.id) {
-                if(readability == 1 && !e.is_member && !e.is_owner) {
+            if(!e.sdata.userClient) return;
+            if(e.sdata.world.id == world.id) {
+                if(readability == 1 && !e.sdata.is_member && !e.sdata.is_owner) {
                     e.close();
                     return;
                 }
-                if(readability == 2 && !e.is_owner) {
+                if(readability == 2 && !e.sdata.is_owner) {
                     e.close();
                     return;
                 }
-                e.world.writability = writability;
-                e.world.readability = readability;
+                e.sdata.world.writability = writability;
+                e.sdata.world.readability = readability;
             }
         });
         await db.run("UPDATE world SET (readability,writability)=(?,?) WHERE id=?",
@@ -300,11 +300,11 @@ module.exports.POST = async function(req, serve, vars) {
         }
         if(id_to_remove) {
             wss.clients.forEach(function(e) {
-                if(!e.userClient) return;
-                if(e.user.id == id_to_remove) {
-                    if(!e.is_owner) {
-                        e.is_member = false;
-                        e.user.stats.member = false;
+                if(!e.sdata.userClient) return;
+                if(e.sdata.user.id == id_to_remove) {
+                    if(!e.sdata.is_owner) {
+                        e.sdata.is_member = false;
+                        e.sdata.user.stats.member = false;
                     }
                 }
             });
@@ -330,15 +330,15 @@ module.exports.POST = async function(req, serve, vars) {
         // update properties in cached world objects for all clients
         var newProps = JSON.stringify(properties);
         wss.clients.forEach(function(e) {
-            if(!e.userClient) return;
-            if(e.world_id == world.id) {
-                e.world.properties = newProps;
-                e.world.feature_go_to_coord = go_to_coord;
-                e.world.feature_membertiles_addremove = membertiles_addremove;
-                e.world.feature_paste = paste;
-                e.world.feature_coord_link = coord_link;
-                e.world.feature_url_link = url_link;
-                e.chat_permission = chat;
+            if(!e.sdata.userClient) return;
+            if(e.sdata.world_id == world.id) {
+                e.sdata.world.properties = newProps;
+                e.sdata.world.feature_go_to_coord = go_to_coord;
+                e.sdata.world.feature_membertiles_addremove = membertiles_addremove;
+                e.sdata.world.feature_paste = paste;
+                e.sdata.world.feature_coord_link = coord_link;
+                e.sdata.world.feature_url_link = url_link;
+                e.sdata.chat_permission = chat;
             }
         });
         await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link,properties)=(?,?,?,?,?,?) WHERE id=?",
@@ -509,9 +509,9 @@ module.exports.POST = async function(req, serve, vars) {
 
         var newProps = JSON.stringify(properties);
         wss.clients.forEach(function(e) {
-            if(!e.userClient) return;
-            if(e.world_id == world.id) {
-                e.world.properties = newProps;
+            if(!e.sdata.userClient) return;
+            if(e.sdata.world_id == world.id) {
+                e.sdata.world.properties = newProps;
             }
         });
         if(properties_updated) {
@@ -523,12 +523,12 @@ module.exports.POST = async function(req, serve, vars) {
             await db.run("UPDATE world SET owner_id=null WHERE id=?", world.id);
             if(id_to_remove) {
                 wss.clients.forEach(function(e) {
-                    if(!e.userClient) return;
-                    if(e.user.id == user.id) {
-                        e.is_owner = false;
-                        e.is_member = false;
-                        e.user.stats.owner = false;
-                        e.user.stats.member = false;
+                    if(!e.sdata.userClient) return;
+                    if(e.sdata.user.id == user.id) {
+                        e.sdata.is_owner = false;
+                        e.sdata.is_member = false;
+                        e.sdata.user.stats.owner = false;
+                        e.sdata.user.stats.member = false;
                     }
                 });
             }

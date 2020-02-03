@@ -67,7 +67,7 @@ module.exports = async function(data, vars, evars) {
     }
 
     if(evars && evars.ws && vars.monitorEventSockets.length) {
-        vars.broadcastMonitorEvent(evars.ws.ipAddress + ", [" + evars.ws.clientId + ", '" + vars.channel + "'] sent 'write' on world ['" + world.name + "', " + world.id + "]. " + tileCount + " modified tiles, " + total_edits + " edits");
+        vars.broadcastMonitorEvent(evars.ws.sdata.ipAddress + ", [" + evars.ws.sdata.clientId + ", '" + vars.channel + "'] sent 'write' on world ['" + world.name + "', " + world.id + "]. " + tileCount + " modified tiles, " + total_edits + " edits");
     }
 
     var call_id = tile_database.newCallId();

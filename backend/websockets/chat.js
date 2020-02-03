@@ -49,7 +49,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     var ranks_cache = vars.ranks_cache;
     var accountSystem = vars.accountSystem;
 
-    var ipHeaderAddr = ws.ipAddress;
+    var ipHeaderAddr = ws.sdata.ipAddress;
 
     var props = JSON.parse(world.properties);
     var chat_perm = props.chat_permission;
@@ -308,16 +308,16 @@ module.exports = async function(ws, data, send, vars, evars) {
             var res = "Clients:<br><div style=\"background-color: #C0C0C0\">";
             var clientsFound = 0;
             wss.clients.forEach(function(ws) {
-                if(!ws.userClient) return;
+                if(!ws.sdata.userClient) return;
                 if(data.location == "page") {
-                    if(ws.world_id == world.id) {
+                    if(ws.sdata.world_id == world.id) {
                         if(clientsFound != 0) res += "<br>";
-                        res += "[" + ws.clientId + "] " + ws.ipAddress;
+                        res += "[" + ws.sdata.clientId + "] " + ws.sdata.ipAddress;
                         clientsFound++;
                     }
                 } else if(data.location == "global") {
                     if(clientsFound != 0) res += "<br>";
-                    res += "[id: " + ws.clientId + ", world: " + ws.world_id + "] " + ws.ipAddress;
+                    res += "[id: " + ws.sdata.clientId + ", world: " + ws.sdata.world_id + "] " + ws.sdata.ipAddress;
                     clientsFound++;
                 }
             });
@@ -345,8 +345,8 @@ module.exports = async function(ws, data, send, vars, evars) {
             var clientFound = false;
             wss.clients.forEach(function(ws) {
                 if(clientFound) return;
-                if(!ws.userClient) return;
-                if(ws.clientId == id && ws.world.id == world.id && ws.can_chat) {
+                if(!ws.sdata.userClient) return;
+                if(ws.sdata.clientId == id && ws.sdata.world.id == world.id && ws.sdata.can_chat) {
                     clientFound = true;
                     var privateMessage = {
                         nickname: nick,
@@ -371,7 +371,7 @@ module.exports = async function(ws, data, send, vars, evars) {
                     send({
                         nickname: "",
                         realUsername: "",
-                        id: ws.clientId,
+                        id: ws.sdata.clientId,
                         message: message,
                         registered: false,
                         location: data.location,

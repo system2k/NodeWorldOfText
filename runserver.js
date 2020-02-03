@@ -2173,8 +2173,8 @@ function generateClientId(world, world_id) {
 function getUserCountFromWorld(world) {
     var counter = 0;
     wss.clients.forEach(function(ws) {
-        if(!ws.userClient) return;
-        var user_world = ws.world_name;
+        if(!ws.sdata.userClient) return;
+        var user_world = ws.sdata.world_name;
         if(NCaseCompare(user_world, world)) {
             counter++;
         }
@@ -2368,16 +2368,16 @@ async function initialize_server_components() {
         if(!opts) opts = {};
         data = JSON.stringify(data);
         wss.clients.forEach(function each(client) {
-            if(!client.userClient) return;
+            if(!client.sdata.userClient) return;
             try {
                 if(client.readyState == WebSocket.OPEN &&
-                world == void 0 || NCaseCompare(client.world_name, world)) {
+                world == void 0 || NCaseCompare(client.sdata.world_name, world)) {
                     if(opts.isChat) {
-                        if(opts.chat_perm == -1) opts.chat_perm = client.chat_permission;
-                        if(opts.chat_perm == 1) if(!(client.is_member || client.is_owner)) return;
-                        if(opts.chat_perm == 2) if(!client.is_owner) return;
-                        if(client.chat_blocks && (client.chat_blocks.indexOf(opts.clientId) > -1 ||
-                            ((client.chat_blocks.indexOf("*") > -1) && opts.clientId != 0))) return;
+                        if(opts.chat_perm == -1) opts.chat_perm = client.sdata.chat_permission;
+                        if(opts.chat_perm == 1) if(!(client.sdata.is_member || client.sdata.is_owner)) return;
+                        if(opts.chat_perm == 2) if(!client.sdata.is_owner) return;
+                        if(client.sdata.chat_blocks && (client.sdata.chat_blocks.indexOf(opts.clientId) > -1 ||
+                            ((client.sdata.chat_blocks.indexOf("*") > -1) && opts.clientId != 0))) return;
                     }
                     client.send(data);
                 }
@@ -2558,19 +2558,20 @@ async function manageWebsocketConnection(ws, req) {
     if(!serverLoaded) await waitForServerLoad();
     if(isStopping) return;
     var socketTerminated = false;
+    ws.sdata = {};
     try {
         var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
         var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
         var remIp = req.socket.remoteAddress;
         var evalIp = evaluateIpAddress(remIp, realIp, cfIp);
-        ws.ipAddress = evalIp[0];
-        ws.ipAddressFam = evalIp[1];
+        ws.sdata.ipAddress = evalIp[0];
+        ws.sdata.ipAddressFam = evalIp[1];
     } catch(e) {
-        ws.ipAddress = "0.0.0.0";
-        ws.ipAddressFam = 4;
+        ws.sdata.ipAddress = "0.0.0.0";
+        ws.sdata.ipAddressFam = 4;
         handle_error(e);
     }
-    if(!can_connect_ip_address(ws.ipAddress)) {
+    if(!can_connect_ip_address(ws.sdata.ipAddress)) {
         try {
             ws.send(JSON.stringify({
                 kind: "error",
@@ -2579,7 +2580,7 @@ async function manageWebsocketConnection(ws, req) {
         } catch(e) {}
         return ws.close();
     }
-    add_ip_address_connection(ws.ipAddress);
+    add_ip_address_connection(ws.sdata.ipAddress);
     var reqs_second = 0; // requests received at current second
     var current_second = Math.floor(Date.now() / 1000);
     function can_process_req() { // limit requests per second
@@ -2614,20 +2615,20 @@ async function manageWebsocketConnection(ws, req) {
             }
             sendMonitorEvents(ws);
             ws.on("close", function() {
-                remove_ip_address_connection(ws.ipAddress);
+                remove_ip_address_connection(ws.sdata.ipAddress);
                 removeMonitorEvents(ws);
             });
-            ws.monitorSocket = true;
+            ws.sdata.monitorSocket = true;
             var msCount = 0;
             wss.clients.forEach(function(msock) {
-                if(msock.monitorSocket) {
+                if(msock.sdata.monitorSocket) {
                     msCount++;
                 }
             });
             broadcastMonitorEvent("[Server] " + msCount + " listening sockets, " + monitorEventSockets.length + " listeners");
             return;
         }
-        ws.userClient = true;
+        ws.sdata.userClient = true;
         var pre_queue = [];
         // adds data to a queue. this must be before any async calls and the message event
         function onMessage(msg) {
@@ -2639,7 +2640,7 @@ async function manageWebsocketConnection(ws, req) {
         });
         var status, clientId = void 0, worldObj;
         ws.on("close", function() {
-            remove_ip_address_connection(ws.ipAddress);
+            remove_ip_address_connection(ws.sdata.ipAddress);
             socketTerminated = true;
             if(status && clientId != void 0) {
                 if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
@@ -2647,7 +2648,7 @@ async function manageWebsocketConnection(ws, req) {
                     client_ips[status.world.id][clientId][1] = Date.now();
                 }
             }
-            if(worldObj && !ws.hide_user_count) {
+            if(worldObj && !ws.sdata.hide_user_count) {
                 worldObj.user_count--;
             }
         });
@@ -2669,7 +2670,7 @@ async function manageWebsocketConnection(ws, req) {
             return ws.close();
         }
         
-        ws.world_name = world_name;
+        ws.sdata.world_name = world_name;
 
         var cookies = parseCookie(req.headers.cookie);
         var user = await get_user_info(cookies, true);
@@ -2680,7 +2681,7 @@ async function manageWebsocketConnection(ws, req) {
         });
 
         if(cookies.hide_user_count == "1" || search.hide == "1") {
-            ws.hide_user_count = true;
+            ws.sdata.hide_user_count = true;
         }
 
         var timemachine = {
@@ -2721,7 +2722,7 @@ async function manageWebsocketConnection(ws, req) {
             return ws.close();
         }
 
-        ws.world_id = status.world.id;
+        ws.sdata.world_id = status.world.id;
 
         if(typeof status == "string") {
             send_ws(JSON.stringify({
@@ -2733,19 +2734,19 @@ async function manageWebsocketConnection(ws, req) {
         vars.world = status.world;
         vars.timemachine = status.timemachine;
 
-        ws.world = status.world;
-        ws.user = user;
+        ws.sdata.world = status.world;
+        ws.sdata.user = user;
 
         var properties = JSON.parse(status.world.properties);
         var chat_permission = properties.chat_permission;
         if(!chat_permission) chat_permission = 0;
-        ws.chat_permission = chat_permission;
+        ws.sdata.chat_permission = chat_permission;
 
         var can_chat = chat_permission == 0 || (chat_permission == 1 && status.permission.member) || (chat_permission == 2 && status.permission.owner);
-        ws.can_chat = can_chat;
+        ws.sdata.can_chat = can_chat;
 
         worldObj = getWorldData(world_name);
-        if(!socketTerminated && !ws.hide_user_count) {
+        if(!socketTerminated && !ws.sdata.hide_user_count) {
             worldObj.user_count++;
         }
 
@@ -2756,21 +2757,21 @@ async function manageWebsocketConnection(ws, req) {
 
         user.stats = status.permission;
 
-        ws.is_member = user.stats.member;
-        ws.is_owner = user.stats.owner;
+        ws.sdata.is_member = user.stats.member;
+        ws.sdata.is_owner = user.stats.owner;
 
         clientId = generateClientId(world_name, status.world.id);
 
         if(!client_ips[status.world.id]) {
             client_ips[status.world.id] = {};
         }
-        client_ips[status.world.id][clientId] = [ws.ipAddress, -1, false];
+        client_ips[status.world.id][clientId] = [ws.sdata.ipAddress, -1, false];
 
-        ws.clientId = clientId;
-        ws.chat_blocks = [];
+        ws.sdata.clientId = clientId;
+        ws.sdata.chat_blocks = [];
 
         if(monitorEventSockets.length) {
-            broadcastMonitorEvent(ws.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + vars.world.name + "', " + vars.world.id + "]");
+            broadcastMonitorEvent(ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + vars.world.name + "', " + vars.world.id + "]");
         }
 
         var sentClientId = clientId;
@@ -2846,7 +2847,7 @@ async function manageWebsocketConnection(ws, req) {
                     }
                     var res = await websockets[kind](ws, msg, send, vars, {
                         broadcast,
-                        clientId: ws.clientId,
+                        clientId: ws.sdata.clientId,
                         ws
                     });
                     if(typeof res == "string") {

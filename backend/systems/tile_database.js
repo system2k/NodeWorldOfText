@@ -89,8 +89,8 @@ function prepareTileUpdateMessage(tileObj, worldObj, channel) {
         };
     }
     wss.clients.forEach(function(client) {
-        if(!client.userClient) return;
-        if(client.world_id == worldObj.id && client.readyState == WebSocket.OPEN) {
+        if(!client.sdata.userClient) return;
+        if(client.sdata.world_id == worldObj.id && client.readyState == WebSocket.OPEN) {
             try {
                 client.send(JSON.stringify({
                     channel: channel,
