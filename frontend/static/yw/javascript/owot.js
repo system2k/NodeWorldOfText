@@ -419,6 +419,15 @@ function loadImgPixelData(callback) {
         if(!error) {
             var width = loadImageElm.width;
             var height = loadImageElm.height;
+            // resize background images based on configuration
+            if(img_key == "background") {
+                if(w.backgroundInfo.w) {
+                    width = w.backgroundInfo.w;
+                }
+                if(w.backgroundInfo.h) {
+                    height = w.backgroundInfo.h;
+                }
+            }
             imgToArrayCanvas.width = width;
             imgToArrayCanvas.height = height;
             backImg.drawImage(loadImageElm, 0, 0, width, height);
@@ -4994,5 +5003,19 @@ var ws_functions = {
     },
     cmd: function(data) {
         w.emit("cmd", data);
+    },
+    error: function(data) {
+        var code = data.code;
+        var message = data.message;
+        switch(code) {
+            case "CONN_LIMIT": // too many connections
+            case "INVALID_ADDR": // invalid websocket path
+            case "NO_EXIST": // world does not exist
+            case "NO_PERM": // no permission to access world
+                console.log("Received error from the server with code [" + code + "]: " + message);
+                break;
+            case "PARAM": // invalid parameters in message
+                break;
+        }
     }
 };

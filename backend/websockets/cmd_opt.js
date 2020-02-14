@@ -6,5 +6,5 @@ module.exports = async function(ws, data, send, vars, evars) {
     send({
         kind: "cmd_opt",
         enabled: true
-    })
+    });
 }

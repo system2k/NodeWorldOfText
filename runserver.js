@@ -23,7 +23,7 @@ const querystring = require("querystring");
 const sql         = require("sqlite3");
 const swig        = require("./lib/swig/swig.js");
 const url         = require("url");
-const WebSocket   = require("./lib/ws/ws.js");
+const WebSocket   = require("ws");
 const zip         = require("adm-zip");
 const zlib        = require("zlib");
 
@@ -1668,17 +1668,13 @@ async function can_view_world(world, user) {
     var is_member = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
         [world.id, user.id]);
 
-    // members (and owners) only
+    // member and owner only
     if(world.readability == 1 && !is_member && !is_owner) {
         return false;
     }
 
-    permissions.member = !!is_member; // !! because is_member is not a boolean
+    permissions.member = !!is_member || is_owner;
     permissions.owner = is_owner;
-
-    if(is_owner) {
-        permissions.member = true;
-    }
     
     return permissions;
 }
@@ -2575,6 +2571,7 @@ async function manageWebsocketConnection(ws, req) {
         try {
             ws.send(JSON.stringify({
                 kind: "error",
+                code: "CONN_LIMIT",
                 message: "Too many connections"
             }));
         } catch(e) {}
@@ -2665,6 +2662,7 @@ async function manageWebsocketConnection(ws, req) {
         } else {
             send_ws(JSON.stringify({
                 kind: "error",
+                code: "INVALID_ADDR",
                 message: "Invalid address"
             }));
             return ws.close();
@@ -2695,18 +2693,37 @@ async function manageWebsocketConnection(ws, req) {
             timemachine.active = true;
         }
     
+        var initError = false;
+        var initErrorMessage = "";
+        var initErrorCode = "";
         var world = await world_get_or_create(world_name);
         if(!world) {
-            return ws.close();
+            initError = true;
+            initErrorMessage = "World does not exist";
+            initErrorCode = "NO_EXIST";
         }
     
         if(timemachine.active && world.owner_id != user.id && !user.superuser) {
-            return ws.close();
+            initError = true;
+            initErrorMessage = "No permission to view time machine";
+            initErrorCode = "NO_PERM";
         }
     
         var permission = await can_view_world(world, user);
-        if(!permission && !user.superuser) {
-            return ws.close();
+        if(!permission) {
+            initError = true;
+            initErrorMessage = "No permission";
+            initErrorCode = "NO_PERM";
+        }
+
+        if(initError) {
+            send_ws(JSON.stringify({
+                kind: "error",
+                code: initErrorCode,
+                message: initErrorMessage
+            }));
+            ws.close();
+            return;
         }
     
         if(timemachine.active) {
@@ -2718,19 +2735,8 @@ async function manageWebsocketConnection(ws, req) {
     
         status = { permission, world, timemachine };
 
-        if(typeof status == "string") { // error
-            return ws.close();
-        }
-
         ws.sdata.world_id = status.world.id;
-
-        if(typeof status == "string") {
-            send_ws(JSON.stringify({
-                kind: "error",
-                message: status
-            }));
-            return ws.close();
-        }
+        
         vars.world = status.world;
         vars.timemachine = status.timemachine;
 
@@ -2820,10 +2826,6 @@ async function manageWebsocketConnection(ws, req) {
                     return ws.close();
                 }
                 if(!msg || msg.constructor != Object) {
-                    send_ws(JSON.stringify({
-                        kind: "error",
-                        message: "Invalid_Type"
-                    }));
                     return;
                 }
                 var kind = msg.kind;
@@ -2853,6 +2855,7 @@ async function manageWebsocketConnection(ws, req) {
                     if(typeof res == "string") {
                         send_ws(JSON.stringify({
                             kind: "error",
+                            code: "PARAM",
                             message: res
                         }));
                     }
