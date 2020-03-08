@@ -335,26 +335,39 @@
 				{% endif %}
 				<a href="javascript: showAdvancedMisc();" style="display: block; margin-bottom: 7px;">Advanced...</a>
 				<div id="advanced" style="display: none;">
-					<p>
-						Use square characters
-						<input name="square_chars" type="checkbox"{%if square_chars%} checked{%endif%}>
-					</p>
-					<p>
-						Use 10x20 characters
-						<input name="half_chars" type="checkbox"{%if half_chars%} checked{%endif%}>
-					</p>
-					<p>
+					<div style="background-color: #EEEEEE;">
+						<b>Cell Dimensions</b>
+						<div>
+							Default (10x18)
+							<input type="radio" name="charsize" value="default"{%if !half_chars && !square_chars%} checked{%endif%}>
+						</div>
+						<div>
+							Square (18x18)
+							<input type="radio" name="charsize" value="square"{%if square_chars%} checked{%endif%}>
+						</div>
+						<div>
+							Half (10x20)
+							<input type="radio" name="charsize" value="half"{%if half_chars%} checked{%endif%}>
+						</div>
+						<div>
+							Mixed (18x20)
+							<input type="radio" name="charsize" value="mixed"{%if mixed_chars%} checked{%endif%}>
+						</div>
+					</div>
+					<div style="background-color: #EEEEEE;">
+						<div>
+							<b>Meta Description</b>
+							<br><textarea name="meta_desc" style="width: 400px; height: 32px;" maxlength="600">{{meta_desc}}</textarea>
+						</div>
+					</div>
+					<div>
 						This page is NSFW
-						<input name="nsfw_page" type="checkbox"{%if page_is_nsfw%} checked{%endif%}>
-					</p>
-					<p>
+						<input name="nsfw_page" type="checkbox">
+					</div>
+					<div>
 						Do not log edits
-						<input name="no_log_edits" type="checkbox"{%if no_log_edits%} checked{%endif%}>
-					</p>
-					<p>
-						Meta Description:
-						<br><textarea name="meta_desc" style="width: 400px; height: 32px;" maxlength="600">{% if meta_desc %}{{meta_desc}}{% endif %}</textarea>
-					</p>
+						<input name="no_log_edits" type="checkbox" checked>
+					</div>
 				</div>
 				<input type="hidden" name="form" value="misc">
 				<input type="submit" value="Submit">

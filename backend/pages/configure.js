@@ -110,6 +110,15 @@ module.exports.GET = async function(req, serve, vars, params) {
     var member_color = world.custom_tile_member || "default";
     var menu_color = properties.custom_menu_color || "default";
 
+    var square_chars = !!properties.square_chars;
+    var half_chars = !!properties.half_chars;
+    var mixed_chars = false;
+    if(square_chars && half_chars) {
+        square_chars = false;
+        half_chars = false;
+        mixed_chars = true;
+    }
+
     var data = {
         user,
 
@@ -140,9 +149,10 @@ module.exports.GET = async function(req, serve, vars, params) {
 
         owner_name,
         page_is_nsfw: !!properties.page_is_nsfw,
-        square_chars: !!properties.square_chars,
+        square_chars,
         no_log_edits: !!properties.no_log_edits,
-        half_chars:   !!properties.half_chars,
+        half_chars,
+        mixed_chars,
 
         background_path: ("background" in properties) ? properties.background : "",
         background_x: ("background_x" in properties) ? properties.background_x : "0",
@@ -401,17 +411,9 @@ module.exports.POST = async function(req, serve, vars) {
             properties_updated = true;
             delete properties.page_is_nsfw;
         }
-        if(!("square_chars" in post_data)) {
-            properties_updated = true;
-            delete properties.square_chars;
-        }
         if(!("no_log_edits" in post_data)) {
             properties_updated = true;
             delete properties.no_log_edits;
-        }
-        if(!("half_chars" in post_data)) {
-            properties_updated = true;
-            delete properties.half_chars;
         }
         if(!post_data.meta_desc) {
             properties_updated = true;
@@ -480,17 +482,30 @@ module.exports.POST = async function(req, serve, vars) {
             properties.page_is_nsfw = true;
             properties_updated = true;
         }
-        if("square_chars" in post_data) {
-            properties.square_chars = true;
-            properties_updated = true;
-        }
         if("no_log_edits" in post_data) {
             properties.no_log_edits = true;
             properties_updated = true;
         }
-        if("half_chars" in post_data) {
+        if(post_data.charsize == "default") {
+            properties_updated = true;
+            delete properties.half_chars;
+            delete properties.square_chars;
+        } else if(post_data.charsize == "square") {
+            properties.square_chars = true;
+            delete properties.half_chars;
+            properties_updated = true;
+        } else if(post_data.charsize == "half") {
+            delete properties.square_chars;
             properties.half_chars = true;
             properties_updated = true;
+        } else if(post_data.charsize == "mixed") {
+            properties.square_chars = true;
+            properties.half_chars = true;
+            properties_updated = true;
+        } else {
+            properties_updated = true;
+            delete properties.half_chars;
+            delete properties.square_chars;
         }
         if(post_data.meta_desc) {
             var mdesc = post_data.meta_desc;

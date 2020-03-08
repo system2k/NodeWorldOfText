@@ -253,10 +253,10 @@ function is_cf_ipv6_int(num) {
 ipv4_txt_to_int();
 ipv6_txt_to_int();
 
-function handle_error(e) {
+function handle_error(e, doLog) {
     var str = JSON.stringify(process_error_arg(e));
     log_error(str);
-    if(isTestServer) {
+    if(isTestServer || doLog) {
         console.log("Error:", str);
     }
 }
@@ -332,8 +332,12 @@ function makePgClient() {
     pgConn = new pgClient({
         connectionString: "pg://"
     });
+    console.log("Postgres client connected");
     pgConn.on("end", function() {
         console.log("WARNING: Postgres client is closed");
+        if(!pgConn._connected) { // TODO
+            setTimeout(uvias_init, 1000 * 2);
+        }
     });
     pgConn.on("error", function(err) {
         console.log("ERROR: Postgres client received an error:");

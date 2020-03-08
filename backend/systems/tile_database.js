@@ -630,6 +630,8 @@ function doFetchTile(queueArray) {
         }
         addTileMem(world_id, tile_x, tile_y, tile);
         processTileEdit(world_id, tile_x, tile_y, pending_edits);
+    }).catch(function(e) {
+        handle_error(e);
     });
 }
 
@@ -647,17 +649,21 @@ function appendToEditLogQueue(tileX, tileY, userID, data, worldID, date) {
 
 async function flushBulkWriteQueue() {
     await db.run("BEGIN");
-    var elm = bulkWriteQueue[0];
-    bulkWriteQueue.shift();
-    var edits = elm[0];
-    var response = elm[1];
-    for(var i = 0; i < edits.length; i++) {
-        var command = edits[i];
-        var sql = command[0];
-        var params = command[1];
-        var callback = command[2];
-        var resp = await db.run(sql, params);
-        if(callback) callback(resp);
+    try {
+        var elm = bulkWriteQueue[0];
+        bulkWriteQueue.shift();
+        var edits = elm[0];
+        var response = elm[1];
+        for(var i = 0; i < edits.length; i++) {
+            var command = edits[i];
+            var sql = command[0];
+            var params = command[1];
+            var callback = command[2];
+            var resp = await db.run(sql, params);
+            if(callback) callback(resp);
+        }
+    } catch(e) {
+        handle_error(e, true);
     }
     await db.run("COMMIT");
     bulkWriteBusy = false;
@@ -727,9 +733,9 @@ async function iterateDatabaseChanges() {
                     }
                     writeQueue.push(["INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?, ?)",
                         [worldID, tile.content.join(""), tileY, tileX, JSON.stringify(propObj), tile.writability, Date.now()], function(newTile) {
-                            var lastID = newTile.lastID;
+                            if(!tile) return;
                             tile.tile_exists = true;
-                            tile.tile_id = lastID;
+                            tile.tile_id = newTile.lastID;
                         }]);
                 }
             }
@@ -1387,8 +1393,9 @@ module.exports.editResponse = async function(id) {
         if(cids[id][3] && cids[id][4] >= cids[id][3]) { // I/O is already completed
             res(cids[id][1]);
             if(cids[id][2]) { // completion callback
+                var completion = cids[id][2];
                 cids[id][2] = null;
-                cids[id][2]();
+                if(completion) completion();
             }
             delete cids[id];
         } else {
@@ -1402,7 +1409,7 @@ module.exports.editResponse = async function(id) {
 
 module.exports.write = function(call_id, type, data) {
     switch(type) {
-        case types.nothing:
+        case types.none:
             break;
         case types.write:
         case types.link:
@@ -1433,7 +1440,7 @@ module.exports.newCallId = function() {
 
 var types_enum = 0;
 var types = {
-    nothing: types_enum++,
+    none: types_enum++,
     write: types_enum++,
     link: types_enum++,
     protect: types_enum++,
