@@ -335,9 +335,7 @@ function makePgClient() {
     console.log("Postgres client connected");
     pgConn.on("end", function() {
         console.log("WARNING: Postgres client is closed");
-        if(!pgConn._connected) { // TODO
-            setTimeout(uvias_init, 1000 * 2);
-        }
+        setTimeout(uvias_init, 1000 * 2);
     });
     pgConn.on("error", function(err) {
         console.log("ERROR: Postgres client received an error:");
@@ -348,7 +346,6 @@ if(accountSystem == "uvias") {
     pg.defaults.user = settings.pg_db.user || "owot";
     pg.defaults.host = settings.pg_db.host || "/var/run/postgresql";
     pg.defaults.database = settings.pg_db.database || "uvias";
-    makePgClient();
 }
 
 var uvias = {};
@@ -2272,6 +2269,8 @@ async function uviasSendIdentifier() {
 }
 
 async function uvias_init() {
+    makePgClient();
+
     console.log("Connecting to account database...");
     await pgConn.connect();
     await uviasSendIdentifier();
