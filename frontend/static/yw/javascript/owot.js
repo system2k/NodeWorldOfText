@@ -4032,7 +4032,7 @@ var networkHTTP = {
             max_tileX: x2,
             max_tileY: y2
         };
-        if(opts.public_only) data.public_only = true;
+        if(opts.utf16) data.utf16 = true;
         if(opts.array) data.array = true;
         if(opts.content_only) data.content_only = true;
         if(opts.concat) data.concat = true;
@@ -4057,7 +4057,7 @@ var networkHTTP = {
         var data = {
             edits: JSON.stringify(edits)
         };
-        if(opts.utf16) data.utf16 = true;
+        if(opts.public_only) data.public_only = true;
         if(opts.preserve_links) data.preserve_links = true;
         ajaxRequest({
             type: "POST",
