@@ -1,7 +1,7 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var cookies = vars.cookies;
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var cookies = evars.cookies;
+    var HTML = evars.HTML;
+    var user = evars.user;
 
     if(!user.authenticated) {
         return serve(null, null, {
@@ -17,10 +17,11 @@ module.exports.GET = async function(req, serve, vars, params) {
     serve(HTML("password_change.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars) {
+module.exports.POST = async function(req, serve, vars, evars) {
+    var post_data = evars.post_data;
+    var user = evars.user;
+
     var db = vars.db;
-    var user = vars.user;
-    var post_data = vars.post_data;
     var dispage = vars.dispage;
     var checkHash = vars.checkHash;
     var encryptHash = vars.encryptHash;
@@ -38,19 +39,19 @@ module.exports.POST = async function(req, serve, vars) {
     if(!valid) {
         return await dispage("password_change", {
             error: "Your old password was entered incorrectly. Please enter it again."
-        }, req, serve, vars)
+        }, req, serve, vars, evars);
     }
 
     if(confirm_pass_1 != confirm_pass_2) {
         return await dispage("password_change", {
             error: "The passwords do not match."
-        }, req, serve, vars)
+        }, req, serve, vars, evars);
     }
 
     if(confirm_pass_1.length < 3 || confirm_pass_1.length > 128) {
         return await dispage("password_change", {
             error: "The new password must be 3 - 128 characters."
-        }, req, serve, vars)
+        }, req, serve, vars, evars);
     }
 
     var new_hash = encryptHash(confirm_pass_1);

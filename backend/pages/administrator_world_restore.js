@@ -1,30 +1,31 @@
-module.exports.GET = async function(req, serve, vars) {
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars) {
+    var user = evars.user;
+    var HTML = evars.HTML;
+
     var dispage = vars.dispage;
     var get_third = vars.get_third;
-    var path = vars.path;
     var db = vars.db;
     var filename_sanitize = vars.filename_sanitize;
     var world_get_or_create = vars.world_get_or_create;
-    var HTML = vars.HTML;
 
     if(!user.superuser) {
-        return await dispage("404", null, req, serve, vars)
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     serve(HTML("administrator_world_restore.html"));
 }
 
-module.exports.POST = async function(req, serve, vars) {
+module.exports.POST = async function(req, serve, vars, evars) {
     return;
+    var post_data = evars.post_data;
+    var query_data = evars.query_data;
+    var path = evars.path;
+    var user = evars.user;
+
     var db = vars.db;
-    var post_data = vars.post_data;
-    var user = vars.user;
     var get_third = vars.get_third;
-    var path = vars.path;
     var dispage = vars.dispage;
     var url = vars.url;
-    var query_data = vars.query_data;
     var san_nbr = vars.san_nbr;
     var advancedSplit = vars.advancedSplit;
     var transaction = vars.transaction;

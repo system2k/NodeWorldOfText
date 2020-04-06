@@ -1,11 +1,12 @@
-module.exports.GET = async function(req, serve, vars) {
-    var cookies = vars.cookies;
+module.exports.GET = async function(req, serve, vars, evars) {
+    var cookies = evars.cookies;
+    var query_data = evars.query_data;
+
     var db = vars.db;
     var new_token = vars.new_token;
     var http_time = vars.http_time;
     var accountSystem = vars.accountSystem;
     var uvias = vars.uvias;
-    var query_data = vars.query_data;
     
     var logoutReturn = query_data.return;
     if(accountSystem == "uvias") {

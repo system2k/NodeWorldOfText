@@ -16,31 +16,32 @@ module.exports.startup_internal = function(vars) {
 var wait_ms = 1000 * 60 * 2;
 var time_limits = {};
 
-module.exports.GET = async function(req, serve, vars) {
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars) {
+    var path = evars.path;
+    var user = evars.user;
+
     var dispage = vars.dispage;
     var get_third = vars.get_third;
-    var path = vars.path;
     var db = vars.db;
     var filename_sanitize = vars.filename_sanitize;
     var world_get_or_create = vars.world_get_or_create;
 
-    var world_name = get_third(path, "accounts", "download")
+    var world_name = get_third(path, "accounts", "download");
 
-    var world = await world_get_or_create(world_name)
+    var world = await world_get_or_create(world_name);
     if(!world) {
-        return await dispage("404", null, req, serve, vars)
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     // not a superuser nor owner
     var is_owner = world.owner_id == user.id
     if(!(user.superuser || is_owner)) {
-        return await dispage("404", null, req, serve, vars)
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     if(is_owner && !user.superuser) {
         if(time_limits[user.id]) {
-            return serve("Wait about 2 minutes before downloading again.")
+            return serve("Wait about 2 minutes before downloading again.");
         } else {
             time_limits[user.id] = Date.now();
         }

@@ -10,10 +10,11 @@ function fjoin(ar, str, len) {
     return [s, ar.join("")];
 }
 
-module.exports.GET = async function(req, serve, vars, params) {
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars) {
+    var path = evars.path;
+    var user = evars.user;
+
     var url = vars.url;
-    var path = vars.path;
     var get_third = vars.get_third;
     var db = vars.db;
     var dispage = vars.dispage;
@@ -36,7 +37,7 @@ module.exports.GET = async function(req, serve, vars, params) {
 
     var world = await world_get_or_create(world_name)
     if(!world) {
-        return await dispage("404", null, req, serve, vars)
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     if(world.owner_id != user.id && !user.superuser) {
@@ -46,5 +47,5 @@ module.exports.GET = async function(req, serve, vars, params) {
     return await dispage("yourworld", {
         timemachine: true,
         world: world.name
-    }, req, serve, vars);
+    }, req, serve, vars, evars);
 }

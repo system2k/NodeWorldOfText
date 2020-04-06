@@ -1,11 +1,12 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var HTML = evars.HTML;
+    var user = evars.user;
+
     var dispage = vars.dispage;
     var db_img = vars.db_img;
 
     if(!user.superuser) {
-        return await dispage("404", null, req, serve, vars);
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     var images = await db_img.all("SELECT id, name, date_created, mime, LENGTH(data) AS len FROM images");
@@ -17,10 +18,11 @@ module.exports.GET = async function(req, serve, vars, params) {
     serve(HTML("administrator_backgrounds.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars) {
+module.exports.POST = async function(req, serve, vars, evars) {
+    var post_data = evars.post_data;
+    var user = evars.user;
+
     var db_img = vars.db_img;
-    var post_data = vars.post_data;
-    var user = vars.user;
     var add_background_cache = vars.add_background_cache;
 
     if(!user.superuser) return;

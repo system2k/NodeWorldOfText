@@ -1,6 +1,8 @@
-module.exports.GET = async function(req, serve, vars) {
-    var HTML = vars.HTML;
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars) {
+    var path = evars.path;
+    var user = evars.user;
+    var HTML = evars.HTML;
+
     var website = vars.website;
     var send_email = vars.send_email;
     var template_data = vars.template_data;
@@ -8,7 +10,6 @@ module.exports.GET = async function(req, serve, vars) {
     var db = vars.db;
     var new_token = vars.new_token;
     var get_third = vars.get_third;
-    var path = vars.path;
     var accountSystem = vars.accountSystem;
 
     if(accountSystem == "uvias") {

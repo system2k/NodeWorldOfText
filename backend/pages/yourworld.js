@@ -37,17 +37,18 @@ async function worldViewCommit(no_interval) {
     if(!no_interval) intv.worldViewCommitTimeout = setTimeout(worldViewCommit, 1000 * 5);
 }
 
-module.exports.GET = async function(req, serve, vars, params) {
-    var query_data = vars.query_data;
-    var path = vars.path;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var query_data = evars.query_data;
+    var path = evars.path;
+    var user = evars.user;
+    var redirect = evars.redirect;
+    var HTML = evars.HTML;
+
     var db = vars.db;
-    var redirect = vars.redirect;
-    var user = vars.user;
     var world_get_or_create = vars.world_get_or_create;
     var can_view_world = vars.can_view_world;
     var modules = vars.modules;
     var announcement = vars.announcement();
-    var HTML = vars.HTML;
     var san_nbr = vars.san_nbr;
     var accountSystem = vars.accountSystem;
 
@@ -202,11 +203,12 @@ module.exports.GET = async function(req, serve, vars, params) {
     }
 }
 
-module.exports.POST = async function(req, serve, vars) {
-    var path = vars.path;
+module.exports.POST = async function(req, serve, vars, evars) {
+    var post_data = evars.post_data;
+    var path = evars.path;
+    var user = evars.user;
+
     var db = vars.db;
-    var post_data = vars.post_data;
-    var user = vars.user;
     var modules = vars.modules;
     var world_get_or_create = vars.world_get_or_create;
     var can_view_world = vars.can_view_world;
@@ -228,7 +230,6 @@ module.exports.POST = async function(req, serve, vars) {
         return serve(null, 418);
     }
 
-    vars.user.stats = read_permission;
     var do_write = await modules.write_data({
         edits: edits_parsed
     }, vars);

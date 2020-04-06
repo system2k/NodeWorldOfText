@@ -1,7 +1,8 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var user = vars.user;
-    var path = vars.path;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var path = evars.path;
+    var HTML = evars.HTML;
+    var user = evars.user;
+
     var get_fourth = vars.get_fourth;
     var db = vars.db;
     var dispage = vars.dispage;
@@ -10,7 +11,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var accountSystem = vars.accountSystem;
 
     if(!user.superuser) {
-        return await dispage("404", null, req, serve, vars);
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     var user_id = get_fourth(path, "administrator", "users", "by_id");

@@ -6,9 +6,10 @@ function escape_control(str) {
     return str;
 }
 
-module.exports.GET = async function(req, serve, vars, props) {
+module.exports.GET = async function(req, serve, vars, evars) {
+    var query_data = evars.query_data;
+
     var db = vars.db;
-    var query_data = vars.query_data;
     var uvias = vars.uvias;
     var accountSystem = vars.accountSystem;
 

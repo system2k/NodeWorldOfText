@@ -1,14 +1,15 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var path = evars.path;
+    var HTML = evars.HTML;
+    var user = evars.user;
+
     var dispage = vars.dispage;
     var db = vars.db;
-    var path = vars.path;
     var get_third = vars.get_third;
 
     // not staff
     if(!user.staff) {
-        return await dispage("404", null, req, serve, vars)
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     var script_name = get_third(path, "script_manager", "edit")
@@ -30,12 +31,13 @@ module.exports.GET = async function(req, serve, vars, params) {
     serve(HTML("script_edit.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars) {
+module.exports.POST = async function(req, serve, vars, evars) {
+    var post_data = evars.post_data;
+    var path = evars.path;
+    var user = evars.user;
+
     var db = vars.db;
-    var user = vars.user;
-    var post_data = vars.post_data;
     var dispage = vars.dispage;
-    var path = vars.path;
     var get_third = vars.get_third;
 
     if(!user.staff) {
@@ -84,5 +86,5 @@ module.exports.POST = async function(req, serve, vars) {
     }
     return await dispage("script_edit", {
         message
-    }, req, serve, vars)
+    }, req, serve, vars, evars);
 }

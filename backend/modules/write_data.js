@@ -1,14 +1,16 @@
 var emptyWriteResponse = { accepted: [], rejected: {} };
 
 module.exports = async function(data, vars, evars) {
-    var user = vars.user;
-    var world = vars.world;
+    var user = evars.user;
+    var channel = evars.channel;
+    var world = evars.world;
+
     var san_nbr = vars.san_nbr;
     var advancedSplit = vars.advancedSplit;
     var get_bypass_key = vars.get_bypass_key;
     var tile_database = vars.tile_database;
     var fixColors = vars.fixColors;
-    var channel = vars.channel;
+    var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 
     var bypass_key = get_bypass_key();
     if(!bypass_key) {
@@ -67,7 +69,7 @@ module.exports = async function(data, vars, evars) {
     }
 
     if(evars && evars.ws && vars.monitorEventSockets.length) {
-        vars.broadcastMonitorEvent(evars.ws.sdata.ipAddress + ", [" + evars.ws.sdata.clientId + ", '" + vars.channel + "'] sent 'write' on world ['" + world.name + "', " + world.id + "]. " + tileCount + " modified tiles, " + total_edits + " edits");
+        broadcastMonitorEvent(evars.ws.sdata.ipAddress + ", [" + evars.ws.sdata.clientId + ", '" + vars.channel + "'] sent 'write' on world ['" + world.name + "', " + world.id + "]. " + tileCount + " modified tiles, " + total_edits + " edits");
     }
 
     var call_id = tile_database.newCallId();

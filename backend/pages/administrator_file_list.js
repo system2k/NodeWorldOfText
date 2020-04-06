@@ -1,13 +1,14 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var HTML = evars.HTML;
+    var user = evars.user;
+
     var dispage = vars.dispage;
     var create_date = vars.create_date;
     var staticIdx_full_buffer = vars.staticIdx_full_buffer;
     var static_retrieve_raw_header = vars.static_retrieve_raw_header;
 
     if(!user.superuser) {
-        return await dispage("404", null, req, serve, vars);
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     var buf = await staticIdx_full_buffer();

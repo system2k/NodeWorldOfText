@@ -21,13 +21,14 @@ function parseRange(range) {
     return range;
 }
 
-module.exports.GET = async function(req, serve, vars) {
-    var query_data = vars.query_data;
+module.exports.GET = async function(req, serve, vars, evars) {
+    var query_data = evars.query_data;
+    var HTML = evars.HTML;
+
     var static_data = vars.static_data;
     var static_retrieve = vars.static_retrieve;
     var filename_sanitize = vars.filename_sanitize;
     var http_time = vars.http_time;
-    var HTML = vars.HTML;
 
     var file = query_data.file;
     if(file) {

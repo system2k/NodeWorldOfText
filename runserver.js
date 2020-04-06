@@ -1327,7 +1327,6 @@ var url_regexp = [ // regexp , function/redirect to , options
     [/^other\/backgrounds\/(.*)[\/]?$/g, pages.load_backgrounds, { no_login: true }],
     [/^other\/chat\/(.*)[\/]?$/g, pages.other_chat],
     [/^other\/test\/(.*)[\/]?$/g, pages.other_test, { no_login: true }],
-    [/^other\/forums\/(.*)[\/]?$/g, pages.other_forums, { no_login: true }],
     [/^other\/serverrequeststatus\/(.*)[\/]?$/g, pages.other_serverrequeststatus, { no_login: true }],
     [/^other\/info\/(.*)[\/]?$/g, pages.other_info, { no_login: true }],
     [/^other\/cd\/(.*)[\/]?$/g, pages.other_cd, { no_login: true }],
@@ -1343,11 +1342,11 @@ var url_regexp = [ // regexp , function/redirect to , options
     dispatch page
     usage: this is to be used in the page modules when
     the module wants to dispatch a different page module.
-    EG: return dispage("404", { extra parameters for page }, req, serve, vars, "POST")
+    EG: return dispage("404", { extra parameters for page }, req, serve, vars, evars, "POST")
     (req, serve, and vars should already be defined by the parameters)
     ("POST" is only needed if you need to post something. otherwise, don't include anything)
 */
-async function dispage(page, params, req, serve, vars, method) {
+async function dispage(page, params, req, serve, vars, evars, method) {
     if(!method || !valid_method(method)) {
         method = "GET";
     }
@@ -1358,7 +1357,7 @@ async function dispage(page, params, req, serve, vars, method) {
     if(!vars) {
         vars = {};
     }
-    await pages[page][method](req, serve, vars, params);
+    await pages[page][method](req, serve, vars, evars, params);
 }
 
 // transfer all values from one object to a main object containing all imports
@@ -1644,8 +1643,47 @@ async function world_get_or_create(name, do_not_create, force_create) {
     if(!world) { // world doesn't exist, create it
         if(((name.match(/^([\w\.\-]*)$/g) || is_unclaimable_worldname(name)) && !do_not_create) || force_create) {
             var date = Date.now();
-            var rw = await db.run("INSERT INTO world VALUES(null, ?, null, ?, 2, 0, 0, 0, 0, '', '', '', '', '', '', 0, 0, '{}')",
-                [name, date]);
+            
+            var feature_go_to_coord = 1;
+            var feature_membertiles_addremove = false;
+            var feature_paste = 1;
+            var feature_coord_link = 1;
+            var feature_url_link = 0;
+            var custom_bg = "";
+            var custom_cursor = "";
+            var custom_guest_cursor = "";
+            var custom_color = "";
+            var custom_tile_owner = "";
+            var custom_tile_member = "";
+            var writability = 0;
+            var readability = 0;
+            var properties = JSON.stringify({
+                // default property values. by default, they are not present in the object.
+
+                // views: 0,
+                // chat_permission: 0,
+                // color_text: 0,
+                // custom_menu_color: "",
+                // page_is_nsfw: false,
+                // square_chars: false,
+                // no_log_edits: false,
+                // half_chars: false,
+                // background: "",
+                // background_x: 0,
+                // background_y: 0,
+                // background_w: 0,
+                // background_h: 0,
+                // background_rmod: 0,
+                // background_alpha: 1,
+                // meta_desc: "",
+            });
+
+            var rw = await db.run("INSERT INTO world VALUES(null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+                name, date,
+                feature_go_to_coord, feature_membertiles_addremove, feature_paste, feature_coord_link, feature_url_link,
+                custom_bg, custom_cursor, custom_guest_cursor, custom_color, custom_tile_owner, custom_tile_member,
+                writability, readability, properties
+            ]);
             world = await db.get("SELECT * FROM world WHERE id=?", rw.lastID);
         } else { // special world names that must not be created
             return false;
@@ -1685,7 +1723,9 @@ process.on("uncaughtException", function(e) {
         err = JSON.stringify(process_error_arg(e));
         err = "TIME: " + Date.now() + "\r\n" + err + "\r\n" + "-".repeat(20) + "\r\n\r\n\r\n";
         fs.appendFileSync(settings.UNCAUGHT_PATH, err);
-    } catch(e) {};
+    } catch(e) {
+        console.log("Error while recording uncaught error", e);
+    }
     console.log("Uncaught error:", e);
     process.exit(-1);
 });
@@ -1708,7 +1748,7 @@ function setupHTTPServer() {
             try {
                 err500Temp = template_data["500.html"]();
             } catch(e) {
-                err500Temp = "An error has occurred while displaying the 500 internal server error page";
+                err500Temp = "An error has occurred while generating the error page.";
                 handle_error(e);
             }
             res.end(err500Temp);
@@ -1728,9 +1768,7 @@ function setupHTTPServer() {
 }
 setupHTTPServer();
 
-var csrf_tokens = {}; // all the csrf tokens that were returned to the clients
-
-var valid_subdomains = ["test", "forums", "serverrequeststatus", "info", "chat", "cd", "random_color", "backgrounds"];
+var valid_subdomains = ["test", "serverrequeststatus", "info", "chat", "cd", "random_color", "backgrounds"];
 
 async function process_request(req, res) {
     if(!serverLoaded) await waitForServerLoad();
@@ -1850,9 +1888,6 @@ async function process_request(req, res) {
         });
     }
 
-    var vars = {};
-    var vars_joined = false; // is already joined with global_data?
-
     var found_url = false;
     for(var i in url_regexp) {
         var row = url_regexp[i];
@@ -1890,9 +1925,6 @@ async function process_request(req, res) {
                     });
                     redirected = true;
                 }
-                if(redirected) {
-                    return;
-                }
                 if(method == "POST") {
                     var dat = await wait_response_data(req, dispatch, options.binary_post_data, user.superuser);
                     if(!dat) {
@@ -1919,12 +1951,9 @@ async function process_request(req, res) {
                     data.registerPath = registerPath;
                     data.profilePath = profilePath;
                     data.accountSystem = accountSystem;
-                    // if(data.csrftoken) {
-                    //     csrf_tokens[data.csrftoken] = 1;
-                    // }
                     return template_data[path](data);
                 }
-                vars = objIncludes(global_data, { // extra information
+                /*vars = objIncludes(global_data, { // extra information
                     cookies,
                     post_data,
                     query_data,
@@ -1935,11 +1964,24 @@ async function process_request(req, res) {
                     broadcast: global_data.ws_broadcast,
                     HTML,
                     ipAddress
-                });
-                vars_joined = true;
+                });*/
+                //vars_joined = true;
+                var evars = { // extra information
+                    cookies,
+                    post_data,
+                    query_data,
+                    path: URL_mod,
+                    user,
+                    redirect,
+                    referer: req.headers.referer,
+                    broadcast: global_data.ws_broadcast,
+                    HTML,
+                    ipAddress
+                };
                 if(row[1][method] && valid_method(method)) {
                     // Return the page
-                    await row[1][method](req, dispatch, vars, {});
+                    //await row[1][method](req, dispatch, vars, {});
+                    await row[1][method](req, dispatch, global_data, evars, {});
                 } else {
                     dispatch("Method " + method + " not allowed.", 405);
                 }
@@ -1951,30 +1993,28 @@ async function process_request(req, res) {
             break;
         }
     }
-    if(!vars.user) vars.user = await get_user_info(parseCookie(req.headers.cookie))
-    if(!vars.cookies) vars.cookie = parseCookie(req.headers.cookie);
-    if(!vars.path) vars.path = URL;
-    if(!vars.HTML) {
-        vars.HTML = function (path, data) {
+
+    if(!found_url || !request_resolved) {
+        var evars = {};
+        evars.user = await get_user_info(parseCookie(req.headers.cookie))
+        evars.cookie = parseCookie(req.headers.cookie);
+        evars.path = URL;
+        evars.HTML = function (path, data) {
             if(!template_data[path]) { // template not found
                 return "An unexpected error occurred while generating this page";
             }
             if(!data) {
                 data = {};
             }
-            data.user = vars.user;
+            data.user = evars.user;
             return template_data[path](data);
         }
+
+        return dispage("404", null, req, dispatch, global_data, evars);
     }
 
-    if(!vars_joined) {
-        vars = objIncludes(global_data, vars);
-        vars_joined = true;
-    }
-
-    if(!found_url || !request_resolved) {
-        return dispage("404", null, req, dispatch, vars);
-    }
+    res.writeHead(404);
+    res.end();
 }
 
 async function MODIFY_ANNOUNCEMENT(text) {
@@ -2007,8 +2047,9 @@ function announce(text) {
     })();
 }
 
-async function validate_claim_worldname(worldname, vars, rename_casing, world_id) {
-    var user = vars.user;
+async function validate_claim_worldname(worldname, vars, evars, rename_casing, world_id) {
+    var user = evars.user;
+
     var db = vars.db;
     var world_get_or_create = vars.world_get_or_create;
 
@@ -2676,10 +2717,15 @@ async function manageWebsocketConnection(ws, req) {
         var cookies = parseCookie(req.headers.cookie);
         var user = await get_user_info(cookies, true);
         var channel = new_token(7);
-        var vars = objIncludes(global_data, {
+
+        var vars = global_data;
+        var evars = {
+            user, channel
+        };
+        /*var vars = objIncludes(global_data, {
             user,
             channel
-        });
+        });*/
 
         if(cookies.hide_user_count == "1" || search.hide == "1") {
             ws.sdata.hide_user_count = true;
@@ -2740,8 +2786,8 @@ async function manageWebsocketConnection(ws, req) {
 
         ws.sdata.world_id = status.world.id;
         
-        vars.world = status.world;
-        vars.timemachine = status.timemachine;
+        evars.world = status.world;
+        evars.timemachine = status.timemachine;
 
         ws.sdata.world = status.world;
         ws.sdata.user = user;
@@ -2850,11 +2896,11 @@ async function manageWebsocketConnection(ws, req) {
                         data.source = kind;
                         global_data.ws_broadcast(data, world_name, opts);
                     }
-                    var res = await websockets[kind](ws, msg, send, vars, {
+                    var res = await websockets[kind](ws, msg, send, vars, objIncludes(evars, {
                         broadcast,
                         clientId: ws.sdata.clientId,
                         ws
-                    });
+                    }));
                     if(typeof res == "string") {
                         send_ws(JSON.stringify({
                             kind: "error",

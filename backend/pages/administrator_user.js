@@ -1,7 +1,8 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var user = vars.user;
-    var path = vars.path;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var path = evars.path;
+    var HTML = evars.HTML;
+    var user = evars.user;
+
     var get_third = vars.get_third;
     var db = vars.db;
     var dispage = vars.dispage;
@@ -10,7 +11,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     var accountSystem = vars.accountSystem;
 
     if(!user.operator) {
-        return await dispage("404", null, req, serve, vars);
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     var username = get_third(path, "administrator", "user");
@@ -19,7 +20,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     if(accountSystem == "uvias") {
         var db_user = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
         if(!db_user) {
-            return await dispage("404", null, req, serve, vars);
+            return await dispage("404", null, req, serve, vars, evars);
         }
         var uid = db_user.uid;
         uid = "x" + uid;
@@ -36,7 +37,7 @@ module.exports.GET = async function(req, serve, vars, params) {
     } else if(accountSystem == "local") {
         user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
         if(!user_edit) {
-            return await dispage("404", null, req, serve, vars);
+            return await dispage("404", null, req, serve, vars, evars);
         }
     }
 
@@ -48,13 +49,14 @@ module.exports.GET = async function(req, serve, vars, params) {
     serve(HTML("administrator_user.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars) {
+module.exports.POST = async function(req, serve, vars, evars) {
+    var post_data = evars.post_data;
+    var path = evars.path;
+    var user = evars.user;
+
     var db = vars.db;
     var db_edits = vars.db_edits;
-    var post_data = vars.post_data;
-    var user = vars.user;
     var get_third = vars.get_third;
-    var path = vars.path;
     var dispage = vars.dispage;
     var url = vars.url;
     var uvias = vars.uvias;
@@ -91,7 +93,7 @@ module.exports.POST = async function(req, serve, vars) {
     if(user_edit.id == user.id) {
         return await dispage("administrator_user", {
             message: "You cannot set your own rank"
-        }, req, serve, vars);
+        }, req, serve, vars, evars);
     }
 
     if(post_data.form == "rank") {
@@ -130,7 +132,7 @@ module.exports.POST = async function(req, serve, vars) {
         }
         return await dispage("administrator_user", {
             message: "Successfully set " + user_edit.username + "'s rank to " + ["Default", "Staff", "Superuser", "Operator"][rank]
-        }, req, serve, vars);
+        }, req, serve, vars, evars);
     }
 
     serve(null, null, {

@@ -1,6 +1,6 @@
 var url = require("url");
 
-module.exports.GET = function(req, serve, vars, props) {
+module.exports.GET = function(req, serve) {
     var path = req.url;
     path = url.parse(path).pathname;
     if(path.charAt(0) == "/") { path = path.substr(1); }

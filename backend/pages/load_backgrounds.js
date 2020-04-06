@@ -16,10 +16,11 @@ module.exports.add_cache = function(name, data, mime) {
     cache[name] = { data, mime };
 }
 
-module.exports.GET = async function(req, serve, vars) {
+module.exports.GET = async function(req, serve, vars, evars) {
+    var path = evars.path;
+
     var get_third = vars.get_third;
     var db_img = vars.db_img;
-    var path = vars.path;
 
     var img_name = get_third(path, "other", "backgrounds");
 

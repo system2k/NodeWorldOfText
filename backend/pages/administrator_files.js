@@ -1,20 +1,22 @@
 var mime = require("../utils/mime.js");
 
-module.exports.GET = async function(req, serve, vars) {
-    var HTML = vars.HTML;
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars) {
+    var HTML = evars.HTML;
+    var user = evars.user;
+
     var dispage = vars.dispage;
 
     if(!user.superuser) {
-        return await dispage("404", null, req, serve, vars);
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     serve(HTML("administrator_files.html"));
 }
 
-module.exports.POST = async function(req, serve, vars) {
-    var post_data = vars.post_data;
-    var user = vars.user;
+module.exports.POST = async function(req, serve, vars, evars) {
+    var post_data = evars.post_data;
+    var user = evars.user;
+
     var static_fileData_append = vars.static_fileData_append;
 
     if(!user.superuser) return;

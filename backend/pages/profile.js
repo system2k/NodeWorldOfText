@@ -1,8 +1,9 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var cookies = vars.cookies;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var cookies = evars.cookies;
+    var user = evars.user;
+    var HTML = evars.HTML;
+
     var db = vars.db;
-    var user = vars.user;
     var plural = vars.plural;
     var worldViews = vars.worldViews;
 
@@ -83,10 +84,11 @@ module.exports.GET = async function(req, serve, vars, params) {
     serve(HTML("profile.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars) {
+module.exports.POST = async function(req, serve, vars, evars) {
+    var post_data = evars.post_data;
+    var user = evars.user;
+
     var db = vars.db;
-    var post_data = vars.post_data;
-    var user = vars.user;
     var dispage = vars.dispage;
     var world_get_or_create = vars.world_get_or_create;
     var validate_claim_worldname = vars.validate_claim_worldname;
@@ -100,14 +102,14 @@ module.exports.POST = async function(req, serve, vars) {
         if(user.uv_rank == 3) {
             return await dispage("profile", {
                 message: "Guests cannot claim worlds"
-            }, req, serve, vars);
+            }, req, serve, vars, evars);
         } else {
             var worldname = post_data.worldname + "";
-            var validate = await validate_claim_worldname(worldname, vars);
+            var validate = await validate_claim_worldname(worldname, vars, evars);
             if(validate.error) { // an error occurred while claiming
                 return await dispage("profile", {
                     message: validate.message
-                }, req, serve, vars);
+                }, req, serve, vars, evars);
             }
             await db.run("UPDATE world SET owner_id=? WHERE id=?", [user.id, validate.world_id]);
             message = validate.message;
@@ -124,5 +126,5 @@ module.exports.POST = async function(req, serve, vars) {
     }
     await dispage("profile", {
         message
-    }, req, serve, vars)
+    }, req, serve, vars, evars);
 }

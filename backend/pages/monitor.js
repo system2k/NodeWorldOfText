@@ -1,6 +1,6 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars) {
+    var HTML = evars.HTML;
+    var user = evars.user;
 
     if(!user.superuser) return;
 

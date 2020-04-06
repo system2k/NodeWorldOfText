@@ -47,14 +47,15 @@ function filterUTF16(str) {
     return advancedSplitCli(str, true, true).join("");
 }
 
-module.exports = async function(data, vars) {
+module.exports = async function(data, vars, evars) {
+    var user = evars.user;
+    var world = evars.world;
+    var timemachine = evars.timemachine;
+
     var db = vars.db;
     var db_edits = vars.db_edits;
-    var user = vars.user;
     var san_nbr = vars.san_nbr;
-    var world = vars.world;
     var advancedSplit = vars.advancedSplit;
-    var timemachine = vars.timemachine;
     var memTileCache = vars.memTileCache;
     var encodeCharProt = vars.encodeCharProt;
     var normalizeCacheTile = vars.normalizeCacheTile;

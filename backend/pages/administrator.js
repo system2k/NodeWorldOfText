@@ -1,6 +1,7 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var HTML = evars.HTML;
+    var user = evars.user;
+
     var dispage = vars.dispage;
     var db = vars.db;
     var announcement = vars.announcement;
@@ -14,7 +15,7 @@ module.exports.GET = async function(req, serve, vars, params) {
 
     // not a superuser...
     if(!user.superuser) {
-        return await dispage("404", null, req, serve, vars);
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     var client_num = 0;
@@ -82,10 +83,11 @@ module.exports.GET = async function(req, serve, vars, params) {
     serve(HTML("administrator.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars) {
-    var user = vars.user;
+module.exports.POST = async function(req, serve, vars, evars) {
+    var post_data = evars.post_data;
+    var user = evars.user;
+
     var dispage = vars.dispage;
-    var post_data = vars.post_data;
     var announce = vars.announce;
     var db = vars.db;
     var db_misc = vars.db_misc;
@@ -94,7 +96,7 @@ module.exports.POST = async function(req, serve, vars) {
     var stopServer = vars.stopServer;
 
     if(!user.superuser) {
-        return await dispage("404", null, req, serve, vars)
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     if("set_bypass_key" in post_data) {
@@ -102,7 +104,7 @@ module.exports.POST = async function(req, serve, vars) {
         modify_bypass_key(new_bypass_key);
         return await dispage("administrator", {
             cons_update_msg: "Bypass key updated successfully"
-        }, req, serve, vars);
+        }, req, serve, vars, evars);
     }
     if("announcement" in post_data) {
         var new_announcement = post_data.announcement;
@@ -122,7 +124,7 @@ module.exports.POST = async function(req, serve, vars) {
     
         return await dispage("administrator", {
             announcement_update_msg: "Announcement updated"
-        }, req, serve, vars);
+        }, req, serve, vars, evars);
     }
     if("manage_server" in post_data) {
         if(!user.operator) return;

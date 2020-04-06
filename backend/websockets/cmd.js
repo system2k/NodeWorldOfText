@@ -1,11 +1,12 @@
 module.exports = async function(ws, data, send, vars, evars) {
     var broadcast = evars.broadcast; // broadcast to current world
+    var user = evars.user;
+    var channel = evars.channel;
+    var world = evars.world;
 
     var data_rec = data.data;
     var wss = vars.wss;
     var NCaseCompare = vars.NCaseCompare;
-    var world = vars.world;
-    var user = vars.user;
     var accountSystem = vars.accountSystem;
 
     // rate limit commands
@@ -30,7 +31,7 @@ module.exports = async function(ws, data, send, vars, evars) {
     var cdata = {
         kind: "cmd",
         data: (data_rec + "").slice(0, 2048),
-        sender: vars.channel,
+        sender: channel,
         source: "cmd"
     };
 

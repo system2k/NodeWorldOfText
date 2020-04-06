@@ -1,12 +1,14 @@
 // write url links and coordinate links
 // this module implies the user has access to the world and that the world exists
-module.exports = async function(data, vars) {
+module.exports = async function(data, vars, evars) {
+    var user = evars.user;
+    var channel = evars.channel;
+    var world = evars.world;
+
     var db = vars.db;
-    var user = vars.user;
     var san_nbr = vars.san_nbr;
     var san_dp = vars.san_dp;
     var decodeCharProt = vars.decodeCharProt;
-    var world = vars.world;
     var tile_database = vars.tile_database;
 
     var is_owner = user.id == world.owner_id || (user.superuser && world.name == "");
@@ -25,8 +27,6 @@ module.exports = async function(data, vars) {
 
     var properties = JSON.parse(world.properties);
     var no_log_edits = !!properties.no_log_edits;
-
-    var channel = data.channel;
 
     var can_link = false;
     var feature_mode;

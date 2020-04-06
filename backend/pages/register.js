@@ -1,8 +1,9 @@
 var emailFormatRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars) {
+    var HTML = evars.HTML;
+    var user = evars.user;
+
     var accountSystem = vars.accountSystem;
     var uvias = vars.uvias;
     
@@ -28,21 +29,13 @@ module.exports.GET = async function(req, serve, vars, params) {
     serve(HTML("registration/registration_form.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars) {
+module.exports.POST = async function(req, serve, vars, evars) {
+    var post_data = evars.post_data;
+    var user = evars.user;
+
     var db = vars.db;
-    var post_data = vars.post_data;
-    var user = vars.user;
     var dispage = vars.dispage;
     var encryptHash = vars.encryptHash;
-    var send_email = vars.send_email;
-    var crypto = vars.crypto;
-    var website = vars.website;
-    var template_data = vars.template_data;
-    var handle_error = vars.handle_error;
-    var ms = vars.ms;
-    var new_token = vars.new_token;
-    var http_time = vars.http_time;
-    var cookies = vars.cookies;
     var testEmailAddress = vars.testEmailAddress;
     var accountSystem = vars.accountSystem;
     
@@ -119,7 +112,7 @@ module.exports.POST = async function(req, serve, vars) {
              username: form_username_errors.length > 0 ? "" : username,
              email: form_email_errors.length > 0 ? "" : email,
              password: form_password1_errors.length > 0 ? "" : password1
-         }, req, serve, vars);
+         }, req, serve, vars, evars);
     }
 
     var date = Date.now();
@@ -135,5 +128,5 @@ module.exports.POST = async function(req, serve, vars) {
         username: username,
         password: password1,
         registered: true
-    }, req, serve, vars, "POST");
+    }, req, serve, vars, evars, "POST");
 }

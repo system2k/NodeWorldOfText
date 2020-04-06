@@ -1,6 +1,7 @@
-module.exports.POST = async function(req, serve, vars, params) {
-    var user = vars.user;
-    var post_data = vars.post_data;
+module.exports.POST = async function(req, serve, vars, evars, params) {
+    var post_data = evars.post_data;
+    var user = evars.user;
+
     var world_get_or_create = vars.world_get_or_create;
     var can_view_world = vars.can_view_world;
     var modules = vars.modules;
@@ -15,11 +16,11 @@ module.exports.POST = async function(req, serve, vars, params) {
         return serve(null, 403)
     }
 
-    vars.world = world;
-    vars.user.stats = can_read;
-
     var action = "protect";
     if(params.unprotect) action = "unprotect";
+
+    evars.world = world;
+    evars.user.stats = can_read;
 
     var do_protect = await modules.protect_areas({
         action,
@@ -29,7 +30,7 @@ module.exports.POST = async function(req, serve, vars, params) {
         charY: post_data.charY,
         precise: !!params.char,
         type: post_data.type
-    }, vars)
+    }, vars, evars);
 
     if(do_protect[0]) {
         var msg = do_protect[1];

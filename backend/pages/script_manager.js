@@ -1,12 +1,13 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var HTML = evars.HTML;
+    var user = evars.user;
+
     var dispage = vars.dispage;
     var db = vars.db;
 
     // not staff
     if(!user.staff) {
-        return await dispage("404", null, req, serve, vars)
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     var scripts = [];
@@ -26,10 +27,11 @@ module.exports.GET = async function(req, serve, vars, params) {
     serve(HTML("script_manager.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars) {
+module.exports.POST = async function(req, serve, vars, evars) {
+    var post_data = evars.post_data;
+    var user = evars.user;
+
     var db = vars.db;
-    var user = vars.user;
-    var post_data = vars.post_data;
     var dispage = vars.dispage;
 
     if(!user.staff) {
@@ -44,7 +46,7 @@ module.exports.POST = async function(req, serve, vars) {
     if(exists) {
         return await dispage("script_manager", {
             message: "The script already exists"
-        }, req, serve, vars)
+        }, req, serve, vars, evars);
     }
 
     await db.run("INSERT INTO scripts VALUES(null, ?, ?, '', ?, 0)",
@@ -52,5 +54,5 @@ module.exports.POST = async function(req, serve, vars) {
 
     await dispage("script_manager", {
         message: "Script created successfully"
-    }, req, serve, vars)
+    }, req, serve, vars, evars);
 }

@@ -1,13 +1,9 @@
 module.exports = async function(ws, data, send, vars, evars) {
     var modules = vars.modules;
-
     var sData = data.data;
-    var channel = vars.channel;
-
     if(!sData) return;
-
     var type = data.type;
-
+    
     var tileX = sData.tileX;
     var tileY = sData.tileY;
     var charX = sData.charX;
@@ -21,7 +17,6 @@ module.exports = async function(ws, data, send, vars, evars) {
         tileX, tileY,
         charX, charY,
         url,
-        link_tileX, link_tileY,
-        channel
-    }, vars);
+        link_tileX, link_tileY
+    }, vars, evars);
 }

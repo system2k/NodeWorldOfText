@@ -1,8 +1,9 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars) {
+    var path = evars.path;
+    var user = evars.user;
+
     var dispage = vars.dispage;
     var db = vars.db;
-    var path = vars.path;
     var get_third = vars.get_third;
 
     // not staff

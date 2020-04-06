@@ -1,7 +1,8 @@
-module.exports.GET = async function(req, serve, vars) {
-    var HTML = vars.HTML;
+module.exports.GET = async function(req, serve, vars, evars) {
+    var path = evars.path;
+    var HTML = evars.HTML;
+
     var get_third = vars.get_third;
-    var path = vars.path;
 
     var world_name = get_third(path, "accounts", "nsfw")
     var data = {

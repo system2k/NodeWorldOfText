@@ -1,10 +1,12 @@
-module.exports = async function(data, vars) {
+module.exports = async function(data, vars, evars) {
+    var user = evars.user;
+    var channel = evars.channel;
+    var world = evars.world;
+
     var db = vars.db;
-    var user = vars.user;
     var san_nbr = vars.san_nbr;
     var encodeCharProt = vars.encodeCharProt;
     var decodeCharProt = vars.decodeCharProt;
-    var world = vars.world;
     var tile_database = vars.tile_database;
 
     var is_owner = user.id == world.owner_id || (user.superuser && world.name == "");
@@ -17,8 +19,6 @@ module.exports = async function(data, vars) {
     var charY = san_nbr(data.charY);
     var precise = data.precise;
     var type = data.type;
-
-    var channel = data.channel;
 
     var properties = JSON.parse(world.properties);
     var no_log_edits = !!properties.no_log_edits;

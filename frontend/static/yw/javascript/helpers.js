@@ -188,10 +188,14 @@ function ReconnectingWebSocket(url) {
             setTimeout(connect, 1000);
         }
         self.socket.onopen = function(e) {
-            self.socket.onmessage = self.onmessage;
-            self.socket.onerror = self.onerror;
             self.socket.binaryType = self.binaryType;
             if(self.onopen) self.onopen(e);
+        }
+        self.socket.onmessage = function(m) {
+            if(self.onmessage) self.onmessage(m);
+        }
+        self.socket.onerror = function(m) {
+            if(self.onerror) self.onerror(m);
         }
     }
     connect();

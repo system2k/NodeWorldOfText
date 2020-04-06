@@ -1,8 +1,9 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var cookies = vars.cookies;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var cookies = evars.cookies;
+    var user = evars.user;
+    var HTML = evars.HTML;
+
     var db = vars.db;
-    var user = vars.user;
     var plural = vars.plural;
     var worldViews = vars.worldViews;
 

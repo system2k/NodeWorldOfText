@@ -1,7 +1,8 @@
-module.exports.GET = async function(req, serve, vars, params) {
+module.exports.GET = async function(req, serve, vars, evars) {
+    var query_data = evars.query_data;
+    var user = evars.user;
+
     var db = vars.db;
-    var user = vars.user;
-    var query_data = vars.query_data;
     var world_get_or_create = vars.world_get_or_create;
     var can_view_world = vars.can_view_world;
     

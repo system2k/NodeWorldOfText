@@ -1,3 +1,3 @@
-module.exports.GET = function(req, serve, vars, props) {
+module.exports.GET = function(req, serve, vars, evars) {
     serve("OWOT subdomain testing <test.hostname.tld>");
 }

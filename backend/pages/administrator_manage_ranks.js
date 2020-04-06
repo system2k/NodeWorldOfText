@@ -5,14 +5,15 @@ function searchRankLevel(rankCache, level) {
     return false;
 }
 
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var HTML = evars.HTML;
+    var user = evars.user;
+
     var dispage = vars.dispage;
     var ranks_cache = vars.ranks_cache;
 
     if(!user.superuser) {
-        return await dispage("404", null, req, serve, vars);
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     var rankCount = ranks_cache.count;
@@ -38,9 +39,10 @@ module.exports.GET = async function(req, serve, vars, params) {
     serve(HTML("administrator_manage_ranks.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars) {
-    var post_data = vars.post_data;
-    var user = vars.user;
+module.exports.POST = async function(req, serve, vars, evars) {
+    var post_data = evars.post_data;
+    var user = evars.user;
+
     var db_misc = vars.db_misc;
     var ranks_cache = vars.ranks_cache;
 

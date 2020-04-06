@@ -26,11 +26,12 @@ function validatePerms(p, max, allowNeg) {
     return num;
 }
 
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var user = vars.user;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var path = evars.path;
+    var HTML = evars.HTML;
+    var user = evars.user;
+
     var url = vars.url;
-    var path = vars.path;
     var get_third = vars.get_third;
     var db = vars.db;
     var dispage = vars.dispage;
@@ -49,7 +50,7 @@ module.exports.GET = async function(req, serve, vars, params) {
 
     var world = await world_get_or_create(world_name)
     if(!world) {
-        return await dispage("404", null, req, serve, vars)
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     if(world.owner_id != user.id && !user.superuser) {
@@ -167,13 +168,14 @@ module.exports.GET = async function(req, serve, vars, params) {
     serve(HTML("configure.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars) {
+module.exports.POST = async function(req, serve, vars, evars) {
+    var post_data = evars.post_data;
+    var path = evars.path;
+    var user = evars.user;
+
     var db = vars.db;
     var db_edits = vars.db_edits;
-    var post_data = vars.post_data;
-    var user = vars.user;
     var get_third = vars.get_third;
-    var path = vars.path;
     var dispage = vars.dispage;
     var url = vars.url;
     var world_get_or_create = vars.world_get_or_create;
@@ -198,7 +200,7 @@ module.exports.POST = async function(req, serve, vars) {
 
     var world = await world_get_or_create(world_name);
     if(!world) {
-        return await dispage("404", null, req, serve, vars);
+        return await dispage("404", null, req, serve, vars, evars);
     }
 
     world_name = world.name;
@@ -223,7 +225,7 @@ module.exports.POST = async function(req, serve, vars) {
         }
 
         if(!adduser) {
-            return await dispage("configure", { message: "User not found" }, req, serve, vars);
+            return await dispage("configure", { message: "User not found" }, req, serve, vars, evars);
         }
 
         if(accountSystem == "uvias") {
@@ -235,21 +237,21 @@ module.exports.POST = async function(req, serve, vars) {
         if(user_id == world.owner_id) {
             return await dispage("configure", {
                 message: "User is already the owner of \"" + world_name + "\""
-            }, req, serve, vars);
+            }, req, serve, vars, evars);
         }
         var whitelist = await db.get("SELECT * FROM whitelist WHERE user_id=? AND world_id=?",
             [user_id, world.id]);
         if(whitelist) {
             return await dispage("configure", {
                 message: "User is already part of this world"
-            }, req, serve, vars);
+            }, req, serve, vars, evars);
         }
 
         await db.run("INSERT into whitelist VALUES(null, ?, ?, ?)", [user_id, world.id, date]);
 
         return await dispage("configure", {
             message: adduser.username + " is now a member of the \"" + world_name + "\" world"
-        }, req, serve, vars);
+        }, req, serve, vars, evars);
     } else if(post_data.form == "access_perm") { // access_perm
         var readability = validatePerms(post_data.readability, 2);
         var writability = validatePerms(post_data.writability, 2);
@@ -421,11 +423,11 @@ module.exports.POST = async function(req, serve, vars) {
         }
         var new_name = post_data.new_world_name;
         if(typeof new_name == "string" && new_name && new_name != world.name) { // changing world name
-            var validate = await validate_claim_worldname(new_name, vars, true, world.id);
+            var validate = await validate_claim_worldname(new_name, vars, evars, true, world.id);
             if(validate.error) { // error with renaming
                 return await dispage("configure", {
                     misc_message: validate.message
-                }, req, serve, vars);
+                }, req, serve, vars, evars);
             }
             if(validate.rename) {
                 await db.run("UPDATE world SET name=? WHERE id=?", [validate.new_name, world.id]);

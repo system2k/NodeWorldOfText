@@ -1,7 +1,8 @@
 // both url links and coordinate links
-module.exports.POST = async function(req, serve, vars, params) {
-    var user = vars.user;
-    var post_data = vars.post_data;
+module.exports.POST = async function(req, serve, vars, evars, params) {
+    var post_data = evars.post_data;
+    var user = evars.user;
+
     var world_get_or_create = vars.world_get_or_create;
     var can_view_world = vars.can_view_world;
     var modules = vars.modules;
@@ -16,13 +17,13 @@ module.exports.POST = async function(req, serve, vars, params) {
         return serve(null, 403)
     }
 
-    vars.world = world;
-    vars.user.stats = can_read;
-
     var type = "url";
     if(params.coordlink) {
         type = "coord";
     }
+
+    evars.world = world;
+    evars.user.stats = can_read;
 
     var do_link = await modules.write_links({
         type: type,
@@ -33,7 +34,7 @@ module.exports.POST = async function(req, serve, vars, params) {
         url: post_data.url,
         link_tileX: post_data.link_tileX,
         link_tileY: post_data.link_tileY
-    }, vars);
+    }, vars, evars);
 
     if(do_link[0]) {
         var msg = do_link[1];

@@ -1,8 +1,8 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var HTML = vars.HTML;
-    var cookies = vars.cookies;
+module.exports.GET = async function(req, serve, vars, evars, params) {
+    var cookies = evars.cookies;
+    var HTML = evars.HTML;
+
     var db = vars.db;
-    var user = vars.user;
     var new_token = vars.new_token;
     var accountSystem = vars.accountSystem;
     var uvias = vars.uvias;
@@ -23,17 +23,17 @@ module.exports.GET = async function(req, serve, vars, params) {
     serve(HTML("registration/login.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, params) {
-    var cookies = vars.cookies;
+module.exports.POST = async function(req, serve, vars, evars, params) {
+    var cookies = evars.cookies;
+    var post_data = evars.post_data;
+    var referer = evars.referer;
+
     var db = vars.db;
-    var user = vars.user;
-    var post_data = vars.post_data;
     var checkHash = vars.checkHash;
     var new_token = vars.new_token;
     var http_time = vars.http_time;
     var ms = vars.ms;
     var querystring = vars.querystring;
-    var referer = vars.referer;
     var url = vars.url;
     var dispage = vars.dispage;
     var accountSystem = vars.accountSystem;
@@ -49,11 +49,11 @@ module.exports.POST = async function(req, serve, vars, params) {
 
     var loginuser = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username)
     if(!loginuser) {
-        return await dispage("login", {errors: true, username}, req, serve, vars);
+        return await dispage("login", {errors: true, username}, req, serve, vars, evars);
     }
     var valid = checkHash(loginuser.password, password)
     if(!valid) { // wrong password
-        return await dispage("login", {errors: true, username}, req, serve, vars);
+        return await dispage("login", {errors: true, username}, req, serve, vars, evars);
     }
 
     var date_now = Date.now();
@@ -74,7 +74,7 @@ module.exports.POST = async function(req, serve, vars, params) {
     await db.run("UPDATE auth_user SET last_login=? WHERE id=?", [date_now, loginuser.id])
 
     var next = "/accounts/profile/";
-    var check_next = querystring.parse(url.parse(referer).query)
+    var check_next = querystring.parse(url.parse(referer).query); // TODO: Make this client-side
     if(check_next.next) {
         next = check_next.next;
     }

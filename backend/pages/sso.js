@@ -1,5 +1,6 @@
-module.exports.GET = async function(req, serve, vars, params) {
-    var query_data = vars.query_data;
+module.exports.GET = async function(req, serve, vars, evars) {
+    var query_data = evars.query_data;
+
     var uvias = vars.uvias;
     var http_time = vars.http_time;
     var accountSystem = vars.accountSystem;
