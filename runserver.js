@@ -1597,7 +1597,6 @@ async function get_user_info(cookies, is_websocket, include_cookies) {
                         user.scripts = [];
                     }
                     user.csrftoken = new_token(32);
-
                     user.session_key = cookies.token;
                 }
             }
@@ -1953,19 +1952,6 @@ async function process_request(req, res) {
                     data.accountSystem = accountSystem;
                     return template_data[path](data);
                 }
-                /*vars = objIncludes(global_data, { // extra information
-                    cookies,
-                    post_data,
-                    query_data,
-                    path: URL_mod,
-                    user,
-                    redirect,
-                    referer: req.headers.referer,
-                    broadcast: global_data.ws_broadcast,
-                    HTML,
-                    ipAddress
-                });*/
-                //vars_joined = true;
                 var evars = { // extra information
                     cookies,
                     post_data,
@@ -1980,7 +1966,6 @@ async function process_request(req, res) {
                 };
                 if(row[1][method] && valid_method(method)) {
                     // Return the page
-                    //await row[1][method](req, dispatch, vars, {});
                     await row[1][method](req, dispatch, global_data, evars, {});
                 } else {
                     dispatch("Method " + method + " not allowed.", 405);
@@ -2409,9 +2394,9 @@ async function initialize_server_components() {
         data = JSON.stringify(data);
         wss.clients.forEach(function each(client) {
             if(!client.sdata.userClient) return;
+            if(client.readyState != WebSocket.OPEN) return;
             try {
-                if(client.readyState == WebSocket.OPEN &&
-                world == void 0 || NCaseCompare(client.sdata.world_name, world)) {
+                if(world == void 0 || NCaseCompare(client.sdata.world_name, world)) {
                     if(opts.isChat) {
                         if(opts.chat_perm == -1) opts.chat_perm = client.sdata.chat_permission;
                         if(opts.chat_perm == 1) if(!(client.sdata.is_member || client.sdata.is_owner)) return;
@@ -2429,9 +2414,19 @@ async function initialize_server_components() {
 
     global_data.ws_broadcast = ws_broadcast;
 
-    wss.on("connection", manageWebsocketConnection);
+    wss.on("connection", async function(ws, req) {
+        try {
+            manageWebsocketConnection(ws, req);
+        } catch(e) {
+            // failed to initialize
+            handle_error(e);
+        }
+    });
 
+    // initialize the subsystems (tile database handling)
     await sysLoad();
+
+    // initialize variables in page handlers
     await sintLoad();
 
     initPingAuto();
@@ -2599,26 +2594,35 @@ async function manageWebsocketConnection(ws, req) {
     if(isStopping) return;
     var socketTerminated = false;
     ws.sdata = {};
-    try {
-        var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
-        var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
-        var remIp = req.socket.remoteAddress;
-        var evalIp = evaluateIpAddress(remIp, realIp, cfIp);
-        ws.sdata.ipAddress = evalIp[0];
-        ws.sdata.ipAddressFam = evalIp[1];
-    } catch(e) {
-        ws.sdata.ipAddress = "0.0.0.0";
-        ws.sdata.ipAddressFam = 4;
-        handle_error(e);
+    
+    // process ip address headers from cloudflare/nginx
+    var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
+    var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
+    var remIp = req.socket.remoteAddress;
+    var evalIp = evaluateIpAddress(remIp, realIp, cfIp);
+    ws.sdata.ipAddress = evalIp[0];
+    ws.sdata.ipAddressFam = evalIp[1];
+
+    // must be at the top before any async calls (errors would occur before this event declaration)
+    ws.on("error", function(err) {
+        handle_error(JSON.stringify(process_error_arg(err)));
+    });
+
+    function send_ws(data) {
+        if(ws.readyState === WebSocket.OPEN) {
+            // most errors tend to be about invalid ws packets
+            try {
+                ws.send(data);
+            } catch(e) {}
+        }
     }
+
     if(!can_connect_ip_address(ws.sdata.ipAddress)) {
-        try {
-            ws.send(JSON.stringify({
-                kind: "error",
-                code: "CONN_LIMIT",
-                message: "Too many connections"
-            }));
-        } catch(e) {}
+        send_ws(JSON.stringify({
+            kind: "error",
+            code: "CONN_LIMIT",
+            message: "Too many connections"
+        }));
         return ws.close();
     }
     add_ip_address_connection(ws.sdata.ipAddress);
@@ -2640,289 +2644,269 @@ async function manageWebsocketConnection(ws, req) {
         }
     }
     var kindLimits = {};
-    try {
-        var parsedURL = url.parse(req.url);
-        var location = parsedURL.pathname;
-        var search = querystring.parse(parsedURL.query);
-        // must be at the top before any async calls (errors would occur before this event declaration)
-        ws.on("error", function(err) {
-            handle_error(JSON.stringify(process_error_arg(err)));
-        });
-        if(location == "/administrator/monitor/ws/") {
-            var cookies = parseCookie(req.headers.cookie);
-            var user = await get_user_info(cookies, true);
-            if(!user.superuser) {
-                return ws.close();
-            }
-            sendMonitorEvents(ws);
-            ws.on("close", function() {
-                remove_ip_address_connection(ws.sdata.ipAddress);
-                removeMonitorEvents(ws);
-            });
-            ws.sdata.monitorSocket = true;
-            var msCount = 0;
-            wss.clients.forEach(function(msock) {
-                if(msock.sdata.monitorSocket) {
-                    msCount++;
-                }
-            });
-            broadcastMonitorEvent("[Server] " + msCount + " listening sockets, " + monitorEventSockets.length + " listeners");
-            return;
-        }
-        ws.sdata.userClient = true;
-        var pre_queue = [];
-        // adds data to a queue. this must be before any async calls and the message event
-        function onMessage(msg) {
-            pre_queue.push(msg);
-        }
-        ws.on("message", function(msg) {
-            if(!can_process_req()) return;
-            onMessage(msg);
-        });
-        var status, clientId = void 0, worldObj;
-        ws.on("close", function() {
-            remove_ip_address_connection(ws.sdata.ipAddress);
-            socketTerminated = true;
-            if(status && clientId != void 0) {
-                if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
-                    client_ips[status.world.id][clientId][2] = true;
-                    client_ips[status.world.id][clientId][1] = Date.now();
-                }
-            }
-            if(worldObj && !ws.sdata.hide_user_count) {
-                worldObj.user_count--;
-            }
-        });
-        var world_name;
-        function send_ws(data) {
-            if(ws.readyState === WebSocket.OPEN) {
-                try {
-                    ws.send(data); // not protected by callbacks
-                } catch(e) {}
-            }
-        }
-        if(location.match(/(\/ws\/$)/)) {
-            world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
-        } else {
-            send_ws(JSON.stringify({
-                kind: "error",
-                code: "INVALID_ADDR",
-                message: "Invalid address"
-            }));
-            return ws.close();
-        }
-        
-        ws.sdata.world_name = world_name;
-
+    var parsedURL = url.parse(req.url);
+    var location = parsedURL.pathname;
+    var search = querystring.parse(parsedURL.query);
+    if(location == "/administrator/monitor/ws/") {
         var cookies = parseCookie(req.headers.cookie);
         var user = await get_user_info(cookies, true);
-        var channel = new_token(7);
-
-        var vars = global_data;
-        var evars = {
-            user, channel
-        };
-        /*var vars = objIncludes(global_data, {
-            user,
-            channel
-        });*/
-
-        if(cookies.hide_user_count == "1" || search.hide == "1") {
-            ws.sdata.hide_user_count = true;
+        if(!user.superuser) {
+            return ws.close();
         }
-
-        var timemachine = {
-            active: false,
-            time: 0
-        };
+        sendMonitorEvents(ws);
+        ws.on("close", function() {
+            remove_ip_address_connection(ws.sdata.ipAddress);
+            removeMonitorEvents(ws);
+        });
+        ws.sdata.monitorSocket = true;
+        var msCount = 0;
+        wss.clients.forEach(function(msock) {
+            if(msock.sdata.monitorSocket) {
+                msCount++;
+            }
+        });
+        broadcastMonitorEvent("[Server] " + msCount + " listening sockets, " + monitorEventSockets.length + " listeners");
+        return;
+    }
+    ws.sdata.userClient = true;
+    var pre_queue = [];
+    // adds data to a queue. this must be before any async calls and the message event
+    function pre_message(msg) {
+        if(!can_process_req()) return;
+        pre_queue.push(msg);
+    }
+    ws.on("message", pre_message);
+    var status, clientId = void 0, worldObj;
+    ws.on("close", function() {
+        remove_ip_address_connection(ws.sdata.ipAddress);
+        socketTerminated = true;
+        if(status && clientId != void 0) {
+            if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
+                client_ips[status.world.id][clientId][2] = true;
+                client_ips[status.world.id][clientId][1] = Date.now();
+            }
+        }
+        if(worldObj && !ws.sdata.hide_user_count) {
+            worldObj.user_count--;
+        }
+    });
+    var world_name;
+    if(location.match(/(\/ws\/$)/)) {
+        world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
+    } else {
+        send_ws(JSON.stringify({
+            kind: "error",
+            code: "INVALID_ADDR",
+            message: "Invalid address"
+        }));
+        return ws.close();
+    }
     
-        var tm_check = world_name.split("/")
-        if(tm_check[0] == "accounts" && tm_check[1] == "timemachine" && tm_check[3]) {
-            world_name = tm_check[2];
-            timemachine.active = true;
-        }
-    
-        var initError = false;
-        var initErrorMessage = "";
-        var initErrorCode = "";
-        var world = await world_get_or_create(world_name);
-        if(!world) {
-            initError = true;
-            initErrorMessage = "World does not exist";
-            initErrorCode = "NO_EXIST";
-        }
-    
-        if(timemachine.active && world.owner_id != user.id && !user.superuser) {
-            initError = true;
-            initErrorMessage = "No permission to view time machine";
-            initErrorCode = "NO_PERM";
-        }
-    
-        var permission = await can_view_world(world, user);
-        if(!permission) {
-            initError = true;
-            initErrorMessage = "No permission";
-            initErrorCode = "NO_PERM";
-        }
+    ws.sdata.world_name = world_name;
 
-        if(initError) {
-            send_ws(JSON.stringify({
-                kind: "error",
-                code: initErrorCode,
-                message: initErrorMessage
-            }));
-            ws.close();
+    var cookies = parseCookie(req.headers.cookie);
+    var user = await get_user_info(cookies, true);
+    var channel = new_token(7);
+
+    var vars = global_data;
+    var evars = {
+        user, channel
+    };
+
+    if(search.hide == "1") {
+        ws.sdata.hide_user_count = true;
+    }
+
+    var timemachine = {
+        active: false,
+        time: 0
+    };
+
+    var tm_check = world_name.split("/")
+    if(tm_check[0] == "accounts" && tm_check[1] == "timemachine" && tm_check[3]) {
+        world_name = tm_check[2];
+        timemachine.active = true;
+    }
+
+    var initError = false;
+    var initErrorMessage = "";
+    var initErrorCode = "";
+    var world = await world_get_or_create(world_name);
+    if(!world) {
+        initError = true;
+        initErrorMessage = "World does not exist";
+        initErrorCode = "NO_EXIST";
+    }
+
+    if(timemachine.active && world.owner_id != user.id && !user.superuser) {
+        initError = true;
+        initErrorMessage = "No permission to view time machine";
+        initErrorCode = "NO_PERM";
+    }
+
+    var permission = await can_view_world(world, user);
+    if(!permission) {
+        initError = true;
+        initErrorMessage = "No permission";
+        initErrorCode = "NO_PERM";
+    }
+
+    if(initError) {
+        send_ws(JSON.stringify({
+            kind: "error",
+            code: initErrorCode,
+            message: initErrorMessage
+        }));
+        ws.close();
+        return;
+    }
+
+    if(timemachine.active) {
+        timemachine.time = san_nbr(tm_check[3]);
+
+        if(timemachine.time < 0) timemachine.time = 0;
+        if(timemachine.time > 1000000) timemachine.time = 1000000;
+    }
+
+    status = { permission, world, timemachine };
+
+    ws.sdata.world_id = status.world.id;
+    
+    evars.world = status.world;
+    evars.timemachine = status.timemachine;
+
+    ws.sdata.world = status.world;
+    ws.sdata.user = user;
+
+    var properties = JSON.parse(status.world.properties);
+    var chat_permission = properties.chat_permission;
+    if(!chat_permission) chat_permission = 0;
+    ws.sdata.chat_permission = chat_permission;
+
+    var can_chat = chat_permission == 0 || (chat_permission == 1 && status.permission.member) || (chat_permission == 2 && status.permission.owner);
+    ws.sdata.can_chat = can_chat;
+
+    worldObj = getWorldData(world_name);
+    if(!socketTerminated && !ws.sdata.hide_user_count) {
+        worldObj.user_count++;
+    }
+
+    var initial_user_count;
+    if(can_chat) {
+        initial_user_count = worldObj.user_count;
+    }
+
+    user.stats = status.permission;
+
+    ws.sdata.is_member = user.stats.member;
+    ws.sdata.is_owner = user.stats.owner;
+
+    clientId = generateClientId(world_name, status.world.id);
+
+    if(!client_ips[status.world.id]) {
+        client_ips[status.world.id] = {};
+    }
+    client_ips[status.world.id][clientId] = [ws.sdata.ipAddress, -1, false];
+
+    ws.sdata.clientId = clientId;
+    ws.sdata.chat_blocks = [];
+
+    if(monitorEventSockets.length) {
+        broadcastMonitorEvent(ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + evars.world.name + "', " + evars.world.id + "]");
+    }
+
+    var sentClientId = clientId;
+    if(!can_chat) sentClientId = -1;
+    send_ws(JSON.stringify({
+        kind: "channel",
+        sender: channel,
+        id: sentClientId,
+        initial_user_count
+    }));
+
+    ws.off("message", pre_message);
+    ws.on("message", handle_message);
+    async function handle_message(msg) {
+        if(!can_process_req()) return;
+        if(!(typeof msg == "string" || typeof msg == "object")) {
             return;
         }
-    
-        if(timemachine.active) {
-            timemachine.time = san_nbr(tm_check[3]);
-    
-            if(timemachine.time < 0) timemachine.time = 0;
-            if(timemachine.time > 1000000) timemachine.time = 1000000;
+        if(msg.constructor == Buffer) {
+            /*msg = bin_packet.decode(msg);
+            if(!msg) return; // malformed packet*/
+            return;
         }
-    
-        status = { permission, world, timemachine };
-
-        ws.sdata.world_id = status.world.id;
-        
-        evars.world = status.world;
-        evars.timemachine = status.timemachine;
-
-        ws.sdata.world = status.world;
-        ws.sdata.user = user;
-
-        var properties = JSON.parse(status.world.properties);
-        var chat_permission = properties.chat_permission;
-        if(!chat_permission) chat_permission = 0;
-        ws.sdata.chat_permission = chat_permission;
-
-        var can_chat = chat_permission == 0 || (chat_permission == 1 && status.permission.member) || (chat_permission == 2 && status.permission.owner);
-        ws.sdata.can_chat = can_chat;
-
-        worldObj = getWorldData(world_name);
-        if(!socketTerminated && !ws.sdata.hide_user_count) {
-            worldObj.user_count++;
+        if(msg.startsWith("1::") && isTestServer) { // debug statement
+            console.log(msg.substr(3));
+            return;
         }
-
-        var initial_user_count;
-        if(can_chat) {
-            initial_user_count = worldObj.user_count;
-        }
-
-        user.stats = status.permission;
-
-        ws.sdata.is_member = user.stats.member;
-        ws.sdata.is_owner = user.stats.owner;
-
-        clientId = generateClientId(world_name, status.world.id);
-
-        if(!client_ips[status.world.id]) {
-            client_ips[status.world.id] = {};
-        }
-        client_ips[status.world.id][clientId] = [ws.sdata.ipAddress, -1, false];
-
-        ws.sdata.clientId = clientId;
-        ws.sdata.chat_blocks = [];
-
-        if(monitorEventSockets.length) {
-            broadcastMonitorEvent(ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + vars.world.name + "', " + vars.world.id + "]");
-        }
-
-        var sentClientId = clientId;
-        if(!can_chat) sentClientId = -1;
-        send_ws(JSON.stringify({
-            kind: "channel",
-            sender: channel,
-            id: sentClientId,
-            initial_user_count
-        }));
-        onMessage = async function(msg) {
-            if(!can_process_req()) return;
-            try {
-                if(!(typeof msg == "string" || typeof msg == "object")) {
-                    return;
-                }
-                if(msg.constructor == Buffer) {
-                    /*msg = bin_packet.decode(msg);
-                    if(!msg) return; // malformed packet*/
-                    return;
-                }
-            } catch(e) {
-                handle_error(e);
-                return;
+        if(msg.startsWith("2::")) { // ping
+            var args = msg.substr(3);
+            var res = {
+                kind: "ping",
+                result: "pong"
             }
+            if(args == "@") {
+                res.time = true;
+            }
+            return send_ws(JSON.stringify(res));
+        }
+        // Parse request
+        try {
+            if(typeof msg == "string") msg = JSON.parse(msg);
+        } catch(e) {
+            return ws.close();
+        }
+        if(!msg || msg.constructor != Object) {
+            return;
+        }
+        var kind = msg.kind;
+        if(typeof kind != "string") return;
+        kind = kind.toLowerCase();
+        var requestID = null;
+        if(typeof msg.request == "number") {
+            requestID = san_nbr(msg.request);
+        }
+        // Begin calling a websocket function for the necessary request
+        if(websockets.hasOwnProperty(kind)) {
+            if(!can_process_req_kind(kindLimits, kind)) return;
+            function send(msg) {
+                msg.kind = kind;
+                if(requestID !== null) msg.request = requestID;
+                send_ws(JSON.stringify(msg));
+            }
+            function broadcast(data, opts) {
+                data.source = kind;
+                global_data.ws_broadcast(data, world_name, opts);
+            }
+            var res;
+            var resError = false;
             try {
-                if(msg.startsWith("1::") && isTestServer) { // debug statement
-                    console.log(msg.substr(3));
-                    return;
-                }
-                if(msg.startsWith("2::")) { // ping
-                    var args = msg.substr(3);
-                    var res = {
-                        kind: "ping",
-                        result: "pong"
-                    }
-                    if(args == "@") {
-                        res.time = true;
-                    }
-                    return send_ws(JSON.stringify(res));
-                }
-                // Parse request
-                try {
-                    if(typeof msg == "string") msg = JSON.parse(msg);
-                } catch(e) {
-                    return ws.close();
-                }
-                if(!msg || msg.constructor != Object) {
-                    return;
-                }
-                var kind = msg.kind;
-                if(typeof kind != "string") return;
-                kind = kind.toLowerCase();
-                var requestID = null;
-                if(typeof msg.request == "number") {
-                    requestID = san_nbr(msg.request);
-                }
-                // Begin calling a websocket function for the necessary request
-                if(websockets.hasOwnProperty(kind)) {
-                    if(!can_process_req_kind(kindLimits, kind)) return;
-                    function send(msg) {
-                        msg.kind = kind;
-                        if(requestID !== null) msg.request = requestID;
-                        send_ws(JSON.stringify(msg));
-                    }
-                    function broadcast(data, opts) {
-                        data.source = kind;
-                        global_data.ws_broadcast(data, world_name, opts);
-                    }
-                    var res = await websockets[kind](ws, msg, send, vars, objIncludes(evars, {
-                        broadcast,
-                        clientId: ws.sdata.clientId,
-                        ws
-                    }));
-                    if(typeof res == "string") {
-                        send_ws(JSON.stringify({
-                            kind: "error",
-                            code: "PARAM",
-                            message: res
-                        }));
-                    }
-                }
+                res = await websockets[kind](ws, msg, send, vars, objIncludes(evars, {
+                    broadcast,
+                    clientId: ws.sdata.clientId,
+                    ws
+                }));
             } catch(e) {
+                resError = true;
                 handle_error(e);
             }
-        }
-        // Some messages might have been received before the socket finished opening
-        if(pre_queue.length > 0) {
-            for(var p = 0; p < pre_queue.length; p++) {
-                onMessage(pre_queue[p]);
-                pre_queue.splice(p, 1);
-                p--;
+            if(!resError && typeof res == "string") {
+                send_ws(JSON.stringify({
+                    kind: "error",
+                    code: "PARAM",
+                    message: res
+                }));
             }
         }
-    } catch(e) {
-        handle_error(e);
+    }
+    // Some messages might have been received before the socket finished opening
+    if(pre_queue.length > 0) {
+        for(var p = 0; p < pre_queue.length; p++) {
+            handle_message(pre_queue[p]);
+            pre_queue.splice(p, 1);
+            p--;
+        }
     }
 }
 

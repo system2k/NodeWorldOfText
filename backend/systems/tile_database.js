@@ -13,6 +13,7 @@ var advancedSplit;
 var change_char_in_array;
 var memTileCache;
 var parse_textcode;
+var broadcastMonitorEvent;
 
 var server_exiting = false;
 var editlog_cell_props = false;
@@ -33,6 +34,7 @@ module.exports.main = function(vars) {
     change_char_in_array = vars.change_char_in_array;
     memTileCache = vars.memTileCache;
     parse_textcode = vars.parse_textcode;
+    broadcastMonitorEvent = vars.broadcastMonitorEvent;
 
     databaseClock();
 
@@ -198,11 +200,17 @@ async function loadTileCacheData(world_id, tileX, tileY) {
 }
 
 var fetch_tile_queue = [];
+var totalTilesCached = 0;
+var tileCacheLimit = 2000;
+
+// This object contains all tiles that are currently loaded during the iteration
+// of all tiles in a world. If an edit has been made to a loaded tile, it gets
+// added to the central tile cache.
 // Unique tile id tuple: "world_id,tile_y,_tile_x"
 var tileIterationTempMem = {};
 
-var tileCacheLim = 1000 * 60 * 1;
-// delete all in-memory tiles if they haven't been written to in a while
+var tileCacheTimeLimit = 1000 * 60 * 1;
+// free all in-memory tiles if they haven't been written to in a while
 function performCacheInvalidation() {
     var date = Date.now();
     for(var worldID in memTileCache) {
@@ -210,15 +218,24 @@ function performCacheInvalidation() {
             for(var tileX in memTileCache[worldID][tileY]) {
                 var tile = memTileCache[worldID][tileY][tileX];
                 if(tile.props_updated || tile.content_updated || tile.writability_updated) continue;
-                if(date - tile.last_accessed > tileCacheLim) {
-                    delete memTileCache[worldID][tileY][tileX];
-                    if(Object.keys(memTileCache[worldID][tileY]).length == 0) {
-                        delete memTileCache[worldID][tileY];
-                    }
-                    if(Object.keys(memTileCache[worldID]).length == 0) {
-                        delete memTileCache[worldID];
-                    }
+                if(date - tile.last_accessed > tileCacheTimeLimit) {
+                    deleteTileDIM(worldID, tileX, tileY);
                 }
+            }
+        }
+    }
+}
+
+function handleTooManyCachedTiles() {
+    // free every single tile
+    if(totalTilesCached <= tileCacheLimit) return;
+    broadcastMonitorEvent("[Database] Too many cached tiles detected");
+    for(var worldID in memTileCache) {
+        for(var tileY in memTileCache[worldID]) {
+            for(var tileX in memTileCache[worldID][tileY]) {
+                var tile = memTileCache[worldID][tileY][tileX];
+                if(tile.props_updated || tile.content_updated || tile.writability_updated) continue;
+                deleteTileDIM(worldID, tileX, tileY);
             }
         }
     }
@@ -585,6 +602,7 @@ function processTileEdit(worldID, tileX, tileY, editData) {
     for(var i = 0; i < editData.length; i++) {
         var editObj = editData[i];
         var editType = editObj[0];
+        // these should all be synchronous operations
         switch(editType) {
             case types.write:
                 tileWriteEdits(cacheTile, editObj);
@@ -630,6 +648,7 @@ function doFetchTile(queueArray) {
         }
         addTileMem(world_id, tile_x, tile_y, tile);
         processTileEdit(world_id, tile_x, tile_y, pending_edits);
+        handleTooManyCachedTiles();
     }).catch(function(e) {
         handle_error(e);
     });
@@ -747,7 +766,7 @@ async function iterateDatabaseChanges() {
     var eLogLen = editLogQueue.length;
     var editTransaction = false;
     if(eLogLen > 1) editTransaction = true;
-    if(editTransaction) await db_edits.run("BEGIN TRANSACTION");
+    if(editTransaction) await db_edits.run("BEGIN");
     for(var i = 0; i < eLogLen; i++) {
         var edit = editLogQueue[0];
         editLogQueue.shift();
@@ -768,8 +787,9 @@ async function databaseClock(serverExit) {
     databaseBusy = true;
     try {
         await iterateDatabaseChanges();
+        broadcastMonitorEvent("[Database] Clock cycle executed");
     } catch(e) {
-        handle_error(e);
+        handle_error(e, true);
     }
     databaseBusy = false;
     if(server_exiting) {
@@ -800,12 +820,12 @@ function addTileMem(worldID, tileX, tileY, cacheTileData) {
     }
     if(!memTileCache[worldID][tileY][tileX]) {
         memTileCache[worldID][tileY][tileX] = cacheTileData;
+        totalTilesCached++;
     }
 }
 function deleteTileDIM(worldID, tileX, tileY) {
-    if(!memTileCache[worldID]) return;
-    if(!memTileCache[worldID][tileY]) return;
     delete memTileCache[worldID][tileY][tileX];
+    totalTilesCached--;
     if(!Object.keys(memTileCache[worldID][tileY]).length) delete memTileCache[worldID][tileY];
     if(!Object.keys(memTileCache[worldID]).length) delete memTileCache[worldID];
 }
