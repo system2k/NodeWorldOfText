@@ -362,11 +362,11 @@
 					</div>
 					<div>
 						This page is NSFW
-						<input name="nsfw_page" type="checkbox">
+						<input name="nsfw_page" type="checkbox"{%if page_is_nsfw%} checked{%endif%}>
 					</div>
 					<div>
 						Do not log edits
-						<input name="no_log_edits" type="checkbox" checked>
+						<input name="no_log_edits" type="checkbox"{%if no_log_edits%} checked{%endif%}>
 					</div>
 				</div>
 				<input type="hidden" name="form" value="misc">

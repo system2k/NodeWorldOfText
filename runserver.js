@@ -9,6 +9,7 @@
 console.log("Starting up...");
 
 var serverLoaded = false;
+var isStopping = false;
 
 const crypto      = require("crypto");
 const fs          = require("fs");
@@ -335,6 +336,7 @@ function makePgClient() {
     console.log("Postgres client connected");
     pgConn.on("end", function() {
         console.log("WARNING: Postgres client is closed");
+        if(isStopping) return;
         setTimeout(uvias_init, 1000 * 2);
     });
     pgConn.on("error", function(err) {
@@ -3035,7 +3037,6 @@ process.once("SIGINT", function() {
 
 // stops server (for upgrades/maintenance) without crashing everything
 // This lets node terminate the program when all handles are complete
-var isStopping = false;
 function stopServer(restart, maintenance) {
     if(isStopping) return;
     isStopping = true;
