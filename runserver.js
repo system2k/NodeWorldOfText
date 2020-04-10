@@ -924,6 +924,10 @@ var bypass_key_cache = "";
 
 async function initialize_server() {
     console.log("Starting server...");
+
+    await initialize_misc_db();
+    await initialize_ranks_db();
+    await initialize_edits_db();
 	
     if(accountSystem == "uvias") {
         await uvias_init();
@@ -2361,9 +2365,6 @@ async function loadAnnouncement() {
 var wss;
 async function initialize_server_components() {
     await loadAnnouncement();
-    await initialize_misc_db();
-    await initialize_ranks_db();
-    await initialize_edits_db();
 
     bypass_key_cache = fs.readFileSync(settings.bypass_key).toString("utf8");
 
