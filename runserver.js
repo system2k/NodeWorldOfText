@@ -2019,7 +2019,7 @@ async function MODIFY_ANNOUNCEMENT(text) {
     } else {
         await db.run("UPDATE server_info SET value=? WHERE name='announcement'", text);
     }
-    ws_broadcast({
+    global_data.ws_broadcast({
         kind: "announcement",
         text: text
     });
