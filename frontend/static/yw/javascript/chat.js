@@ -13,10 +13,11 @@ var chatWriteTmpBuffer   = "";
 var defaultChatColor     = window.localStorage ? parseInt(localStorage.getItem("chatcolor")) : null; // 24-bit Uint
 
 if(isNaN(defaultChatColor)) {
-    defaultChatColor = 0;
+    defaultChatColor = null;
+} else {
+    if(defaultChatColor < 0) defaultChatColor = 0;
+    if(defaultChatColor > 16777215) defaultChatColor = 16777215;
 }
-if(defaultChatColor < 0) defaultChatColor = 0;
-if(defaultChatColor > 16777215) defaultChatColor = 16777215;
 
 defineElements({ // elm[<name>]
     chat_window: byId("chat_window"),
@@ -71,7 +72,7 @@ function api_chat_send(message, opts) {
     var chatColor;
     if(!opts.color) {
         if(!YourWorld.Color) {
-            chatColor = assignColor(YourWorld.Nickname)
+            chatColor = assignColor(YourWorld.Nickname);
         } else {
             chatColor = "#" + ("00000" + YourWorld.Color.toString(16)).slice(-6);
         }
