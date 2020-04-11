@@ -441,14 +441,13 @@ function tileWriteProtections(cacheTile, editObj) {
     var charX = data.charX;
     var charY = data.charY;
     var user = data.user;
-    var world = data.user;
-    var is_member = data.is_member || (user.superuser && world.name == "");
-    var is_owner = data.is_owner || (user.superuser && world.name == "");
+    var world = data.world;
     var precise = data.precise;
     var protect_type = data.protect_type;
 
     var feature_perm = world.feature_membertiles_addremove;
-    is_member = (is_member && feature_perm) || is_owner || (user.superuser && world.name == "");
+    var is_owner = data.is_owner || (user.superuser && world.name == "");
+    var is_member = (data.is_member && feature_perm) || is_owner || (user.superuser && world.name == "");
 
     var tile_writability = cacheTile.writability;
     if(tile_writability == null) tile_writability = world.writability;
