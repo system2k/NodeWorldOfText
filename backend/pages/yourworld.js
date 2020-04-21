@@ -68,8 +68,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
     }
 
     if(query_data.fetch == 1) { // fetch request
-        vars.timemachine = { active: params.timemachine };
-        vars.world = world;
+        evars.timemachine = { active: params.timemachine };
+        evars.world = world;
         var tiles = await modules.fetch_tiles({
             fetchRectangles: [{
                 minY: query_data.min_tileY,
@@ -81,7 +81,10 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
             array: query_data.array,
             content_only: query_data.content_only,
             concat: query_data.concat
-        }, vars);
+        }, vars, evars);
+        if(typeof tiles == "string") {
+            return serve(tiles);
+        }
         if("data" in tiles) tiles = tiles.data;
         var tData;
         if(typeof tiles == "string") {
@@ -89,7 +92,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
         } else {
             tData = JSON.stringify(tiles);
         }
-        serve(tData, null, {
+        return serve(tData, null, {
             mime: "application/json; charset=utf-8"
         });
     } else { // the HTML page
@@ -197,7 +200,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
             nsfw: world_properties.page_is_nsfw,
             meta_desc
         }
-        serve(HTML("yourworld.html", data), null, {
+        return serve(HTML("yourworld.html", data), null, {
             mime: "text/html; charset=utf-8"
         });
     }
@@ -222,17 +225,19 @@ module.exports.POST = async function(req, serve, vars, evars) {
         return serve(null, 403);
     }
 
-    vars.world = world;
+    evars.world = world;
+    evars.user.stats = read_permission;
+
     var edits_parsed;
     try {
         edits_parsed = JSON.parse(post_data.edits);
     } catch(e) {
-        return serve(null, 418);
+        return serve(null, 400);
     }
 
     var do_write = await modules.write_data({
         edits: edits_parsed
-    }, vars);
+    }, vars, evars);
 
     serve(JSON.stringify(do_write.accepted));
 }

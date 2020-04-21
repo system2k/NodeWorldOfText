@@ -1208,6 +1208,15 @@ function createWsPath() {
 }
 var ws_path = createWsPath();
 
+var defaultTextColorOverridden = false;
+function checkTextColorOverride() {
+    // if the (main) default text color is black, allow protected zones to use their own text color
+    if(styles.text == "#000" || styles.text == "#000000") {
+        defaultTextColorOverridden = true;
+    } else {
+        defaultTextColorOverridden = false;
+    }
+}
 var styles = null;
 
 var menuStyle;
@@ -1268,9 +1277,12 @@ function defaultStyles() {
         member: "#eee",
         public: "#fff",
         cursor: "#ff0",
-        guestCursor: "#ffffee",
+        guestCursor: "#ffe",
         text: "#000",
-        menu: "#e5e5ff"
+        menu: "#e5e5ff",
+        public_text: "#000",
+        member_text: "#000",
+        owner_text: "#000"
     };
 }
 
@@ -1337,6 +1349,7 @@ function begin() {
         } else {
             styles = style;
         }
+        checkTextColorOverride();
         menu_color(styles.menu);
         createSocket();
     });
@@ -3426,7 +3439,7 @@ function encodeCharProt(array, encoding) {
     return str;
 }
 
-function renderChar(x, y, str, content, props, textRender, colors) {
+function renderChar(x, y, str, content, props, textRender, colors, writability) {
     // fillText is always off by 5 pixels, adjust it
     var textYOffset = cellH - (5 * zoom);
     // fill background if defined
@@ -3444,6 +3457,12 @@ function renderChar(x, y, str, content, props, textRender, colors) {
     var color = colors[y * tileC + x];
     // initialize link color to default text color in case there's no link to color
     var linkColor = styles.text;
+    if(defaultTextColorOverridden) {
+        if(writability == 0) linkColor = styles.public_text;
+        if(writability == 1) linkColor = styles.member_text;
+        if(writability == 2) linkColor = styles.owner_text;
+    }
+
     var isLink = false;
 
     // check if this char is a link
@@ -3550,17 +3569,14 @@ function renderTile(tileX, tileY, redraw) {
 
     var writability = null;
 
-    // make sure tile is not null before getting the writability
     if(tile) writability = tile.properties.writability;
 
-    // placeholder in case writability is null
-    var temp_writability = writability;
-
+    var computed_writability = writability;
     if(!tile.backgroundColor) {
-        if(writability == null) temp_writability = state.worldModel.writability;
-        if(temp_writability == 0) owotCtx.fillStyle = styles.public;
-        if(temp_writability == 1) owotCtx.fillStyle = styles.member;
-        if(temp_writability == 2) owotCtx.fillStyle = styles.owner;
+        if(writability == null) computed_writability = state.worldModel.writability;
+        if(computed_writability == 0) owotCtx.fillStyle = styles.public;
+        if(computed_writability == 1) owotCtx.fillStyle = styles.member;
+        if(computed_writability == 2) owotCtx.fillStyle = styles.owner;
     } else {
         owotCtx.fillStyle = tile.backgroundColor;
     }
@@ -3691,13 +3707,19 @@ function renderTile(tileX, tileY, redraw) {
                 var cX = c % tileC;
                 var cY = Math.floor(c / tileC);
                 textRender.clearRect(cX * cellW, cY * cellH, cellW, cellH);
-                renderChar(cX, cY, str, content, props, textRender, colors);
+                renderChar(cX, cY, str, content, props, textRender, colors, code);
             }
         }
     } else {
         for(var y = 0; y < tileR; y++) {
             for(var x = 0; x < tileC; x++) {
-                renderChar(x, y, str, content, props, textRender, colors);
+                var protValue = writability;
+                if(tile.properties.char) {
+                    protValue = tile.properties.char[y * tileC + x];
+                }
+                if(protValue == null) protValue = tile.properties.writability;
+                if(protValue == null) protValue = state.worldModel.writability;
+                renderChar(x, y, str, content, props, textRender, colors, protValue);
             }
         }
     }
@@ -4797,9 +4819,13 @@ var ws_functions = {
         styles.public = data.colors.background;
         styles.cursor = data.colors.cursor;
         styles.member = data.colors.member_area;
-        styles.menu   = data.colors.menu;
-        styles.owner  = data.colors.owner_area;
-        styles.text   = data.colors.text;
+        styles.menu = data.colors.menu;
+        styles.owner = data.colors.owner_area;
+        styles.text = data.colors.text;
+        styles.public_text = data.colors.public_text;
+        styles.member_text = data.colors.member_text;
+        styles.owner_text = data.colors.owner_text;
+        checkTextColorOverride();
         renderTiles(true); // render all tiles with new colors
         menu_color(styles.menu);
     },

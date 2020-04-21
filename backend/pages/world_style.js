@@ -6,6 +6,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
     var world_get_or_create = vars.world_get_or_create;
     var can_view_world = vars.can_view_world;
     
+    if(typeof query_data.world != "string") return serve(null, 400);
     var world = await world_get_or_create(query_data.world);
     if(!world) {
         return serve(null, 404);
@@ -22,8 +23,11 @@ module.exports.GET = async function(req, serve, vars, evars) {
     var memberTileColor = world.custom_tile_member || "#eee";
     var publicTileColor = world.custom_bg || "#fff";
     var cursorColor = world.custom_cursor || "#ff0";
-    var guestCursorColor = world.custom_guest_cursor || "#ffffee";
+    var guestCursorColor = world.custom_guest_cursor || "#ffe";
     var menuColor = properties.custom_menu_color || "#e5e5ff";
+    var publicTextColor = properties.custom_public_text_color || "#000";
+    var memberTextColor = properties.custom_member_text_color || "#000";
+    var ownerTextColor = properties.custom_owner_text_color || "#000";
 
     var style = {
         owner: ownerTileColor,
@@ -32,7 +36,10 @@ module.exports.GET = async function(req, serve, vars, evars) {
         cursor: cursorColor,
         guestCursor: guestCursorColor,
         text: backgroundColor,
-        menu: menuColor
+        menu: menuColor,
+        public_text: publicTextColor,
+        member_text: memberTextColor,
+        owner_text: ownerTextColor
     }
 
     serve(JSON.stringify(style), null, {

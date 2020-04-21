@@ -1663,12 +1663,15 @@ async function world_get_or_create(name, do_not_create, force_create) {
             var writability = 0;
             var readability = 0;
             var properties = JSON.stringify({
-                // default property values. by default, they are not present in the object.
+                // default property values. by default, they are not present in this object.
 
                 // views: 0,
                 // chat_permission: 0,
                 // color_text: 0,
                 // custom_menu_color: "",
+                // custom_public_text_color: "",
+                // custom_member_text_color: "",
+                // custom_owner_text_color: "",
                 // page_is_nsfw: false,
                 // square_chars: false,
                 // no_log_edits: false,

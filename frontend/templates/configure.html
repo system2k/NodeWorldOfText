@@ -220,7 +220,35 @@
 							<input name="color" value="{{ color }}" maxlength="20">
 						</td>
 						<td class="feature_description">
-							Use any <a href="http://en.wikipedia.org/wiki/Web_colors">CSS color</a>, such as "#40E0D0".
+							Use any <a href="https://en.wikipedia.org/wiki/Web_colors">CSS color</a>, such as "#40E0D0".
+							This is the color to be used then the text is completely black (#000000).
+						</td>
+					</tr>
+					<tr>
+						<td class="feature_name">Text color (public areas)</td>
+						<td>
+							<input name="public_text_color" value="{{ public_text_color }}" maxlength="20">
+						</td>
+						<td class="feature_description">
+							Public area text color
+						</td>
+					</tr>
+					<tr>
+						<td class="feature_name">Text color (member areas)</td>
+						<td>
+							<input name="member_text_color" value="{{ member_text_color }}" maxlength="20">
+						</td>
+						<td class="feature_description">
+							Member area text color
+						</td>
+					</tr>
+					<tr>
+						<td class="feature_name">Text color (owner areas)</td>
+						<td>
+							<input name="owner_text_color" value="{{ owner_text_color }}" maxlength="20">
+						</td>
+						<td class="feature_description">
+							Owner area text color
 						</td>
 					</tr>
 					<tr>
@@ -231,14 +259,14 @@
 						<td class="feature_description">
 						</td>
                     </tr>
-                    <tr>
+                    <!--<tr>
 						<td class="feature_name">Guest cursor color</td>
 						<td>
 							<input name="cursor_guest_color" value="{{ cursor_guest_color }}" maxlength="20">
 						</td>
 						<td class="feature_description">
 						</td>
-					</tr>
+					</tr>-->
 					<tr>
 						<td class="feature_name">Background color</td>
 						<td>

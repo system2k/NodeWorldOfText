@@ -6,6 +6,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
     var world_get_or_create = vars.world_get_or_create;
     var can_view_world = vars.can_view_world;
     
+    if(typeof query_data.world != "string") return serve(null, 400);
     var world = await world_get_or_create(query_data.world);
     if(!world) {
         return serve(null, 404);
@@ -22,6 +23,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
         pathname = "/" + pathname;
     }
 
+    // TODO: display all properties as given in yourworld.js
     var props = {
         feature_membertiles_addremove: !!world.feature_membertiles_addremove,
         writability: world.writability,

@@ -1,10 +1,4 @@
-// 0 = false, 1 = true
-function bint(x) {
-    return !!parseInt(x);
-}
-
 function validateCSS(c) {
-    c += "";
     if(c == "default") return "";
     if(typeof c !== "string") return "";
     if(c.length > 100) c = c.slice(0, 100);
@@ -109,7 +103,11 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
     var bg = world.custom_bg || "default";
     var owner_color = world.custom_tile_owner || "default";
     var member_color = world.custom_tile_member || "default";
+
     var menu_color = properties.custom_menu_color || "default";
+    var public_text_color = properties.custom_public_text_color || "default";
+    var member_text_color = properties.custom_member_text_color || "default";
+    var owner_text_color = properties.custom_owner_text_color || "default";
 
     var square_chars = !!properties.square_chars;
     var half_chars = !!properties.half_chars;
@@ -146,7 +144,11 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
         bg,
         owner_color,
         member_color,
+
         menu_color,
+        public_text_color,
+        member_text_color,
+        owner_text_color,
 
         owner_name,
         page_is_nsfw: !!properties.page_is_nsfw,
@@ -362,8 +364,33 @@ module.exports.POST = async function(req, serve, vars, evars) {
         var bg = validateCSS(post_data.bg);
         var owner_color = validateCSS(post_data.owner_color);
         var member_color = validateCSS(post_data.member_color);
+
         var menu_color = validateCSS(post_data.menu_color);
-        properties.custom_menu_color = menu_color;
+        var public_text_color = validateCSS(post_data.public_text_color);
+        var member_text_color = validateCSS(post_data.member_text_color);
+        var owner_text_color = validateCSS(post_data.owner_text_color);
+
+        if(menu_color) {
+            properties.custom_menu_color = menu_color;
+        } else {
+            delete properties.custom_menu_color;
+        }
+
+        if(public_text_color) {
+            properties.custom_public_text_color = public_text_color;
+        } else {
+            delete properties.custom_public_text_color;
+        }
+        if(member_text_color) {
+            properties.custom_member_text_color = member_text_color;
+        } else {
+            delete properties.custom_member_text_color;
+        }
+        if(owner_text_color) {
+            properties.custom_owner_text_color = owner_text_color;
+        } else {
+            delete properties.custom_owner_text_color;
+        }
 
         await db.run("UPDATE world SET (custom_bg,custom_cursor,custom_color,custom_tile_owner,custom_tile_member,properties)=(?,?,?,?,?,?) WHERE id=?",
             [bg, cursor_color, color, owner_color, member_color, JSON.stringify(properties), world.id]);
@@ -376,7 +403,10 @@ module.exports.POST = async function(req, serve, vars, evars) {
                 member_area: member_color || "#eee",
                 background: bg || "#fff",
                 owner_area: owner_color || "#ddd",
-                menu: menu_color || "#e5e5ff"
+                menu: menu_color || "#e5e5ff",
+                public_text: public_text_color || "#000",
+                member_text: member_text_color || "#000",
+                owner_text: owner_text_color || "#000"
             }
         }, world.name);
     } else if(post_data.form == "misc") {
