@@ -1208,13 +1208,26 @@ function createWsPath() {
 }
 var ws_path = createWsPath();
 
-var defaultTextColorOverridden = false;
+var textColorOverride = 0; // public-member-owner bitfield
 function checkTextColorOverride() {
-    // if the (main) default text color is black, allow protected zones to use their own text color
-    if(styles.text == "#000" || styles.text == "#000000") {
-        defaultTextColorOverridden = true;
+    var public = 4;
+    var member = 2;
+    var owner = 1;
+    // if custom text color is set to a zone, use that color instead of main default
+    if(styles.public_text != "#000" && styles.public_text != "#000000") {
+        textColorOverride |= public;
     } else {
-        defaultTextColorOverridden = false;
+        textColorOverride &= textColorOverride ^ public;
+    }
+    if(styles.member_text != "#000" && styles.member_text != "#000000") {
+        textColorOverride |= member;
+    } else {
+        textColorOverride &= textColorOverride ^ member;
+    }
+    if(styles.owner_text != "#000" && styles.owner_text != "#000000") {
+        textColorOverride |= owner;
+    } else {
+        textColorOverride &= textColorOverride ^ owner;
     }
 }
 var styles = null;
@@ -3457,11 +3470,12 @@ function renderChar(x, y, str, content, props, textRender, colors, writability) 
     var color = colors[y * tileC + x];
     // initialize link color to default text color in case there's no link to color
     var linkColor = styles.text;
-    if(defaultTextColorOverridden) {
-        if(writability == 0) linkColor = styles.public_text;
-        if(writability == 1) linkColor = styles.member_text;
-        if(writability == 2) linkColor = styles.owner_text;
+    if(textColorOverride) {
+        if(writability == 0 && textColorOverride & 4) linkColor = styles.public_text;
+        if(writability == 1 && textColorOverride & 2) linkColor = styles.member_text;
+        if(writability == 2 && textColorOverride & 1) linkColor = styles.owner_text;
     }
+    
 
     var isLink = false;
 
