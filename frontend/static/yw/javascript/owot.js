@@ -3267,7 +3267,7 @@ function getTileCanvas(str) {
     return [textRenderCanvas, textRender];
 }
 
-function generateBackgroundPixels(tileX, tileY, image, returnCanvas, isBackground) {
+function generateBackgroundPixels(tileX, tileY, image, returnCanvas, isBackground, writability) {
     var tileWidth = Math.trunc(tileW);
     var tileHeight = Math.trunc(tileH);
     if(returnCanvas) {
@@ -3305,6 +3305,12 @@ function generateBackgroundPixels(tileX, tileY, image, returnCanvas, isBackgroun
         startX += Math.floor(img_width / 2);
         startY += Math.floor(img_height / 2);
     }
+    var brightnessOffset = 0;
+    if(writability == 1) {
+        brightnessOffset = -30;
+    } else if(writability == 2) {
+        brightnessOffset = -60;
+    }
     // start drawing the pixels
     for(var y = 0; y < tileHeight; y++) {
         for(var x = 0; x < tileWidth; x++) {
@@ -3330,6 +3336,9 @@ function generateBackgroundPixels(tileX, tileY, image, returnCanvas, isBackgroun
                 G = 255 - G;
                 B = 255 - B;
             }
+            R += brightnessOffset;
+            G += brightnessOffset;
+            B += brightnessOffset;
             imgData.data[destIndex + 0] = R;
             imgData.data[destIndex + 1] = G;
             imgData.data[destIndex + 2] = B;
@@ -3586,8 +3595,8 @@ function renderTile(tileX, tileY, redraw) {
     if(tile) writability = tile.properties.writability;
 
     var computed_writability = writability;
+    if(writability == null) computed_writability = state.worldModel.writability;
     if(!tile.backgroundColor) {
-        if(writability == null) computed_writability = state.worldModel.writability;
         if(computed_writability == 0) owotCtx.fillStyle = styles.public;
         if(computed_writability == 1) owotCtx.fillStyle = styles.member;
         if(computed_writability == 2) owotCtx.fillStyle = styles.owner;
@@ -3698,7 +3707,7 @@ function renderTile(tileX, tileY, redraw) {
     // first, clear text renderer canvas
     textRender.clearRect(0, 0, tileW, tileH);
     if(images.background && backgroundEnabled) {
-        var background_data = generateBackgroundPixels(tileX, tileY, images.background, true, true);
+        var background_data = generateBackgroundPixels(tileX, tileY, images.background, true, true, computed_writability);
         textRender.drawImage(background_data, 0, 0, tileW, tileH);
     }
 

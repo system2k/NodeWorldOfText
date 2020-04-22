@@ -262,7 +262,7 @@ module.exports = async function(ws, data, send, vars, evars) {
                 id = san_nbr(id);
                 if(id < 0) return;
             }
-            var blocks = ws.chat_blocks;
+            var blocks = ws.sdata.chat_blocks;
             if(blocks.length >= chatIdBlockLimit) return serverChatResponse("Too many blocked IDs", data.location);
             if(blocks.indexOf(id) > -1) return;
             blocks.push(id);
