@@ -266,18 +266,10 @@ var SelectionModal = (function() {
                         if(col == currentCol) continue;
                         currentCol = col;
                         var chr = "\x1b";
-                        // optimized for using less bytes
                         if(col == 0) {
                             chr += "x";
                         } else {
-                            var colc = col.toString(16);
-                            if(colc.length == 1) chr += "A";
-                            if(colc.length == 2) chr += "B";
-                            if(colc.length == 3) chr += "C";
-                            if(colc.length == 4) chr += "D";
-                            if(colc.length == 5) chr += "E";
-                            if(colc.length == 6) chr += "F";
-                            chr += colc;
+                            chr += "F" + col.toString(16).padStart(6, 0);
                         }
                         chr += line[x];
                         line[x] = chr;

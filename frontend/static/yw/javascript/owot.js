@@ -2496,7 +2496,11 @@ function alertJS(data) {
     js_alert_active = true;
     elm.confirm_js.style.display = "";
     elm.confirm_js_code.innerText = data;
-    run_js_confirm_risk.href = "javascript:confirmRunJsLink(\"" + escapeURLQuote(data) + "\");"
+    run_js_confirm_risk.href = data;
+    run_js_confirm_risk.onclick = function() {
+        confirmRunJsLink(data);
+        return false;
+    }
     run_js_confirm.href = "javascript:confirmRunJsLink(null, true);"
     confirm_js_cancel.onclick = closeJSAlert;
     confirm_js_cancel_x.onclick = closeJSAlert;
@@ -2517,10 +2521,14 @@ function confirmRunJsLink(data, confirmWarning) {
         run_js_confirm.text = "run ▲";
         return; 
     }
-    var doRun = confirm("Are you sure you want to run this javascript link?\nPress cancel to NOT run it.\n\"" + escapeURLQuote(data.slice(0, 256)) + "\"");
+    var preview = data;
+    if(preview.length > 256) {
+        preview = preview.slice(0, 256) + " [...]";
+    }
+    var doRun = confirm("Are you sure you want to run this javascript link?\nPress cancel to NOT run it.\n\"" + preview + "\"");
     if(!doRun) return closeJSAlert();
     var link = document.createElement("a");
-    link.href = data;
+    link.href = "javascript:" + data;
     link.click();
     link.remove();
     closeJSAlert();
@@ -2554,6 +2562,11 @@ var linkElm = document.createElement("a");
 linkElm.href = "";
 linkElm.className = "link_element";
 document.body.appendChild(linkElm);
+var linkParams = {
+    protocol: "",
+    url: "",
+    coord: false
+};
 var linkDiv = document.createElement("div");
 linkDiv.style.width = cellW + "px";
 linkDiv.style.height = cellH + "px";
@@ -2563,6 +2576,28 @@ linkElm.target = "_blank";
 linkElm.style.cursor = "pointer";
 linkElm.ondragstart = function() {
     return false;
+}
+linkElm.onclick = function(e) {
+    if(linkParams.coord) {
+        coord_link_click(e);
+        return;
+    }
+    var linkEvent = url_link_click(e);
+    var prot = linkParams.protocol;
+    var url = linkParams.url;
+    if(prot == "javascript") {
+        runJsLink(url);
+        return false;
+    } else if(prot == "com") {
+        w.broadcastCommand(url);
+        return false;
+    } else if(prot == "comu") {
+        w.broadcastCommand(url, true);
+        return false;
+    }
+    if(linkEvent && linkEvent[0]) {
+        return linkEvent[0];
+    }
 }
 var currentSelectedLink = null;
 var currentSelectedLinkCoords = null; // [tileX, tileY, charX, charY]
@@ -2607,43 +2642,47 @@ function updateHoveredLink(mouseX, mouseY, evt) {
         linkElm.style.left = pos[0] + "px";
         linkElm.style.top = pos[1] + "px";
         linkElm.hidden = false;
-        linkElm.onclick = "";
         linkElm.target = "_blank";
         linkElm.href = "";
-        linkElm.onclick = null;
         linkElm.rel = "";
         linkElm.title = "";
         if(link[0].type == "url") {
+            linkParams.coord = false;
             var URL_Link = link[0].url;
             linkElm.href = URL_Link;
+            linkElm.rel = "noopener noreferrer";
             var linkProtocol = linkElm.protocol;
             if(linkProtocol == "javascript:") {
                 linkElm.target = "";
-                URL_Link = "javascript:runJsLink(\"" + escapeURLQuote(URL_Link) + "\");";
-                linkElm.href = URL_Link;
+                linkParams.protocol = "javascript";
+                var url = URL_Link.slice(linkProtocol.length);
+                linkParams.url = url;
             } else if(linkProtocol == "com:") {
                 linkElm.target = "";
-                var com = URL_Link.split("com:")[1];
-                URL_Link = "javascript:w.broadcastCommand(\"" + escapeURLQuote(com) + "\");";
-                linkElm.href = URL_Link;
-                linkElm.title = "com:" + com;
+                linkParams.protocol = "com";
+                var url = URL_Link.slice(linkProtocol.length);
+                linkParams.url = url;
+                linkElm.title = "com:" + url;
             } else if(linkProtocol == "comu:") {
                 linkElm.target = "";
-                var com = URL_Link.split("comu:")[1];
-                URL_Link = "javascript:w.broadcastCommand(\"" + escapeURLQuote(com) + "\", true);";
-                linkElm.href = URL_Link;
-                linkElm.title = "comu:" + com;
+                linkParams.protocol = "comu";
+                var url = URL_Link.slice(linkProtocol.length);
+                linkParams.url = url;
+                linkElm.title = "comu:" + url;
             } else {
+                linkParams.protocol = "";
                 linkElm.rel = "noopener noreferrer";
+                linkParams.url = URL_Link;
             }
             if(!linkElm.title) linkElm.title = "Link to URL " + linkElm.href;
-            linkElm.onclick = url_link_click;
         } else if(link[0].type == "coord") {
-            var pos = link[0].link_tileX + "," + link[0].link_tileY;
-            if(!linkElm.title) linkElm.title = "Link to coordinates " + pos;
-            linkElm.href = "javascript:void(0);";
-            linkElm.onclick = coord_link_click;
+            linkParams.coord = true;
+            linkParams.protocol = "";
             linkElm.target = "";
+            linkElm.href = "javascript:void(0);";
+            linkElm.target = "";
+            var pos = link[0].link_tileX + "," + link[0].link_tileY;
+            linkElm.title = "Link to coordinates " + pos;
         }
     } else {
         currentSelectedLink = null;
