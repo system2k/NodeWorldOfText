@@ -159,6 +159,7 @@ function normalize_tile(tile_db_data) {
         props_updated: false,
         content_updated: false,
         writability_updated: false,
+        inserting: false,
         last_accessed: -1
     };
     if(tile_db_data) {
@@ -217,7 +218,7 @@ function performCacheInvalidation() {
         for(var tileY in memTileCache[worldID]) {
             for(var tileX in memTileCache[worldID][tileY]) {
                 var tile = memTileCache[worldID][tileY][tileX];
-                if(tile.props_updated || tile.content_updated || tile.writability_updated) continue;
+                if(tile.props_updated || tile.content_updated || tile.writability_updated || tile.inserting) continue;
                 if(date - tile.last_accessed > tileCacheTimeLimit) {
                     deleteTileDIM(worldID, tileX, tileY);
                 }
@@ -234,7 +235,7 @@ function handleTooManyCachedTiles() {
         for(var tileY in memTileCache[worldID]) {
             for(var tileX in memTileCache[worldID][tileY]) {
                 var tile = memTileCache[worldID][tileY][tileX];
-                if(tile.props_updated || tile.content_updated || tile.writability_updated) continue;
+                if(tile.props_updated || tile.content_updated || tile.writability_updated || tile.inserting) continue;
                 deleteTileDIM(worldID, tileX, tileY);
             }
         }
@@ -411,7 +412,7 @@ function tileWriteLinks(cacheTile, editObj) {
     if(type == "url") {
         cacheTile.prop_cell_props[charY][charX].link = {
             type: "url",
-            url: url.slice(0, 10064) // size limit of urls
+            url: url.slice(0, 10000) // size limit of urls
         }
     } else if(type == "coord") {
         cacheTile.prop_cell_props[charY][charX].link = {
@@ -749,9 +750,10 @@ async function iterateDatabaseChanges() {
                     if(Object.keys(tile.prop_cell_props).length > 0) {
                         propObj.cell_props = tile.prop_cell_props;
                     }
+                    tile.inserting = true; // don't cache invalidate tile as it's being inserted
                     writeQueue.push(["INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?, ?)",
                         [worldID, tile.content.join(""), tileY, tileX, JSON.stringify(propObj), tile.writability, Date.now()], function(newTile) {
-                            if(!tile) return;
+                            tile.inserting = false;
                             tile.tile_exists = true;
                             tile.tile_id = newTile.lastID;
                         }]);

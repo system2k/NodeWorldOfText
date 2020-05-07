@@ -2540,17 +2540,13 @@ var ws_limits = { // [amount, per ms, minimum ms cooldown]
     link:        [400, 1000, 0],
     protect:     [400, 1000, 0],
     set_tile:    [10, 1000, 0],
-    write:       [256, 1000, 0], // rate limited in another script
+    write:       [30, 1000, 0], // rate limited in another script
     paste:       [1, 1000, 0]
 };
 /*
-    fetch:
-        max 20 reqs every 500 MS
-        a large requests is 200+ tiles in a single request.
-        max 5 large requests every second.
     write:
-        1000 characters per second
-        10 tiles per second
+        5 edits per second for 200-and-below writes.
+        2 edits per second for larger edits.
 */
 
 function can_process_req_kind(lims, kind) {
