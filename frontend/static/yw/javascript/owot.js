@@ -2528,7 +2528,7 @@ function confirmRunJsLink(data, confirmWarning) {
     var doRun = confirm("Are you sure you want to run this javascript link?\nPress cancel to NOT run it.\n\"" + preview + "\"");
     if(!doRun) return closeJSAlert();
     var link = document.createElement("a");
-    link.href = "javascript:" + data;
+    link.href = "javascript:" + encodeURIComponent(data);
     link.click();
     link.remove();
     closeJSAlert();
@@ -2539,7 +2539,7 @@ function runJsLink(data) {
         alertJS(data);
     } else {
         var link = document.createElement("a");
-        link.href = data;
+        link.href = "javascript:" + encodeURIComponent(data);
         link.click();
         link.remove();
     }
