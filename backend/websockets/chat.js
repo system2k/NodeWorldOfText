@@ -152,8 +152,6 @@ module.exports = async function(ws, data, send, vars, evars) {
         [3, "uptime", null, "get uptime of server", null],
 
         [2, "worlds", null, "list all worlds", null],
-        [2, "getip", ["id"], "retrieve the IP address", "1220"],
-        [2, "getclients", null, "get list of all connected clients", null],
 
         [0, "help", null, "list all commands", null],
         [0, "nick", ["nickname"], "change your nickname", "JohnDoe"], // client-side
@@ -271,63 +269,6 @@ module.exports = async function(ws, data, send, vars, evars) {
         uptime: function() {
             serverChatResponse("Server uptime: " + uptime(), data.location);
         },
-        getip: function(id) {
-            id = san_nbr(id);
-            if(id < 0) id = 0;
-            var res = "Client [" + id + "]:<br><div style=\"background-color: #C0C0C0\">";
-            var clientsFound = 0;
-
-            if(data.location == "page") {
-                if(client_ips[world.id] && client_ips[world.id][id]) {
-                    var cli = client_ips[world.id][id];
-                    var cli_ip = cli[0];
-                    var cli_closed = cli[2];
-                    if(clientsFound != 0) res += "<br>";
-                    res += cli_ip + ", " + (cli_closed ? "disconnected" : "connected");
-                    clientsFound++;
-                }
-            } else if(data.location == "global") {
-                for(var c_world in client_ips) {
-                    var c_obj = client_ips[c_world];
-                    if(c_obj[id]) {
-                        var cli = c_obj[id];
-                        var cli_ip = cli[0];
-                        var cli_closed = cli[2];
-                        if(clientsFound != 0) res += "<br>";
-                        res += "[world: " + c_world + "], " + (cli_closed ? "disconnected" : "connected");
-                        clientsFound++;
-                    }
-                }
-            }
-            res += "</div>";
-            if(clientsFound == 0) {
-                res = "No clients found for id " + id;
-            }
-            serverChatResponse(res, data.location);
-        },
-        getclients: function() {
-            var res = "Clients:<br><div style=\"background-color: #C0C0C0\">";
-            var clientsFound = 0;
-            wss.clients.forEach(function(ws) {
-                if(!ws.sdata.userClient) return;
-                if(data.location == "page") {
-                    if(ws.sdata.world_id == world.id) {
-                        if(clientsFound != 0) res += "<br>";
-                        res += "[" + ws.sdata.clientId + "] " + ws.sdata.ipAddress;
-                        clientsFound++;
-                    }
-                } else if(data.location == "global") {
-                    if(clientsFound != 0) res += "<br>";
-                    res += "[id: " + ws.sdata.clientId + ", world: " + ws.sdata.world_id + "] " + ws.sdata.ipAddress;
-                    clientsFound++;
-                }
-            });
-            res += "</div>";
-            if(clientsFound == 0) {
-                res = "No clients found";
-            }
-            serverChatResponse(res, data.location);
-        },
         tell: function(id, message) {
             id += "";
             message += "";
@@ -412,12 +353,6 @@ module.exports = async function(ws, data, send, vars, evars) {
                 return;
             case "block":
                 com.block(args[1]);
-                return;
-            case "getip":
-                com.getip(args[1]);
-                return;
-            case "getclients":
-                com.getclients();
                 return;
             case "tell":
                 com.tell(args[1], args.slice(2).join(" "));

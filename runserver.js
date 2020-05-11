@@ -2543,11 +2543,6 @@ var ws_limits = { // [amount, per ms, minimum ms cooldown]
     write:       [30, 1000, 0], // rate limited in another script
     paste:       [1, 1000, 0]
 };
-/*
-    write:
-        5 edits per second for 200-and-below writes.
-        2 edits per second for larger edits.
-*/
 
 function can_process_req_kind(lims, kind) {
     if(!ws_limits[kind]) return true;
