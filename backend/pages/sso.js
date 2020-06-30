@@ -6,7 +6,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
     var accountSystem = vars.accountSystem;
     var ms = vars.ms;
 
-    if(accountSystem == "local") return;
+    if(accountSystem == "local") return vars.skip;
 
     var token = query_data.ssotoken;
 

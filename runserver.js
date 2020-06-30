@@ -716,7 +716,7 @@ console.log("Loading page files");
 const pages      = load_modules("./backend/pages/");
 const websockets = load_modules("./backend/websockets/");
 const modules    = load_modules("./backend/modules/");
-const systems    = load_modules("./backend/systems/");
+const subsystems = load_modules("./backend/subsystems/");
 
 function asyncDbSystem(database) {
     const db = {
@@ -1276,10 +1276,12 @@ var ms = {
     decade: 315569520000
 };
 
+var skipSymbol = Symbol("skip");
 var url_regexp = [ // regexp , function/redirect to , options
     [/^favicon\.ico[\/]?$/g, "/static/favicon.png", { no_login: true }],
     [/^robots\.txt[\/]?$/g, "/static/robots.txt", { no_login: true }],
     [/^home[\/]?$/g, pages.home],
+    [/^.well-known\/(.*)/g, pages.well_known, { no_login: true, binary_post_data: true }],
 
     [/^accounts\/login[\/]?$/g, pages.login],
     [/^accounts\/logout[\/]?$/g, pages.logout],
@@ -1918,7 +1920,7 @@ async function process_request(req, res) {
                     user = await get_user_info(cookies, false, include_cookies);
                     // check if user is logged in
                     if(!cookies.csrftoken) {
-                        var token = new_token(32)
+                        var token = new_token(32);
                         var date = Date.now();
                         include_cookies.push("csrftoken=" + token + "; expires=" + http_time(date + ms.year) + "; path=/;");
                         user.csrftoken = token;
@@ -1936,7 +1938,7 @@ async function process_request(req, res) {
                 if(method == "POST") {
                     var dat = await wait_response_data(req, dispatch, options.binary_post_data, user.superuser);
                     if(!dat) {
-                        return;
+                        return dispatch("Post error", 400);
                     }
                     post_data = dat;
                 }
@@ -1975,7 +1977,8 @@ async function process_request(req, res) {
                 };
                 if(row[1][method] && valid_method(method)) {
                     // Return the page
-                    await row[1][method](req, dispatch, global_data, evars, {});
+                    var pageStat = await row[1][method](req, dispatch, global_data, evars, {});
+                    if(pageStat == skipSymbol) continue;
                 } else {
                     dispatch("Method " + method + " not allowed.", 405);
                 }
@@ -2921,6 +2924,7 @@ function start_server() {
 var worldViews = {};
 
 var global_data = {
+    skip: skipSymbol,
     memTileCache,
     isTestServer,
     announcement: function() { return announcement_cache },
@@ -2976,7 +2980,7 @@ var global_data = {
     client_ips,
     modify_bypass_key,
     trimHTML,
-    tile_database: systems.tile_database,
+    tile_database: subsystems.tile_database,
     intv,
     WebSocket,
     fixColors,
@@ -3000,9 +3004,9 @@ var global_data = {
 };
 
 async function sysLoad() {
-    // initialize variables in the systems
-    for(var i in systems) {
-        var sys = systems[i];
+    // initialize variables in the subsystems
+    for(var i in subsystems) {
+        var sys = subsystems[i];
         await sys.main(global_data);
     }
 }
@@ -3060,8 +3064,8 @@ function stopServer(restart, maintenance) {
                 }
             }
 
-            for(var i in systems) {
-                var sys = systems[i];
+            for(var i in subsystems) {
+                var sys = subsystems[i];
                 if(sys.server_exit) {
                     await sys.server_exit();
                 }
