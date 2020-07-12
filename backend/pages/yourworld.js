@@ -44,6 +44,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
     var redirect = evars.redirect;
     var HTML = evars.HTML;
 
+    var dispage = vars.dispage;
     var db = vars.db;
     var world_get_or_create = vars.world_get_or_create;
     var can_view_world = vars.can_view_world;
@@ -58,7 +59,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
     }
 
     var world = await world_get_or_create(world_name);
-    if(!world) return;
+    if(!world) return await dispage("404", null, req, serve, vars, evars);
 
     var world_properties = JSON.parse(world.properties);
 
@@ -217,7 +218,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
     var can_view_world = vars.can_view_world;
 
     var world = await world_get_or_create(path);
-    if(!world) return;
+    if(!world) return serve(null, 404);
 
     var read_permission = await can_view_world(world, user, db);
     if(!read_permission) {

@@ -1333,17 +1333,15 @@ var url_regexp = [ // regexp , function/redirect to , options
 
     [/^other\/random_color[\/]?$/g, pages.random_color, { no_login: true }],
     [/^other\/backgrounds\/(.*)[\/]?$/g, pages.load_backgrounds, { no_login: true }],
-    [/^other\/chat\/(.*)[\/]?$/g, pages.other_chat],
-    [/^other\/test\/(.*)[\/]?$/g, pages.other_test, { no_login: true }],
-    [/^other\/serverrequeststatus\/(.*)[\/]?$/g, pages.other_serverrequeststatus, { no_login: true }],
-    [/^other\/info\/(.*)[\/]?$/g, pages.other_info, { no_login: true }],
-    [/^other\/cd\/(.*)[\/]?$/g, pages.other_cd, { no_login: true }],
+    [/^other\/test\/(.*)[\/]?$/g, pages.test, { no_login: true }],
     [/^other\/ipaddress[\/]?$/g, pages.ipaddress],
 
     [/^static\/(.*)[\/]?$/g, pages.static, { no_login: true }],
     [/^static[\/]?$/g, pages.static, { no_login: true }],
 
-    [/^([\w\/\.\-\~]*)$/g, pages.yourworld, { remove_end_slash: true }]
+    [/^([\w\/\.\-\~]*)$/g, pages.yourworld, { remove_end_slash: true }],
+
+    [/./gs, pages["404"]]
 ];
 
 /*
@@ -1758,7 +1756,7 @@ function setupHTTPServer() {
             try {
                 err500Temp = template_data["500.html"]();
             } catch(e) {
-                err500Temp = "An error has occurred while generating the error page.";
+                err500Temp = "HTTP 500: An internal server error has occurred";
                 handle_error(e);
             }
             res.end(err500Temp);
@@ -1778,7 +1776,7 @@ function setupHTTPServer() {
 }
 setupHTTPServer();
 
-var valid_subdomains = ["test", "serverrequeststatus", "info", "chat", "cd", "random_color", "backgrounds"];
+var valid_subdomains = ["test"];
 
 async function process_request(req, res) {
     if(!serverLoaded) await waitForServerLoad();
@@ -1786,9 +1784,8 @@ async function process_request(req, res) {
     var hostname = req.headers.host;
     if(!hostname) hostname = "www.ourworldoftext.com";
     hostname = hostname.slice(0, 1000);
-    var offset = 2;
     var subdomains = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
-    var sub = subdomains.slice(offset);
+    var sub = subdomains.slice(2);
     for(var i = 0; i < sub.length; i++) sub[i] = sub[i].toLowerCase();
 
     var URLparse = url.parse(req.url);
@@ -1898,16 +1895,16 @@ async function process_request(req, res) {
         });
     }
 
-    var found_url = false;
+    var page_resolved = false;
     for(var i in url_regexp) {
-        var row = url_regexp[i];
-        var options = row[2];
+        var pattern = url_regexp[i];
+        var urlReg = pattern[0];
+        var pageRes = pattern[1];
+        var options = pattern[2];
         if(!options) options = {};
-        var matchCheck;
-        matchCheck = URL.match(row[0]);
-        if(matchCheck) {
-            found_url = true;
-            if(typeof row[1] == "object") {
+        if(URL.match(urlReg)) {
+            page_resolved = true;
+            if(typeof pageRes == "object") {
                 var no_login = options.no_login;
                 var method = req.method.toUpperCase();
                 var post_data = {};
@@ -1922,18 +1919,17 @@ async function process_request(req, res) {
                     if(!cookies.csrftoken) {
                         var token = new_token(32);
                         var date = Date.now();
+                        // TODO: introduce only for forms
                         include_cookies.push("csrftoken=" + token + "; expires=" + http_time(date + ms.year) + "; path=/;");
                         user.csrftoken = token;
                     } else {
                         user.csrftoken = cookies.csrftoken;
                     }
                 }
-                var redirected = false;
                 function redirect(path) {
                     dispatch(null, null, {
                         redirect: path
                     });
-                    redirected = true;
                 }
                 if(method == "POST") {
                     var dat = await wait_response_data(req, dispatch, options.binary_post_data, user.superuser);
@@ -1975,39 +1971,24 @@ async function process_request(req, res) {
                     HTML,
                     ipAddress
                 };
-                if(row[1][method] && valid_method(method)) {
+                if(pageRes[method] && valid_method(method)) {
                     // Return the page
-                    var pageStat = await row[1][method](req, dispatch, global_data, evars, {});
+                    var pageStat = await pageRes[method](req, dispatch, global_data, evars, {});
                     if(pageStat == skipSymbol) continue;
                 } else {
                     dispatch("Method " + method + " not allowed.", 405);
                 }
-            } else if(typeof row[1] == "string") { // it's a path and must be redirected to
-                dispatch(null, null, { redirect: row[1] });
+            } else if(typeof pageRes == "string") { // redirection
+                dispatch(null, null, { redirect: pageRes });
             } else {
-                found_url = false; // it's not found because the type is invalid
+                page_resolved = false; // 404 not found
             }
             break;
         }
     }
 
-    if(!found_url || !request_resolved) {
-        var evars = {};
-        evars.user = await get_user_info(parseCookie(req.headers.cookie))
-        evars.cookie = parseCookie(req.headers.cookie);
-        evars.path = URL;
-        evars.HTML = function (path, data) {
-            if(!template_data[path]) { // template not found
-                return "An unexpected error occurred while generating this page";
-            }
-            if(!data) {
-                data = {};
-            }
-            data.user = evars.user;
-            return template_data[path](data);
-        }
-
-        return dispage("404", null, req, dispatch, global_data, evars);
+    if(!page_resolved || !request_resolved) {
+        return dispatch("HTTP 404: The resource cannot be found", 404);
     }
 
     res.writeHead(404);
