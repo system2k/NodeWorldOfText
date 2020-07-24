@@ -662,10 +662,35 @@ function resolvePath(path, obj) {
     };
 }
 
+var digits = "0123456789";
+function isDigit(x) {
+    return digits.indexOf(x) > -1;
+}
+
+function processNumber(x) {
+    if(typeof x == "number") return x;
+    if(Array.isArray(x)) {
+        if(!x.length) return x;
+        if(isDigit(x[0][0])) {
+            if(x.length == 1) {
+                return parseInt(x[0]);
+            } else if(x.length == 2) {
+                return parseFloat(x[0] + "." + x[1]);
+            } else {
+                throw "runtime - invalid decimal number";
+            }
+        }
+    }
+    return x;
+}
+
 function resolveIfStmt(stmt, obj) {
     var cmp = stmt.compare;
     var a = stmt.a;
     var b = stmt.b;
+    
+    a = processNumber(a);
+    b = processNumber(b);
     
     if(Array.isArray(a)) a = resolvePath(a, obj).result;
     if(Array.isArray(b)) b = resolvePath(b, obj).result;
@@ -675,9 +700,9 @@ function resolveIfStmt(stmt, obj) {
     a = processStr(a);
     b = processStr(b);
 
-    if(typeof a == "object" && typeof b == "boolean") {
+    if(typeof a != "boolean" && typeof b == "boolean") {
         a = !!a;
-    } else if(typeof b == "object" && typeof a == "boolean") {
+    } else if(typeof b != "boolean" && typeof a == "boolean") {
         b = !!b;
     }
     
@@ -720,21 +745,17 @@ function escapeHTML(h) {
 function executeTemplate(code, vars, currentpath, filesystem) {
     var page = "";
     
+    var blockNames = {};
+    var isExtended = false;
     if(code.extends) {
+        isExtended = true;
         var path = processStr(code.extends);
         var template = filesystem(path, currentpath);
         if(!template) throw "Extended template not found";
-        var blockNames = {};
         for(var i = 0; i < code.exec.length; i++) {
             var part = code.exec[i];
             if(part.type == "block") {
                 blockNames[part.name] = part.exec;
-            }
-        }
-        for(var i = 0; i < template.exec.length; i++) {
-            var part = template.exec[i];
-            if(part.type == "block" && blockNames[part.name]) {
-                part.exec = blockNames[part.name];
             }
         }
         code = template;
@@ -786,6 +807,8 @@ function executeTemplate(code, vars, currentpath, filesystem) {
                 code.eif = false;
                 if(resolveIfStmt(stmt, local)) {
                     stack.push([ifexec, 0, local]);
+                    delete code.stage;
+                    delete code.eif;
                 } else {
                     if(elif_chain) {
                         stack.push([elif_chain, 0, local]);
@@ -794,12 +817,22 @@ function executeTemplate(code, vars, currentpath, filesystem) {
                 }
             } else if(code.stage == 1) {
                 code.stage = 2;
-                var cs = code.chainstack;
-                if(!code.eif && else_exec.length) {
+                if(!code.eif) {
                     // all else-if statements are false, execute else statement
-                    stack.push([else_exec[0].exec, 0, local]);
-                    continue;
+                    if(else_exec.length) {
+                        stack.push([else_exec[0].exec, 0, local]);
+                        continue;
+                    } else {
+                        delete code.stage;
+                        delete code.eif;
+                    }
+                } else {
+                    delete code.stage;
+                    delete code.eif;
                 }
+            } else {
+                delete code.stage;
+                delete code.eif;
             }
         } else if(code.type == "else_if") {
             var stmt = code.stmt;
@@ -857,8 +890,10 @@ function executeTemplate(code, vars, currentpath, filesystem) {
                 code.loop = 0;
             }
         } else if(code.type == "block") {
-            var blockexec = code.exec;
-            stack.push([blockexec, 0, local]);
+            var name = code.name;
+            if(isExtended && blockNames[name]) {
+                stack.push([blockNames[name], 0, local]);
+            }
         }
         ctx[1]++;
         if(ctx[1] >= exec.length) {
