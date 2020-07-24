@@ -32,6 +32,7 @@ const chat_mgr       = require("./backend/utils/chat_mgr.js");
 const bin_packet     = require("./backend/utils/bin_packet.js");
 const utils          = require("./backend/utils/utils.js");
 const parse_textcode = require("./backend/utils/parse_textcode.js");
+const templates      = require("./backend/utils/templates.js");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
