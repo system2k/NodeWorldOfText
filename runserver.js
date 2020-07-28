@@ -267,6 +267,7 @@ var isTestServer = false;
 var debugLogging = false;
 var testServerMainDirs = false;
 var testUviasIds = false;
+var acmeEnabled = false;
 
 var intv = {}; // intervals and timeouts
 
@@ -1229,6 +1230,30 @@ function command_prompt() {
         }
         if(code == "help") {
             console.log("stop: close server\nres: restart\nmaint: maintenance mode\nsta: reload templates and static files");
+            command_prompt();
+            return;
+        }
+        if(code.startsWith("acme")) {
+            var args = code.split(" ");
+            var action = args[1];
+            var pass = args[2];
+            if(action == "on") {
+                var goodPass = true;
+                if(!pass || pass.length < 8) goodPass = false;
+                if(goodPass) {
+                    acmePass = pass;
+                    acmeEnabled = true;
+                    console.log("Enabled acme with password: " + acmePass);
+                } else {
+                    console.log("Bad acme password");
+                }
+            } else if(action == "off") {
+                acmeEnabled = false;
+                acmePass = null;
+                console.log("Disabled acme");
+            } else {
+                console.log("acme command usage:\nacme on <password>: enable acme challenge\nacme off: disable acme challenge");
+            }
             command_prompt();
             return;
         }
@@ -2982,7 +3007,8 @@ var global_data = {
     monitorEventSockets,
     arrayIsEntirely,
     normalizeCacheTile,
-    parse_textcode
+    parse_textcode,
+    acme_stat: function() { return { enabled: acmeEnabled, pass: acmePass } }
 };
 
 async function sysLoad() {
