@@ -13,6 +13,7 @@ function init_dom() {
     textLayer = document.getElementById("text");
     textLayer.hidden = false;
     textLayer.style.pointerEvents = "none";
+    textInput.value = "";
 
     updateCoordDisplay();
 
@@ -2001,7 +2002,6 @@ function spaceTrim(str_array, left, right, gaps, secondary_array) {
 
 function convertToDate(epoch) {
     var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
     var str = "";
     var date = new Date(epoch);
     var month = date.getMonth();
@@ -2009,9 +2009,7 @@ function convertToDate(epoch) {
     var year = date.getFullYear();
     var hour = date.getHours();
     var minute = date.getMinutes();
-
     str += year + " " + months[month] + " " + day + " ";
-
     var per = "AM";
     if(hour >= 12) {
         per = "PM";
@@ -2023,192 +2021,266 @@ function convertToDate(epoch) {
         hour = 12;
     }
     str += hour + ":" + ("0" + minute).slice(-2) + " " + per;
-
     return str;
+}
+
+function textcode_parser(value) {
+    if(typeof value == "string") value = w.split(value);
+    var hex = "ABCDEF";
+    var pasteColor = null;
+    var index = 0;
+    var next = function() {
+        if(index >= value.length) return -1;
+        var chr = value[index];
+        var doWriteChar = true;
+        var newline = true;
+        if(chr == "\x1b") {
+            doWriteChar = false;
+            var hCode = value[index + 1];
+            if(hCode == "$") { // contains links
+                index += 2;
+                var lType = value[index];
+                index++;
+                if(lType == "c") { // coord
+                    var strPoint = index;
+                    var buf = "";
+                    var mode = 0;
+                    while(true) {
+                        if(value[strPoint] == "[" && mode == 0) {
+                            mode = 1;
+                            if(++strPoint >= value.length) break;
+                            continue;
+                        }
+                        if(value[strPoint] == "]" && mode == 1) {
+                            strPoint++;
+                            break;
+                        }
+                        if(mode == 1) {
+                            buf += value[strPoint];
+                            if(++strPoint >= value.length) break;
+                            continue;
+                        }
+                        if(++strPoint >= value.length) break;
+                    }
+                    index = strPoint;
+                    buf = buf.split(",");
+                    var coordTileX = parseFloat(buf[0].trim());
+                    var coordTileY = parseFloat(buf[1].trim());
+                    return {
+                        type: "link",
+                        linkType: "coord",
+                        tileX: cursorCoords[0],
+                        tileY: cursorCoords[1],
+                        charX: cursorCoords[2],
+                        charY: cursorCoords[3],
+                        coord_tileX: coordTileX,
+                        coord_tileY: coordTileY
+                    };
+                } else if(lType == "u") { // urllink
+                    var strPoint = index;
+                    var buf = "";
+                    var quotMode = 0;
+                    while(true) {
+                        if(value[strPoint] == "\"" && quotMode == 0) {
+                            quotMode = 1;
+                            if(++strPoint >= value.length) break;
+                            continue;
+                        }
+                        if(value[strPoint] == "\"" && quotMode == 1) {
+                            strPoint++;
+                            break;
+                        }
+                        if(quotMode == 1) {
+                            if(value[strPoint] == "\\") {
+                                quotMode = 2;
+                                if(++strPoint >= value.length) break;
+                                continue;
+                            }
+                            buf += value[strPoint];
+                        }
+                        if(quotMode == 2) {
+                            buf += value[strPoint];
+                            quotMode = 1;
+                            if(++strPoint >= value.length) break;
+                            continue;
+                        }
+                        if(++strPoint >= value.length) break;
+                    }
+                    index = strPoint;
+                    return {
+                        type: "link",
+                        linkType: "url",
+                        tileX: cursorCoords[0],
+                        tileY: cursorCoords[1],
+                        charX: cursorCoords[2],
+                        charY: cursorCoords[3],
+                        url: buf
+                    };
+                }
+            } else if(hCode == "P") { // contains area protections
+                index += 2;
+                var protType = parseInt(value[index]);
+                index++;
+                if(isNaN(protType)) protType = 0;
+                if(!(protType >= 0 && protType <= 2)) protType = 0;
+                return {
+                    type: "protect",
+                    protType: protType,
+                    tileX: cursorCoords[0],
+                    tileY: cursorCoords[1],
+                    charX: cursorCoords[2],
+                    charY: cursorCoords[3]
+                };
+            } else if(hCode == "\r" || hCode == "\n" || hCode == "\x1b" || hCode == "r" || hCode == "n") {
+                index++;
+                doWriteChar = true;
+                if(hCode == "\n") { // paste newline character itself
+                    chr = "\n";
+                    newline = false;
+                } else if(hCode == "\r") { // paste carriage return character itself
+                    chr = "\r";
+                    newline = false;
+                } else if(hCode == "\x1b") { // paste ESC character itself
+                    chr = "\x1b";
+                } else if(hCode == "r") { // newline
+                    chr = "\r";
+                } else if(hCode == "n") { // newline
+                    chr = "\n";
+                }
+            } else if(hCode == "*") { // skip character
+                index++;
+                chr = "";
+                doWriteChar = true;
+            } else { // colored paste
+                var cCol = "";
+                if(hCode == "x") {
+                    cCol = "000000";
+                    index += 2;
+                } else if(hCode == "X") {
+                    cCol = "-1";
+                    index += 2;
+                } else {
+                    var code = hex.indexOf(hCode);
+                    if(code > -1) {
+                        cCol = value.slice(index + 2, index + 2 + code + 1).join("");
+                        index += code + 1;
+                    }
+                    index += 2;
+                }
+                pasteColor = parseInt(cCol, 16);
+                return {
+                    type: "yield"
+                };
+            }
+        } else {
+            index++;
+        }
+        return {
+            type: "char",
+            char: chr,
+            color: pasteColor,
+            writable: doWriteChar,
+            newline: newline
+        };
+    }
+    return {
+        next: next,
+        nextItem: function() {
+            while(true) {
+                var item = next();
+                if(item == -1) return -1;
+                if(item.type == "yield") continue;
+                return item;
+            }
+        }
+    };
 }
 
 // write characters inputted
 var write_busy = false; // busy pasting
 var pasteInterval;
 var linkQueue = [];
-elm.textInput.value = "";
 var char_input_check = setInterval(function() {
     if(write_busy) return;
+    write_busy = true;
     var value = elm.textInput.value;
     if(!value) return;
-    value = value.replace(/\r\n/g, "\n");
-    value = value.replace(/\r/g, "\n");
-    value = w.split(value);
-    var index = 1;
-    if(value[0] == "\x1b") {
-        index--;
-    } else {
-        writeChar(value[0]);
-    }
+    clearInterval(pasteInterval);
+    value = w.split(value.replace(/\r\n/g, "\n"));
     if(value.length == 1) {
+        writeChar(value[0]);
         elm.textInput.value = "";
         return;
     }
-    if(Permissions.can_paste(state.userModel, state.worldModel)) {
-        linkQueue.splice(0);
-        write_busy = true;
-        clearInterval(pasteInterval);
-        var hex = "ABCDEF";
-        var pasteColor = YourWorld.Color;
-        var pauseValue = 0;
-        pasteInterval = setInterval(function() {
-            if(pauseValue) {
-                pauseValue--;
-                return;
-            }
-            var chr = value[index];
-            var doWriteChar = true;
-            var noNewline = false;
-            if(chr == "\x1b") {
-                doWriteChar = false;
-                var hCode = value[index + 1];
-                if(hCode == "$") { // contains links
-                    index += 2;
-                    var lType = value[index];
-                    index++;
-                    if(lType == "c") { // coord
-                        var strPoint = index;
-                        var buf = "";
-                        var mode = 0;
-                        while(true) {
-                            if(value[strPoint] == "[" && mode == 0) {
-                                mode = 1;
-                                if(++strPoint >= value.length) break;
-                                continue;
-                            }
-                            if(value[strPoint] == "]" && mode == 1) {
-                                strPoint++;
-                                break;
-                            }
-                            if(mode == 1) {
-                                buf += value[strPoint];
-                                if(++strPoint >= value.length) break;
-                                continue;
-                            }
-                            if(++strPoint >= value.length) break;
-                        }
-                        index = strPoint;
-                        buf = buf.split(",");
-                        var coordTileX = parseFloat(buf[0].trim());
-                        var coordTileY = parseFloat(buf[1].trim());
-                        if(Permissions.can_coordlink(state.userModel, state.worldModel)) {
-                            linkQueue.push(["coord", cursorCoords[0], cursorCoords[1], cursorCoords[2], cursorCoords[3], coordTileX, coordTileY]);
-                        }
-                    } else if(lType == "u") { // urllink
-                        var strPoint = index;
-                        var buf = "";
-                        var quotMode = 0;
-                        while(true) {
-                            if(value[strPoint] == "\"" && quotMode == 0) {
-                                quotMode = 1;
-                                if(++strPoint >= value.length) break;
-                                continue;
-                            }
-                            if(value[strPoint] == "\"" && quotMode == 1) {
-                                strPoint++;
-                                break;
-                            }
-                            if(quotMode == 1) {
-                                if(value[strPoint] == "\\") {
-                                    quotMode = 2;
-                                    if(++strPoint >= value.length) break;
-                                    continue;
-                                }
-                                buf += value[strPoint];
-                            }
-                            if(quotMode == 2) {
-                                buf += value[strPoint];
-                                quotMode = 1;
-                                if(++strPoint >= value.length) break;
-                                continue;
-                            }
-                            if(++strPoint >= value.length) break;
-                        }
-                        index = strPoint;
-                        if(Permissions.can_urllink(state.userModel, state.worldModel)) {
-                            linkQueue.push(["url", cursorCoords[0], cursorCoords[1], cursorCoords[2], cursorCoords[3], buf]);
-                        }
-                    }
-                } else if(hCode == "P") { // contains area protections
-                    index += 2;
-                    var protType = parseInt(value[index]);
-                    index++;
-                    if(isNaN(protType)) return;
-                    if(!(protType >= 0 && protType <= 2)) return;
-                    if(protType <= 1) { // public, member
-                        if(!Permissions.can_protect_tiles(state.userModel, state.worldModel)) return;
-                    }
-                    if(protType == 2) { // owner
-                        if(!Permissions.can_admin(state.userModel, state.worldModel)) {
-                            protType = 1; // member
-                        }
-                    }
-                    network.protect({
-                        tileY: cursorCoords[1],
-                        tileX: cursorCoords[0],
-                        charY: cursorCoords[3],
-                        charX: cursorCoords[2]
-                    }, ["public", "member-only", "owner-only"][protType]);
-                } else if(hCode == "\r" || hCode == "\n" || hCode == "\x1b" || hCode == "r" || hCode == "n") {
-                    index++;
-                    doWriteChar = true;
-                    if(hCode == "\n") { // paste newline character itself
-                        chr = "\n";
-                        noNewline = true;
-                    } else if(hCode == "\r") { // paste carriage return character itself
-                        chr = "\r";
-                        noNewline = true;
-                    } else if(hCode == "\x1b") { // paste ESC character itself
-                        chr = "\x1b";
-                    } else if(hCode == "r") { // newline
-                        chr = "\r";
-                    } else if(hCode == "n") { // newline
-                        chr = "\n";
-                    }
-                } else if(hCode == "*") { // skip character
-                    index++;
-                    chr = "";
-                    doWriteChar = true;
-                } else { // colored paste
-                    var cCol = "";
-                    if(hCode == "x") {
-                        cCol = "000000";
-                        index += 2;
-                    } else if(hCode == "X") {
-                        cCol = "-1";
-                        index += 2;
-                    } else {
-                        var code = hex.indexOf(hCode);
-                        if(code > -1) {
-                            cCol = value.slice(index + 2, index + 2 + code + 1).join("");
-                            index += code + 1;
-                        }
-                        index += 2;
-                    }
-                    pasteColor = parseInt(cCol, 16);
+    var pastePerm = Permissions.can_paste(state.userModel, state.worldModel);
+    var requestNextItem = true;
+    var parser = textcode_parser(value, {
+        tileX: cursorCoords[0],
+        tileY: cursorCoords[1],
+        charX: cursorCoords[2],
+        charY: cursorCoords[3]
+    });
+    var item;
+    var charCount = 0;
+    var pasteFunc = function() {
+        if(requestNextItem) {
+            item = parser.nextItem();
+        } else {
+            requestNextItem = true;
+        }
+        if(item == -1)  {
+            elm.textInput.value = "";
+            write_busy = false;
+            return -1;
+        }
+        if(item.type == "char") {
+            if(item.writable) {
+                var color = item.color;
+                if(color === null) color = YourWorld.Color;
+                var res = writeChar(item.char, false, item.color, !item.newline);
+                if(res === null) {
+                    // pause until tile loads
+                    requestNextItem = false;
+                    return;
                 }
+                charCount++;
             }
-            if(doWriteChar) {
-                var res = writeChar(chr, false, pasteColor, noNewline);
-                if(res === null) { // write failed
-                    return; // keep waiting until tile loads
-                }
-                index++;
+        } else if(item.type == "link") {
+            if(item.linkType == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
+                linkQueue.push(["url", item.tileX, item.tileY, item.charX, item.charY, item.url]);
+            } else if(item.linkType == "coord" && Permissions.can_coordlink(state.userModel, state.worldModel)) {
+                linkQueue.push(["coord", item.tileX, item.tileY, item.charX, item.charY, item.coord_tileX, item.coord_tileY]);
             }
-            if(index >= value.length) {
-                elm.textInput.value = "";
-                clearInterval(pasteInterval);
-                write_busy = false;
+        } else if(item.type == "protect") {
+            var protType = item.protType;
+            var canProtect = true;
+            if(protType <= 1) { // public, member
+                if(!Permissions.can_protect_tiles(state.userModel, state.worldModel)) canProtect = false;
             }
-        }, 1);
-    } else {
-        elm.textInput.value = "";
+            if(protType == 2) { // owner
+                if(!Permissions.can_admin(state.userModel, state.worldModel)) protType = 1; // member
+            }
+            if(canProtect) {
+                network.protect({
+                    tileY: item.tileY,
+                    tileX: item.tileX,
+                    charY: item.charY,
+                    charX: item.charX
+                }, ["public", "member-only", "owner-only"][protType]);
+            }
+        }
+    };
+    if(!pastePerm) {
+        while(true) {
+            var res = pasteFunc();
+            if(res == -1 || charCount >= 1) break;
+        }
+        return;
     }
+    pasteInterval = setInterval(function() {
+        var res = pasteFunc();
+        if(res == -1) clearInterval(pasteInterval);
+    }, 1);
 }, 10);
 
 function stopPasting() {

@@ -268,6 +268,7 @@ var debugLogging = false;
 var testServerMainDirs = false;
 var testUviasIds = false;
 var acmeEnabled = false;
+var acmePass = null;
 
 var intv = {}; // intervals and timeouts
 
@@ -1302,7 +1303,6 @@ var ms = {
     decade: 315569520000
 };
 
-var skipSymbol = Symbol("skip");
 var url_regexp = [ // regexp , function/redirect to , options
     [/^favicon\.ico[\/]?$/g, "/static/favicon.png", { no_login: true }],
     [/^robots\.txt[\/]?$/g, "/static/robots.txt", { no_login: true }],
@@ -2000,7 +2000,7 @@ async function process_request(req, res) {
                 if(pageRes[method] && valid_method(method)) {
                     // Return the page
                     var pageStat = await pageRes[method](req, dispatch, global_data, evars, {});
-                    if(pageStat == skipSymbol) continue;
+                    if(pageStat === -1) continue;
                 } else {
                     dispatch("Method " + method + " not allowed.", 405);
                 }
@@ -2931,7 +2931,6 @@ function start_server() {
 var worldViews = {};
 
 var global_data = {
-    skip: skipSymbol,
     memTileCache,
     isTestServer,
     announcement: function() { return announcement_cache },

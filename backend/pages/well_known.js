@@ -24,7 +24,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
     var acme_stat = vars.acme_stat;
 
     var stat = acme_stat();
-    if(!stat.enabled) return vars.skip;
+    if(!stat.enabled) return -1;
 
 	var procPath = processPath(path);
 
@@ -52,7 +52,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
     var acme_stat = vars.acme_stat;
 
     var stat = acme_stat();
-    if(!stat.enabled) return vars.skip;
+    if(!stat.enabled) return;
 
     var token = cookies.token;
     if(token !== stat.pass) {
