@@ -46,7 +46,7 @@
 
         onload = function() {
             autocomplete({
-                element: document.getElementById("username_config"),
+                element: document.getElementById("user_info_by_username"),
                 url: "/accounts/member_autocomplete/",
                 delay: 50
             });
@@ -54,14 +54,20 @@
             var mgr_restart = document.getElementById("mgr_restart");
             var mgr_close = document.getElementById("mgr_close");
             var mgr_maintenance = document.getElementById("mgr_maintenance");
-            mgr_restart.onclick = function() {
-                manageServerCommand("restart");
+            if(mgr_restart) {
+                mgr_restart.onclick = function() {
+                    manageServerCommand("restart");
+                }
             }
-            mgr_close.onclick = function() {
-                manageServerCommand("close");
+            if(mgr_close) {
+                mgr_close.onclick = function() {
+                    manageServerCommand("close");
+                }
             }
-            mgr_maintenance.onclick = function() {
-                manageServerCommand("maintenance");
+            if(mgr_maintenance) {
+                mgr_maintenance.onclick = function() {
+                    manageServerCommand("maintenance");
+                }
             }
         }
 

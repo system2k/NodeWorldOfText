@@ -1,6 +1,6 @@
 var emailFormatRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-module.exports.GET = async function(req, serve, vars, evars) {
+module.exports.GET = async function(req, serve, vars, evars, params) {
     var HTML = evars.HTML;
     var user = evars.user;
 

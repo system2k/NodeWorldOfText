@@ -423,17 +423,19 @@ Error.stackTraceLimit = 1024;
 
 var intv = {}; // intervals and timeouts
 
-if(isTestServer && !testServerMainDirs) {
+if(isTestServer) {
     serverPort = settings.test_port;
-    serverDB = settings.TEST_DATABASE_PATH;
-    chatDB = settings.TEST_CHAT_HISTORY_PATH;
-    imageDB = settings.TEST_IMAGES_PATH;
-    miscDB = settings.TEST_MISC_PATH;
-    editsDB = settings.TEST_EDITS_PATH;
-    settings.LOG_PATH = settings.TEST_LOG_PATH;
-    settings.ZIP_LOG_PATH = settings.TEST_ZIP_LOG_PATH;
-    settings.UNCAUGHT_PATH = settings.TEST_UNCAUGHT_PATH;
-    settings.REQ_LOG_PATH = settings.TEST_REQ_LOG_PATH;
+    if(!testServerMainDirs) {
+        serverDB = settings.TEST_DATABASE_PATH;
+        chatDB = settings.TEST_CHAT_HISTORY_PATH;
+        imageDB = settings.TEST_IMAGES_PATH;
+        miscDB = settings.TEST_MISC_PATH;
+        editsDB = settings.TEST_EDITS_PATH;
+        settings.LOG_PATH = settings.TEST_LOG_PATH;
+        settings.ZIP_LOG_PATH = settings.TEST_ZIP_LOG_PATH;
+        settings.UNCAUGHT_PATH = settings.TEST_UNCAUGHT_PATH;
+        settings.REQ_LOG_PATH = settings.TEST_REQ_LOG_PATH;
+    }
 }
 
 const log_error = function(err) {
@@ -2623,14 +2625,17 @@ async function manageWebsocketConnection(ws, req) {
             } catch(e) {}
         }
     }
-
-    if(!can_connect_ip_address(ws.sdata.ipAddress)) {
+    function error_ws(errorCode, errorMsg) {
         send_ws(JSON.stringify({
             kind: "error",
-            code: "CONN_LIMIT",
-            message: "Too many connections"
+            code: errorCode,
+            message: errorMsg
         }));
-        return ws.close();
+        ws.close();
+    }
+
+    if(!can_connect_ip_address(ws.sdata.ipAddress)) {
+        return error_ws("CONN_LIMIT", "Too many connections");
     }
     add_ip_address_connection(ws.sdata.ipAddress);
     var reqs_second = 0; // requests received at current second
@@ -2697,22 +2702,19 @@ async function manageWebsocketConnection(ws, req) {
             worldObj.user_count--;
         }
     });
+    if(socketTerminated) return; // in the event of an immediate close
     var world_name;
     if(location.match(/(\/ws\/$)/)) {
         world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
     } else {
-        send_ws(JSON.stringify({
-            kind: "error",
-            code: "INVALID_ADDR",
-            message: "Invalid address"
-        }));
-        return ws.close();
+        return error_ws("INVALID_ADDR", "Invalid address");
     }
     
     ws.sdata.world_name = world_name;
 
     var cookies = parseCookie(req.headers.cookie);
     var user = await get_user_info(cookies, true);
+    if(socketTerminated) return;
     var channel = new_token(7);
 
     var vars = global_data;
@@ -2735,42 +2737,24 @@ async function manageWebsocketConnection(ws, req) {
         timemachine.active = true;
     }
 
-    var initError = false;
-    var initErrorMessage = "";
-    var initErrorCode = "";
     var world = await world_get_or_create(world_name);
+    if(socketTerminated) return;
     if(!world) {
-        initError = true;
-        initErrorMessage = "World does not exist";
-        initErrorCode = "NO_EXIST";
+        return error_ws("NO_EXIST", "World does not exist");
     }
 
     if(timemachine.active && world.owner_id != user.id && !user.superuser) {
-        initError = true;
-        initErrorMessage = "No permission to view time machine";
-        initErrorCode = "NO_PERM";
+        return error_ws("NO_PERM", "No permission to view time machine");
     }
 
     var permission = await can_view_world(world, user);
+    if(socketTerminated) return;
     if(!permission) {
-        initError = true;
-        initErrorMessage = "No permission";
-        initErrorCode = "NO_PERM";
-    }
-
-    if(initError) {
-        send_ws(JSON.stringify({
-            kind: "error",
-            code: initErrorCode,
-            message: initErrorMessage
-        }));
-        ws.close();
-        return;
+        return error_ws("NO_PERM", "No permission");
     }
 
     if(timemachine.active) {
         timemachine.time = san_nbr(tm_check[3]);
-
         if(timemachine.time < 0) timemachine.time = 0;
         if(timemachine.time > 1000000) timemachine.time = 1000000;
     }
