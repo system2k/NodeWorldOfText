@@ -74,7 +74,7 @@ module.exports.POST = async function(req, serve, vars, evars, params) {
     await db.run("UPDATE auth_user SET last_login=? WHERE id=?", [date_now, loginuser.id])
 
     var next = "/accounts/profile/";
-    var check_next = querystring.parse(url.parse(referer).query); // TODO: Make this client-side
+    var check_next = querystring.parse(url.parse(referer).query);
     if(check_next.next) {
         next = check_next.next;
     }

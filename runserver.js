@@ -270,7 +270,7 @@ var testUviasIds = false;
 var acmeEnabled = false;
 var acmePass = null;
 
-var intv = {}; // intervals and timeouts
+var intv = {};
 
 function processArgs() {
     var args = process.argv;
@@ -975,15 +975,6 @@ async function initialize_server() {
 function sendProcMsg(msg) {
     if(process.send) {
         process.send(msg);
-    }
-}
-
-async function main() {
-    try {
-        await initialize_server();
-    } catch(e) {
-        console.log("An error occurred during the initialization process:");
-        console.log(e);
     }
 }
 
@@ -1773,12 +1764,10 @@ process.on("unhandledRejection", function(reason) {
 
 var server,
     HTTPSockets,
-    HTTPSockketID;
+    HTTPSocketID;
 function setupHTTPServer() {
-    server = https_reference.createServer(options, async function(req, res) {
-        try {
-            await process_request(req, res);
-        } catch(e) {
+    server = https_reference.createServer(options, function(req, res) {
+        process_request(req, res).catch(function(e) {
             res.statusCode = 500;
             var err500Temp = "";
             try {
@@ -1789,13 +1778,13 @@ function setupHTTPServer() {
             }
             res.end(err500Temp);
             handle_error(e); // writes error to error log
-        }
+        });
     });
     
     HTTPSockets = {};
-    HTTPSockketID = 0;
+    HTTPSocketID = 0;
     server.on("connection", function(socket) {
-        var sockID = HTTPSockketID++;
+        var sockID = HTTPSocketID++;
         HTTPSockets[sockID] = socket;
         socket.on("close", function() {
             delete HTTPSockets[sockID];
@@ -1912,14 +1901,14 @@ async function process_request(req, res) {
         if(!params.streamed_length) info["Content-Length"] = Buffer.byteLength(data);
         res.writeHead(status_code, info);
         if(!params.streamed_length) {
-            res.write(data, "utf8");
+            res.write(data);
             res.end();
         }
     }
     dispatch.res = res;
     dispatch.write = function(data) {
         return new Promise(function(resolve) {
-            res.write(data, "utf8", resolve);
+            res.write(data, resolve);
         });
     }
 
@@ -2680,7 +2669,6 @@ async function manageWebsocketConnection(ws, req) {
         broadcastMonitorEvent("[Server] " + msCount + " listening sockets, " + monitorEventSockets.length + " listeners");
         return;
     }
-    ws.sdata.userClient = true;
     var pre_queue = [];
     // adds data to a queue. this must be before any async calls and the message event
     function pre_message(msg) {
@@ -2762,6 +2750,7 @@ async function manageWebsocketConnection(ws, req) {
     status = { permission, world, timemachine };
 
     ws.sdata.world_id = status.world.id;
+    ws.sdata.userClient = true; // client connection is now initialized
     
     evars.world = status.world;
     evars.timemachine = status.timemachine;
@@ -2902,17 +2891,11 @@ async function manageWebsocketConnection(ws, req) {
 }
 
 function start_server() {
-    (async function() {
-        try {
-            await initialize_server_components();
-        } catch(e) {
-            console.log("An error occurred during component initialization");
-            console.log(e);
-        }
-    })();
+    initialize_server_components().catch(function(e) {
+        console.log("An error occurred during component initialization");
+        console.log(e);
+    });
 }
-
-var worldViews = {};
 
 var global_data = {
     memTileCache,
@@ -2975,7 +2958,7 @@ var global_data = {
     WebSocket,
     fixColors,
     sanitize_color,
-    worldViews,
+    worldViews: {},
     ranks_cache,
     static_data,
     staticRaw_append,
@@ -3117,5 +3100,8 @@ function stopServer(restart, maintenance) {
     })();
 }
 
-// ignite the server
-main();
+// start the server
+initialize_server().catch(function(e) {
+    console.log("An error occurred during the initialization process:");
+    console.log(e);
+});

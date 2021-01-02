@@ -252,10 +252,10 @@ function http_time(timeStamp) {
 }
 
 function encode_base64(str) {
-    return new Buffer(str).toString("base64");
+    return Buffer.from(str).toString("base64");
 }
 function decode_base64(b64str) {
-    return new Buffer(b64str, "base64").toString("ascii");
+    return Buffer.from(b64str, "base64").toString("utf8");
 }
 
 // properly take all data from an error stack
