@@ -2330,6 +2330,7 @@ async function uvias_init() {
         }
         switch(channel) {
             case "uv_kick":
+				invalidateWebsocketSession(data.session);
                 if(debugLogging) console.log("Signal uv_kick. Session '" + data.session + "', Reason '" + data.reason + "'");
                 break;
             case "uv_sess_renew":
@@ -2587,11 +2588,24 @@ function remove_ip_address_connection(ip) {
     if(!ip_address_conn_limit[ip]) delete ip_address_conn_limit[ip];
 }
 
+function invalidateWebsocketSession(session_token) {
+	if(!session_token) return;
+	wss.clients.forEach(function(ws) {
+		if(ws.sdata.monitorSocket) return;
+		if(ws.sdata.terminated) return;
+		if(!ws.sdata.session_key) return; // safety layer: don't process unauthenticated clients
+		if(ws.sdata.session_key != session_token) return;
+		ws.sdata.terminated = true;
+		ws.close();
+	});
+}
+
 async function manageWebsocketConnection(ws, req) {
     if(!serverLoaded) await waitForServerLoad();
     if(isStopping) return;
-    var socketTerminated = false;
-    ws.sdata = {};
+    ws.sdata = {
+		terminated: false
+	};
     
     // process ip address headers from cloudflare/nginx
     var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
@@ -2679,7 +2693,7 @@ async function manageWebsocketConnection(ws, req) {
     var status, clientId = void 0, worldObj;
     ws.on("close", function() {
         remove_ip_address_connection(ws.sdata.ipAddress);
-        socketTerminated = true;
+		ws.sdata.terminated = true;
         if(status && clientId != void 0) {
             if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
                 client_ips[status.world.id][clientId][2] = true;
@@ -2690,7 +2704,7 @@ async function manageWebsocketConnection(ws, req) {
             worldObj.user_count--;
         }
     });
-    if(socketTerminated) return; // in the event of an immediate close
+    if(ws.sdata.terminated) return; // in the event of an immediate close
     var world_name;
     if(location.match(/(\/ws\/$)/)) {
         world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
@@ -2702,7 +2716,7 @@ async function manageWebsocketConnection(ws, req) {
 
     var cookies = parseCookie(req.headers.cookie);
     var user = await get_user_info(cookies, true);
-    if(socketTerminated) return;
+    if(ws.sdata.terminated) return;
     var channel = new_token(7);
 
     var vars = global_data;
@@ -2726,7 +2740,7 @@ async function manageWebsocketConnection(ws, req) {
     }
 
     var world = await world_get_or_create(world_name);
-    if(socketTerminated) return;
+    if(ws.sdata.terminated) return;
     if(!world) {
         return error_ws("NO_EXIST", "World does not exist");
     }
@@ -2736,7 +2750,7 @@ async function manageWebsocketConnection(ws, req) {
     }
 
     var permission = await can_view_world(world, user);
-    if(socketTerminated) return;
+    if(ws.sdata.terminated) return;
     if(!permission) {
         return error_ws("NO_PERM", "No permission");
     }
@@ -2767,7 +2781,7 @@ async function manageWebsocketConnection(ws, req) {
     ws.sdata.can_chat = can_chat;
 
     worldObj = getWorldData(world_name);
-    if(!socketTerminated && !ws.sdata.hide_user_count) {
+    if(!ws.sdata.terminated && !ws.sdata.hide_user_count) {
         worldObj.user_count++;
     }
 
