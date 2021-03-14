@@ -16,7 +16,6 @@ module.exports.GET = async function(req, serve, vars, evars) {
 }
 
 module.exports.POST = async function(req, serve, vars, evars) {
-    return;
     var post_data = evars.post_data;
     var query_data = evars.query_data;
     var path = evars.path;
@@ -52,7 +51,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
         await db.run("DELETE FROM tile WHERE world_id=?", world.id);
 
-        await transaction.begin();
+        //await transaction.begin();
         for(var i = 0; i < world_data.length; i++) {
             var tile = world_data[i];
             
@@ -69,7 +68,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
             await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?, ?)",
                 [world.id, content, tileY, tileX, properties, writability, Date.now()]);
         }
-        await transaction.end();
+        //await transaction.end();
 
         return serve("COMPLETED");
     }
@@ -156,7 +155,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
         }
     }
 
-    await transaction.begin();
+    //await transaction.begin();
     for(var i in dataTable) {
         var tile = dataTable[i];
         var coord = i.split(",");
@@ -169,7 +168,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
         await db.run("INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, null, ?)",
             [world.id, content, tileY, tileX, JSON.stringify(properties), Date.now()]);
     }
-    await transaction.end();
+    //await transaction.end();
 
     serve("COMPLETED");
 }

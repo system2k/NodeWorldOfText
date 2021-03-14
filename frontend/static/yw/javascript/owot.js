@@ -3016,7 +3016,7 @@ function checkKeyPatterns(combination) {
     if(typeof combination == "object") {
         var res = false;
         for(var i = 0; i < combination.length; i++) {
-            res = res || checkKeyPress(e, combination[i]);
+            res = res || checkKeyPatterns(e, combination[i]);
         }
         return res;
     }
@@ -5040,7 +5040,9 @@ var ws_functions = {
             tiles[tileKey].redraw = true;
             tiles[tileKey].initted = true;
             var pos = getPos(tileKey);
-            renderTile(pos[1], pos[0]);
+            if(isTileVisible(pos[1], pos[0])) {
+                renderTile(pos[1], pos[0]);
+            }
         }
         if(highlights.length > 0 && useHighlight) highlight(highlights);
         var tileLim = Math.floor(getArea(fetchClientMargin) * 1.5 / zoom + 1000);

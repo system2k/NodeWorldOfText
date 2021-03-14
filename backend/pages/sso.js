@@ -14,6 +14,12 @@ module.exports.GET = async function(req, serve, vars, evars) {
         return serve("No token specified");
     }
 
+	// uvias redirects you to ourworldoftext.com, preventing users from being able
+	// to access their accounts on www.ourworldoftext.com
+	var host = req.headers.host;
+	if(typeof host != "string") host = "ourworldoftext.com";
+	host = "." + host;
+
     if(token.length > 1000) {
         return serve("Token is too long.");
     }
@@ -34,7 +40,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
     var expires = session.expires.getTime();
     
     serve(null, null, {
-        cookie: "token=" + token + "; expires=" + http_time(expires + ms.year) + "; path=/; HttpOnly;",
+        cookie: "token=" + token + "; expires=" + http_time(expires + ms.year) + "; path=/; domain=" + encodeURIComponent(host) + "; HttpOnly;",
         redirect: "/accounts/profile/"
     });
 }
