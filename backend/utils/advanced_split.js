@@ -19,8 +19,8 @@ function takeSurrogates(str) {
 			if(cd(str[i]) >= range2A && cd(str[i]) <= range2B) {
 				res.push(str[i - 1] + str[i]);
 			} else { // ignore malformed surrogate pair
-                res.push(str[i]);
-            }
+				res.push(str[i]);
+			}
 		} else {
 			res.push(str[i]);
 		}
@@ -65,43 +65,43 @@ function advancedSplit(str) {
 }
 
 var test_cases = [
-    "",
-    "A",
-    "ABCDEF",
-    "😃",
-    "\u0315",
-    "Test123",
-    "test123[\x00]456",
-    "😃\u0315\u0315\u0315",
-    " 😃Ṭ̮͔̳͈̕e̴͓̻͎͇s̟̟͉͇̞͕͡ͅt̛̻̖̱̪͙ :: [ 😃\u0315\u0315\u0315, \u0315\u0315 ]",
-    "This is only a test. 😃 Ṭ̮͔̳͈̕e̴͓̻͎͇s̟̟͉͇̞͕͡ͅt̛̻̖̱̪͙ asd <\u2028> [\ud83d]asd <\0\1\2\3\4\5> 😃Ṭ̮͔̳͈̕e̴͓̻͎͇s̟̟͉͇̞͕͡ͅt̛̻̖̱̪͙ :: [ 😃\u0315\u0315\u0315, \u0315\u0315 ]",
-    "A\u2028C",
-    "\u0315\u0315\u0315",
-    "Q\u0315\u0315\u0315",
-    "\u0315\u0315\u0315😃",
-    "[\u2028*\u2029]",
-    "Modifier<👨🏻‍💻>",
-    "✈️[\ufe0f]",
-    "✈️\ufe0f",
-    "\ufe0f",
-    "Surrogate(\ud83d)(\ude03)",
-    "\ud83d",
-    "👨🏻‍💻",
-    "\ud83d\u0323\u0323 ; \ude03\u0323\u0323",
-    "\0\u0323",
-    "\ud83d\u1111 ; \ude03\u1111",
-    "LimitA\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315","Limit😃\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315",
-    "\uFFFF\u0000\uFFFE",
-    "\u0315A\u0315A\u0315A",
-    "\ud83d\ud83d\ud83d\ud83d\ud83d\ud83d\ud83d\ud83d\ud83d\ud83d"
+	"",
+	"A",
+	"ABCDEF",
+	"😃",
+	"\u0315",
+	"Test123",
+	"test123[\x00]456",
+	"😃\u0315\u0315\u0315",
+	" 😃Ṭ̮͔̳͈̕e̴͓̻͎͇s̟̟͉͇̞͕͡ͅt̛̻̖̱̪͙ :: [ 😃\u0315\u0315\u0315, \u0315\u0315 ]",
+	"This is only a test. 😃 Ṭ̮͔̳͈̕e̴͓̻͎͇s̟̟͉͇̞͕͡ͅt̛̻̖̱̪͙ asd <\u2028> [\ud83d]asd <\0\1\2\3\4\5> 😃Ṭ̮͔̳͈̕e̴͓̻͎͇s̟̟͉͇̞͕͡ͅt̛̻̖̱̪͙ :: [ 😃\u0315\u0315\u0315, \u0315\u0315 ]",
+	"A\u2028C",
+	"\u0315\u0315\u0315",
+	"Q\u0315\u0315\u0315",
+	"\u0315\u0315\u0315😃",
+	"[\u2028*\u2029]",
+	"Modifier<👨🏻‍💻>",
+	"✈️[\ufe0f]",
+	"✈️\ufe0f",
+	"\ufe0f",
+	"Surrogate(\ud83d)(\ude03)",
+	"\ud83d",
+	"👨🏻‍💻",
+	"\ud83d\u0323\u0323 ; \ude03\u0323\u0323",
+	"\0\u0323",
+	"\ud83d\u1111 ; \ude03\u1111",
+	"LimitA\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315","Limit😃\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315\u0315",
+	"\uFFFF\u0000\uFFFE",
+	"\u0315A\u0315A\u0315A",
+	"\ud83d\ud83d\ud83d\ud83d\ud83d\ud83d\ud83d\ud83d\ud83d\ud83d"
 ];
 
 function runTestCases() {
-    for(var i = 0; i < test_cases.length; i++) {
-        console.log(i, advancedSplit(test_cases[i]));
-    }
+	for(var i = 0; i < test_cases.length; i++) {
+		console.log(i, advancedSplit(test_cases[i]));
+	}
 }
 
 module.exports = {
-    advancedSplit
+	advancedSplit
 };

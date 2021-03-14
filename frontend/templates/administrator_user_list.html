@@ -13,72 +13,72 @@
 	<div class="content_set" style="width: auto; display: table;">
 		<div class="content_set_title">User List</div>
 		<div class="content_set_content">
-            <table>
-                <tbody>
-                    <tr>
-                        <th>
-                            ID
-                        </th>
-                        <th>
-                            Username
-                        </th>
-                        {% if accountSystem == "uvias" %}
-                        <th>
-                            Display Name
-                        </th>
-                        {% endif %}
-                        <th>
-                            Active
-                        </th>
-                        <th>
-                            Level
-                        </th>
-                        {% if accountSystem == "uvias" %}
-                        <th>
-                            Rank
-                        </th>
-                        {% endif %}
-                        <th>
-                            Last Login
-                        </th>
-                        <th>
-                            Date Joined
-                        </th>
-                    </tr>
-                    {% for user in users %}
-                    <tr>
-                        <td>
-                            {{user.id}}
-                        </td>
-                        {% if accountSystem == "uvias" %}
-                        <td>
-                            {{user.login_name}}
-                        </td>
-                        {% endif %}
+			<table>
+				<tbody>
+					<tr>
+						<th>
+							ID
+						</th>
+						<th>
+							Username
+						</th>
+						{% if accountSystem == "uvias" %}
+						<th>
+							Display Name
+						</th>
+						{% endif %}
+						<th>
+							Active
+						</th>
+						<th>
+							Level
+						</th>
+						{% if accountSystem == "uvias" %}
+						<th>
+							Rank
+						</th>
+						{% endif %}
+						<th>
+							Last Login
+						</th>
+						<th>
+							Date Joined
+						</th>
+					</tr>
+					{% for user in users %}
+					<tr>
 						<td>
-                            {{user.username}}
-                        </td>
-                        <td>
-                            {{user.is_active}}
-                        </td>
-                        <td>
-                            {{user.level}}
-                        </td>
-                        {% if accountSystem == "uvias" %}
-                        <td>
-                            {{user.rank_name}}
-                        </td>
-                        {% endif %}
-                        <td>
-                            {{user.last_login|safe}}
-                        </td>
-                        <td>
-                            {{user.date_joined|safe}}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+							{{user.id}}
+						</td>
+						{% if accountSystem == "uvias" %}
+						<td>
+							{{user.login_name}}
+						</td>
+						{% endif %}
+						<td>
+							{{user.username}}
+						</td>
+						<td>
+							{{user.is_active}}
+						</td>
+						<td>
+							{{user.level}}
+						</td>
+						{% if accountSystem == "uvias" %}
+						<td>
+							{{user.rank_name}}
+						</td>
+						{% endif %}
+						<td>
+							{{user.last_login|safe}}
+						</td>
+						<td>
+							{{user.date_joined|safe}}
+						</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
 		</div>
 	</div>
 {% endblock %}

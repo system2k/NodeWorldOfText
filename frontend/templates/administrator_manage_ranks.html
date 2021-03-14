@@ -36,8 +36,8 @@
 							Chat Color
 						</th>
 					</tr>
-                    {% for rank in misc_ranks %}
-                        <tr id="rank_row_{{rank.id}}">
+					{% for rank in misc_ranks %}
+						<tr id="rank_row_{{rank.id}}">
 							<td>
 								{{rank.id}}
 							</td>
@@ -48,14 +48,14 @@
 								<img src="/static/up_arrow.png" class="move_arrow" onclick="moveUp({{rank.id}});" ondragstart="return false;">
 								<img src="/static/down_arrow.png" class="move_arrow" onclick="moveDown({{rank.id}});" ondragstart="return false;">
 							</td>
-                            <td>
+							<td>
 								<input value="{{rank.name}}" id="rank_name_{{rank.id}}">
 							</td>
 							<td>
 								<input value="{{rank.chat_color}}" id="rank_cc_{{rank.id}}">
 							</td>
-                        </tr>
-                    {% endfor %}
+						</tr>
+					{% endfor %}
 				</tbody>
 			</table>
 			<button onclick="updVal();">Update</button>

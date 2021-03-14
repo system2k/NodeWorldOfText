@@ -13,64 +13,64 @@
 	<div class="content_set" style="width: auto; display: table;">
 		<div class="content_set_title">File List</div>
 		<div class="content_set_content">
-            <table>
-                <tbody>
-                    <tr>
-                        <th>
-                            ID
-                        </th>
-                        <th>
-                            Name
-                        </th>
-                        <th>
-                            Created
-                        </th>
-                        <th>
-                            Mime
-                        </th>
-                        <th>
-                            Offset Start
-                        </th>
-                        <th>
-                            Size
-                        </th>
-                        <th>
-                            Offset
-                        </th>
-                        <th>
-                            Accessible
-                        </th>
-                    </tr>
-                    {% for file in files %}
-                    <tr>
-                        <td>
-                            {{file.index}}
-                        </td>
-                        <td>
-                            <a href="/static?file={{file.index}}">{{file.filename}}</a>
-                        </td>
-                        <td>
-                            {{file.unixtime|safe}}
-                        </td>
-                        <td>
-                            {{file.mimetype}}
-                        </td>
-                        <td>
-                            {{file.start}}
-                        </td>
-                        <td>
-                            {{file.len}}
-                        </td>
-                        <td>
-                            {{file.offset}}
-                        </td>
-                        <td>
-                            {{file.accessible}}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+			<table>
+				<tbody>
+					<tr>
+						<th>
+							ID
+						</th>
+						<th>
+							Name
+						</th>
+						<th>
+							Created
+						</th>
+						<th>
+							Mime
+						</th>
+						<th>
+							Offset Start
+						</th>
+						<th>
+							Size
+						</th>
+						<th>
+							Offset
+						</th>
+						<th>
+							Accessible
+						</th>
+					</tr>
+					{% for file in files %}
+					<tr>
+						<td>
+							{{file.index}}
+						</td>
+						<td>
+							<a href="/static?file={{file.index}}">{{file.filename}}</a>
+						</td>
+						<td>
+							{{file.unixtime|safe}}
+						</td>
+						<td>
+							{{file.mimetype}}
+						</td>
+						<td>
+							{{file.start}}
+						</td>
+						<td>
+							{{file.len}}
+						</td>
+						<td>
+							{{file.offset}}
+						</td>
+						<td>
+							{{file.accessible}}
+						</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
 		</div>
 	</div>
 {% endblock %}

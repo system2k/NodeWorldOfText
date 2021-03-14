@@ -1,318 +1,318 @@
 {% extends "base.html" %}
 
 {% block title %}
-    Admin Panel | Our World of Text
+	Admin Panel | Our World of Text
 {% endblock %}
 
 {% block endhead %}
-    <script>
-        function goto_config() {
-            window.location.pathname = "/accounts/configure/" + worldname_config.value + "/";
-            return false;
-        }
-        function goto_user() {
-            window.location.pathname = "/administrator/user/" + username_config.value + "/";
-            return false;
-        }
-        function goto_download() {
-            window.location.pathname = "/accounts/download/" + worldname_download.value + "/";
-            return false;
-        }
-        function goto_user_by_username() {
-            window.location.pathname = "/administrator/users/by_username/" + user_info_by_username.value + "/";
-            return false;
-        }
-        function goto_user_by_id() {
-            window.location.pathname = "/administrator/users/by_id/" + user_info_by_id.value + "/";
-            return false;
-        }
-        function goto_custom_rank_usr() {
-            window.location.pathname = "/administrator/set_custom_rank/" + custom_rank_username_config.value + "/";
-            return false;
-        }
+	<script>
+		function goto_config() {
+			window.location.pathname = "/accounts/configure/" + worldname_config.value + "/";
+			return false;
+		}
+		function goto_user() {
+			window.location.pathname = "/administrator/user/" + username_config.value + "/";
+			return false;
+		}
+		function goto_download() {
+			window.location.pathname = "/accounts/download/" + worldname_download.value + "/";
+			return false;
+		}
+		function goto_user_by_username() {
+			window.location.pathname = "/administrator/users/by_username/" + user_info_by_username.value + "/";
+			return false;
+		}
+		function goto_user_by_id() {
+			window.location.pathname = "/administrator/users/by_id/" + user_info_by_id.value + "/";
+			return false;
+		}
+		function goto_custom_rank_usr() {
+			window.location.pathname = "/administrator/set_custom_rank/" + custom_rank_username_config.value + "/";
+			return false;
+		}
 
-        function manageServerCommand(command) {
-            ajaxRequest({
-                type: "POST",
-                data: {
-                    manage_server: command
-                },
-                url: "/administrator/",
-                done: function(e) {
-                    alert("Command '" + command + "' has been sent to the server with the response '" + e + "'");
-                }
-            });
-        }
+		function manageServerCommand(command) {
+			ajaxRequest({
+				type: "POST",
+				data: {
+					manage_server: command
+				},
+				url: "/administrator/",
+				done: function(e) {
+					alert("Command '" + command + "' has been sent to the server with the response '" + e + "'");
+				}
+			});
+		}
 
-        onload = function() {
-            autocomplete({
-                element: document.getElementById("user_info_by_username"),
-                url: "/accounts/member_autocomplete/",
-                delay: 50
-            });
+		onload = function() {
+			autocomplete({
+				element: document.getElementById("user_info_by_username"),
+				url: "/accounts/member_autocomplete/",
+				delay: 50
+			});
 
-            var mgr_restart = document.getElementById("mgr_restart");
-            var mgr_close = document.getElementById("mgr_close");
-            var mgr_maintenance = document.getElementById("mgr_maintenance");
-            if(mgr_restart) {
-                mgr_restart.onclick = function() {
-                    manageServerCommand("restart");
-                }
-            }
-            if(mgr_close) {
-                mgr_close.onclick = function() {
-                    manageServerCommand("close");
-                }
-            }
-            if(mgr_maintenance) {
-                mgr_maintenance.onclick = function() {
-                    manageServerCommand("maintenance");
-                }
-            }
-        }
+			var mgr_restart = document.getElementById("mgr_restart");
+			var mgr_close = document.getElementById("mgr_close");
+			var mgr_maintenance = document.getElementById("mgr_maintenance");
+			if(mgr_restart) {
+				mgr_restart.onclick = function() {
+					manageServerCommand("restart");
+				}
+			}
+			if(mgr_close) {
+				mgr_close.onclick = function() {
+					manageServerCommand("close");
+				}
+			}
+			if(mgr_maintenance) {
+				mgr_maintenance.onclick = function() {
+					manageServerCommand("maintenance");
+				}
+			}
+		}
 
-        function ajaxRequest(settings) {
-            var req = new XMLHttpRequest();
+		function ajaxRequest(settings) {
+			var req = new XMLHttpRequest();
 
-            var formData = "";
-            var ampAppend = false;
-            if(settings.data) {
-                for(var i in settings.data) {
-                    if(ampAppend) formData += "&";
-                    ampAppend = true;
-                    formData += encodeURIComponent(i) + "=" + encodeURIComponent(settings.data[i]);
-                }
-            }
-            // append form data to url if this is a GET
-            if(settings.type == "GET" && formData) {
-                settings.url += "?" + formData;
-            }
-            var async = !!settings.async;
-            req.open(settings.type, settings.url, !async);
-            req.onload = function() {
-                if(req.status >= 200 && req.status < 400) {
-                    if(settings.done) {
-                        settings.done(req.responseText, req);
-                    }
-                } else {
-                    if(settings.error) {
-                        settings.error(req);
-                    }
-                }
-            }
-            req.onerror = function() {
-                if(settings.error) {
-                    settings.error(req);
-                }
-            }
-            if(settings.type == "POST") {
-                if(formData) req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-                req.send(formData);
-            } else {
-                req.send();
-            }
-        }
-    </script>
-    <link rel="stylesheet" type="text/css" href="/static/css/autocomplete.css">
-    <style>
-        .server_mgr {
-            margin-top: 4px;
-            width: 200px;
-            height: 32px;
-            text-align: left;
-        }
-        .server_mgr_txt {
-            position: relative;
+			var formData = "";
+			var ampAppend = false;
+			if(settings.data) {
+				for(var i in settings.data) {
+					if(ampAppend) formData += "&";
+					ampAppend = true;
+					formData += encodeURIComponent(i) + "=" + encodeURIComponent(settings.data[i]);
+				}
+			}
+			// append form data to url if this is a GET
+			if(settings.type == "GET" && formData) {
+				settings.url += "?" + formData;
+			}
+			var async = !!settings.async;
+			req.open(settings.type, settings.url, !async);
+			req.onload = function() {
+				if(req.status >= 200 && req.status < 400) {
+					if(settings.done) {
+						settings.done(req.responseText, req);
+					}
+				} else {
+					if(settings.error) {
+						settings.error(req);
+					}
+				}
+			}
+			req.onerror = function() {
+				if(settings.error) {
+					settings.error(req);
+				}
+			}
+			if(settings.type == "POST") {
+				if(formData) req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+				req.send(formData);
+			} else {
+				req.send();
+			}
+		}
+	</script>
+	<link rel="stylesheet" type="text/css" href="/static/css/autocomplete.css">
+	<style>
+		.server_mgr {
+			margin-top: 4px;
+			width: 200px;
+			height: 32px;
+			text-align: left;
+		}
+		.server_mgr_txt {
+			position: relative;
 			left: 4px;
 			top: -5px;
 			font-size: 1.2em;
-        }
-    </style>
+		}
+	</style>
 {% endblock %}
 
 {% block header %}
-    <h1>Administrator Panel</h1>
+	<h1>Administrator Panel</h1>
 {% endblock %}
 
 {% block content %}
-    <div class="content_set">
-        <div class="content_set_title">Edit World Config</div>
-        <div class="content_set_content">
-            <form onsubmit="return goto_config();">
+	<div class="content_set">
+		<div class="content_set_title">Edit World Config</div>
+		<div class="content_set_content">
+			<form onsubmit="return goto_config();">
 				World name: 
 				<input type="text" name="worldname" id="worldname_config" value="">
 				<input type="submit" value="Edit">
 			</form>
-        </div>
-    </div>
+		</div>
+	</div>
 
-    <div class="content_set">
-        <div class="content_set_title">Download a World</div>
-        <div class="content_set_content">
-            <form onsubmit="return goto_download();">
+	<div class="content_set">
+		<div class="content_set_title">Download a World</div>
+		<div class="content_set_content">
+			<form onsubmit="return goto_download();">
 				World name: 
 				<input type="text" name="worldname" id="worldname_download" value="">
 				<input type="submit" value="Download">
 			</form>
-        </div>
-    </div>
+		</div>
+	</div>
 
-    {% if user.operator %}
-    <div class="content_set">
-        <div class="content_set_title">Edit Users</div>
-        <div class="content_set_content">
-            <form onsubmit="return goto_user();">
-                User name: 
-                <input type="text" name="username" id="username_config" value="">
-                <input type="submit" value="Edit">
-            </form>
-        </div>
-    </div>
-    {% endif %}
-    <div class="content_set">
-        <div class="content_set_title">User Ranks</div>
-        <div class="content_set_content">
-            <ul>
-                {% for user_rank in user_ranks %}
-                <li>
-                    <span>{{ user_rank.username }}</span>
-                    
-                    {% if user_rank.level == 1%}
-                        (staff)
-                    {% endif %}
-                    {% if user_rank.level == 2%}
-                        (superuser)
-                    {% endif %}
-                    {% if user_rank.level == 3%}
-                        (operator)
-                    {% endif %}
+	{% if user.operator %}
+	<div class="content_set">
+		<div class="content_set_title">Edit Users</div>
+		<div class="content_set_content">
+			<form onsubmit="return goto_user();">
+				User name: 
+				<input type="text" name="username" id="username_config" value="">
+				<input type="submit" value="Edit">
+			</form>
+		</div>
+	</div>
+	{% endif %}
+	<div class="content_set">
+		<div class="content_set_title">User Ranks</div>
+		<div class="content_set_content">
+			<ul>
+				{% for user_rank in user_ranks %}
+				<li>
+					<span>{{ user_rank.username }}</span>
+					
+					{% if user_rank.level == 1%}
+						(staff)
+					{% endif %}
+					{% if user_rank.level == 2%}
+						(superuser)
+					{% endif %}
+					{% if user_rank.level == 3%}
+						(operator)
+					{% endif %}
 
-                    {% if user.operator %}
-                        <a href="/administrator/user/{{ user_rank.username }}/">configure</a>
-                    {% endif %}
-                </li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
-    <div class="content_set">
-        <div class="content_set_title">Set Custom Rank</div>
-        <div class="content_set_content">
-            <form onsubmit="return goto_custom_rank_usr();">
-                User name: 
-                <input type="text" name="username" id="custom_rank_username_config" value="">
-                <input type="submit" value="Modify">
-            </form>
-        </div>
-    </div>
-    <div class="content_set">
-        <div class="content_set_title">All Ranks</div>
-        <div class="content_set_content">
-            {% if user.operator %}
-            <a href="/administrator/manage_ranks">Manage Ranks</a><br>
-            {% endif %}
-            <table style="table-layout: fixed; display: table-cell;">
-                <tbody>
-                    {% for rank in custom_ranks %}
-                    <tr>
-                        <td style="font-weight: bold; width: auto;">
-                            {{rank.level}}:
-                        </td>
-                        <td>
-                            {{rank.name}}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+					{% if user.operator %}
+						<a href="/administrator/user/{{ user_rank.username }}/">configure</a>
+					{% endif %}
+				</li>
+				{% endfor %}
+			</ul>
+		</div>
+	</div>
+	<div class="content_set">
+		<div class="content_set_title">Set Custom Rank</div>
+		<div class="content_set_content">
+			<form onsubmit="return goto_custom_rank_usr();">
+				User name: 
+				<input type="text" name="username" id="custom_rank_username_config" value="">
+				<input type="submit" value="Modify">
+			</form>
+		</div>
+	</div>
+	<div class="content_set">
+		<div class="content_set_title">All Ranks</div>
+		<div class="content_set_content">
+			{% if user.operator %}
+			<a href="/administrator/manage_ranks">Manage Ranks</a><br>
+			{% endif %}
+			<table style="table-layout: fixed; display: table-cell;">
+				<tbody>
+					{% for rank in custom_ranks %}
+					<tr>
+						<td style="font-weight: bold; width: auto;">
+							{{rank.level}}:
+						</td>
+						<td>
+							{{rank.name}}
+						</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+	</div>
 
-    <div class="content_set">
-        <div class="content_set_title">Set Announcement</div>
-        <div class="content_set_content">
-            {% if announcement_update_msg %}
+	<div class="content_set">
+		<div class="content_set_title">Set Announcement</div>
+		<div class="content_set_content">
+			{% if announcement_update_msg %}
 				<span style="font-size:80%"><i>{{ announcement_update_msg }}</i></span>
 			{% endif %}
-            <form method="POST" action=".">
+			<form method="POST" action=".">
 				Text: 
 				<input type="text" name="announcement" id="announcement" value="{{ announcement }}" style="width: 100%;">
 				<input type="submit" value="Set">
 			</form>
-        </div>
-    </div>
+		</div>
+	</div>
 
-    <div class="content_set">
-        <div class="content_set_title">View User Info</div>
-        <div class="content_set_content">
-            <form onsubmit="return goto_user_by_username();">
-                User name: 
-                <input type="text" name="username" id="user_info_by_username" value="">
-                <input type="submit" value="Enter">
-            </form>
-            <form onsubmit="return goto_user_by_id();">
-                User id: 
-                <input type="text" name="username" id="user_info_by_id" value="">
-                <input type="submit" value="Enter">
-            </form>
-        </div>
-    </div>
+	<div class="content_set">
+		<div class="content_set_title">View User Info</div>
+		<div class="content_set_content">
+			<form onsubmit="return goto_user_by_username();">
+				User name: 
+				<input type="text" name="username" id="user_info_by_username" value="">
+				<input type="submit" value="Enter">
+			</form>
+			<form onsubmit="return goto_user_by_id();">
+				User id: 
+				<input type="text" name="username" id="user_info_by_id" value="">
+				<input type="submit" value="Enter">
+			</form>
+		</div>
+	</div>
 
-    <div class="content_set">
-        <div class="content_set_title">Constants</div>
-        <div class="content_set_content">
-            {% if cons_update_msg %}
+	<div class="content_set">
+		<div class="content_set_title">Constants</div>
+		<div class="content_set_content">
+			{% if cons_update_msg %}
 			<span style="font-size:80%"><i>{{ cons_update_msg }}</i></span>
 			{% endif %}
-            <form method="POST" action=".">
+			<form method="POST" action=".">
 				Bypass key: 
 				<input type="text" name="set_bypass_key" id="set_bypass_key" value="{{ bypass_key }}" style="width: 100%;">
 				<input type="submit" value="Set">
 			</form>
-        </div>
-    </div>
+		</div>
+	</div>
 
-    <div class="content_set">
-        <div class="content_set_title">Page Links</div>
-        <div class="content_set_content">
-            <a href="/administrator/world_restore/">Automatic World Rollback</a>
-            <br>
-            <a href="/administrator/backgrounds/">Upload Page Backgrounds</a>
-            <br>
-            <a href="/administrator/files/">Manage files</a>
-            {% if user.operator %}<br>
-            <a href="/administrator/user_list/">User list</a>{% endif %}
-        </div>
-    </div>
+	<div class="content_set">
+		<div class="content_set_title">Page Links</div>
+		<div class="content_set_content">
+			<a href="/administrator/world_restore/">Automatic World Rollback</a>
+			<br>
+			<a href="/administrator/backgrounds/">Upload Page Backgrounds</a>
+			<br>
+			<a href="/administrator/files/">Manage files</a>
+			{% if user.operator %}<br>
+			<a href="/administrator/user_list/">User list</a>{% endif %}
+		</div>
+	</div>
 
-    <div class="content_set">
-        <div class="content_set_title">Server Uptime</div>
-        <div class="content_set_content">
-            <span>{{ uptime }}</span>
-            <br>
-            <b>Machine Uptime: </b>{{ machine_uptime }}
-        </div>
-    </div>
+	<div class="content_set">
+		<div class="content_set_title">Server Uptime</div>
+		<div class="content_set_content">
+			<span>{{ uptime }}</span>
+			<br>
+			<b>Machine Uptime: </b>{{ machine_uptime }}
+		</div>
+	</div>
 
-    {% if user.operator %}
-    <div class="content_set">
-        <div class="content_set_title">Manage Server</div>
-        <div class="content_set_content">
-            <button class="server_mgr" id="mgr_restart"><img src="/static/restart.png"><span class="server_mgr_txt">Restart</span></button>
-            <br>
-            <button class="server_mgr" id="mgr_close"><img src="/static/close.png"><span class="server_mgr_txt">Close</span></button>
-            <br>
-            <button class="server_mgr" id="mgr_maintenance"><img src="/static/maintenance.png"><span class="server_mgr_txt">Maintenance</span></button>
-        </div>
-    </div>
-    {% endif %}
+	{% if user.operator %}
+	<div class="content_set">
+		<div class="content_set_title">Manage Server</div>
+		<div class="content_set_content">
+			<button class="server_mgr" id="mgr_restart"><img src="/static/restart.png"><span class="server_mgr_txt">Restart</span></button>
+			<br>
+			<button class="server_mgr" id="mgr_close"><img src="/static/close.png"><span class="server_mgr_txt">Close</span></button>
+			<br>
+			<button class="server_mgr" id="mgr_maintenance"><img src="/static/maintenance.png"><span class="server_mgr_txt">Maintenance</span></button>
+		</div>
+	</div>
+	{% endif %}
 
-    <div class="content_set">
-        <div class="content_set_title">Connected Clients</div>
-        <div class="content_set_content">
-            <span>{{ client_num }} client(s)</span>
-        </div>
-    </div>
+	<div class="content_set">
+		<div class="content_set_title">Connected Clients</div>
+		<div class="content_set_content">
+			<span>{{ client_num }} client(s)</span>
+		</div>
+	</div>
 {% endblock %}
 
 {% block endbody %}

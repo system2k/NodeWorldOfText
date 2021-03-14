@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
 {% block title %}
-    Profile | Our World of Text
+	Profile | Our World of Text
 {% endblock %}
 
 {% block header %}
-    <h1>Private</h1>
+	<h1>Private</h1>
 {% endblock %}
 
 {% block content %}
-    <div class="text">
+	<div class="text">
 		<p>Sorry, the owner of that world has made it only visible to members.
 			{% if user_is_authenticated %}
 				<a href="/">Go back to the main world</a>, perhaps.
@@ -19,5 +19,5 @@
 				Or, <a href="/">go back to the main world</a>.
 			{% endif %}
 		</p>
-    </div>
+	</div>
 {% endblock %}

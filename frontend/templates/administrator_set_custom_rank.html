@@ -13,19 +13,19 @@
 	<div class="content_set">
 		<div class="content_set_title">Set Custom User Rank</div>
 		<div class="content_set_content">
-            {% if message %}
+			{% if message %}
 				<span style="font-size:80%"><i>{{ message }}</i></span>
 			{% endif %}
 			<form method="POST" action=".">
-			    Set custom rank to this user: <select name="rank">
-                <option value="-1"{% if current_rank == "none" %} selected{% endif %}>(No custom rank)</option>
-                {% for rank in ranks %}
-                <option value="{{rank.id}}"{% if current_rank == rank.id %} selected{% endif %}>{{rank.name}}</option>
-                {% endfor %}
+				Set custom rank to this user: <select name="rank">
+				<option value="-1"{% if current_rank == "none" %} selected{% endif %}>(No custom rank)</option>
+				{% for rank in ranks %}
+				<option value="{{rank.id}}"{% if current_rank == rank.id %} selected{% endif %}>{{rank.name}}</option>
+				{% endfor %}
 			</select>
 			<input type="hidden" name="form" value="rank">
-            <input type="submit" value="Submit">
-            
+			<input type="submit" value="Submit">
+			
 			</form>
 		</div>
 	</div>

@@ -1,58 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
-        <title>{% block title %}Our World of Text{% endblock %}</title>
-        <link rel="stylesheet" href="/static/css/blueprint/print.css" type="text/css" media="print">
-        <link rel="shortcut icon" type="image/png" href="/static/favicon.png"/>
-        <link rel="stylesheet" type="text/css" href="/static/css/site.css">
-        <link rel="shortcut icon" href="/static/favicon.png">
-        {% block endhead %}{% endblock %}
-        {% for script in user.scripts %}
-            <script src="/script_manager/view/{{ script.name }}/"></script>
-        {% endfor %}
-    </head>
-    <body>
-        <div class="container">
-            <div class="span-19">
-                <div id="topbar" class="span-19 last">
-                    {% if user.authenticated %}
-                        {% if accountSystem == "uvias" %}
-                            Logged in as {{ user.username }}{% if user.username != user.display_username %}<b> ({{ user.display_username }})</b>{% endif %}:
-                        {% else %}
-                            Logged in as {{ user.username }}:
-                        {% endif %}
-                    {% endif %}
-                    <a href="/home/">Home</a>
-                    {% if user.authenticated %}
-                        | <a href="/accounts/profile/">Your Worlds</a>
-                        {% if user.superuser %}
-                            | <a href="/administrator/">Admin Panel</a>
-                            | <a href="/administrator/monitor/">Monitor</a>
-                        {% endif %}
-                        {% if user.staff %}
-                            | <a href="/script_manager/">Script Manager</a>
-                        {% endif %}
-                        | <a href="{{ logoutPath }}">Logout</a>
-                    {% else %}
-                        | <a href="{{ loginPath }}">{% if accountSystem == "uvias" %}Login via Uvias{% else %}Login{% endif %}</a>
-                        | <a href="{{ registerPath }}">Register</a>
-                    {% endif %}
-                </div>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+		<title>{% block title %}Our World of Text{% endblock %}</title>
+		<link rel="stylesheet" href="/static/css/blueprint/print.css" type="text/css" media="print">
+		<link rel="shortcut icon" type="image/png" href="/static/favicon.png"/>
+		<link rel="stylesheet" type="text/css" href="/static/css/site.css">
+		<link rel="shortcut icon" href="/static/favicon.png">
+		{% block endhead %}{% endblock %}
+		{% for script in user.scripts %}
+			<script src="/script_manager/view/{{ script.name }}/"></script>
+		{% endfor %}
+	</head>
+	<body>
+		<div class="container">
+			<div class="span-19">
+				<div id="topbar" class="span-19 last">
+					{% if user.authenticated %}
+						{% if accountSystem == "uvias" %}
+							Logged in as {{ user.username }}{% if user.username != user.display_username %}<b> ({{ user.display_username }})</b>{% endif %}:
+						{% else %}
+							Logged in as {{ user.username }}:
+						{% endif %}
+					{% endif %}
+					<a href="/home/">Home</a>
+					{% if user.authenticated %}
+						| <a href="/accounts/profile/">Your Worlds</a>
+						{% if user.superuser %}
+							| <a href="/administrator/">Admin Panel</a>
+							| <a href="/administrator/monitor/">Monitor</a>
+						{% endif %}
+						{% if user.staff %}
+							| <a href="/script_manager/">Script Manager</a>
+						{% endif %}
+						| <a href="{{ logoutPath }}">Logout</a>
+					{% else %}
+						| <a href="{{ loginPath }}">{% if accountSystem == "uvias" %}Login via Uvias{% else %}Login{% endif %}</a>
+						| <a href="{{ registerPath }}">Register</a>
+					{% endif %}
+				</div>
 
-                <div class="span-19 last">
-                    {% block header %}{% endblock %}
-                </div>
+				<div class="span-19 last">
+					{% block header %}{% endblock %}
+				</div>
 
-                <div class="span-14">
-                    {% block content %}{% endblock %}
-                </div>
-                <div class="span-5 last">
-                    &nbsp;
-                </div>
-            </div>
-        </div>
-        
-        {% block endbody %}{% endblock %}
-    </body>
+				<div class="span-14">
+					{% block content %}{% endblock %}
+				</div>
+				<div class="span-5 last">
+					&nbsp;
+				</div>
+			</div>
+		</div>
+		
+		{% block endbody %}{% endblock %}
+	</body>
 </html>

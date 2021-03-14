@@ -1,11 +1,11 @@
 module.exports.GET = async function(req, serve, vars, evars) {
-    var HTML = evars.HTML;
-    
-    var website = vars.website;
+	var HTML = evars.HTML;
+	
+	var website = vars.website;
 
-    var data = {
-        website
-    };
+	var data = {
+		website
+	};
 
-    serve(HTML("home.html", data));
+	serve(HTML("home.html", data));
 }

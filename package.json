@@ -1,18 +1,18 @@
 {
-    "name": "nodeworldoftext",
-    "version": "1.0.0",
-    "description": "OurWorldOfText server",
-    "dependencies": {
-        "adm-zip": "^0.4.14",
-        "nodemailer": "^6.4.6",
-        "pg": "^8.0.3",
-        "sqlite3": "^4.2.0",
-        "ws": "^7.2.5"
-    },
-    "scripts": {
-        "start": "node main.js",
-        "tst": "node --expose-gc main.js --test-server",
-        "dbg": "node --trace-warnings --stack-trace-limit=1024 --expose-gc main.js --test-server"
-    },
-    "private": true
+	"name": "nodeworldoftext",
+	"version": "1.0.0",
+	"description": "OurWorldOfText server",
+	"dependencies": {
+		"adm-zip": "^0.4.14",
+		"nodemailer": "^6.4.6",
+		"pg": "^8.0.3",
+		"sqlite3": "^4.2.0",
+		"ws": "^7.2.5"
+	},
+	"scripts": {
+		"start": "node main.js",
+		"tst": "node --expose-gc main.js --test-server",
+		"dbg": "node --trace-warnings --stack-trace-limit=1024 --expose-gc main.js --test-server"
+	},
+	"private": true
 }

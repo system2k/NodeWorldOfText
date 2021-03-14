@@ -1,110 +1,110 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
-        <title>Load Monitor</title>
-        <style>
-            table {
-                background-color: #FFFFFF;
-                padding: 1px;
-                font-family: Verdana, Arial;
-                color: #FFFFFF;
-                font-size: 0.9em;
-                border-spacing: 0px;
-            }
-            body {
-                background-color: #b7c9ff;
-            }
-            .mainTable {
-                border: solid 1px #000000;
-            }
-            a {
-                color: #86d6cf;
-            }
-            a:hover {
-                color: #ffc336;
-            }
-            #mainTitle {
-                background-image: linear-gradient(#4292ee, #314d77);
-            }
-            #outputPanel {
-                background-color: black;
-                width: 700px;
-                height: 500px;
-                border: solid 1px #FFFFFF;
-                color: white;
-                font-family: 'Courier New', monospace;
-                padding: 4px;
-                overflow: scroll;
-                overflow-x: hidden;
-                overflow-wrap: break-word;
-                display: inline-block;
-            }
-            #outputPanel span {
-                display: block;
-            }
-            #tileCachePanel {
-                background-color: white;
-                border: solid 1px black;
-                display: inline-block;
-                padding: 7px;
-            }
-        </style>
-    </head>
-    <body>
-        <table style="width: 100%;" class="mainTable">
-            <tbody>
-                <tr style="background-color: #6961e2;">
-                    <td style="padding: 4px;" id="mainTitle">
-                        <span style="font-weight: bold;">Load Monitor</span>
-                        <a style="float: right; margin-right: 10px;" href="/home/">Home Page</a>
-                    </td>
-                </tr>
-                <tr style="height: 100%; color: #000000;">
-                    <td style="vertical-align: top; padding-top: 1px;">
-                        <div style="background-color: #e6f0ff; height: 100%; padding: 4px;">
-                            <div id="outputPanel"></div>
-                            <div id="tileCachePanel">
-                                <b>Tile Cache</b><br>
-                                <span>Worlds: {{tc_worlds}}</span><br>
-                                <span>Total Tiles: {{tc_tiles}}</span>
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-        <script>
-            var outputPanel = document.getElementById("outputPanel");
-            function appendLine(string) {
-                var line = document.createElement("span");
-                line.innerText = string;
-                var scrollBottom = false;
-                if((outputPanel.scrollHeight - outputPanel.clientHeight) - outputPanel.scrollTop < 20) {
-                    scrollBottom = true;
-                }
-                outputPanel.appendChild(line);
-                if(scrollBottom) {
-                    outputPanel.scrollTop = outputPanel.scrollHeight;
-                }
-            }
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+		<title>Load Monitor</title>
+		<style>
+			table {
+				background-color: #FFFFFF;
+				padding: 1px;
+				font-family: Verdana, Arial;
+				color: #FFFFFF;
+				font-size: 0.9em;
+				border-spacing: 0px;
+			}
+			body {
+				background-color: #b7c9ff;
+			}
+			.mainTable {
+				border: solid 1px #000000;
+			}
+			a {
+				color: #86d6cf;
+			}
+			a:hover {
+				color: #ffc336;
+			}
+			#mainTitle {
+				background-image: linear-gradient(#4292ee, #314d77);
+			}
+			#outputPanel {
+				background-color: black;
+				width: 700px;
+				height: 500px;
+				border: solid 1px #FFFFFF;
+				color: white;
+				font-family: 'Courier New', monospace;
+				padding: 4px;
+				overflow: scroll;
+				overflow-x: hidden;
+				overflow-wrap: break-word;
+				display: inline-block;
+			}
+			#outputPanel span {
+				display: block;
+			}
+			#tileCachePanel {
+				background-color: white;
+				border: solid 1px black;
+				display: inline-block;
+				padding: 7px;
+			}
+		</style>
+	</head>
+	<body>
+		<table style="width: 100%;" class="mainTable">
+			<tbody>
+				<tr style="background-color: #6961e2;">
+					<td style="padding: 4px;" id="mainTitle">
+						<span style="font-weight: bold;">Load Monitor</span>
+						<a style="float: right; margin-right: 10px;" href="/home/">Home Page</a>
+					</td>
+				</tr>
+				<tr style="height: 100%; color: #000000;">
+					<td style="vertical-align: top; padding-top: 1px;">
+						<div style="background-color: #e6f0ff; height: 100%; padding: 4px;">
+							<div id="outputPanel"></div>
+							<div id="tileCachePanel">
+								<b>Tile Cache</b><br>
+								<span>Worlds: {{tc_worlds}}</span><br>
+								<span>Total Tiles: {{tc_tiles}}</span>
+							</div>
+						</div>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+		<script>
+			var outputPanel = document.getElementById("outputPanel");
+			function appendLine(string) {
+				var line = document.createElement("span");
+				line.innerText = string;
+				var scrollBottom = false;
+				if((outputPanel.scrollHeight - outputPanel.clientHeight) - outputPanel.scrollTop < 20) {
+					scrollBottom = true;
+				}
+				outputPanel.appendChild(line);
+				if(scrollBottom) {
+					outputPanel.scrollTop = outputPanel.scrollHeight;
+				}
+			}
 
-            var socket;
-            function makeSocket() {
-                socket = new WebSocket("ws" + (window.location.protocol === "https:" ? "s" : "") + "://" + window.location.host + "/administrator/monitor/ws/");
-                socket.onopen = function() {
-                    appendLine("[Monitor] Opened");
-                }
-                socket.onclose = function() {
-                    appendLine("[Monitor] Closed. Reconnecting...");
-                    makeSocket();
-                }
-                socket.onmessage = function(msg) {
-                    var data = msg.data;
-                    appendLine(data);
-                }
-            }
-            makeSocket();
-        </script>
-    </body>
+			var socket;
+			function makeSocket() {
+				socket = new WebSocket("ws" + (window.location.protocol === "https:" ? "s" : "") + "://" + window.location.host + "/administrator/monitor/ws/");
+				socket.onopen = function() {
+					appendLine("[Monitor] Opened");
+				}
+				socket.onclose = function() {
+					appendLine("[Monitor] Closed. Reconnecting...");
+					makeSocket();
+				}
+				socket.onmessage = function(msg) {
+					var data = msg.data;
+					appendLine(data);
+				}
+			}
+			makeSocket();
+		</script>
+	</body>
 </html>
