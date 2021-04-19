@@ -99,6 +99,19 @@ function getKeyCode(e) {
 	return 0;
 }
 
+function escapeQuote(text) { // escapes " and ' and \
+	return text.replace(/\\/g, "\\\\").replace(/\"/g, "\\\"").replace(/\'/g, "\\'");
+}
+
+function escapeURLQuote(url) {
+	try {
+		var decode = decodeURIComponent(url);
+	} catch(e) {
+		return "";
+	}
+	return encodeURIComponent(escapeQuote(decode));
+}
+
 function html_tag_esc(str, non_breaking_space, newline_br) {
 	str += "";
 	str = str.replace(/\&/g, "&amp;");
@@ -121,6 +134,30 @@ function html_tag_esc(str, non_breaking_space, newline_br) {
 	str = str.replace(/\=/g, "&#61;");
 	if(non_breaking_space) str = str.replace(/\u0020/g, "&nbsp;");
 	if(str.indexOf(">") > -1 || str.indexOf("<") > -1) return "";
+	return str;
+}
+
+function convertToDate(epoch) {
+	var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+	var str = "";
+	var date = new Date(epoch);
+	var month = date.getMonth();
+	var day = date.getDate();
+	var year = date.getFullYear();
+	var hour = date.getHours();
+	var minute = date.getMinutes();
+	str += year + " " + months[month] + " " + day + " ";
+	var per = "AM";
+	if(hour >= 12) {
+		per = "PM";
+	}
+	if(hour > 12) {
+		hour = hour - 12;
+	}
+	if(hour == 0) {
+		hour = 12;
+	}
+	str += hour + ":" + ("0" + minute).slice(-2) + " " + per;
 	return str;
 }
 
@@ -212,35 +249,58 @@ function ReconnectingWebSocket(url) {
 	return this;
 }
 
-var surrogateRegexStr = "([\\uD800-\\uDBFF][\\uDC00-\\uDFFF])";
-var surrogateRegex = new RegExp(surrogateRegexStr, "g");
-var combiningRegexStr = "(([\\0-\\u02FF\\u0370-\\u1DBF\\u1E00-\\u20CF\\u2100-\\uD7FF\\uDC00-\\uFE1F\\uFE30-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF])([\\u0300-\\u036F\\u1DC0-\\u1DFF\\u20D0-\\u20FF\\uFE20-\\uFE2F]+))";
-var combiningRegex = new RegExp(combiningRegexStr, "g");
-var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\n|\\r|\\u2028|\\u2029", "g");
-
-// Split a string properly with surrogates and combining characters in mind
-function advancedSplit(str, noSurrog, noComb) {
-	str += "";
-	if(classicTileProcessing) {
-		return str.split("");
+// split a mixed string with surrogates and combining characters
+function advancedSplit(str, noSurrog, noComb, norm) {
+	if(str && str.constructor == Array) return str;
+	var chars = [];
+	var buffer = "";
+	var surrogMode = false;
+	var charMode = false;
+	for(var i = 0; i < str.length; i++) {
+		var char = str[i];
+		var code = char.charCodeAt();
+		if(code >= 0xDC00 && code <= 0xDFFF) {
+			if(surrogMode) {
+				buffer += char;
+			} else {
+				buffer = "";
+				chars.push("?");
+			}
+			surrogMode = false;
+			continue;
+		} else if(surrogMode) {
+			buffer = "";
+			chars.push("?");
+			surrogMode = false;
+			continue;
+		}
+		if(!noSurrog && code >= 0xD800 && code <= 0xDBFF) {
+			if(charMode) {
+				chars.push(buffer);
+			}
+			charMode = true;
+			surrogMode = true;
+			buffer = char;
+			continue;
+		}
+		if(!norm && ((code >= 0x0300 && code <= 0x036F) ||
+		  (code >= 0x1DC0 && code <= 0x1DFF) ||
+		  (code >= 0x20D0 && code <= 0x20FF) ||
+		  (code >= 0xFE20 && code <= 0xFE2F))) {
+			if(!noComb && charMode) buffer += char;
+			continue;
+		} else {
+			if(charMode) {
+				chars.push(buffer);
+			}
+			charMode = true;
+			buffer = char;
+		}
 	}
-	// look for surrogate pairs first. then look for combining characters. finally, look for the rest
-	var data = str.match(splitRegex)
-	if(data == null) return [];
-	for(var i = 0; i < data.length; i++) {
-		// contains surrogates without second character?
-		if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
-			data.splice(i, 1);
-			i--;
-		}
-		if((!surrogateCharsEnabled || noSurrog) && data[i].match(surrogateRegex)) {
-			data[i] = "?";
-		}
-		if((!combiningCharsEnabled || noComb) && data[i].match(combiningRegex)) {
-			data[i] = data[i].charAt(0);
-		}
+	if(buffer) {
+		chars.push(buffer);
 	}
-	return data;
+	return chars;
 }
 
 var w = {

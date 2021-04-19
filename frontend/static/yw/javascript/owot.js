@@ -95,7 +95,7 @@ var pasteDirDown           = true;
 var defaultCursor          = "text";
 var defaultDragCursor      = "move";
 var fetchClientMargin      = 200;
-var classicTileProcessing  = false; // use content.split("") instead of advancedSplit(content)
+var classicTileProcessing  = false; // directly process utf32
 var cursorRenderingEnabled = true;
 
 var images_to_load = {
@@ -155,7 +155,9 @@ defineElements({ // elm[<name>]
 	run_js_confirm_risk: byId("run_js_confirm_risk"),
 	usr_online: byId("usr_online"),
 	usr_online_container: byId("usr_online_container"),
-	chatfield_container: byId("chatfield_container")
+	chatfield_container: byId("chatfield_container"),
+	link_element: byId("link_element"),
+	link_div: byId("link_div")
 });
 
 var jscolorInput;
@@ -1044,7 +1046,6 @@ function event_resize() {
 }
 window.addEventListener("resize", event_resize);
 
-// fix zooming blurriness issue
 browserZoomAdjust(true);
 
 function getChar(tileX, tileY, charX, charY) {
@@ -1057,7 +1058,7 @@ function getChar(tileX, tileY, charX, charY) {
 	}
 	var tile = tiles[tileY + "," + tileX];
 	if(!tile) return " ";
-	var content = w.split(tile.content);
+	var content = tile.content;
 	return content[charY * tileC + charX];
 }
 
@@ -1729,14 +1730,6 @@ function is_link(tileX, tileY, charX, charY) {
 	return false;
 }
 
-var blankColor = (function() {
-	var ar = [];
-	for(var i = 0; i < tileArea; i++) {
-		ar.push(0);
-	}
-	return ar;
-})();
-
 var writeBuffer = [];
 
 function flushWrites() {
@@ -1800,11 +1793,10 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY) {
 		Tile.set(tileX, tileY, blankTile());
 	}
 	
-	// get the objects containing link data and color data
 	var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
 	if(!cell_props) cell_props = {};
 	var color = tiles[tileY + "," + tileX].properties.color;
-	if(!color) color = Object.assign([], blankColor);
+	if(!color) color = new Array(tileArea).fill(0);
 
 	// delete link
 	if(cell_props[charY]) {
@@ -1822,12 +1814,7 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY) {
 	tiles[tileY + "," + tileX].properties.cell_props = cell_props;
 
 	var con = tiles[tileY + "," + tileX].content;
-	con = w.split(con);
-	// replace character
 	con[charY * tileC + charX] = char;
-	// join splitted content string
-	tiles[tileY + "," + tileX].content = con.join("");
-	// re-render
 	renderTile(tileX, tileY, true);
 
 	var editArray = [tileY, tileX, charY, charX, getDate(), char, nextObjId];
@@ -1998,30 +1985,6 @@ function spaceTrim(str_array, left, right, gaps, secondary_array) {
 		}
 	}
 	return str_array;
-}
-
-function convertToDate(epoch) {
-	var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-	var str = "";
-	var date = new Date(epoch);
-	var month = date.getMonth();
-	var day = date.getDate();
-	var year = date.getFullYear();
-	var hour = date.getHours();
-	var minute = date.getMinutes();
-	str += year + " " + months[month] + " " + day + " ";
-	var per = "AM";
-	if(hour >= 12) {
-		per = "PM";
-	}
-	if(hour > 12) {
-		hour = hour - 12;
-	}
-	if(hour == 0) {
-		hour = 12;
-	}
-	str += hour + ":" + ("0" + minute).slice(-2) + " " + per;
-	return str;
 }
 
 function textcode_parser(value) {
@@ -2617,35 +2580,17 @@ function runJsLink(data) {
 	}
 }
 
-function escapeQuote(text) { // escapes " and ' and \
-	return text.replace(/\\/g, "\\\\").replace(/\"/g, "\\\"").replace(/\'/g, "\\'");
-}
-
-function escapeURLQuote(url) {
-	try {
-		var decode = decodeURIComponent(url);
-	} catch(e) {
-		return "";
-	}
-	return encodeURIComponent(escapeQuote(decode));
-}
-
-var linkElm = document.createElement("a");
-linkElm.href = "";
-linkElm.className = "link_element";
-document.body.appendChild(linkElm);
+var linkElm = elm.link_element;
+var linkDiv = elm.link_div;
 var linkParams = {
 	protocol: "",
 	url: "",
 	coord: false
 };
-var linkDiv = document.createElement("div");
 linkDiv.style.width = cellW + "px";
 linkDiv.style.height = cellH + "px";
-linkElm.appendChild(linkDiv);
-linkElm.title = "Link to url...";
-linkElm.target = "_blank";
-linkElm.style.cursor = "pointer";
+linkElm.style.top = "-1000px";
+linkElm.style.left = "-1000px";
 linkElm.ondragstart = function() {
 	return false;
 }
@@ -2704,7 +2649,9 @@ function updateHoveredLink(mouseX, mouseY, evt) {
 	var tileY = coords[1];
 	var charX = coords[2];
 	var charY = coords[3];
-	if(evt && evt.target != elm.owot && evt.target != linkDiv) return;
+	if(evt) {
+		if(!closest(evt.target, elm.main_view) && evt.target != linkDiv) return;
+	}
 	var link = is_link(tileX, tileY, charX, charY);
 	if(link && linksEnabled && !regionSelectionsActive()) {
 		currentSelectedLink = link[0];
@@ -3236,14 +3183,6 @@ function getPos(ref) {
 	return [parseInt(ref[0]), parseInt(ref[1])];
 }
 
-function newColorArray() {
-	var ar = [];
-	for(var i = 0; i < tileArea; i++) {
-		ar.push(0);
-	}
-	return ar;
-}
-
 // cache for individual tile pixel data
 var tilePixelCache = {};
 
@@ -3301,12 +3240,9 @@ var flashAnimateInterval = setInterval(function() {
 	}
 }, 1);
 
-var blank = "";
-for(var i = 0; i < tileArea; i++) blank += " ";
-
 function blankTile() {
 	var newTile = {
-		content: blank,
+		content: new Array(tileArea).fill(" "),
 		properties: {
 			cell_props: {},
 			writability: null,
@@ -3314,7 +3250,7 @@ function blankTile() {
 		},
 		initted: false
 	}
-	newTile.properties.color = Object.assign([], blankColor);
+	newTile.properties.color = new Array(tileArea).fill(0);
 	return newTile;
 }
 
@@ -3802,6 +3738,10 @@ function renderTile(tileX, tileY, redraw) {
 			startX: offsetX, startY: offsetY,
 			endX: offsetX + tilePixelCache[str][2], endY: offsetY + tilePixelCache[str][3]
 		});
+		if(cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
+			//var idx = cursorCoords[3] * tileC + cursorCoords[2];
+
+		}
 		return;
 	}
 	// tile has been drawn at least once
@@ -3825,12 +3765,11 @@ function renderTile(tileX, tileY, redraw) {
 	var content = tile.content;
 	var colors = tile.properties.color;
 	// color data doesn't exist, use empty array as placeholder
-	if(!colors) colors = newColorArray();
+	if(!colors) colors = new Array(tileArea).fill(0);
 
 	var props = tile.properties.cell_props;
 	if(!props) props = {};
 
-	content = w.split(content);
 	if(priorityOverwriteChar && tile.properties.char) {
 		for(var lev = 0; lev < 3; lev++) {
 			for(var c = 0; c < tileArea; c++) {
@@ -3892,7 +3831,6 @@ function renderTiles(redraw) {
 		var tileY = visibleTiles[i][1];
 		renderTile(tileX, tileY);
 	}
-	updateHoveredLink();
 	w.emit("tilesRendered");
 }
 
@@ -4451,6 +4389,7 @@ var lastLinkHover = null;
 var lastTileHover = null;
 
 Object.assign(w, {
+	tiles: tiles,
 	userCount: -1,
 	clientId: -1,
 	net: network,
@@ -4790,6 +4729,13 @@ Object.assign(w, {
 			maxX: bottom_right[0],
 			maxY: bottom_right[1]
 		});
+	},
+	splitTile: function(str) {
+		if(!classicTileProcessing) {
+			return w.split(str);
+		} else {
+			return w.split(str, false, false, true);
+		}
 	}
 });
 
@@ -4870,6 +4816,7 @@ function isAnimated(posStr) {
 }
 
 function animateTile(tile, posStr) {
+	// unused and deprecated feature
 	var pos = getPos(posStr);
 	if (isAnimated(posStr))
 		stopAnimation(posStr);
@@ -4889,7 +4836,7 @@ function animateTile(tile, posStr) {
 				stopAnimation(posStr);
 			var frame = frames[atFrame];
 			var newTile = tile;
-			newTile.content = frame[0];
+			newTile.content = w.split(frame[0]);
 			newTile.properties.color = frame[1];
 			Tile.set(tileX, tileY, newTile)
 			renderTile(tileX, tileY, true);
@@ -4932,15 +4879,18 @@ var ws_functions = {
 			} else if (isAnimated(tileKey)) {
 				stopAnimation(tileKey);
 			}
-			Tile.set(pos[1], pos[0], tile);
-			if(!tiles[tileKey]) Tile.set(pos[1], pos[0], blankTile());
+			if(tile) {
+				tile.content = w.splitTile(tile.content);
+				Tile.set(pos[1], pos[0], tile);
+			} else {
+				Tile.set(pos[1], pos[0], blankTile());
+			}
 			tiles[tileKey].initted = true;
 			if(tiles[tileKey].properties.char) {
 				tiles[tileKey].properties.char = decodeCharProt(tiles[tileKey].properties.char);
 			}
 			renderTile(pos[1], pos[0], true);
 		}
-		updateHoveredLink();
 		w.emit("afterFetch", data);
 		// too many tiles, remove tiles outside of the viewport
 		var tileLim = Math.floor(getArea(fetchClientMargin) * 1.5 / zoom + 1000);
@@ -4982,7 +4932,7 @@ var ws_functions = {
 				data.tiles[tileKey] = blankTile();
 			}
 			if(!data.tiles[tileKey].properties.color) {
-				data.tiles[tileKey].properties.color = Object.assign([], blankColor);
+				data.tiles[tileKey].properties.color = new Array(tileArea).fill(0);
 			}
 			if(data.tiles[tileKey].properties.char) {
 				data.tiles[tileKey].properties.char = decodeCharProt(data.tiles[tileKey].properties.char);
@@ -4993,22 +4943,24 @@ var ws_functions = {
 				stopAnimation(tileKey);
 			}
 			if(!tiles[tileKey].properties.color) {
-				tiles[tileKey].properties.color = Object.assign([], blankColor);
+				tiles[tileKey].properties.color = new Array(tileArea).fill(0);
 			}
 
-			var newContent = blank;
-			var newColors = newColorArray();
+			var newContent;
+			var newColors;
 			// get content and colors from new tile data
 			if(data.tiles[tileKey]) {
-				newContent = data.tiles[tileKey].content;
+				newContent = w.splitTile(data.tiles[tileKey].content);
 				if(data.tiles[tileKey].properties.color) {
 					newColors = data.tiles[tileKey].properties.color;
+				} else {
+					newColors = new Array(tileArea).fill(0);
 				}
+			} else {
+				newContent = new Array(tileArea).fill(" ");
 			}
 			var oldContent = tiles[tileKey].content;
 			var oldColors = tiles[tileKey].properties.color.slice(0);
-			newContent = w.split(newContent);
-			oldContent = w.split(oldContent);
 			var charX = 0;
 			var charY = 0;
 			// compare data
@@ -5033,7 +4985,6 @@ var ws_functions = {
 					charY++;
 				}
 			}
-			oldContent = oldContent.join("");
 			tiles[tileKey].properties = data.tiles[tileKey].properties; // update tile
 			tiles[tileKey].content = oldContent; // update only necessary character updates
 			tiles[tileKey].properties.color = oldColors; // update only necessary color updates

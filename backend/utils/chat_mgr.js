@@ -125,9 +125,9 @@ async function retrieveChatHistory(world_id) {
 
 var chatAdditionId = -2; // avoid using -1.
 async function add_to_chatlog(chatData, world_id) {
-	var location = "page"
+	var location = "page";
 	if(world_id == 0) {
-		location = "global"
+		location = "global";
 	}
 
 	var date = Date.now();

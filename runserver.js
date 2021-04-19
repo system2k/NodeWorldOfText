@@ -2924,6 +2924,7 @@ var global_data = {
 	db_img,
 	db_misc,
 	db_edits,
+	db_ch,
 	dispage,
 	ms,
 	http_time,

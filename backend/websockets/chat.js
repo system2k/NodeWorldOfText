@@ -36,6 +36,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var world = evars.world;
 
 	var db = vars.db;
+	var db_ch = vars.db_ch;
 	var san_nbr = vars.san_nbr;
 	var tile_coord = vars.tile_coord;
 	var modules = vars.modules;
@@ -49,6 +50,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var uptime = vars.uptime;
 	var ranks_cache = vars.ranks_cache;
 	var accountSystem = vars.accountSystem;
+	var create_date = vars.create_date;
 
 	var ipHeaderAddr = ws.sdata.ipAddress;
 
@@ -110,30 +112,6 @@ module.exports = async function(ws, data, send, vars, evars) {
 	data.color = data.color.slice(0, 20);
 	data.color = data.color.trim();
 
-	var msNow = Date.now();
-
-	var second = Math.floor(msNow / 1000);
-	var chatsEverySecond = 2;
-
-	// chat limiter
-	if(!chat_ip_limits[ipHeaderAddr]) {
-		chat_ip_limits[ipHeaderAddr] = {};
-	}
-	var cil = chat_ip_limits[ipHeaderAddr];
-	if(cil.lastChatSecond != second) {
-		cil.lastChatSecond = second;
-		cil.chatsSentInSecond = 0;
-	} else {
-		if(cil.chatsSentInSecond >= chatsEverySecond - 1) {
-			if(!user.staff) {
-				serverChatResponse("You are chatting too fast.", data.location);
-				return;
-			}
-		} else {
-			cil.chatsSentInSecond++;
-		}
-	}
-
 	if(!user.staff) {
 		msg = msg.slice(0, 400);
 	} else {
@@ -149,10 +127,17 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	// [rank, name, args, description, example]
 	var command_list = [
+		// operator
 		[3, "uptime", null, "get uptime of server", null],
 
+		// superuser
 		[2, "worlds", null, "list all worlds", null],
 
+		// staff
+		[1, "channel", null, "get info about a chat channel"],
+		[1, "mute", ["id", "time (seconds)"], "mute a user for all clients", "1220 100"],
+
+		// general
 		[0, "help", null, "list all commands", null],
 		[0, "nick", ["nickname"], "change your nickname", "JohnDoe"], // client-side
 		[0, "ping", null, "check the latency", null],
@@ -329,13 +314,45 @@ module.exports = async function(ws, data, send, vars, evars) {
 			if(!clientFound) {
 				return serverChatResponse("User not found", data.location);
 			}
+		},
+		channel: async function() {
+			var worldId = world.id;
+			if(data.location == "global") worldId = 0;
+			var channels = await db_ch.all("SELECT * FROM channels WHERE world_id=?", worldId);
+			var count = channels.length;
+			var infoLog = "Found " + count + " channel(s) for this world.<br>";
+			for(var i = 0; i < count; i++) {
+				var ch = channels[i];
+				var name = ch.name;
+				var desc = ch.description;
+				var date = ch.date_created;
+				infoLog += "<b>Name:</b> " + html_tag_esc(name) + "<br>";
+				infoLog += "<b>Desc:</b> " + html_tag_esc(desc) + "<br>";
+				infoLog += "<b>Created:</b> " + html_tag_esc(create_date(date)) + "<br>";
+				infoLog += "----------------<br>";
+			}
+			var def = await db_ch.get("SELECT * FROM default_channels WHERE world_id=?", worldId);
+			if(def && def.channel_id) {
+				def = def.channel_id;
+			} else {
+				def = "<none>";
+			}
+			infoLog += "<b>Default channel id:</b> " + html_tag_esc(def) + "<br>";
+			return serverChatResponse(infoLog, data.location);
+		},
+		mute: function(id, time) {
+			id = san_nbr(id);
+			time = san_nbr(time);
+			
 		}
 	}
 
+	var isCommand = false;
 	// This is a command
 	if(msg[0] == "/") {
 		var args = msg.substr(1).split(" ");
 		var command = args[0].toLowerCase();
+		isCommand = true;
 
 		var operator  = user.operator;
 		var superuser = user.superuser;
@@ -357,8 +374,39 @@ module.exports = async function(ws, data, send, vars, evars) {
 			case "tell":
 				com.tell(args[1], args.slice(2).join(" "));
 				return;
+			case "channel":
+				com.channel();
+				return;
+			case "mute":
+				if(staff) com.mute(args[1], args[2]);
+				return;
 			default:
 				serverChatResponse("Invalid command: " + html_tag_esc(msg));
+		}
+	}
+
+	var msNow = Date.now();
+
+	var second = Math.floor(msNow / 1000);
+	var chatsEverySecond = 2;
+	if(isCommand) chatsEverySecond = 512;
+
+	// chat limiter
+	if(!chat_ip_limits[ipHeaderAddr]) {
+		chat_ip_limits[ipHeaderAddr] = {};
+	}
+	var cil = chat_ip_limits[ipHeaderAddr];
+	if(cil.lastChatSecond != second) {
+		cil.lastChatSecond = second;
+		cil.chatsSentInSecond = 0;
+	} else {
+		if(cil.chatsSentInSecond >= chatsEverySecond - 1) {
+			if(!user.staff) {
+				serverChatResponse("You are chatting too fast.", data.location);
+				return;
+			}
+		} else {
+			cil.chatsSentInSecond++;
 		}
 	}
 

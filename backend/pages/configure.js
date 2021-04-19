@@ -544,8 +544,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			if(typeof mdesc != "string") mdesc = "";
 			mdesc = mdesc.trim();
 			mdesc = mdesc.slice(0, 600);
-			mdesc = mdesc.replace(/\r\n/g, "\n");
-			mdesc = mdesc.replace(/\n/g, " ");
+			mdesc = mdesc.replace(/\r|\n/g, " ");
 			if(!mdesc) {
 				delete properties.meta_desc;
 			} else {
