@@ -17,6 +17,15 @@ function clipIntMax(x) {
 	return x;
 }
 
+function closest(element, parElement) {
+	var currentElm = element;
+	while(currentElm) {
+		if(currentElm == parElement) return true;
+		currentElm = currentElm.parentNode;
+	}
+	return false;
+}
+
 function lineGen(x0, y0, x1, y1, max) {
 	if(!max) max = 2000;
 	var list = [];
@@ -256,6 +265,8 @@ function advancedSplit(str, noSurrog, noComb, norm) {
 	var buffer = "";
 	var surrogMode = false;
 	var charMode = false;
+	var combCount = 0;
+	var combLimit = 15;
 	for(var i = 0; i < str.length; i++) {
 		var char = str[i];
 		var code = char.charCodeAt();
@@ -287,12 +298,16 @@ function advancedSplit(str, noSurrog, noComb, norm) {
 		  (code >= 0x1DC0 && code <= 0x1DFF) ||
 		  (code >= 0x20D0 && code <= 0x20FF) ||
 		  (code >= 0xFE20 && code <= 0xFE2F))) {
-			if(!noComb && charMode) buffer += char;
+			if(!noComb && charMode && combCount < combLimit) {
+				buffer += char;
+				combCount++;
+			}
 			continue;
 		} else {
 			if(charMode) {
 				chars.push(buffer);
 			}
+			combCount = 0;
 			charMode = true;
 			buffer = char;
 		}
