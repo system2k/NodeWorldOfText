@@ -2243,7 +2243,7 @@ function broadcastUserCount() {
 			}, user_world, {
 				isChat: true,
 				clientId: 0,
-				chat_perm: -1 // chat permission is cached in client object
+				chat_perm: -1 // -1: check cached value in client object
 			});
 		}
 	}
@@ -2406,9 +2406,13 @@ async function initialize_server_components() {
 			try {
 				if(world == void 0 || NCaseCompare(client.sdata.world_name, world)) {
 					if(opts.isChat) {
+						// -1: check cached value; this is a miscellaneous signal that depends on the chat permission (e.g. user count)
 						if(opts.chat_perm == -1) opts.chat_perm = client.sdata.chat_permission;
+						// 1: members only
 						if(opts.chat_perm == 1) if(!(client.sdata.is_member || client.sdata.is_owner)) return;
+						// 2: owner only
 						if(opts.chat_perm == 2) if(!client.sdata.is_owner) return;
+						// check if user has blocked this client
 						if(client.sdata.chat_blocks && (client.sdata.chat_blocks.indexOf(opts.clientId) > -1 ||
 							((client.sdata.chat_blocks.indexOf("*") > -1) && opts.clientId != 0))) return;
 					}
@@ -2528,22 +2532,25 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 	return [ipAddress, ipAddressFam];
 }
 
-var ip_address_conn_limit = {}; // "<IP>": <Count>
+// {ip: count}
+var ip_address_conn_limit = {};
+// {ip: ws_limits}
+var ip_address_req_limit = {}; // TODO: Cleanup objects
 
 var ws_req_per_second = 1024;
-var ws_limits = { // [amount, per ms, minimum ms cooldown]
-	chat:		[10, 1000, 0], // rate limited further handled in another script
-	chathistory: [3, 20000, 3000],
-	clear_tile:  [1000, 1000, 0],
-	cmd_opt:	 [10, 1000, 0],
-	cmd:		 [256, 1000, 0],
-	debug:	   [10, 1000, 0],
-	fetch:	   [256, 1000, 0],
-	link:		[400, 1000, 0],
-	protect:	 [400, 1000, 0],
-	set_tile:	[10, 1000, 0],
-	write:	   [30, 1000, 0], // rate limited in another script
-	paste:	   [1, 1000, 0]
+var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
+	chat:			[256, 1000, 0], // rate-limiting handled separately
+	chathistory:	[10, 1000, 0],
+	clear_tile:		[1000, 1000, 0],
+	cmd_opt:		[10, 1000, 0],
+	cmd:			[256, 1000, 0],
+	debug:			[10, 1000, 0],
+	fetch:			[256, 1000, 0],
+	link:			[400, 1000, 0],
+	protect:		[400, 1000, 0],
+	set_tile:		[10, 1000, 0],
+	write:			[256, 1000, 0], // rate-limiting handled separately
+	paste:			[10, 500, 0]
 };
 
 function can_process_req_kind(lims, kind) {
@@ -2566,6 +2573,15 @@ function can_process_req_kind(lims, kind) {
 	lims[kind][1] = curr_date;
 	lims[kind][3] = date;
 	return true;
+}
+
+function get_ip_kind_limits(ip) {
+	if(ip_address_req_limit[ip]) {
+		return ip_address_req_limit[ip];
+	}
+	var obj = {};
+	ip_address_req_limit[ip] = obj;
+	return obj;
 }
 
 var connections_per_ip = 50;
@@ -2658,7 +2674,7 @@ async function manageWebsocketConnection(ws, req) {
 			return true;
 		}
 	}
-	var kindLimits = {};
+	var kindLimits = get_ip_kind_limits(ws.sdata.ipAddress);
 	var parsedURL = url.parse(req.url);
 	var location = parsedURL.pathname;
 	var search = querystring.parse(parsedURL.query);

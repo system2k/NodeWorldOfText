@@ -3,24 +3,21 @@
 	Nickname: state.userModel.username
 }
 
-var owot, textInput, textLayer;
+var owot, owotCtx, textInput;
+var linkElm, linkDiv;
 function init_dom() {
-	elm.loading.style.display = "none";
 	owot = document.getElementById("owot");
 	owot.hidden = false;
 	owot.style.cursor = defaultCursor;
+	owotCtx = owot.getContext("2d");
 	textInput = document.getElementById("textInput");
-	textLayer = document.getElementById("text");
-	textLayer.hidden = false;
-	textLayer.style.pointerEvents = "none";
 	textInput.value = "";
-
+	linkElm = elm.link_element;
+	linkDiv = elm.link_div;
 	updateCoordDisplay();
-
 	defineElements({
 		owot: owot,
-		textInput: textInput,
-		textLayer: textLayer
+		textInput: textInput
 	});
 }
 function getWndWidth() {
@@ -64,6 +61,8 @@ var tiles            = {}; // All loaded tiles
 var images           = {}; // { name: [data RGBA, width, height] }
 var keysPressed      = {};
 var verticalEnterPos = [0, 0]; // position to go when pressing enter (tileX, charX)
+var imgPatterns      = {};
+var tileCanvasPool   = [];
 
 var positionX              = 0; // client position in pixels
 var positionY              = 0;
@@ -75,6 +74,7 @@ var linksEnabled           = true;
 var linksRendered          = true;
 var colorsEnabled          = true;
 var backgroundEnabled      = true; // render backgrounds if any
+var scrollingEnabled       = true;
 var zoomRatio              = window.devicePixelRatio; // browser's zoom ratio
 var protectPrecision       = 0; // 0 being tile and 1 being char
 var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
@@ -104,7 +104,6 @@ var fetchClientMargin      = 200;
 var classicTileProcessing  = false; // directly process utf32 only
 var cursorRenderingEnabled = true;
 var unobstructCursor       = false;
-var subpixelFontRendering  = false; // must use w.enableSubpixelRendering()
 
 var images_to_load = {
 	unloaded: "/static/unloaded.png"
@@ -182,8 +181,6 @@ function random_color() {
 		Math.floor(Math.random() * 256),
 		Math.floor(Math.random() * 256));
 }
-
-elm.random_color_link.onclick = random_color;
 
 function updateCoordDisplay() {
 	var tileCoordX = -positionX / tileW;
@@ -419,38 +416,40 @@ var img_load_keys = Object.keys(images_to_load);
 var imgToArrayCanvas = document.createElement("canvas");
 var backImg = imgToArrayCanvas.getContext("2d"); // temporary canvas used to pull data from images
 
-var loadImageElm;
 var img_load_index = 0;
 function loadImgPixelData(callback) {
-	if(!loadImageElm) loadImageElm = new Image();
+	var loadImageElm = new Image();
 	var img_key = img_load_keys[img_load_index];
 	loadImageElm.src = images_to_load[img_key];
 	var error = false;
 	loadImageElm.onload = function() {
-		if(!error) {
-			var width = loadImageElm.width;
-			var height = loadImageElm.height;
-			// resize background images based on configuration
-			if(img_key == "background") {
-				if(w.backgroundInfo.w) {
-					width = w.backgroundInfo.w;
-				}
-				if(w.backgroundInfo.h) {
-					height = w.backgroundInfo.h;
-				}
+		var width = loadImageElm.width;
+		var height = loadImageElm.height;
+		// resize background images based on configuration
+		if(img_key == "background") {
+			if(w.backgroundInfo.w) {
+				width = w.backgroundInfo.w;
 			}
-			imgToArrayCanvas.width = width;
-			imgToArrayCanvas.height = height;
-			backImg.drawImage(loadImageElm, 0, 0, width, height);
-			images[img_key] = [backImg.getImageData(0, 0, width, height).data, width, height];
-		} else {
-			// failed to load. use gray color
-			images[img_key] = [new Uint8ClampedArray([221, 221, 221, 255]), 1, 1];
+			if(w.backgroundInfo.h) {
+				height = w.backgroundInfo.h;
+			}
 		}
+		if(error) {
+			width = 1;
+			height = 1;
+			backImg.fillStyle = "#DDDDDD";
+			backImg.fillRect(0, 0, 1, 1);
+		}
+		imgToArrayCanvas.width = width;
+		imgToArrayCanvas.height = height;
+		backImg.drawImage(loadImageElm, 0, 0, width, height);
+		var rawPixelData = backImg.getImageData(0, 0, width, height).data;
+		images[img_key] = [rawPixelData, width, height, loadImageElm];
+
 		img_load_index++;
 		if(img_load_index >= img_load_keys.length) {
 			// once all the images are loaded
-			renderTiles();
+			w.render();
 			callback();
 		} else {
 			// continue loading
@@ -462,14 +461,6 @@ function loadImgPixelData(callback) {
 		loadImageElm.onload();
 	}
 }
-
-function beginLoadingOWOT() {
-	// load main images
-	loadImgPixelData(function() {
-		begin();
-	});
-}
-beginLoadingOWOT();
 
 function keydown_regionSelect(e) {
 	if(!checkKeyPress(e, keyConfig.copyRegion) || regionSelectionsActive()) return;
@@ -574,14 +565,19 @@ function updateScaleConsts() {
 	font = fontTemplate.replace("$", fontSize);
 	specialCharFont = specialCharFontTemplate.replace("$", fontSize);
 
+	textRenderCanvas.width = tileW | 0;
+	textRenderCanvas.height = tileH | 0;
+	textRenderCtx.font = font;
+
 	tileC = defaultSizes.tileC;
 	tileR = defaultSizes.tileR;
 	tileArea = tileC * tileR;
 }
-updateScaleConsts();
 
-var dTileW = tileW; // permanent tile sizes in pixel (remains same throughout client's session)
-var dTileH = tileH;
+var textRenderCanvas = document.createElement("canvas");
+var textRenderCtx = textRenderCanvas.getContext("2d");
+
+updateScaleConsts();
 
 // used to stretch background images
 var backgroundImageCanvasRenderer = document.createElement("canvas");
@@ -589,9 +585,9 @@ backgroundImageCanvasRenderer.width = tileW;
 backgroundImageCanvasRenderer.height = tileH;
 var backgroundImageCtx = backgroundImageCanvasRenderer.getContext("2d");
 
-// used to render font subpixels
-var subpixelFontCanvas = document.createElement("canvas");
-var subpixelFontCtx = subpixelFontCanvas.getContext("2d");
+// lock size of background images when client is zoomed
+var dTileW = tileW;
+var dTileH = tileH;
 
 // performs the zoom calculations and changes all constants
 function doZoom(percentage) {
@@ -603,31 +599,19 @@ function doZoom(percentage) {
 
 	updateScaleConsts();
 
-	if(subpixelFontRendering) {
-		subpixelFontCanvas.width = (tileW | 0) * 3;
-		subpixelFontCanvas.height = tileH | 0;
-		subpixelFontCtx.scale(3, 1);
-		subpixelFontCtx.font = font;
-	}
+	textRenderCanvas.width = tileW | 0;
+	textRenderCanvas.height = tileH | 0;
+	textRenderCtx.font = font;
 
-	// if the tile system has loaded yet. otherwise, update it
-	if(window.tilePixelCache) {
-		// modify invisible-link size
-		linkDiv.style.width = cellW + "px";
-		linkDiv.style.height = cellH + "px";
+	// change size of invisible link
+	linkDiv.style.width = cellW + "px";
+	linkDiv.style.height = cellH + "px";
 
-		textLayerCtx.clearRect(0, 0, owotWidth, owotHeight);
-		// change size of tiles
-		for(var i in tilePixelCache) {
-			var canvas = tilePixelCache[i][0];
-			canvas.width = tileW | 0;
-			canvas.height = tileH | 0;
-			var ctx = tilePixelCache[i][1];
-			tilePixelCache[i][2] = tileW | 0;
-			tilePixelCache[i][3] = tileH | 0;
-			ctx.font = font;
-		}
-		renderTiles(true);
+	// rerender everything
+	if(tileCanvasPool.length) {
+		removeAllTilesFromPools();
+		deleteAllPools();
+		w.render(true);
 	}
 }
 
@@ -641,7 +625,7 @@ function changeZoom(percentage) {
 	positionY *= zoom;
 	positionX = Math.trunc(positionX); // remove decimals
 	positionY = Math.trunc(positionY);
-	renderTiles();
+	w.render();
 }
 
 function browserZoomAdjust(retry) {
@@ -658,6 +642,156 @@ function browserZoomAdjust(retry) {
 
 	adjust_scaling_DOM(ratio);
 	doZoom(ratio * 100);
+}
+
+function createTilePool() {
+	var pCanv = document.createElement("canvas");
+	var pDims = getPoolDimensions(tileW | 0, tileH | 0);
+	var pWidth = pDims[0] * tileW;
+	var pHeight = pDims[1] * tileH;
+	pCanv.width = pWidth;
+	pCanv.height = pHeight;
+	var pCtx = pCanv.getContext("2d");
+	var pMap = {};
+	var pool = {
+		canv: pCanv,
+		ctx: pCtx,
+		map: pMap,
+		width: pDims[0],
+		height: pDims[1],
+		size: 0
+	};
+	tileCanvasPool.push(pool);
+	return pool;
+}
+
+function allocateTile() {
+	var pLocated = false;
+	var pObj, pTilePos;
+	for(var i = 0; i < tileCanvasPool.length; i++) {
+		var pool = tileCanvasPool[i];
+		var area = pool.width * pool.height;
+		if(pool.size >= area) continue;
+		var map = pool.map;
+		for(var t = 0; t < area; t++) {
+			if(map[t]) continue;
+			pLocated = true;
+			pObj = pool;
+			pTilePos = t;
+			break;
+		}
+		if(pLocated) break;
+	}
+	if(!pLocated) {
+		pObj = createTilePool();
+		pTilePos = 0;
+	}
+	var pMap = pObj.map;
+	pObj.size++;
+	var mapX = pTilePos % pObj.width;
+	var mapY = Math.floor(pTilePos / pObj.width);
+	var tileObj = {
+		pool: pObj,
+		x: mapX,
+		y: mapY,
+		idx: pTilePos,
+		poolX: mapX * (tileW | 0),
+		poolY: mapY * (tileH | 0)
+	};
+	pMap[pTilePos] = tileObj;
+	return tileObj;
+}
+
+function deallocateTile(obj) {
+	var pool = obj.pool;
+	var idx = obj.idx;
+	if(pool.map[idx]) {
+		delete pool.map[idx];
+		pool.size--;
+	}
+}
+
+function reallocateTile(obj) {
+	var pX = obj.poolX;
+	var pY = obj.poolY;
+	var pool = obj.pool;
+	deallocateTile(obj);
+	var newObj = allocateTile();
+	var newPool = newObj.pool;
+	var newPX = newObj.poolX;
+	var newPY = newObj.poolY;
+	// transfer rendered text data
+	if(pX != newPX || pY != newPY || pool != newPool) {
+		newPool.ctx.clearRect(newPX, newpY, tileW | 0, tileH | 0);
+		newPool.ctx.drawImage(pool.canv, pX, pY, tileW | 0, tileH | 0, newPX, newPY, tileW | 0, tileH | 0);
+	}
+	return newObj;
+}
+
+function deletePool(pool) {
+	var canv = pool.canv;
+	canv.width = 0;
+	canv.height = 0;
+	delete pool.canv;
+	delete canv;
+	for(var t in pool.map) {
+		delete pool.map[t];
+	}
+}
+
+function deleteEmptyPools() {
+	for(var i = 0; i < tileCanvasPool.length; i++) {
+		var pool = tileCanvasPool[i];
+		if(pool.size == 0) {
+			deletePool(pool);
+			tileCanvasPool.splice(i, 1);
+			i--;
+		}
+	}
+}
+
+function deleteAllPools() {
+	for(var i = 0; i < tileCanvasPool.length; i++) {
+		var pool = tileCanvasPool[i];
+		deletePool(pool);
+		tileCanvasPool.splice(i, 1);
+		i--;
+	}
+}
+
+var tilePixelCache = {};
+function loadTileFromPool(tileX, tileY, doNotCreate) {
+	var pos = tileY + "," + tileX;
+	if(tilePixelCache[pos]) {
+		return tilePixelCache[pos];
+	}
+	if(doNotCreate) return null;
+	var newTile = allocateTile();
+	tilePixelCache[pos] = newTile;
+	return newTile;
+}
+
+// TODO: put in timer if deleted tiles are detected
+function shiftAllTilesInPools() {
+	if(tileCanvasPool.length <= 1) return;
+	for(var tile in tilePixelCache) {
+		tilePixelCache[tile] = reallocateTile(tilePixelCache[tile]);
+	}
+	deleteEmptyPools();
+}
+
+function removeTileFromPool(tileX, tileY) {
+	var pos = tileY + "," + tileX;
+	if(!tilePixelCache[pos]) return;
+	deallocateTile(tilePixelCache[pos]);
+	delete tilePixelCache[pos];
+}
+
+function removeAllTilesFromPools() {
+	for(var tile in tilePixelCache) {
+		deallocateTile(tilePixelCache[tile]);
+		delete tilePixelCache[tile];
+	}
 }
 
 function removeAlpha(data) {
@@ -719,7 +853,6 @@ function mousemove_tileProtectAuto() {
 	if(!tileProtectAuto.active) return;
 	var tile = tiles[currentPosition[1] + "," + currentPosition[0]];
 	if(!tile) return;
-	if(!tile.initted) return;
 	tileProtectAuto.selectedTile = tile;
 	var tileX = currentPosition[0];
 	var tileY = currentPosition[1];
@@ -879,7 +1012,6 @@ function mousemove_linkAuto() {
 	if(!linkAuto.active) return;
 	var tile = tiles[currentPosition[1] + "," + currentPosition[0]];
 	if(!tile) return;
-	if(!tile.initted) return;
 	
 	var tileX = currentPosition[0];
 	var tileY = currentPosition[1];
@@ -1042,11 +1174,6 @@ function adjust_scaling_DOM(ratio) {
 	// make the display size the size of the viewport
 	elm.owot.style.width = window_width + "px";
 	elm.owot.style.height = window_height + "px";
-	// comments above apply below
-	elm.textLayer.width = Math.round(window_width * ratio);
-	elm.textLayer.height = Math.round(window_height * ratio);
-	elm.textLayer.style.width = window_width + "px";
-	elm.textLayer.style.height = window_height + "px";
 }
 
 function event_resize() {
@@ -1057,7 +1184,7 @@ function event_resize() {
 	adjust_scaling_DOM(ratio);
 
 	browserZoomAdjust();
-	renderTiles();
+	w.render();
 }
 window.addEventListener("resize", event_resize);
 
@@ -1195,28 +1322,19 @@ Tile.set = function(tileX, tileY, data) {
 		tileCount++;
 	}
 	tiles[str] = data;
+	return data;
 }
 Tile.delete = function(tileX, tileY) {
 	var str = tileY + "," + tileX;
-	if(str in tilePixelCache) {
-		delete tilePixelCache[str][0];
-		delete tilePixelCache[str];
+	removeTileFromPool(tileX, tileY);
+	if(str in tiles) {
+		delete tiles[str];
+		tileCount--;
 	}
-	delete tiles[str];
-	tileCount--;
 }
 
-var owotCtx = elm.owot.getContext("2d");
-owotCtx.fillStyle = "#eee";
-owotCtx.fillRect(0, 0, owotWidth, owotHeight);
-
-var textLayerCtx = elm.textLayer.getContext("2d");
-elm.textLayer.width = owotWidth;
-elm.textLayer.height = owotHeight;
-
-if (!window.WebSocket && window.MozWebSocket) {
-	window.WebSocket = window.MozWebSocket;
-}
+// deprecated
+var textLayerCtx = owotCtx;
 
 function createWsPath() {
 	var search = window.location.search;
@@ -1331,10 +1449,6 @@ function manageCoordHash() {
 	}
 }
 
-window.onhashchange = function(e) {
-	manageCoordHash();
-}
-
 // type: "style" or "props"
 // callback: function(style, error)
 function getWorldProps(world, type, cb) {
@@ -1381,7 +1495,12 @@ function begin() {
 		}
 		checkTextColorOverride();
 		menu_color(styles.menu);
-		createSocket();
+		loadImgPixelData(function() {
+			owotCtx.clearRect(0, 0, owotWidth, owotHeight);
+			renderLoop();
+			createSocket();
+			elm.loading.style.display = "none";
+		});
 	});
 }
 
@@ -1560,13 +1679,11 @@ function renderCursor(coords) {
 	var newTileY = coords[1];
 	var tileStr = newTileY + "," + newTileX;
 	if(!tiles[tileStr]) return false;
-	if(!tiles[tileStr].initted) return false;
 	var writability = null;
 	if(tiles[tileStr]) {
 		writability = tiles[tileStr].properties.writability;
 	}
 	var thisTile = {
-		initted: function() { return true },
 		writability: writability,
 		char: tiles[tileStr].properties.char
 	}
@@ -1590,8 +1707,8 @@ function renderCursor(coords) {
 		cursorCoords = null;
 		renderTile(tileX, tileY);
 	}
-	cursorCoords = coords;
-	cursorCoordsCurrent = coords;
+	cursorCoords = coords.slice(0);
+	cursorCoordsCurrent = coords.slice(0);
 	renderTile(coords[0], coords[1]);
 
 	var pixelX = (coords[0] * tileW) + (coords[2] * cellW) + positionX + Math.trunc(owotWidth / 2);
@@ -1619,7 +1736,7 @@ function renderCursor(coords) {
 		positionY -= cellH - diff;
 	}
 
-	if(diff != null && (posXCompare != positionX || posYCompare != positionY)) renderTiles();
+	if(diff != null && (posXCompare != positionX || posYCompare != positionY)) w.render();
 	if(cursorCoords) w.emit("cursorMove", {
 		tileX: cursorCoords[0],
 		tileY: cursorCoords[1],
@@ -1659,8 +1776,10 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 
 	if(e.which == 3) { // right click
 		if(ignoreCanvasContext) {
+			ignoreCanvasContext = false;
 			elm.owot.style.pointerEvents = "none";
 			setTimeout(function() {
+				ignoreCanvasContext = true;
 				elm.owot.style.pointerEvents = "";
 			}, 1);
 		}
@@ -1689,15 +1808,13 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 		pageX: pageX,
 		pageY: pageY
 	});
-	if(cursorEnabled) {
-		if(tiles[pos[1] + "," + pos[0]] !== void 0) {
-			verticalEnterPos = [pos[0], pos[2]];
-			// change position of the cursor and get results
-			if(renderCursor(pos) == false) {
-				// cursor should be removed if on area where user cannot write
-				if(cursorCoords) {
-					removeCursor();
-				}
+	if(cursorEnabled && tiles[pos[1] + "," + pos[0]] !== void 0) {
+		verticalEnterPos = [pos[0], pos[2]];
+		// change position of the cursor and get results
+		if(renderCursor(pos) == false) {
+			// cursor should be removed if on area where user cannot write
+			if(cursorCoords) {
+				removeCursor();
 			}
 		}
 	}
@@ -1717,21 +1834,15 @@ function event_mouseenter() {
 document.addEventListener("mouseenter", event_mouseenter);
 
 function is_link(tileX, tileY, charX, charY) {
-	if(tiles[tileY + "," + tileX]) {
-		var tile = tiles[tileY + "," + tileX]
-		if(tile) {
-			var props = tile.properties.cell_props;
-			if(!props) return false;
-			if(props[charY]) {
-				if(props[charY][charX]) {
-					if(props[charY][charX].link) {
-						return [props[charY][charX].link];
-					}
-				}
-			}
-		}
-	}
-	return false;
+	if(!tiles[tileY + "," + tileX]) return;
+	var tile = tiles[tileY + "," + tileX];
+	if(!tile) return;
+	var props = tile.properties.cell_props;
+	if(!props) return false;
+	if(!props[charY]) return false;
+	if(!props[charY][charX]) return false;
+	if(!props[charY][charX].link) return false;
+	return [props[charY][charX].link];
 }
 
 var writeBuffer = [];
@@ -1751,42 +1862,39 @@ var writeInterval = setInterval(function() {
 	}
 }, 1000);
 
-window.onbeforeunload = function() {
-	if(writeBuffer.length) flushWrites();
-}
-
 function moveCursor(direction, preserveVertPos) {
 	if(!cursorCoords) return;
 	// [tileX, tileY, charX, charY]
+	var pos = cursorCoords.slice(0);
 	if(direction == "up") {
-		cursorCoords[3]--;
-		if(cursorCoords[3] < 0) {
-			cursorCoords[3] = tileR - 1;
-			cursorCoords[1]--
+		pos[3]--;
+		if(pos[3] < 0) {
+			pos[3] = tileR - 1;
+			pos[1]--
 		}
 	} else if(direction == "down") {
-		cursorCoords[3]++;
-		if(cursorCoords[3] > tileR - 1) {
-			cursorCoords[3] = 0;
-			cursorCoords[1]++;
+		pos[3]++;
+		if(pos[3] > tileR - 1) {
+			pos[3] = 0;
+			pos[1]++;
 		}
 	} else if(direction == "left") {
-		cursorCoords[2]--;
-		if(cursorCoords[2] < 0) {
-			cursorCoords[2] = tileC - 1;
-			cursorCoords[0]--;
+		pos[2]--;
+		if(pos[2] < 0) {
+			pos[2] = tileC - 1;
+			pos[0]--;
 		}
 	} else if(direction == "right") {
-		cursorCoords[2]++;
-		if(cursorCoords[2] > tileC - 1) {
-			cursorCoords[2] = 0;
-			cursorCoords[0]++;
+		pos[2]++;
+		if(pos[2] > tileC - 1) {
+			pos[2] = 0;
+			pos[0]++;
 		}
 	}
 	if(!preserveVertPos) {
-		verticalEnterPos = [cursorCoords[0], cursorCoords[2]];
+		verticalEnterPos = [pos[0], pos[2]];
 	}
-	return renderCursor(cursorCoords);
+	return renderCursor(pos);
 }
 
 // place a character
@@ -2340,13 +2448,13 @@ function autoArrowKeyMoveStart(dir) {
 					var addDiff = diff - autoArrowKeyMoveState.prog_x;
 					autoArrowKeyMoveState.prog_x = diff;
 					positionX -= addDiff;
-					renderTiles();
+					w.render();
 				}
 				if(s_left && !s_right) {
 					var addDiff = diff - autoArrowKeyMoveState.prog_x;
 					autoArrowKeyMoveState.prog_x = diff;
 					positionX += addDiff;
-					renderTiles();
+					w.render();
 				}
 			}
 			if(y_t) {
@@ -2355,13 +2463,13 @@ function autoArrowKeyMoveStart(dir) {
 					var addDiff = diff - autoArrowKeyMoveState.prog_y;
 					autoArrowKeyMoveState.prog_y = diff;
 					positionY += addDiff;
-					renderTiles();
+					w.render();
 				}
 				if(s_down && !s_up) {
 					var addDiff = diff - autoArrowKeyMoveState.prog_y;
 					autoArrowKeyMoveState.prog_y = diff;
 					positionY -= addDiff;
-					renderTiles();
+					w.render();
 				}
 			}
 		}, 10);
@@ -2507,6 +2615,12 @@ function getTileCoordsFromMouseCoords(x, y) {
 	return [tileX, tileY, charX, charY];
 }
 
+function getTileScreenPosition(tileX, tileY) {
+	var offsetX = tileX * tileW + Math.trunc(owotWidth / 2) + Math.floor(positionX);
+	var offsetY = tileY * tileH + Math.trunc(owotHeight / 2) + Math.floor(positionY);
+	return [offsetX, offsetY];
+}
+
 function getRange(x1, y1, x2, y2) {
 	var tmp;
 	if(x1 > x2) {
@@ -2630,8 +2744,6 @@ function runJsLink(data) {
 	}
 }
 
-var linkElm = elm.link_element;
-var linkDiv = elm.link_div;
 var linkParams = {
 	protocol: "",
 	url: "",
@@ -2894,10 +3006,11 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 	if(pageX >= owotWidth || pageY >= owotHeight || pageX < 0 || pageY < 0) stopDragging();
 
 	if(!isDragging || regionSelectionsActive()) return;
+
 	positionX = dragPosX + (pageX - dragStartX);
 	positionY = dragPosY + (pageY - dragStartY);
 	hasDragged = true;
-	renderTiles();
+	w.render();
 }
 document.addEventListener("mousemove", event_mousemove);
 function event_touchmove(e) {
@@ -2915,7 +3028,6 @@ function touch_pagePos(e) {
 	return [Math.trunc(first_touch.pageX * zoomRatio), Math.trunc(first_touch.pageY * zoomRatio)];
 }
 
-var scrollingEnabled = true;
 function event_wheel(e) {
 	if(w._state.uiModal) return;
 	if(!scrollingEnabled) return; // return if disabled
@@ -2938,7 +3050,7 @@ function event_wheel(e) {
 		deltaX: -deltaX,
 		deltaY: -deltaY
 	});
-	renderTiles();
+	w.render();
 }
 document.addEventListener("wheel", event_wheel);
 
@@ -3234,7 +3346,7 @@ function getPos(ref) {
 }
 
 // cache for individual tile pixel data
-var tilePixelCache = {};
+//var tilePixelCache = {};
 
 var highlightFlash = {};
 var highlightCount = 0;
@@ -3288,7 +3400,7 @@ var flashAnimateInterval = setInterval(function() {
 		var pos = getPos(i);
 		renderTile(pos[1], pos[0]);
 	}
-}, 1);
+}, 1000 / 60);
 
 function blankTile() {
 	var newTile = {
@@ -3297,8 +3409,7 @@ function blankTile() {
 			cell_props: {},
 			writability: null,
 			color: null
-		},
-		initted: false
+		}
 	}
 	newTile.properties.color = new Array(tileArea).fill(0);
 	return newTile;
@@ -3348,33 +3459,19 @@ function uncolorChar(tileX, tileY, charX, charY) {
 	}
 }
 
-function getTileCanvas(str) {
-	var textRenderCanvas = tilePixelCache[str];
-	var textRender;
-	if(!textRenderCanvas) {
-		textRenderCanvas = document.createElement("canvas");
-		textRenderCanvas.width = cellW * tileC;
-		textRenderCanvas.height = cellH * tileR;
-		textRender = textRenderCanvas.getContext("2d");
-		textRender.font = font;
-		tilePixelCache[str] = [textRenderCanvas, textRender, textRenderCanvas.width, textRenderCanvas.height];
-	} else {
-		textRender = tilePixelCache[str][1];
-	}
-	return [textRenderCanvas, textRender];
-}
-
 function generateBackgroundPixels(tileX, tileY, image, returnCanvas, isBackground, writability) {
-	var tileWidth = Math.trunc(tileW);
-	var tileHeight = Math.trunc(tileH);
+	var tileWidth = tileW | 0;
+	var tileHeight = tileH | 0;
 	if(returnCanvas) {
-		// returning a canvas (for scaling purposes), so use the constant tile sizes
-		tileWidth = Math.trunc(dTileW);
-		tileHeight = Math.trunc(dTileH);
+		tileWidth = dTileW | 0;
+		tileHeight = dTileH | 0;
 	}
-	var imgData = textLayerCtx.createImageData(tileWidth, tileHeight);
-	if(!image) { // image doesn't exist, return as how it is
-		return imgData;
+	if(tileWidth <= 0 || tileHeight <= 0) {
+		return false;
+	}
+	var imgData = owotCtx.createImageData(tileWidth, tileHeight);
+	if(!image) { // image doesn't exist
+		return false;
 	}
 	var invert = false;
 	if(image == images.unloaded && w.nightMode == 1) {
@@ -3451,11 +3548,11 @@ function generateBackgroundPixels(tileX, tileY, image, returnCanvas, isBackgroun
 function isTileVisible(tileX, tileY) {
 	var tilePosX = tileX * tileW + positionX + Math.trunc(owotWidth / 2);
 	var tilePosY = tileY * tileH + positionY + Math.trunc(owotHeight / 2);
-	// too far left or top. check if the right/bottom edge of tile is also too far left/top
+	// too far left/top. check if the right/bottom edge of tile is also too far left/top
 	if((tilePosX < 0 || tilePosY < 0) && (tilePosX + tileW - 1 < 0 || tilePosY + tileH - 1 < 0)) {
 		return false;
 	}
-	// too far right or bottom
+	// too far right/bottom
 	if(tilePosX >= owotWidth || tilePosY >= owotHeight) {
 		return false;
 	}
@@ -3463,8 +3560,7 @@ function isTileVisible(tileX, tileY) {
 }
 
 function isTileLoaded(tileX, tileY) {
-	var str = tileY + "," + tileX;
-	return !!(tiles[str] && tiles[str].initted);
+	return !!tiles[tileY + "," + tileX];
 }
 
 var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -3564,10 +3660,6 @@ function renderChar(x, y, str, content, props, textRender, colors, writability) 
 	var fontX = x * cellW;
 	var fontY = y * cellH;
 
-	if(subpixelFontRendering) {
-		textRender = subpixelFontCtx;
-	}
-
 	// fill background if defined
 	if(coloredChars[str]) {
 		if(coloredChars[str][y]) {
@@ -3648,12 +3740,9 @@ function renderChar(x, y, str, content, props, textRender, colors, writability) 
 		} else if(ansiBlockFill && cCode == 0x2590) { // ▐ right half block
 			textRender.fillRect(fontX + Math.trunc(cellW / 2), fontY, Math.trunc(cellW / 2), cellH);
 		} else { // character rendering
-			var mSpec = (char.charCodeAt(1) == 822) && mSpecRendering;
-			if(char.length > 1 && !mSpec) textRender.font = specialCharFont;
-			if(mSpec) char = char.replace(String.fromCharCode(822), "");
-			textRender.fillText(char, Math.round(fontX + XPadding), Math.round(fontY + textYOffset)); // render text
-			if(char.length > 1 && !mSpec) textRender.font = font;
-			if(mSpec) textRender.fillRect(fontX, fontY + cellH - 9 * zoom, cellW, zoom);
+			if(char.length > 1 ) textRender.font = specialCharFont;
+			textRender.fillText(char, Math.round(fontX + XPadding), Math.round(fontY + textYOffset));
+			if(char.length > 1) textRender.font = font;
 		}
 	}
 }
@@ -3688,44 +3777,21 @@ function drawGrid(canv, offsetX, offsetY, gridColor, isTileCanvas) {
 }
 
 function renderTile(tileX, tileY, redraw) {
-	if(!isTileVisible(tileX, tileY)) {
-		return;
-	}
-	var str = tileY + "," + tileX;
-	var offsetX = tileX * tileW + Math.trunc(owotWidth / 2) + Math.floor(positionX);
-	var offsetY = tileY * tileH + Math.trunc(owotHeight / 2) + Math.floor(positionY);
+	if(!isTileVisible(tileX, tileY)) return;
+	if(!isTileLoaded(tileX, tileY)) return;
 
-	// unloaded tiles
-	if(!isTileLoaded(tileX, tileY)) {
-		// unloaded tile background is already drawn
-		if(tilePixelCache[str]) {
-			textLayerCtx.clearRect(offsetX, offsetY, tilePixelCache[str][2], tilePixelCache[str][3]);
-			textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY, tilePixelCache[str][2], tilePixelCache[str][3]);
-			return;
-		}
-		// generate tile background
-		var imgData = generateBackgroundPixels(tileX, tileY, images.unloaded, true, false);
-		if(!imgData || imgData.constructor != HTMLCanvasElement) return;
-		// get main canvas of the tile
-		var tileCanv = getTileCanvas(str);
-		// get the canvas context
-		var textRender = tileCanv[1];
-		textRender.drawImage(imgData, 0, 0, tileW, tileH);
-		textLayerCtx.clearRect(offsetX, offsetY, tilePixelCache[str][2], tilePixelCache[str][3]);
-		textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY, tilePixelCache[str][2], tilePixelCache[str][3]);
-		return;
-	}
+	var str = tileY + "," + tileX;
+	var tileScreenPos = getTileScreenPosition(tileX, tileY);
+	var offsetX = Math.floor(tileScreenPos[0]);
+	var offsetY = Math.floor(tileScreenPos[1]);
 
 	var tile = tiles[str];
 
 	if(tile == null) {
-		Tile.set(tileX, tileY, blankTile());
-		tile = tiles[str];
+		tile = Tile.set(tileX, tileY, blankTile());
 	}
 
-	var writability = null;
-
-	if(tile) writability = tile.properties.writability;
+	var writability = tile.properties.writability;
 
 	var computed_writability = writability;
 	if(writability == null) computed_writability = state.worldModel.writability;
@@ -3739,7 +3805,7 @@ function renderTile(tileX, tileY, redraw) {
 
 	// put this right below the changes to fillStyle for tiles' background color
 	var tileColor = owotCtx.fillStyle;
-	var tileColorInverted = "#" + ("00000" + (16777215 - parseInt(tileColor.substr(1), 16)).toString(16)).slice(-6);
+	var tileColorInverted = "#" + ("00000" + (16777215 - parseInt(tileColor.substr(1), 16)).toString(16)).padStart(6, 0);
 
 	// fill tile background color
 	owotCtx.fillRect(offsetX, offsetY, tileW, tileH);
@@ -3768,37 +3834,35 @@ function renderTile(tileX, tileY, redraw) {
 	}
 
 	var highlight = highlightFlash[str];
-	if(!highlight) highlight = {};
-
-	// render edit highlight animation
-	for(var y = 0; y < tileR; y++) {
-		for(var x = 0; x < tileC; x++) {
-			if(highlight[y]) {
-				if(highlight[y][x] !== void 0) {
-					owotCtx.fillStyle = "rgb(255,255," + highlight[y][x][1] + ")";
-					owotCtx.fillRect(offsetX + x * cellW, offsetY + y * cellH, cellW, cellH);
+	if(highlight) { // highlighted edits
+		for(var y = 0; y < tileR; y++) {
+			for(var x = 0; x < tileC; x++) {
+				if(highlight[y]) {
+					if(highlight[y][x] !== void 0) {
+						owotCtx.fillStyle = "rgb(255,255," + highlight[y][x][1] + ")";
+						owotCtx.fillRect(offsetX + x * cellW, offsetY + y * cellH, cellW, cellH);
+					}
 				}
 			}
 		}
 	}
 
-	// tile is null, so don't add text/color data
-	if(!tile) {
-		drawGrid(owotCtx, offsetX, offsetY, tileColorInverted);
-		return;
-	}
-
-	// tile is already written
-	// (force redraw if tile hasn't been drawn before and it's initted)
-	if(tilePixelCache[str] && !redraw && !tile.redraw && !(!tile.been_drawn && tile.initted)) {
-		textLayerCtx.clearRect(offsetX, offsetY, tilePixelCache[str][2], tilePixelCache[str][3]);
-		textLayerCtx.drawImage(tilePixelCache[str][0], offsetX | 0, offsetY | 0, tilePixelCache[str][2], tilePixelCache[str][3]);
+	// render text data from cache
+	// TODO: make sure tile has been drawn at least once
+	var tilePool = loadTileFromPool(tileX, tileY, true);
+	if(tilePool && !redraw && !tile.redraw) {
+		var pCanv = tilePool.pool.canv;
+		var pX = tilePool.poolX;
+		var pY = tilePool.poolY;
+		owotCtx.drawImage(pCanv, pX, pY, tileW | 0, tileH | 0, offsetX, offsetY, tileW | 0, tileH | 0);
+		//owotCtx.drawImage(textRenderCanvas, offsetX, offsetY);
 		if(w.events.tilerendered) w.emit("tileRendered", {
 			tileX: tileX, tileY: tileY,
 			startX: offsetX, startY: offsetY,
-			endX: offsetX + tilePixelCache[str][2], endY: offsetY + tilePixelCache[str][3]
+			endX: offsetX + (tileW | 0) - 1, endY: offsetY + (tileH | 0) - 1
 		});
-		if(unobstructCursor && cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
+		// TODO
+		/*if(unobstructCursor && cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
 			var curX = cursorCoords[2];
 			var curY = cursorCoords[3];
 			var idx = curY * tileC + curX;
@@ -3809,25 +3873,25 @@ function renderTile(tileX, tileY, redraw) {
 					textLayerCtx.fillRect(offsetX + curX * cellW, offsetY + curY * cellH, cellW, cellH);
 				}
 			}
-		}
+		}*/
 		return;
 	}
-	// tile has been drawn at least once
-	tile.been_drawn = true;
-
-	// tile is being redrawn via boolean (draw next time renderer is called), so set it back to false
 	if(tile.redraw) {
 		delete tile.redraw;
 	}
 
-	var tileCanv = getTileCanvas(str);
-	var textRender = tileCanv[1];
+	tilePool = loadTileFromPool(tileX, tileY);
+	var poolCtx = tilePool.pool.ctx;
+	var poolCanv = tilePool.pool.canv;
+	var poolX = tilePool.poolX;
+	var poolY = tilePool.poolY;
 
-	// first, clear text renderer canvas
-	textRender.clearRect(0, 0, tileW, tileH);
+	textRenderCtx.clearRect(0, 0, tileW, tileH);
 	if(images.background && backgroundEnabled) {
 		var background_data = generateBackgroundPixels(tileX, tileY, images.background, true, true, computed_writability);
-		textRender.drawImage(background_data, 0, 0, tileW, tileH);
+		if(background_data) {
+			textRenderCtx.drawImage(background_data, 0, 0, tileW, tileH);
+		}
 	}
 
 	var content = tile.content;
@@ -3838,11 +3902,6 @@ function renderTile(tileX, tileY, redraw) {
 	var props = tile.properties.cell_props;
 	if(!props) props = {};
 
-	if(subpixelFontRendering) {
-		subpixelFontCtx.fillStyle = "#FFFFFF";
-		subpixelFontCtx.fillRect(0, 0, tileW * 3, tileH);
-	}
-
 	if(priorityOverwriteChar && tile.properties.char) {
 		for(var lev = 0; lev < 3; lev++) {
 			for(var c = 0; c < tileArea; c++) {
@@ -3852,8 +3911,8 @@ function renderTile(tileX, tileY, redraw) {
 				if(code != lev) continue;
 				var cX = c % tileC;
 				var cY = Math.floor(c / tileC);
-				textRender.clearRect(cX * cellW, cY * cellH, cellW, cellH);
-				renderChar(cX, cY, str, content, props, textRender, colors, code);
+				textRenderCtx.clearRect(cX * cellW, cY * cellH, cellW, cellH);
+				renderChar(cX, cY, str, content, props, textRenderCtx, colors, code);
 			}
 		}
 	} else {
@@ -3865,79 +3924,62 @@ function renderTile(tileX, tileY, redraw) {
 				}
 				if(protValue == null) protValue = tile.properties.writability;
 				if(protValue == null) protValue = state.worldModel.writability;
-				renderChar(x, y, str, content, props, textRender, colors, protValue);
+				renderChar(x, y, str, content, props, textRenderCtx, colors, protValue);
 			}
 		}
 	}
 
-	if(subpixelFontRendering) {
-		var subData = subpixelFontCtx.getImageData(0, 0, (tileW | 0) * 3, tileH | 0);
-		var textData = textRender.createImageData(tileW | 0, tileH | 0);
-		for(var y = 0; y < tileH | 0; y++) {
-			for(var x = 0; x < tileW | 0; x++) {
-				var subIdx = (y * ((tileW | 0) * 3) + (x * 3)) * 4;
-				var dstIdx = (y * (tileW | 0) + x) * 4;
-				var ar = (subData.data[subIdx] + subData.data[subIdx - 4] + subData.data[subIdx + 4]) / 3;
-				var ag = (subData.data[subIdx + 5] + subData.data[subIdx + 1] + subData.data[subIdx + 9]) / 3;
-				var ab = (subData.data[subIdx + 10] + subData.data[subIdx + 6] + subData.data[subIdx + 14]) / 3;
-				textData.data[dstIdx] = ar;
-				textData.data[dstIdx + 1] = ag;
-				textData.data[dstIdx + 2] = ab;
-				textData.data[dstIdx + 3] = 255;
-			}
-		}
-		textRender.putImageData(textData, 0, 0);
-	}
+	drawGrid(textRenderCtx, offsetX, offsetY, tileColorInverted, true);
 
-	drawGrid(textRender, offsetX, offsetY, tileColorInverted, true);
+	// add image to tile pool
+	poolCtx.clearRect(poolX, poolY, tileW, tileH);
+	poolCtx.drawImage(textRenderCanvas, poolX, poolY);
 
 	// add image to main canvas
-	textLayerCtx.clearRect(offsetX, offsetY, tilePixelCache[str][2], tilePixelCache[str][3]);
-	textLayerCtx.drawImage(tilePixelCache[str][0], offsetX, offsetY, tilePixelCache[str][2], tilePixelCache[str][3]);
+	owotCtx.drawImage(textRenderCanvas, offsetX, offsetY);
 
 	if(w.events.tilerendered) w.emit("tileRendered", {
 		tileX: tileX, tileY: tileY,
 		startX: offsetX, startY: offsetY,
-		endX: offsetX + tilePixelCache[str][2], endY: offsetY + tilePixelCache[str][3]
+		endX: offsetX + (tileW | 0) - 1, endY: offsetY + (tileH | 0) - 1
 	});
 }
 
 function renderTiles(redraw) {
 	w.emit("beforeTilesRendered");
 	updateCoordDisplay();
-	if(redraw) {
-		for(var i in tiles) {
-			if(tiles[i]) {
-				tiles[i].redraw = true;
-			}
+	elm.owot.style.backgroundPosition = positionX + "px " + positionY + "px";
+	owotCtx.clearRect(0, 0, owotWidth, owotHeight);
+	if(redraw) w.setRedraw();
+	// render all visible tiles
+	var pointA = getTileCoordsFromMouseCoords(0, 0);
+	var pointB = getTileCoordsFromMouseCoords(owotWidth - 1, owotHeight - 1);
+	for(var y = pointA[1]; y <= pointB[1]; y++) {
+		for(var x = pointA[0]; x <= pointB[0]; x++) {
+			renderTile(x, y, redraw);
 		}
-	}
-	owotCtx.fillStyle = "#ddd";
-	// clear tile color layer
-	owotCtx.fillRect(0, 0, owotWidth, owotHeight);
-	// clear text layer
-	textLayerCtx.clearRect(0, 0, owotWidth, owotHeight);
-	// get all visible tiles
-	var visibleTiles = getVisibleTiles();
-	for(var i in visibleTiles) {
-		var tileX = visibleTiles[i][0];
-		var tileY = visibleTiles[i][1];
-		renderTile(tileX, tileY);
 	}
 	w.emit("tilesRendered");
 }
 
-function protectPrecisionOption(option) { // 0 being tile and 1 being char
+function renderLoop() {
+	if(w.hasUpdated) {
+		w.hasUpdated = false;
+		renderTiles();
+	}
+	w.emit("frame");
+	requestAnimationFrame(renderLoop);
+}
+
+function protectPrecisionOption(option) {
 	protectPrecision = option;
 	removeTileProtectHighlight();
 	var tileChoiceColor = "";
 	var charChoiceColor = "";
-	switch(option) {
-		case 0:
-			tileChoiceColor = "#FF6600";
-			break;
-		case 1:
-			charChoiceColor = "#FF6600";
+	if(option == 0) { // tile
+		tileChoiceColor = "#FF6600";
+	} else if(option == 1) { // char
+		charChoiceColor = "#FF6600";
 	}
 	elm.tile_choice.style.backgroundColor = tileChoiceColor;
 	elm.char_choice.style.backgroundColor = charChoiceColor;
@@ -3989,17 +4031,17 @@ function buildMenu() {
 	}
 	menu.addCheckboxOption(" Toggle grid", function() {
 		gridEnabled = true;
-		renderTiles(true);
+		w.render(true);
 	}, function() {
 		gridEnabled = false;
-		renderTiles(true);
+		w.render(true);
 	});
 	menu.addCheckboxOption(" Toggle subgrid", function() {
 		subgridEnabled = true;
-		renderTiles(true);
+		w.render(true);
 	}, function() {
 		subgridEnabled = false;
-		renderTiles(true);
+		w.render(true);
 	});
 	menu.addCheckboxOption(" Links enabled", function() {
 		linksEnabled = true;
@@ -4014,10 +4056,10 @@ function buildMenu() {
 	if("background" in images) {
 		menu.addCheckboxOption(" Background", function() {
 			backgroundEnabled = true;
-			renderTiles(true);
+			w.render(true);
 		}, function() {
 			backgroundEnabled = false;
-			renderTiles(true);
+			w.render(true);
 		}, true);
 	}
 	var zoomBar = document.createElement("input");
@@ -4034,14 +4076,6 @@ function buildMenu() {
 	zoomBar.max = 1000;
 	zoomBar.id = "zoombar";
 	menu.addEntry(zoomBar);
-}
-
-document.onselectstart = function(e) {
-	var target = e.target;
-	if(closest(target, getChatfield()) || target == elm.chatbar || closest(target, elm.confirm_js_code) || closest(target, elm.announce_text)) {
-		return true;
-	}
-	return w._state.uiModal;
 }
 
 function orderRangeABCoords(coordA, coordB) {
@@ -4193,6 +4227,13 @@ function RegionSelection() {
 	}
 	return this;
 }
+
+w.on("tilesRendered", function() {
+	for(var i = 0; i < regionSelections.length; i++) {
+		var reg = regionSelections[i];
+		if(reg.regionCoordA && reg.regionCoordB) reg.setSelection(reg.regionCoordA, reg.regionCoordB);
+	}
+});
 
 var networkHTTP = {
 	fetch: function(x1, y1, x2, y2, opts, callback) {
@@ -4483,6 +4524,7 @@ var lastTileHover = null;
 
 Object.assign(w, {
 	tiles: tiles,
+	hasUpdated: true,
 	userCount: -1,
 	clientId: -1,
 	net: network,
@@ -4550,7 +4592,7 @@ Object.assign(w, {
 		}
 		positionX = Math.floor(-x * tileW * coordSizeX);
 		positionY = Math.floor(y * tileH * coordSizeY);
-		renderTiles();
+		w.render();
 	},
 	getCenterCoords: function() {
 		return [-positionY / tileH, -positionX / tileW];
@@ -4662,22 +4704,35 @@ Object.assign(w, {
 		w.loadScript(jqueryURL, callback);
 	},
 	redraw: function() {
-		// redraw all tiles, clearing the cache
 		renderTiles(true);
+	},
+	setRedraw: function() {
+		for(var t in tiles) {
+			if(!tiles[t]) continue;
+			tiles[t].redraw = true;
+		}
+	},
+	render: function(redraw) {
+		if(redraw) w.setRedraw();
+		w.hasUpdated = true;
 	},
 	changeFont: function(fontData) {
 		// change the global font
 		fontTemplate = fontData;
 		font = fontTemplate.replace("$", normFontSize(16 * zoom));
-		for(var i in tilePixelCache) {
-			tilePixelCache[i][1].font = font;
-		}
+		textRenderCtx.font = font;
 		w.redraw();
 	},
-	enableSubpixelRendering: function() {
-		subpixelFontRendering = true;
-		browserZoomAdjust(true);
-		w.redraw();
+	fixFonts: function() {
+		var fnt_main = new FontFace("suppl_cour", "url('/static/font/cour.ttf')");
+		var fnt_cal = new FontFace("suppl_cal", "url('/static/font/calibri.ttf')");
+		var fnt_sym = new FontFace("suppl_sym", "url('/static/font/seguisym.ttf')");
+		Promise.all([fnt_main.load(), fnt_cal.load(), fnt_sym.load()]).then(function() {
+			document.fonts.add(fnt_main);
+			document.fonts.add(fnt_cal);
+			document.fonts.add(fnt_sym);
+			w.changeFont("$px suppl_cour, suppl_cal, suppl_sym");
+		});
 	},
 	changeSpecialCharFont: function(fontData) {
 		specialCharFontTemplate = fontData;
@@ -4726,11 +4781,18 @@ Object.assign(w, {
 		styles.public = "#000";
 		styles.text = "#FFF";
 		w.nightMode = 1;
-		if(ignoreUnloadedPattern) w.nightMode = 2;
+		if(ignoreUnloadedPattern) {
+			w.nightMode = 2;
+		} else if(!elm.owot.classList.contains("nightmode")) {
+			elm.owot.classList.add("nightmode");
+		}
 		w.redraw();
 	},
 	day: function(reloadStyle) {
 		w.nightMode = 0;
+		if(elm.owot.classList.contains("nightmode")) {
+			elm.owot.classList.remove("nightmode");
+		}
 		if(reloadStyle) {
 			getWorldProps(state.worldModel.name, "style", function(style, error) {
 				if(!error) {
@@ -4837,14 +4899,6 @@ Object.assign(w, {
 	}
 });
 
-if(Permissions.can_chat(state.userModel, state.worldModel)) {
-	OWOT.on("chat", function(e) {
-		w.emit("chatMod", e);
-		if(e.hide) return;
-		event_on_chat(e);
-	});
-}
-
 if (state.announce) {
 	w._ui.announce_text.innerHTML = w._state.announce;
 	w._ui.announce.style.display = "";
@@ -4852,6 +4906,35 @@ if (state.announce) {
 
 w._ui.announce_close.onclick = function() {
 	w._ui.announce.style.display = "none";
+}
+
+elm.random_color_link.onclick = random_color;
+
+elm.owot.oncontextmenu = function() {
+	if(ignoreCanvasContext) {
+		ignoreCanvasContext = false;
+		elm.owot.style.pointerEvents = "none";
+		setTimeout(function() {
+			ignoreCanvasContext = true;
+			elm.owot.style.pointerEvents = "";
+		}, 1);
+	}
+}
+
+window.onhashchange = function(e) {
+	manageCoordHash();
+}
+
+window.onbeforeunload = function() {
+	if(writeBuffer.length) flushWrites();
+}
+
+document.onselectstart = function(e) {
+	var target = e.target;
+	if(closest(target, getChatfield()) || target == elm.chatbar || closest(target, elm.confirm_js_code) || closest(target, elm.announce_text)) {
+		return true;
+	}
+	return w._state.uiModal;
 }
 
 w._state.goToCoord = {};
@@ -4873,13 +4956,6 @@ if(state.background) {
 	w.backgroundInfo.rmod = ("rmod" in state.background) ? state.background.rmod : 0;
 	w.backgroundInfo.alpha = ("alpha" in state.background) ? state.background.alpha : 1;
 }
-
-w.on("tilesRendered", function() {
-	for(var i = 0; i < regionSelections.length; i++) {
-		var reg = regionSelections[i];
-		if(reg.regionCoordA && reg.regionCoordB) reg.setSelection(reg.regionCoordA, reg.regionCoordB);
-	}
-});
 
 var simplemodal_onopen = function() {
 	return w._state.uiModal = true;
@@ -4914,7 +4990,7 @@ function isAnimated(posStr) {
 }
 
 function animateTile(tile, posStr) {
-	// unused and deprecated feature
+	// deprecated
 	var pos = getPos(posStr);
 	if (isAnimated(posStr))
 		stopAnimation(posStr);
@@ -4972,18 +5048,12 @@ var ws_functions = {
 		for(var tileKey in data.tiles) {
 			var tile = data.tiles[tileKey];
 			var pos = getPos(tileKey);
-			if (tile && tile.properties && tile.properties.animation) {
-				animateTile(tile, tileKey); // if it's already animated it will stop the old animation
-			} else if (isAnimated(tileKey)) {
-				stopAnimation(tileKey);
-			}
 			if(tile) {
 				tile.content = w.splitTile(tile.content);
 				Tile.set(pos[1], pos[0], tile);
 			} else {
 				Tile.set(pos[1], pos[0], blankTile());
 			}
-			tiles[tileKey].initted = true;
 			if(tiles[tileKey].properties.char) {
 				tiles[tileKey].properties.char = decodeCharProt(tiles[tileKey].properties.char);
 			}
@@ -4998,6 +5068,7 @@ var ws_functions = {
 	},
 	colors: function(data) {
 		// update all world colors
+		w.emit("colors", data);
 		styles.public = data.colors.background;
 		styles.cursor = data.colors.cursor;
 		styles.member = data.colors.member_area;
@@ -5008,7 +5079,7 @@ var ws_functions = {
 		styles.member_text = data.colors.member_text;
 		styles.owner_text = data.colors.owner_text;
 		checkTextColorOverride();
-		renderTiles(true); // render all tiles with new colors
+		w.render(true); // render all tiles with new colors
 		menu_color(styles.menu);
 	},
 	tileUpdate: function(data) {
@@ -5080,11 +5151,9 @@ var ws_functions = {
 			tiles[tileKey].properties = data.tiles[tileKey].properties; // update tile
 			tiles[tileKey].content = oldContent; // update only necessary character updates
 			tiles[tileKey].properties.color = oldColors; // update only necessary color updates
-			tiles[tileKey].redraw = true;
-			tiles[tileKey].initted = true;
 			var pos = getPos(tileKey);
 			if(isTileVisible(pos[1], pos[0])) {
-				renderTile(pos[1], pos[0]);
+				renderTile(pos[1], pos[0], true);
 			}
 		}
 		if(highlights.length > 0 && useHighlight) highlight(highlights);
@@ -5146,11 +5215,12 @@ var ws_functions = {
 		w.doAnnounce(data.text);
 	},
 	ping: function(data) {
+		w.emit("ping", data);
 		if(data.time) {
 			var clientReceived = getDate();
 			// serverPingTime is from chat.js
 			var pingMs = clientReceived - serverPingTime;
-			addChat(null, 0, "user", "[ Server ]", "Ping: " + pingMs + " MS", "Server", false, false, false, null, clientReceived);
+			addChat(null, 0, "user", "[ Client ]", "Ping: " + pingMs + " MS", "Client", false, false, false, null, clientReceived);
 			return;
 		}
 	},
@@ -5159,7 +5229,6 @@ var ws_functions = {
 		if(tiles[pos]) {
 			var writability = tiles[pos].properties.writability;
 			Tile.set(data.tileX, data.tileY, blankTile());
-			tiles[pos].initted = true;
 			tiles[pos].properties.writability = writability;
 			renderTile(data.tileX, data.tileY);
 		}
@@ -5224,3 +5293,5 @@ var ws_functions = {
 		}
 	}
 };
+
+begin();

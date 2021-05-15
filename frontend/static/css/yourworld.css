@@ -367,3 +367,10 @@ a:visited {
 #textInput {
     font-size: 16px; /* prevent zooming on mobile keyboard */
 }
+#owot {
+	background-image: url("/static/unloaded.png");
+	background-repeat: "repeat";
+}
+#owot.nightmode {
+	background-image: url("/static/unloaded_night.png");
+}

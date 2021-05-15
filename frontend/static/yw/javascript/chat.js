@@ -35,6 +35,14 @@ defineElements({ // elm[<name>]
 	global_unread: byId("global_unread")
 });
 
+if(Permissions.can_chat(state.userModel, state.worldModel)) {
+	OWOT.on("chat", function(e) {
+		w.emit("chatMod", e);
+		if(e.hide) return;
+		event_on_chat(e);
+	});
+}
+
 if(state.userModel.is_staff) {
 	elm.chatbar.maxLength = 3030;
 } else {
@@ -124,7 +132,7 @@ var client_commands = {
 		} else {
 			nickChangeMsg = "Nickname reset";
 		}
-		addChat(null, 0, "user", "[ Server ]", nickChangeMsg, "Server", false, false, false, null, getDate());
+		addChat(null, 0, "user", "[ Client ]", nickChangeMsg, "Client", false, false, false, null, getDate());
 	},
 	ping: function() {
 		serverPingTime = getDate();
@@ -147,7 +155,7 @@ var client_commands = {
 		updateScaleConsts();
 		for(var i in tilePixelCache) delete tilePixelCache[i];
 		renderTiles(true);
-		addChat(null, 0, "user", "[ Server ]", "Changed grid size to " + width + "x" + height, "Server", false, false, false, null, getDate());
+		addChat(null, 0, "user", "[ Client ]", "Changed grid size to " + width + "x" + height, "Client", false, false, false, null, getDate());
 	},
 	color: function(args) {
 		var color = args[0];
@@ -156,7 +164,7 @@ var client_commands = {
 		if(!color) color = 0;
 		YourWorld.Color = parseInt(color, 16);
 		if(isNaN(color)) color = 0;
-		addChat(null, 0, "user", "[ Server ]", "Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase(), "Server", false, false, false, null, getDate());
+		addChat(null, 0, "user", "[ Client ]", "Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase(), "Client", false, false, false, null, getDate());
 	},
 	chatcolor: function(args) {
 		var color = args[0];
@@ -170,13 +178,13 @@ var client_commands = {
 		if(reset) {
 			localStorage.removeItem("chatcolor");
 			defaultChatColor = null;
-			addChat(null, 0, "user", "[ Server ]", "Chat color reset", "Server", false, false, false, null, getDate());
+			addChat(null, 0, "user", "[ Client ]", "Chat color reset", "Client", false, false, false, null, getDate());
 		} else {
 			defaultChatColor = parseInt(color, 16);
 			localStorage.setItem("chatcolor", defaultChatColor);
 			if(isNaN(color)) color = 0;
-			addChat(null, 0, "user", "[ Server ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(),
-				"Server", false, false, false, null, getDate());
+			addChat(null, 0, "user", "[ Client ]", "Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase(),
+				"Client", false, false, false, null, getDate());
 		}
 	},
 	warp: function(args) {
@@ -188,7 +196,7 @@ var client_commands = {
 		state.worldModel.pathname = "/" + address;
 		ws_path = createWsPath();
 		w.changeSocket(ws_path);
-		addChat(null, 0, "user", "[ Server ]", "Switching to world: \"" + address + "\"", "Server", false, false, false, null, getDate());
+		addChat(null, 0, "user", "[ Client ]", "Switching to world: \"" + address + "\"", "Client", false, false, false, null, getDate());
 	},
 	warpserver: function(args) {
 		var address = args[0];
@@ -200,7 +208,7 @@ var client_commands = {
 		positionX = 0;
 		positionY = 0;
 		w.changeSocket(ws_path);
-		addChat(null, 0, "user", "[ Server ]", "Switching to server: " + ws_path, "Server", false, false, false, null, getDate());
+		addChat(null, 0, "user", "[ Client ]", "Switching to server: " + ws_path, "Client", false, false, false, null, getDate());
 	},
 	night: function() {
 		w.night();
@@ -359,7 +367,7 @@ elm.chat_page_tab.addEventListener("click", function() {
 	elm.chat_page_tab.style.color = "white";
 
 	elm.global_chatfield.style.display = "none";
-	elm.page_chatfield.style.display=  "";
+	elm.page_chatfield.style.display = "";
 	selectedChatTab = 0;
 	chatPageUnread = 0;
 	updateUnread();

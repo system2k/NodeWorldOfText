@@ -11,8 +11,7 @@ var Permissions = {
 		return user.is_owner;
 	},
 	can_coordlink: function(user, world, optTile) {
-		var action;
-		var write;
+		var action, write;
 		if(optTile) {
 			write = Permissions.can_edit_tile(user, world, optTile);
 		} else {
@@ -22,10 +21,10 @@ var Permissions = {
 		return write && action;
 	},
 	can_edit_tile: function(user, world, tile, charX, charY) {
-		if (!tile.initted()) {
+		if(!tile) {
 			throw new Error("Can't check perms on un-initted tile");
 		}
-		if (!Permissions.can_read(user, world)) {
+		if(!Permissions.can_read(user, world)) {
 			return false;
 		}
 		var targetWritability;
@@ -57,8 +56,7 @@ var Permissions = {
 		return Permissions.user_matches_perm(user, world, world.readability);
 	},
 	can_urllink: function(user, world, optTile) {
-		var action;
-		var write;
+		var action, write;
 		if(optTile) {
 			write = Permissions.can_edit_tile(user, world, optTile);
 		} else {

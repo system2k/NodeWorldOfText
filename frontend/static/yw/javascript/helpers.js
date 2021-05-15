@@ -1,3 +1,7 @@
+if(!window.WebSocket && window.MozWebSocket) {
+	window.WebSocket = window.MozWebSocket;
+}
+
 function assert(exp, optMsg) {
 	if (!exp) {
 		throw new Error(optMsg || "Assertion failed");
@@ -119,6 +123,14 @@ function escapeURLQuote(url) {
 		return "";
 	}
 	return encodeURIComponent(escapeQuote(decode));
+}
+
+function getPoolDimensions(tileWidth, tileHeight) {
+	var sizeX = Math.floor(1024 / tileWidth);
+	var sizeY = Math.floor(1024 / tileHeight);
+	if(sizeX < 1) sizeX = 1;
+	if(sizeY < 1) sizeY = 1;
+	return [sizeX, sizeY];
 }
 
 function html_tag_esc(str, non_breaking_space, newline_br) {
