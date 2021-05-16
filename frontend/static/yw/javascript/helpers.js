@@ -3,7 +3,7 @@ if(!window.WebSocket && window.MozWebSocket) {
 }
 
 function assert(exp, optMsg) {
-	if (!exp) {
+	if(!exp) {
 		throw new Error(optMsg || "Assertion failed");
 	}
 }
@@ -158,8 +158,23 @@ function html_tag_esc(str, non_breaking_space, newline_br) {
 	return str;
 }
 
+function isHexString(str) {
+	if(!str.length) return false;
+	for(var i = 0; i < str.length; i++) {
+		var chr = str[i];
+		var isHex = ("a" <= chr && chr <= "f") || ("A" <= chr && chr <= "F") || ("0" <= chr && chr <= "9");
+		if(!isHex) return false;
+	}
+	return true;
+}
+
 function convertToDate(epoch) {
-	var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+	var months = [
+		"January", "February", "March",
+		"April", "May", "June",
+		"July", "August", "September",
+		"October", "November", "December"
+	];
 	var str = "";
 	var date = new Date(epoch);
 	var month = date.getMonth();
@@ -182,36 +197,19 @@ function convertToDate(epoch) {
 	return str;
 }
 
-if (!Math.trunc) {
+if(!Math.trunc) {
 	Math.trunc = function(v) {
 		v = +v;
 		return (v - v % 1) || (!isFinite(v) || v === 0 ? v : v < 0 ? -0 : 0);
 	}
 }
 
-if (typeof Object.assign != "function") {
-	Object.defineProperty(Object, "assign", {
-		value: function assign(target, varArgs) {
-			"use strict";
-			if (target == null) {
-				throw new TypeError("Cannot convert undefined or null to object");
-			}
-			var to = Object(target);
-			for (var index = 1; index < arguments.length; index++) {
-				var nextSource = arguments[index];
-				if (nextSource != null) {
-					for (var nextKey in nextSource) {
-						if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
-							to[nextKey] = nextSource[nextKey];
-						}
-					}
-				}
-			}
-			return to;
-		},
-		writable: true,
-		configurable: true
-	});
+if(!Object.assign) {
+	Object.assign = function(target, vars) {
+		for(var i in vars) {
+			target[i] = vars[i];
+		}
+	}
 }
 
 if(!Array.prototype.fill) {
@@ -224,9 +222,27 @@ if(!Array.prototype.fill) {
 	}
 }
 
-if (!String.prototype.startsWith) {
+if(!String.prototype.startsWith) {
 	String.prototype.startsWith = function(search, pos) {
-		return this.substr(!pos || pos < 0 ? 0 : +pos, search.length) === search;
+		return this.substr(!pos || pos < 0 ? 0 : +pos, search.length) == search;
+	}
+}
+
+if(!String.prototype.repeat) {
+	String.prototype.repeat = function(count) {
+		if(count < 0) throw "Range error";
+		var res = "";
+		for(var i = 0; i < count; i++) {
+			res += this;
+		}
+		return res;
+	}
+}
+
+if(!String.prototype.padStart) {
+	String.prototype.padStart = function(count, fillStr) {
+		fillStr += "";
+		return (fillStr.repeat(count) + this).slice(-count);
 	}
 }
 

@@ -343,7 +343,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 		mute: function(id, time) {
 			id = san_nbr(id);
 			time = san_nbr(time);
-			
+			// TODO
 		}
 	}
 
