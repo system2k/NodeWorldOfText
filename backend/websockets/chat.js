@@ -27,6 +27,7 @@ function sanitizeColor(col) {
 }
 
 var chat_ip_limits = {};
+var blocked_ips = {};
 
 module.exports = async function(ws, data, send, vars, evars) {
 	var broadcast = evars.broadcast; // broadcast to current world
@@ -88,6 +89,15 @@ module.exports = async function(ws, data, send, vars, evars) {
 		return;
 	}
 
+	var isMuted = blocked_ips[ipHeaderAddr];
+	if(isMuted) {
+		var expTime = blocked_ips[ipHeaderAddr];
+		if(!expTime || typeof expTime != "number" || Date.now() >= expTime) {
+			isMuted = false;
+			delete blocked_ips[ipHeaderAddr];
+		}
+	}
+
 	var nick = "";
 	if(data.nickname) {
 		nick = data.nickname + "";
@@ -136,6 +146,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 		// staff
 		[1, "channel", null, "get info about a chat channel"],
 		[1, "mute", ["id", "time (seconds)"], "mute a user for all clients", "1220 100"],
+		[1, "clearmutes", null, "unmute all clients"],
 
 		// general
 		[0, "help", null, "list all commands", null],
@@ -255,6 +266,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 			serverChatResponse("Server uptime: " + uptime(), data.location);
 		},
 		tell: function(id, message) {
+			if(isMuted) return;
 			id += "";
 			message += "";
 			message = message.trim();
@@ -342,8 +354,37 @@ module.exports = async function(ws, data, send, vars, evars) {
 		},
 		mute: function(id, time) {
 			id = san_nbr(id);
-			time = san_nbr(time);
-			// TODO
+			time = san_nbr(time); // in seconds
+			var clientFound = false;
+			var muteDate = 0;
+			wss.clients.forEach(function(ws) {
+				if(clientFound) return;
+				if(!ws.sdata.userClient) return;
+				var searchParam = ws.sdata.clientId == id && ws.sdata.world.id == world.id;
+				if(data.location == "global") {
+					searchParam = ws.sdata.clientId == id;
+				}
+				if(searchParam) {
+					clientFound = true;
+					var cliIp = ws.sdata.ipAddress;
+					if(!cliIp) return;
+					muteDate = Date.now() + (time * 1000);
+					blocked_ips[cliIp] = muteDate;
+				}
+			});
+			if(clientFound) {
+				return serverChatResponse("Muted client until " + html_tag_esc(create_date(muteDate)), data.location);
+			} else {
+				return serverChatResponse("Client not found", data.location);
+			}
+		},
+		clearmutes: function() {
+			var cnt = 0;
+			for(var i in blocked_ips) {
+				delete blocked_ips[i];
+				cnt++;
+			}
+			return serverChatResponse("Unmuted " + cnt + " user(s)", data.location);
 		}
 	}
 
@@ -356,7 +397,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 		var operator  = user.operator;
 		var superuser = user.superuser;
-		var staff	 = user.staff;
+		var staff	  = user.staff;
 
 		switch(command) {
 			case "worlds":
@@ -379,6 +420,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 				return;
 			case "mute":
 				if(staff) com.mute(args[1], args[2]);
+				return;
+			case "clearmutes":
+				if(staff) com.clearmutes();
 				return;
 			default:
 				serverChatResponse("Invalid command: " + html_tag_esc(msg));
@@ -434,7 +478,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 		isCommand = true;
 	}
 
-	if(!isCommand) {
+	if(!isCommand && !isMuted) {
 		if(data.location == "page") {
 			await add_to_chatlog(chatData, world.id);
 		} else if(data.location == "global") {
@@ -442,6 +486,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 		}
 	}
 
+	if(isMuted) return;
 	var websocketChatData = Object.assign({
 		kind: "chat",
 		channel

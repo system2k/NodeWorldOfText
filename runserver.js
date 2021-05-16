@@ -2243,7 +2243,7 @@ function broadcastUserCount() {
 			}, user_world, {
 				isChat: true,
 				clientId: 0,
-				chat_perm: -1 // -1: check cached value in client object
+				chat_perm: "inherit"
 			});
 		}
 	}
@@ -2406,12 +2406,14 @@ async function initialize_server_components() {
 			try {
 				if(world == void 0 || NCaseCompare(client.sdata.world_name, world)) {
 					if(opts.isChat) {
-						// -1: check cached value; this is a miscellaneous signal that depends on the chat permission (e.g. user count)
-						if(opts.chat_perm == -1) opts.chat_perm = client.sdata.chat_permission;
+						// inherit: check cached value; this is a miscellaneous signal that depends on the chat permission (e.g. user count)
+						if(opts.chat_perm == "inherit") opts.chat_perm = client.sdata.chat_permission;
 						// 1: members only
 						if(opts.chat_perm == 1) if(!(client.sdata.is_member || client.sdata.is_owner)) return;
 						// 2: owner only
 						if(opts.chat_perm == 2) if(!client.sdata.is_owner) return;
+						// -1: unavailable to all
+						if(opts.chat_perm == -1) return;
 						// check if user has blocked this client
 						if(client.sdata.chat_blocks && (client.sdata.chat_blocks.indexOf(opts.clientId) > -1 ||
 							((client.sdata.chat_blocks.indexOf("*") > -1) && opts.clientId != 0))) return;

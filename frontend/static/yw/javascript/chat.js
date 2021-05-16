@@ -251,7 +251,6 @@ elm.chatbar.addEventListener("keypress", function(e) {
 	var keyCode = e.keyCode;
 	if(keyCode == 13) { // Enter
 		sendChat();
-		elm.chatbar.blur();
 	}
 });
 
