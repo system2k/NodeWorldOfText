@@ -308,13 +308,13 @@ function run(path) {
 
 const settings = require(SETTINGS_PATH);
 
-var serverPort	 = settings.port;
-var serverDB	   = settings.DATABASE_PATH;
-var editsDB		= settings.EDITS_PATH;
-var chatDB		 = settings.CHAT_HISTORY_PATH;
-var imageDB		= settings.IMAGES_PATH;
-var miscDB		 = settings.MISC_PATH;
-var filesPath	  = settings.FILES_PATH;
+var serverPort     = settings.port;
+var serverDB       = settings.DATABASE_PATH;
+var editsDB        = settings.EDITS_PATH;
+var chatDB         = settings.CHAT_HISTORY_PATH;
+var imageDB        = settings.IMAGES_PATH;
+var miscDB         = settings.MISC_PATH;
+var filesPath      = settings.FILES_PATH;
 var staticFilesRaw = settings.STATIC_FILES_RAW;
 var staticFilesIdx = settings.STATIC_FILES_IDX;
 var accountSystem  = settings.accountSystem; // "uvias" or "local"

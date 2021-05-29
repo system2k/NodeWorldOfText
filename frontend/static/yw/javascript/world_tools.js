@@ -26,7 +26,7 @@ menu.addCheckboxOption(" Clear Tiles", function() {
 	atcInfo.style.display = "none";
 	admclr.activated = false;
 	tiles[currentPosition[1] + "," + currentPosition[0]].backgroundColor = "";
-	renderTile(currentPosition[0], currentPosition[1], true);
+	w.setTileRedraw(currentPosition[0], currentPosition[1]);
 });
 
 var admclr = {
@@ -41,7 +41,7 @@ var admclr = {
 			if(!preserveLastPos)
 				admclr.lastPos = [currentPosition[0], currentPosition[1]];
 			// re-render the tile
-			renderTile(currentPosition[0], currentPosition[1], true);
+			w.setTileRender(currentPosition[0], currentPosition[1]);
 		}
 	},
 	handleClear: function(x, y) {
@@ -79,7 +79,7 @@ function mousemove_admclr(e) {
 		var tileBackColorRes = tiles[admclr.lastPos[1] + "," + admclr.lastPos[0]];
 		if(tileBackColorRes) tileBackColorRes.backgroundColor = "";
 		// re-render the tile
-		renderTile(admclr.lastPos[0], admclr.lastPos[1], true);
+		w.setTileRender(admclr.lastPos[0], admclr.lastPos[1]);
 	}
 	// if tile exists
 	admclr.renderTile();
@@ -99,10 +99,10 @@ function keyup_admclr(e) {
 	if(admclr.lastPos) {
 		tiles[admclr.lastPos[1] + "," + admclr.lastPos[0]].backgroundColor = "";
 		// re-render the tile
-		renderTile(admclr.lastPos[0], admclr.lastPos[1], true);
+		w.setTileRender(admclr.lastPos[0], admclr.lastPos[1]);
 	}
 	tiles[currentPosition[1] + "," + currentPosition[0]].backgroundColor = "";
-	renderTile(currentPosition[0], currentPosition[1], true);
+	w.setTileRender(currentPosition[0], currentPosition[1]);
 	admclr.lastPos = null;
 }
 document.body.addEventListener("keyup", keyup_admclr)

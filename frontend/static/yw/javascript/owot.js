@@ -109,6 +109,7 @@ var classicTileProcessing  = false; // directly process utf32 only
 var unloadedPatternPanning = false;
 var cursorRenderingEnabled = true;
 var unobstructCursor       = false;
+var staticBackground       = false; // transparent background
 
 var images_to_load = {
 	unloaded: "/static/unloaded.png"
@@ -493,7 +494,7 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 			char = char.replace(/\r|\n|\x1b/g, " ");
 			reg += char;
 			colors.push(charInfo.color);
-			var tile = tiles[tileY + "," + tileX];
+			var tile = Tile.get(tileX, tileY);
 			var containsLink = false;
 			if(tile && tile.properties && tile.properties.cell_props) {
 				if(tile.properties.cell_props[charY] && tile.properties.cell_props[charY][charX]) {
@@ -856,7 +857,7 @@ function updateAutoProg() {
 // Fast tile protecting
 function mousemove_tileProtectAuto() {
 	if(!tileProtectAuto.active) return;
-	var tile = tiles[currentPosition[1] + "," + currentPosition[0]];
+	var tile = Tile.get(currentPosition[0], currentPosition[1]);
 	if(!tile) return;
 	tileProtectAuto.selectedTile = tile;
 	var tileX = currentPosition[0];
@@ -901,7 +902,7 @@ function mousemove_tileProtectAuto() {
 				ctileX = x;
 				ctileY = y;
 			}
-			var tempTile = tiles[ctileY + "," + ctileX];
+			var tempTile = Tile.get(ctileX, ctileY);
 			var mode = tileProtectAuto.mode;
 			if(protectPrecision == 0 && tempTile) {
 				tileProtectAuto.selected[ctileY + "," + ctileX] =
@@ -923,7 +924,7 @@ function mousemove_tileProtectAuto() {
 			var pos = i.split(",");
 			var tileX = parseInt(pos[1]);
 			var tileY = parseInt(pos[0]);
-			renderTile(tileX, tileY, true);
+			w.setTileRedraw(tileX, tileY);
 		}
 	}
 	if(tileProtectAuto.shiftDown) {
@@ -939,7 +940,7 @@ function mousemove_tileProtectAuto() {
 				uncolorChar(tileX, tileY, charX, charY);
 			}
 			delete tileProtectAuto.selected[pos];
-			renderTile(tileX, tileY);
+			w.setTileRender(tileX, tileY);
 		}
 	}
 }
@@ -990,11 +991,11 @@ function keydown_tileProtectAuto(e) {
 			if(precision == 0) {
 				selected[i][2].backgroundColor = "";
 				delete selected[i];
-				renderTile(tileX, tileY);
+				w.setTileRender(tileX, tileY);
 			} else if(precision == 1) {
 				delete selected[i];
 				uncolorChar(tileX, tileY, charX, charY);
-				renderTile(tileX, tileY, true);
+				w.setTileRedraw(tileX, tileY);
 			}
 
 			if(idx >= keys.length) return;
@@ -1015,7 +1016,7 @@ document.body.addEventListener("keydown", keydown_tileProtectAuto)
 // Fast linking
 function mousemove_linkAuto() {
 	if(!linkAuto.active) return;
-	var tile = tiles[currentPosition[1] + "," + currentPosition[0]];
+	var tile = Tile.get(currentPosition[0], currentPosition[1]);
 	if(!tile) return;
 	
 	var tileX = currentPosition[0];
@@ -1065,14 +1066,14 @@ function mousemove_linkAuto() {
 			var pos = i.split(",");
 			var tileX = parseInt(pos[1]);
 			var tileY = parseInt(pos[0]);
-			renderTile(tileX, tileY, true);
+			w.setTileRedraw(tileX, tileY);
 		}
 	}
 	if(linkAuto.shiftDown) {
 		var elm = linkAuto.selected[tileY + "," + tileX + "," + charY + "," + charX];
 		if(elm !== void 0) {
 			uncolorChar(tileX, tileY, charX, charY);
-			renderTile(tileX, tileY, true);
+			w.setTileRedraw(tileX, tileY);
 			delete linkAuto.selected[tileY + "," + tileX + "," + charY + "," + charX];
 		}
 	}
@@ -1125,7 +1126,7 @@ function keydown_linkAuto(e) {
 			updateAutoProg();
 			delete selected[i];
 			uncolorChar(tileX, tileY, charX, charY);
-			renderTile(tileX, tileY, true);
+			w.setTileRedraw(tileX, tileY);
 
 			if(idx >= keys.length) return;
 			setTimeout(step, 4);
@@ -1203,7 +1204,7 @@ function getChar(tileX, tileY, charX, charY) {
 		charX = cursorCoords[2];
 		charY = cursorCoords[3];
 	}
-	var tile = tiles[tileY + "," + tileX];
+	var tile = Tile.get(tileX, tileY);
 	if(!tile) return " ";
 	var content = tile.content;
 	return content[charY * tileC + charX];
@@ -1217,7 +1218,7 @@ function getCharColor(tileX, tileY, charX, charY) {
 		charX = cursorCoords[2];
 		charY = cursorCoords[3];
 	}
-	var tile = tiles[tileY + "," + tileX];
+	var tile = Tile.get(tileX, tileY);
 	if(!tile) return 0;
 	if(!tile.properties.color) return 0;
 	return tile.properties.color[charY * tileC + charX];
@@ -1231,7 +1232,7 @@ function getCharProtection(tileX, tileY, charX, charY) {
 		charX = cursorCoords[2];
 		charY = cursorCoords[3];
 	}
-	var tile = tiles[tileY + "," + tileX];
+	var tile = Tile.get(tileX, tileY);
 	if(!tile) return state.worldModel.writability;
 	var prot = tile.properties.writability;
 	if(tile.properties && tile.properties.char) {
@@ -1365,6 +1366,10 @@ Tile.delete = function(tileX, tileY) {
 		delete tiles[str];
 		tileCount--;
 	}
+}
+Tile.get = function(tileX, tileY) {
+	var tile = tiles[tileY + "," + tileX];
+	return tile;
 }
 
 var poolCleanupInterval = setInterval(function() {
@@ -1550,7 +1555,7 @@ function stopLinkUI() {
 	var charY = lastLinkHover[3];
 	// remove highlight
 	uncolorChar(tileX, tileY, charX, charY);
-	renderTile(tileX, tileY, true);
+	w.setTileRedraw(tileX, tileY);
 }
 
 function removeTileProtectHighlight() {
@@ -1561,14 +1566,14 @@ function removeTileProtectHighlight() {
 	var charX = lastTileHover[3];
 	var charY = lastTileHover[4];
 
-	if(tiles[tileY + "," + tileX]) {
+	if(Tile.get(tileX, tileY)) {
 		if(precision == 0) {
-			tiles[tileY + "," + tileX].backgroundColor = "";
+			Tile.get(tileX, tileY).backgroundColor = "";
 		} else if(precision == 1) {
 			uncolorChar(tileX, tileY, charX, charY);
 		}
 	}
-	renderTile(tileX, tileY, true);
+	w.setTileRedraw(tileX, tileY);
 }
 
 function stopTileUI() {
@@ -1711,15 +1716,12 @@ document.addEventListener("touchstart", event_touchstart, { passive: false });
 function renderCursor(coords) {
 	var newTileX = coords[0];
 	var newTileY = coords[1];
-	var tileStr = newTileY + "," + newTileX;
-	if(!tiles[tileStr]) return false;
-	var writability = null;
-	if(tiles[tileStr]) {
-		writability = tiles[tileStr].properties.writability;
-	}
+	var tile = Tile.get(newTileX, newTileY);
+	if(!tile) return false;
+	var writability = tile.properties.writability;
 	var thisTile = {
 		writability: writability,
-		char: tiles[tileStr].properties.char
+		char: tile.properties.char
 	}
 	var tileX = 0;
 	var tileY = 0;
@@ -1732,18 +1734,18 @@ function renderCursor(coords) {
 	if(!Permissions.can_edit_tile(state.userModel, state.worldModel, thisTile, selCharX, selCharY)) {
 		if(cursorCoords) {
 			cursorCoords = null;
-			renderTile(tileX, tileY);
+			w.setTileRender(tileX, tileY);
 		}
 		return false;
 	}
 
 	if(cursorCoords) {
 		cursorCoords = null;
-		renderTile(tileX, tileY);
+		w.setTileRender(tileX, tileY);
 	}
 	cursorCoords = coords.slice(0);
 	cursorCoordsCurrent = coords.slice(0);
-	renderTile(coords[0], coords[1]);
+	w.setTileRender(coords[0], coords[1]);
 
 	var pixelX = (coords[0] * tileW) + (coords[2] * cellW) + positionX + Math.trunc(owotWidth / 2);
 	var pixelY = (coords[1] * tileH) + (coords[3] * cellH) + positionY + Math.trunc(owotHeight / 2);
@@ -1785,7 +1787,7 @@ function removeCursor() {
 	var remTileX = cursorCoords[0];
 	var remTileY = cursorCoords[1];
 	cursorCoords = null;
-	renderTile(remTileX, remTileY);
+	w.setTileRender(remTileX, remTileY);
 }
 
 function stopDragging() {
@@ -1842,7 +1844,7 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 		pageX: pageX,
 		pageY: pageY
 	});
-	if(cursorEnabled && tiles[pos[1] + "," + pos[0]] !== void 0) {
+	if(cursorEnabled && Tile.get(pos[0], pos[1]) !== void 0) {
 		verticalEnterPos = [pos[0], pos[2]];
 		// change position of the cursor and get results
 		if(renderCursor(pos) == false) {
@@ -1868,8 +1870,8 @@ function event_mouseenter() {
 document.addEventListener("mouseenter", event_mouseenter);
 
 function is_link(tileX, tileY, charX, charY) {
-	if(!tiles[tileY + "," + tileX]) return;
-	var tile = tiles[tileY + "," + tileX];
+	if(!Tile.get(tileX, tileY)) return;
+	var tile = Tile.get(tileX, tileY);
 	if(!tile) return;
 	var props = tile.properties.cell_props;
 	if(!props) return false;
@@ -1933,13 +1935,13 @@ function moveCursor(direction, preserveVertPos) {
 
 // place a character
 function writeCharTo(char, charColor, tileX, tileY, charX, charY) {
-	if(!tiles[tileY + "," + tileX]) {
+	if(!Tile.get(tileX, tileY)) {
 		Tile.set(tileX, tileY, blankTile());
 	}
 	
-	var cell_props = tiles[tileY + "," + tileX].properties.cell_props;
+	var cell_props = Tile.get(tileX, tileY).properties.cell_props;
 	if(!cell_props) cell_props = {};
-	var color = tiles[tileY + "," + tileX].properties.color;
+	var color = Tile.get(tileX, tileY).properties.color;
 	if(!color) color = new Array(tileArea).fill(0);
 
 	// delete link
@@ -1951,15 +1953,15 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY) {
 	// change color
 	if(Permissions.can_color_text(state.userModel, state.worldModel)) {
 		color[charY * tileC + charX] = charColor;
-		tiles[tileY + "," + tileX].properties.color = color; // if the color array doesn't already exist in the tile
+		Tile.get(tileX, tileY).properties.color = color; // if the color array doesn't already exist in the tile
 	}
 
 	// update cell properties (link positions)
-	tiles[tileY + "," + tileX].properties.cell_props = cell_props;
+	Tile.get(tileX, tileY).properties.cell_props = cell_props;
 
-	var con = tiles[tileY + "," + tileX].content;
+	var con = Tile.get(tileX, tileY).content;
 	con[charY * tileC + charX] = char;
-	renderTile(tileX, tileY, true);
+	w.setTileRedraw(tileX, tileY);
 
 	var editArray = [tileY, tileX, charY, charX, getDate(), char, nextObjId];
 	if(tileFetchOffsetX || tileFetchOffsetY) {
@@ -2946,27 +2948,27 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 			var charX = reg.lastSelectionHover[2];
 			var charY = reg.lastSelectionHover[3];
 			if(reg.tiled) {
-				if(tiles[tileY + "," + tileX]) {
-					tiles[tileY + "," + tileX].backgroundColor = "";
+				if(Tile.get(tileX, tileY)) {
+					Tile.get(tileX, tileY).backgroundColor = "";
 				}
 			} else {
 				uncolorChar(tileX, tileY, charX, charY);
 			}
-			renderTile(tileX, tileY, true);
+			w.setTileRedraw(tileX, tileY);
 		}
 		reg.lastSelectionHover = currentPosition;
 		var newTileX = currentPosition[0];
 		var newTileY = currentPosition[1];
 		var newCharX = currentPosition[2];
 		var newCharY = currentPosition[3];
-		if(tiles[newTileY + "," + newTileX]) {
+		if(Tile.get(newTileX, newTileY)) {
 			if(reg.tiled) {
-				tiles[newTileY + "," + newTileX].backgroundColor = reg.charColor;
+				Tile.get(newTileX, newTileY).backgroundColor = reg.charColor;
 			} else {
 				colorChar(newTileX, newTileY, newCharX, newCharY, reg.charColor, true);
 			}
 			// re-render tile
-			renderTile(newTileX, newTileY, true);
+			w.setTileRedraw(newTileX, newTileY);
 		}
 		reg.regionCoordB = currentPosition;
 		if(reg.regionCoordA && reg.regionCoordB) reg.setSelection(reg.regionCoordA, reg.regionCoordB);
@@ -2980,17 +2982,17 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 			var charX = lastLinkHover[2];
 			var charY = lastLinkHover[3];
 			uncolorChar(tileX, tileY, charX, charY);
-			renderTile(tileX, tileY, true);
+			w.setTileRedraw(tileX, tileY);
 		}
 		lastLinkHover = currentPosition;
 		var newTileX = currentPosition[0];
 		var newTileY = currentPosition[1];
 		var newCharX = currentPosition[2];
 		var newCharY = currentPosition[3];
-		if(tiles[newTileY + "," + newTileX]) {
+		if(Tile.get(newTileX, newTileY)) {
 			colorChar(newTileX, newTileY, newCharX, newCharY, "#aaf", true);
 			// re-render tile
-			renderTile(newTileX, newTileY, true);
+			w.setTileRedraw(newTileX, newTileY);
 		}
 	}
 
@@ -3003,14 +3005,14 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 			var charX = lastTileHover[3];
 			var charY = lastTileHover[4];
 			if(precision == 0) {
-				if(tiles[tileY + "," + tileX] && !tileProtectAuto.selected[tileY + "," + tileX]) {
-					tiles[tileY + "," + tileX].backgroundColor = "";
+				if(Tile.get(tileX, tileY) && !tileProtectAuto.selected[tileY + "," + tileX]) {
+					Tile.get(tileX, tileY).backgroundColor = "";
 				}
 			} else if(precision == 1) {
 				uncolorChar(tileX, tileY, charX, charY);
-				renderTile(tileX, tileY, true);
+				w.setTileRedraw(tileX, tileY);
 			}
-			renderTile(tileX, tileY, true);
+			w.setTileRedraw(tileX, tileY);
 		}
 		var cp = currentPosition;
 		lastTileHover = [protectPrecision, cp[0], cp[1], cp[2], cp[3]];
@@ -3019,14 +3021,14 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 		var newCharX = currentPosition[2];
 		var newCharY = currentPosition[3];
 		if(protectPrecision == 0) {
-			if(tiles[newTileY + "," + newTileX] && !tileProtectAuto.selected[newTileY + "," + newTileX]) {
-				tiles[newTileY + "," + newTileX].backgroundColor = w.protect_bg;
-				renderTile(newTileX, newTileY);
+			if(Tile.get(newTileX, newTileY) && !tileProtectAuto.selected[newTileY + "," + newTileX]) {
+				Tile.get(newTileX, newTileY).backgroundColor = w.protect_bg;
+				w.setTileRender(newTileX, newTileY);
 			}
 		} else if(protectPrecision == 1) {
-			if(tiles[newTileY + "," + newTileX]) {
+			if(Tile.get(newTileX, newTileY)) {
 				colorChar(newTileX, newTileY, newCharX, newCharY, w.protect_bg);
-				renderTile(newTileX, newTileY, true);
+				w.setTileRedraw(newTileX, newTileY);
 			}
 		}
 	}
@@ -3425,7 +3427,7 @@ var flashAnimateInterval = setInterval(function() {
 	// re-render tiles
 	for(var i in tileGroup) {
 		var pos = getPos(i);
-		renderTile(pos[1], pos[0]);
+		w.setTileRender(pos[1], pos[0]);
 	}
 }, 1000 / 60);
 
@@ -3587,7 +3589,7 @@ function isTileVisible(tileX, tileY) {
 }
 
 function isTileLoaded(tileX, tileY) {
-	return !!tiles[tileY + "," + tileX];
+	return !!Tile.get(tileX, tileY);
 }
 
 var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -3816,15 +3818,17 @@ function drawObstructedCursor(content, curX, curY, offsetX, offsetY) {
 }
 
 function renderTile(tileX, tileY, redraw) {
-	if(!isTileVisible(tileX, tileY)) return;
 	if(!isTileLoaded(tileX, tileY)) return;
-
 	var str = tileY + "," + tileX;
 	var tileScreenPos = getTileScreenPosition(tileX, tileY);
 	var offsetX = Math.floor(tileScreenPos[0]);
 	var offsetY = Math.floor(tileScreenPos[1]);
 
 	var tile = tiles[str];
+	if(redraw) {
+		tile.redraw = true;
+	}
+	if(!isTileVisible(tileX, tileY)) return;
 
 	if(tile == null) {
 		tile = Tile.set(tileX, tileY, blankTile());
@@ -3889,7 +3893,7 @@ function renderTile(tileX, tileY, redraw) {
 	// render text data from cache
 	// TODO: make sure tile has been drawn at least once
 	var tilePool = loadTileFromPool(tileX, tileY, true);
-	if(tilePool && !redraw && !tile.redraw) {
+	if(tilePool && !tile.redraw) {
 		var pCanv = tilePool.pool.canv;
 		var pX = tilePool.poolX;
 		var pY = tilePool.poolY;
@@ -3997,11 +4001,32 @@ function renderTiles(redraw) {
 	w.emit("tilesRendered");
 }
 
+function renderTilesSelective() {
+	var pointA = getTileCoordsFromMouseCoords(0, 0);
+	var pointB = getTileCoordsFromMouseCoords(owotWidth - 1, owotHeight - 1);
+	for(var y = pointA[1]; y <= pointB[1]; y++) {
+		for(var x = pointA[0]; x <= pointB[0]; x++) {
+			var tile = Tile.get(x, y);
+			if(!tile) continue;
+			if(tile.rerender) {
+				delete tile.rerender;
+				renderTile(x, y);
+				continue;
+			}
+			if(!tile.redraw) continue;
+			renderTile(x, y);
+		}
+	}
+}
+
 function renderLoop() {
 	if(w.hasUpdated) {
-		w.hasUpdated = false;
 		renderTiles();
+	} else if(w.hasSelectiveUpdated) {
+		renderTilesSelective();
 	}
+	w.hasUpdated = false;
+	w.hasSelectiveUpdated = false;
 	w.emit("frame");
 	requestAnimationFrame(renderLoop);
 }
@@ -4221,13 +4246,13 @@ function RegionSelection() {
 		var charY = this.lastSelectionHover[3];
 		// remove highlight
 		if(this.tiled) {
-			if(tiles[tileY + "," + tileX]) {
-				tiles[tileY + "," + tileX].backgroundColor = "";
+			if(Tile.get(tileX, tileY)) {
+				Tile.get(tileX, tileY).backgroundColor = "";
 			}
 		} else {
 			uncolorChar(tileX, tileY, charX, charY);
 		}
-		renderTile(tileX, tileY, true);
+		w.setTileRedraw(tileX, tileY);
 		this.deselect();
 	}
 	var onselectionEvents = [];
@@ -4561,6 +4586,7 @@ Object.assign(w, {
 	tiles: tiles,
 	periodDeletedTiles: 0,
 	hasUpdated: true,
+	hasSelectiveUpdated: false,
 	userCount: -1,
 	clientId: -1,
 	net: network,
@@ -4747,6 +4773,19 @@ Object.assign(w, {
 			if(!tiles[t]) continue;
 			tiles[t].redraw = true;
 		}
+	},
+	setTileRedraw: function(tileX, tileY) {
+		var tile = Tile.get(tileX, tileY);
+		if(!tile) return;
+		w.hasSelectiveUpdated = true;
+		tile.redraw = true;
+	},
+	setTileRender: function(tileX, tileY) {
+		// render tile again on main canvas on next render loop
+		var tile = Tile.get(tileX, tileY);
+		if(!tile) return;
+		w.hasSelectiveUpdated = true;
+		tile.rerender = true;
 	},
 	render: function(redraw) {
 		if(redraw) w.setRedraw();
@@ -5033,7 +5072,6 @@ function isAnimated(posStr) {
 }
 
 function animateTile(tile, posStr) {
-	// deprecated
 	var pos = getPos(posStr);
 	if (isAnimated(posStr))
 		stopAnimation(posStr);
@@ -5056,7 +5094,7 @@ function animateTile(tile, posStr) {
 			newTile.content = w.split(frame[0]);
 			newTile.properties.color = frame[1];
 			Tile.set(tileX, tileY, newTile)
-			renderTile(tileX, tileY, true);
+			w.setTileRedraw(tileX, tileY);
 			atFrame++;
 			if (atFrame >= framenum) {
 				if (repeat)
@@ -5100,7 +5138,7 @@ var ws_functions = {
 			if(tiles[tileKey].properties.char) {
 				tiles[tileKey].properties.char = decodeCharProt(tiles[tileKey].properties.char);
 			}
-			renderTile(pos[1], pos[0], true);
+			w.setTileRedraw(pos[1], pos[0]);
 		}
 		w.emit("afterFetch", data);
 		// too many tiles, remove tiles outside of the viewport
@@ -5194,10 +5232,7 @@ var ws_functions = {
 			tiles[tileKey].properties = data.tiles[tileKey].properties; // update tile
 			tiles[tileKey].content = oldContent; // update only necessary character updates
 			tiles[tileKey].properties.color = oldColors; // update only necessary color updates
-			var pos = getPos(tileKey);
-			if(isTileVisible(pos[1], pos[0])) {
-				renderTile(pos[1], pos[0], true);
-			}
+			w.setTileRedraw(tileX, tileY);
 		}
 		if(highlights.length > 0 && useHighlight) highlight(highlights);
 		var tileLim = Math.floor(getArea(fetchClientMargin) * 1.5 / zoom + 1000);
@@ -5273,7 +5308,7 @@ var ws_functions = {
 			var writability = tiles[pos].properties.writability;
 			Tile.set(data.tileX, data.tileY, blankTile());
 			tiles[pos].properties.writability = writability;
-			renderTile(data.tileX, data.tileY);
+			w.setTileRender(data.tileX, data.tileY);
 		}
 	},
 	chat: function(data) {
