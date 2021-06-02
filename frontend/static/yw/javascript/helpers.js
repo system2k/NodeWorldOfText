@@ -246,6 +246,18 @@ if(!String.prototype.padStart) {
 	}
 }
 
+if(state.worldModel.nsfw) {
+	var check = localStorage.getItem("nsfw_yes");
+	if(check) {
+		check = JSON.parse(check);
+		if(!check[state.worldModel.name.toUpperCase()]) {
+			window.location.pathname = "/accounts/nsfw/" + state.worldModel.name;
+		}
+	} else {
+		window.location.pathname = "/accounts/nsfw/" + state.worldModel.name;
+	}
+}
+
 function ReconnectingWebSocket(url) {
 	this.binaryType = "blob";
 	this.onopen = null;

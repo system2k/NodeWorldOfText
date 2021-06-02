@@ -17,6 +17,7 @@ var broadcastMonitorEvent;
 
 var server_exiting = false;
 var editlog_cell_props = false;
+var main_world_name = "";
 
 module.exports.main = function(vars) {
 	db = vars.db;
@@ -57,6 +58,8 @@ module.exports.main = function(vars) {
 			handle_error(e);
 		}
 	}, 1000 * 60 * 3);
+
+	sendTileUpdatesToClients();
 }
 
 module.exports.server_exit = async function() {
@@ -64,47 +67,83 @@ module.exports.server_exit = async function() {
 	await databaseClock();
 }
 
+var tileClientUpdateQueue = {};
+
 function prepareTileUpdateMessage(tileObj, worldObj, channel) {
-	var updObj = {};
+	var worldID = worldObj.id;
+	var updateObj = tileClientUpdateQueue[worldID];
+	if(!updateObj) {
+		updateObj = {};
+		tileClientUpdateQueue[worldID] = updateObj;
+	}
 	if(!channel) channel = "00000000000000";
 	for(var i = 0; i < tileObj.length; i++) {
 		var tileElm = tileObj[i];
 		var tile = tileElm.tile;
 		var tileX = tileElm.tileX;
 		var tileY = tileElm.tileY;
-		var content = tile.content.join("");
-		var properties = {
-			writability: tile.writability
-		};
-		if(!arrayIsEntirely(tile.prop_char, null)) {
-			properties.char = encodeCharProt(tile.prop_char);
-		}
-		if(!arrayIsEntirely(tile.prop_color, 0)) {
-			properties.color = tile.prop_color;
-		}
-		if(Object.keys(tile.prop_cell_props).length > 0) {
-			properties.cell_props = tile.prop_cell_props;
-		}
-		updObj[tileY + "," + tileX] = {
-			content,
-			properties
-		};
+		updateObj[tileY + "," + tileX] = [tile, channel];
 	}
-	wss.clients.forEach(function(client) {
-		if(!client.sdata.userClient) return;
-		if(client.sdata.world_id == worldObj.id && client.readyState == WebSocket.OPEN) {
-			try {
-				client.send(JSON.stringify({
-					channel: channel,
-					kind: "tileUpdate",
-					source: "write",
-					tiles: updObj
-				}));
-			} catch(e) {
-				handle_error(e);
+}
+
+function sendTileUpdatesToClients() {
+	if(server_exiting) return;
+	var hasUpdates = Object.keys(tileClientUpdateQueue).length > 0;
+	if(!hasUpdates) {
+		intv.client_update_clock = setTimeout(sendTileUpdatesToClients, 1000 / 30);
+		return;
+	}
+	for(var world in tileClientUpdateQueue) {
+		var worldQueue = tileClientUpdateQueue[world];
+		var worldID = parseInt(world);
+		var cliUpdData = {};
+		var totalUpdatedTiles = 0;
+		for(var coord in worldQueue) {
+			var tileUpdate = worldQueue[coord];
+			delete worldQueue[coord];
+			totalUpdatedTiles++;
+			if(totalUpdatedTiles > 100) {
+				continue;
 			}
+			var tile = tileUpdate[0];
+			var channel = tileUpdate[1];
+			var content = tile.content.join("");
+			var properties = {
+				writability: tile.writability
+			};
+			if(!arrayIsEntirely(tile.prop_char, null)) {
+				properties.char = encodeCharProt(tile.prop_char);
+			}
+			if(!arrayIsEntirely(tile.prop_color, 0)) {
+				properties.color = tile.prop_color;
+			}
+			if(Object.keys(tile.prop_cell_props).length > 0) {
+				properties.cell_props = tile.prop_cell_props;
+			}
+			cliUpdData[coord] = {
+				content,
+				properties
+			};
 		}
-	});
+		delete tileClientUpdateQueue[world];
+		// broadcast to clients
+		wss.clients.forEach(function(client) {
+			if(!client.sdata.userClient) return;
+			if(client.sdata.world_id == worldID && client.readyState == WebSocket.OPEN) {
+				try {
+					client.send(JSON.stringify({
+						channel: channel,
+						kind: "tileUpdate",
+						source: "write",
+						tiles: cliUpdData
+					}));
+				} catch(e) {
+					handle_error(e);
+				}
+			}
+		});
+	}
+	intv.client_update_clock = setTimeout(sendTileUpdatesToClients, 1000 / 30);
 }
 
 // caller ids. this returns information to a request that uploaded the edits to the server
@@ -202,7 +241,7 @@ async function loadTileCacheData(world_id, tileX, tileY) {
 
 var fetch_tile_queue = [];
 var totalTilesCached = 0;
-var tileCacheLimit = 2000;
+var tileCacheLimit = 4000;
 
 // This object contains all tiles that are currently loaded during the iteration
 // of all tiles in a world. If an edit has been made to a loaded tile, it gets
@@ -286,8 +325,8 @@ function tileWriteEdits(cacheTile, editObj) {
 	var preserve_links = data.preserve_links;
 	var can_color_text = data.can_color_text;
 	var no_log_edits = data.no_log_edits;
-	var is_owner = data.is_owner || (user.superuser && world.name == "");
-	var is_member = data.is_member || (user.superuser && world.name == "");
+	var is_owner = data.is_owner || (user.superuser && world.name == main_world_name);
+	var is_member = data.is_member || (user.superuser && world.name == main_world_name);
 
 	var index = charY * CONST.tileCols + charX;
 	var char_writability = cacheTile.prop_char[index];
@@ -376,8 +415,8 @@ function tileWriteLinks(cacheTile, editObj) {
 	var charY = data.charY;
 	var user = data.user;
 	var world = data.world;
-	var is_member = data.is_member || (user.superuser && world.name == "");
-	var is_owner = data.is_owner || (user.superuser && world.name == "");
+	var is_member = data.is_member || (user.superuser && world.name == main_world_name);
+	var is_owner = data.is_owner || (user.superuser && world.name == main_world_name);
 	var type = data.type;
 	var url = data.url;
 	var link_tileX = data.link_tileX;
@@ -447,8 +486,8 @@ function tileWriteProtections(cacheTile, editObj) {
 	var protect_type = data.protect_type;
 
 	var feature_perm = world.feature_membertiles_addremove;
-	var is_owner = data.is_owner || (user.superuser && world.name == "");
-	var is_member = (data.is_member && feature_perm) || is_owner || (user.superuser && world.name == "");
+	var is_owner = data.is_owner || (user.superuser && world.name == main_world_name);
+	var is_member = (data.is_member && feature_perm) || is_owner || (user.superuser && world.name == main_world_name);
 
 	var tile_writability = cacheTile.writability;
 	if(tile_writability == null) tile_writability = world.writability;

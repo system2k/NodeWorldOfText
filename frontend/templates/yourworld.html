@@ -127,13 +127,13 @@
 		<textarea autocapitalize="off" autocorrect="off" autocomplete="off" style="left: -1000px; top: -1000px; position: absolute;" id="textInput"></textarea>
 
 		<div id="protect_precision" style="display: none;">
-			<span style="position: absolute; top: 2px; left: 3px;">
+			<div style="padding-bottom: 3px;">
 				Protect type:
-			</span>
-			<div class="protect_button" style="left: 4px;" id="tile_choice" onclick="protectPrecisionOption(0);">
+			</div>
+			<div class="protect_button" id="tile_choice" onclick="protectPrecisionOption(0);">
 				Tile
 			</div>
-			<div class="protect_button" style="left: 64px;" id="char_choice" onclick="protectPrecisionOption(1);">
+			<div class="protect_button" id="char_choice" onclick="protectPrecisionOption(1);">
 				Char
 			</div>
 		</div>
@@ -202,7 +202,6 @@
 		</div>
 
 		<script src="/static/yw/javascript/helpers.js"></script>
-		{% if nsfw %}<script src="/static/yw/javascript/nsfw.js"></script>{% endif %}
 		<script src="/static/lib/jscolor.min.js"></script>
 		<script src="/static/yw/javascript/modals.js"></script>
 		<script src="/static/yw/javascript/menu.js"></script>

@@ -2539,7 +2539,7 @@ var ip_address_conn_limit = {};
 // {ip: ws_limits}
 var ip_address_req_limit = {}; // TODO: Cleanup objects
 
-var ws_req_per_second = 1024;
+var ws_req_per_second = 20000;
 var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	chat:			[256, 1000, 0], // rate-limiting handled separately
 	chathistory:	[10, 1000, 0],

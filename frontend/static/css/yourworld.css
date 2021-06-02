@@ -70,10 +70,6 @@ a:visited {
     top: 0px;
     position: absolute;
 }
-#paused {
-    left: 2px;
-    display: none;
-}
 .message {
     margin-left: auto;
     margin-right: auto;
@@ -169,19 +165,19 @@ a:visited {
     position: absolute;
     left: 0px;
     top: 30px;
-    width: 110px;
-    height: 47px;
     background-color: #626262;
     color: white;
+	padding: 4px;
+}
+#char_choice {
+	margin-left: 14px;
 }
 .protect_button {
-    position: absolute;
-    top: 23px;
-    border: solid;
-    width: 40px;
-    border-width: 1px;
+    border: solid 1px white;
     text-align: center;
     cursor: pointer;
+	min-width: 40px;
+	display: inline-block;
 }
 .auto_prog_panel {
     position: absolute;
