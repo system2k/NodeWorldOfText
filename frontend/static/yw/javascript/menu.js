@@ -1,117 +1,154 @@
-var Menu = (function() {
-	function Menu(titleEl, menuEl) {
-		var self = this;
-		this.titleEl = titleEl;
-		this.menuEl = menuEl;
-		this._SPEED = 250;
-		this.entries = [];
-		this.addOption = function(text, action) {
-			var s;
-			s = document.createElement("div");
-			s.innerText = text;
-			s.onclick = function() {
-				action();
-				self.hideNow();
-			}
-			self.addEntry(s);
+function Menu(titleEl, menuEl) {
+	var _this = this;
+	this.titleEl = titleEl;
+	this.menuEl = menuEl;
+	this.pinEl = null;
+	this._SPEED = 250;
+	this.entries = [];
+	this.pinned = false;
+	this.lastEntryId = 1;
+	this.entriesById = {};
+	this.addOption = function(text, action) {
+		var s = document.createElement("div");
+		s.innerText = text;
+		s.onclick = function() {
+			action();
+			_this.hideNow();
 		}
-		this.addCheckboxOption = function(text, checkedAction, uncheckedAction, checked) {
-			var i, s;
-			s = document.createElement("div");
-			s.innerText = text;
-			i = document.createElement("input");
-			i.type = "checkbox";
-			i.checked = !!checked;
-			s.insertBefore(i, s.firstChild);
-			s.checked = !!checked;
-			s.onclick = function(e) {
-				if (e.target !== i) {
-					i.checked = !i.checked;
-				}
-				if (i.checked) {
-					checkedAction();
-				} else {
-					uncheckedAction();
-				}
-			}
-			self.addEntry(s);
-		}
-		this.hideNow = function() {
-			slideMenu("up", self.menuEl, self._SPEED);
-			self.titleEl.classList.remove("hover");
-		}
-		this.cancelHide = false;
-		this.hide = function() {
-			self.cancelHide = false;
-			setTimeout((function() {
-				if (!self.cancelHide) {
-					self.hideNow();
-				}
-			}), 500);
-		}
-		this.show = function() {
-			self.cancelHide = true;
-			slideMenu("down", self.menuEl, self._SPEED)
-			self.titleEl.classList.add("hover");
-		}
-		this.addEntry = function(liContents) {
-			var newItem;
-			var menuEl = self.menuEl.children;
-			for(var i = 0; i < menuEl.length; i++) {
-				var elm = menuEl[i];
-				if(elm.tagName == "UL") {
-					elm.appendChild(document.createElement("li"));
-				}
-			}
-			for(var i = 0; i < menuEl.length; i++) {
-				var elm = menuEl[i];
-				var children = elm.children;
-				for(var x = children.length - 1; x >= 0; x--) {
-					var ch = children[x];
-					if(ch.tagName == "LI") {
-						newItem = ch;
-						break;
-					}
-				}
-			}
-			if(typeof liContents == "string") {
-				var lcDiv = document.createElement("div");
-				lcDiv.innerHTML = liContents;
-				var ch = lcDiv.children;
-				var len = ch.length;
-				for(var r = 0; r < len; r++) {
-					var elm = ch[0];
-					newItem.appendChild(elm);
-				}
-			} else {
-				newItem.appendChild(liContents);
-			}
-			this.entries.push({
-				element: newItem,
-				content: liContents
-			});
-			newItem.onmouseenter = function() {
-				this.classList.add("hover");
-			}
-			newItem.onmouseleave = function() {
-				this.classList.remove("hover");
-			}
-		}
-		this.titleEl.style.display = "";
-
-		this.menuEl.style.top = (this.titleEl.getBoundingClientRect().top + document.body.scrollTop) + this.titleEl.offsetHeight + "px";
-
-		this.titleEl.onmouseenter = this.show;
-		this.titleEl.onmouseleave = this.hide;
-
-		this.menuEl.onmouseenter = this.show;
-		this.menuEl.onmouseleave = this.hide;
-		
-		this.titleEl.onclick = this.show;
-		this.menuEl.onclick = this.show;
+		return _this.addEntry(s);
 	}
-	return Menu;
-}());
+	this.addCheckboxOption = function(text, checkedAction, uncheckedAction, checked) {
+		var s = document.createElement("div");
+		if(text.charAt(0) == " ") {
+			text = text.substr(1);
+		}
+		s.innerText = " " + text;
+		var i = document.createElement("input");
+		i.type = "checkbox";
+		i.checked = !!checked;
+		s.insertBefore(i, s.firstChild);
+		s.checked = !!checked;
+		s.onclick = function(e) {
+			if(e.target !== i) {
+				i.checked = !i.checked;
+			}
+			if(i.checked) {
+				checkedAction();
+			} else {
+				uncheckedAction();
+			}
+		}
+		return _this.addEntry(s);
+	}
+	this.hideNow = function() {
+		if(_this.pinned) return;
+		slideMenu("up", _this.menuEl, _this._SPEED);
+		_this.titleEl.classList.remove("hover");
+	}
+	this.cancelHide = false;
+	this.hide = function() {
+		if(_this.pinned) return;
+		_this.cancelHide = false;
+		setTimeout((function() {
+			if (!_this.cancelHide) {
+				_this.hideNow();
+			}
+		}), 500);
+	}
+	this.show = function() {
+		_this.cancelHide = true;
+		slideMenu("down", _this.menuEl, _this._SPEED);
+		_this.titleEl.classList.add("hover");
+	}
+	this.addEntry = function(liContents) {
+		var mainUl = _this.menuEl.getElementsByTagName("ul");
+		var entryLi = null;
+		if(mainUl.length) {
+			entryLi = document.createElement("li");
+			mainUl[0].appendChild(entryLi);
+		}
+		if(!entryLi) {
+			throw "Cannot locate space for new entry";
+		}
+		if(typeof liContents == "string") {
+			var lcDiv = document.createElement("div");
+			lcDiv.innerHTML = liContents;
+			var ch = lcDiv.children;
+			var len = ch.length;
+			for(var r = 0; r < len; r++) {
+				var elm = ch[0];
+				entryLi.appendChild(elm);
+			}
+		} else {
+			entryLi.appendChild(liContents);
+		}
+		var entryData = {
+			element: entryLi,
+			content: liContents
+		};
+		_this.entries.push(entryData);
+		entryLi.onmouseenter = function() {
+			this.classList.add("hover");
+		}
+		entryLi.onmouseleave = function() {
+			this.classList.remove("hover");
+		}
+		var eid = _this.lastEntryId++;
+		_this.entriesById[eid] = entryData;
+		return eid;
+	}
+	this.hideEntry = function(id) {
+		var entry = _this.entriesById[id];
+		if(!entry) return;
+		var elm = entry.element;
+		elm.style.display = "none";
+	}
+	this.showEntry = function(id) {
+		var entry = _this.entriesById[id];
+		if(!entry) return;
+		var elm = entry.element;
+		elm.style.display = "";
+	}
+	this.pin = function() {
+		_this.pinned = true;
+		_this.show();
+		if(!_this.pinEl) {
+			var pin = _this.titleEl.getElementsByClassName("menuPin");
+			if(pin.length) {
+				_this.pinEl = pin[0];
+			}
+		}
+		if(_this.pinEl) {
+			_this.pinEl.style.display = "";
+		}
+	}
+	this.unpin = function(noHide) {
+		_this.pinned = false;
+		if(!noHide) {
+			_this.hide();
+		}
+		if(_this.pinEl) {
+			_this.pinEl.style.display = "none";
+		}
+	}
+	this.titleEl.style.display = "";
+
+	this.menuEl.style.top = (this.titleEl.getBoundingClientRect().top + document.body.scrollTop) + this.titleEl.offsetHeight + "px";
+
+	this.titleEl.onmouseenter = this.show;
+	this.titleEl.onmouseleave = this.hide;
+
+	this.menuEl.onmouseenter = this.show;
+	this.menuEl.onmouseleave = this.hide;
+
+	this.titleEl.onclick = function() {
+		if(_this.pinned) {
+			_this.unpin(true);
+		} else {
+			_this.pin();
+		}
+	}
+}
 
 function easeOutQuad(h, f, j, i) {
 	return -j * (h /= i) * (h - 2) + f;

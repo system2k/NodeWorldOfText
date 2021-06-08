@@ -615,14 +615,16 @@ var backgroundImageCtx = backgroundImageCanvasRenderer.getContext("2d");
 
 // performs the zoom calculations and changes all constants
 function doZoom(percentage) {
-	if(percentage < 20 || percentage > 1000) {
-		return;
-	}
+	if(percentage < 20) percentage = 20;
+	if(percentage > 1000) percentage = 1000;
 	percentage = decimal(percentage);
 	zoom = percentage;
 
 	updateScaleConsts();
 
+	if(tileWidth * tileHeight > 100000000) {
+		throw "Memory leak";
+	}
 	textRenderCanvas.width = tileWidth;
 	textRenderCanvas.height = tileHeight;
 	textRenderCtx.font = font;
@@ -641,7 +643,6 @@ function doZoom(percentage) {
 
 // called from the zoombar, adjusts client position to be in center
 function changeZoom(percentage) {
-	zoombar.value = percentage;
 	positionX /= zoom;
 	positionY /= zoom;
 	doZoom(percentage);
@@ -650,6 +651,18 @@ function changeZoom(percentage) {
 	positionX = Math.trunc(positionX); // remove decimals
 	positionY = Math.trunc(positionY);
 	w.render();
+	setZoombarValue();
+}
+
+function setZoombarValue() {
+	// zoombar is logarithmic
+	var val = zoom;
+	if(val <= 1) {
+		val = 2 ** (-1 / val);
+	} else {
+		val = 1 - (2 ** (-val));
+	}
+	zoombar.value = val * 100;
 }
 
 function browserZoomAdjust(retry) {
@@ -2700,13 +2713,13 @@ function getRange(x1, y1, x2, y2) {
 		y2 = tmp;
 	}
 
-	assert(intmax([x1, y1, x2, y2]), "Ranges too large");
+	assert(intmax([x1, y1, x2, y2]), "Invalid ranges");
 
 	var coords = [];
 	for(var y = y1; y <= y2; y++) {
 		for(var x = x1; x <= x2; x++) {
 			coords.push([x, y]);
-			if(coords.length >= 400000) throw "Array too large";
+			if(coords.length >= 400000) throw "Potential memory leak";
 		}
 	}
 	return coords;
@@ -4109,6 +4122,7 @@ function buildMenu() {
 	w.menu = menu;
 	var homeLink = document.createElement("a");
 	var homeLinkIcon = document.createElement("img");
+	var subgridEntry;
 	homeLink.href = "/home";
 	homeLink.target = "_blank";
 	homeLink.innerHTML = "More...&nbsp";
@@ -4146,32 +4160,35 @@ function buildMenu() {
 		});
 		menu.addOption("Default area protection", w.doUnprotect);
 	}
-	menu.addCheckboxOption(" Toggle grid", function() {
+	menu.addCheckboxOption("Toggle grid", function() {
 		gridEnabled = true;
 		w.render(true);
+		menu.showEntry(subgridEntry);
 	}, function() {
 		gridEnabled = false;
 		w.render(true);
+		menu.hideEntry(subgridEntry);
 	});
-	menu.addCheckboxOption(" Toggle subgrid", function() {
+	subgridEntry = menu.addCheckboxOption("Subgrid", function() {
 		subgridEnabled = true;
 		w.render(true);
 	}, function() {
 		subgridEnabled = false;
 		w.render(true);
 	});
-	menu.addCheckboxOption(" Links enabled", function() {
+	menu.hideEntry(subgridEntry);
+	menu.addCheckboxOption("Links enabled", function() {
 		linksEnabled = true;
 	}, function() {
 		linksEnabled = false;
 	}, true);
-	menu.addCheckboxOption(" Colors enabled", function() {
+	menu.addCheckboxOption("Colors enabled", function() {
 		w.enableColors();
 	}, function() {
 		w.disableColors();
 	}, true);
 	if("background" in images) {
-		menu.addCheckboxOption(" Background", function() {
+		menu.addCheckboxOption("Background", function() {
 			backgroundEnabled = true;
 			w.render(true);
 		}, function() {
@@ -4181,16 +4198,24 @@ function buildMenu() {
 	}
 	var zoomBar = document.createElement("input");
 	zoomBar.onchange = function() {
-		changeZoom(this.value);
+		var val = this.value;
+		val /= 100;
+		if(val < 0 || val > 1) val = 0.5;
+		if(val <= 0.5) {
+			val = -1 / Math.log2(val);
+		} else {
+			val = -Math.log2(1 - val);
+		}
+		changeZoom(val * 100);
 	}
 	zoomBar.ondblclick = function() {
 		changeZoom(100);
 	}
 	zoomBar.title = "Zoom";
 	zoomBar.type = "range";
-	zoomBar.value = 100;
-	zoomBar.min = 20;
-	zoomBar.max = 1000;
+	zoomBar.value = 50;
+	zoomBar.min = 1;
+	zoomBar.max = 100;
 	zoomBar.id = "zoombar";
 	menu.addEntry(zoomBar);
 }
@@ -4704,8 +4729,8 @@ Object.assign(w, {
 		w._ui.coordinateInputModal.open("Go to coordinates:", w.doGoToCoord.bind(w));
 	},
 	doGoToCoord: function(y, x) {
-		var maxX = Number.MAX_SAFE_INTEGER / tileW / coordSizeX;
-		var maxY = Number.MAX_SAFE_INTEGER / tileH / coordSizeY;
+		var maxX = Number.MAX_SAFE_INTEGER / 160 / 4;
+		var maxY = Number.MAX_SAFE_INTEGER / 144 / 4;
 		if(x > maxX || x < -maxX || y > maxY || y < -maxY) {
 			return;
 		}
@@ -5126,52 +5151,6 @@ function searchTellEdit(tileX, tileY, charX, charY) {
 		}
 	}
 	return false;
-}
-
-var tilesAnimated = {};
-
-function stopAnimation(posStr) {
-	clearInterval(tilesAnimated[posStr]);
-	delete tilesAnimated[posStr];
-}
-
-function isAnimated(posStr) {
-	return tilesAnimated[posStr] != null;
-}
-
-function animateTile(tile, posStr) {
-	var pos = getPos(posStr);
-	if (isAnimated(posStr))
-		stopAnimation(posStr);
-	setTimeout(function() { // delay it a bit, so the parent code is fully executed
-		var pos = getPos(posStr);
-		var tileY = pos[0];
-		var tileX = pos[1];
-		var animation = tile.properties.animation;
-		var changeInterval = animation.changeInterval;
-		var repeat = animation.repeat;
-		var frames = animation.frames;
-		var framenum = frames.length;
-		var animationInterval;
-		var atFrame = 0;
-		animationInterval = tilesAnimated[posStr] = setInterval(function doAnimation() {
-			if (!tiles[posStr]) // not visible
-				stopAnimation(posStr);
-			var frame = frames[atFrame];
-			var newTile = tile;
-			newTile.content = w.split(frame[0]);
-			newTile.properties.color = frame[1];
-			Tile.set(tileX, tileY, newTile)
-			w.setTileRedraw(tileX, tileY);
-			atFrame++;
-			if (atFrame >= framenum) {
-				if (repeat)
-					atFrame = 0;
-				else
-					stopAnimation(posStr);
-			}
-		}.bind(this), changeInterval);
-	}.bind(this), 200);
 }
 
 function tile_offset_object(data, tileOffX, tileOffY) {

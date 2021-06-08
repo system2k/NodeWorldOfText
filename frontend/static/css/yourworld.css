@@ -370,3 +370,6 @@ a:visited {
 #owot.nightmode {
 	background-image: url("/static/unloaded_night.png");
 }
+#zoombar {
+	width: 100%;
+}
