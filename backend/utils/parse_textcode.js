@@ -100,32 +100,16 @@ function parse(tcode) {
 				if(isNaN(protType)) return;
 				if(!(protType >= 0 && protType <= 2)) return;
 				protData.push([protType, tileX, tileY, charX, charY]);
-			} else if(hCode == "\r" || hCode == "\n" || hCode == "\x1b" || hCode == "r" || hCode == "n") {
-				index++;
-				doWriteChar = true;
-				if(hCode == "\n") { // paste newline character itself
-					chr = "\n";
-					noNewline = true;
-				} else if(hCode == "\r") { // paste carriage return character itself
-					chr = "\r";
-					noNewline = true;
-				} else if(hCode == "\x1b") { // paste ESC character itself
-					chr = "\x1b";
-				} else if(hCode == "r") { // newline
-					chr = "\r";
-				} else if(hCode == "n") { // newline
-					chr = "\n";
-				}
 			} else if(hCode == "*") { // skip character
 				index++;
 				chr = "";
 				doWriteChar = true;
-			} else { // colored paste
+			} else if(hCode == "x" || hCode == "X" || (hCode >= "A" && hCode <= "F")) { // colored paste
 				var cCol = "";
 				if(hCode == "x") {
 					cCol = "000000";
 					index += 2;
-				} else if(hCode == "X") {
+				} else if(hCode == "X") { // do not overwrite char color
 					cCol = "-1";
 					index += 2;
 				} else {
@@ -137,6 +121,20 @@ function parse(tcode) {
 					index += 2;
 				}
 				pasteColor = parseInt(cCol, 16);
+			} else {
+				index += 2;
+				doWriteChar = true;
+				if(hCode == "\n") { // paste newline character itself
+					chr = "\n";
+					noNewline = true;
+				} else if(hCode == "\r") { // paste carriage return character itself
+					chr = "\r";
+					noNewline = true;
+				} else if(hCode == "\x1b") { // paste ESC character itself
+					chr = "\x1b";
+				} else {
+					chr = hCode;
+				}
 			}
 		}
 		if(doWriteChar) {

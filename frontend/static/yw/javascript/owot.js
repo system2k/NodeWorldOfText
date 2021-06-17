@@ -5,6 +5,7 @@
 
 var owot, owotCtx, textInput;
 var linkElm, linkDiv;
+var jscolorInput;
 function init_dom() {
 	owot = document.getElementById("owot");
 	owot.hidden = false;
@@ -65,6 +66,12 @@ var verticalEnterPos       = [0, 0]; // position to go when pressing enter (tile
 var imgPatterns            = {};
 var tileCanvasPool         = [];
 var textColorOverride      = 0; // public-member-owner bitfield
+var transparentBackground  = true;
+var writeFlushRate         = 1000;
+var writeBuffer            = [];
+var highlightFlash         = {};
+var highlightCount         = 0;
+var coloredChars           = {}; // highlighted chars
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -106,10 +113,9 @@ var defaultCursor          = "text";
 var defaultDragCursor      = "move";
 var fetchClientMargin      = 200;
 var classicTileProcessing  = false; // directly process utf32 only
-var unloadedPatternPanning = false;
+var unloadedPatternPanning = true;
 var cursorRenderingEnabled = true;
 var unobstructCursor       = false;
-var transparentBackground  = true;
 
 var images_to_load = {
 	unloaded: "/static/unloaded.png"
@@ -130,12 +136,11 @@ var keyConfig = {
 	cursorDown: "DOWN+*",
 	cursorLeft: "LEFT+*",
 	cursorRight: "RIGHT+*",
-	copyRegion: "ALT+G"
+	copyRegion: ["ALT+G", "CTRL+A"]
 };
 
-var clientOnload = [];
 window.addEventListener("load", function() {
-	for(var i = 0; i < clientOnload.length; i++) clientOnload[i]();
+	w.emit("clientLoaded");
 });
 
 document.addEventListener("visibilitychange", function() {
@@ -163,28 +168,31 @@ defineElements({ // elm[<name>]
 	confirm_js: byId("confirm_js"),
 	confirm_js_code: byId("confirm_js_code"),
 	main_view: byId("main_view"),
-	random_color_link: byId("random_color_link"),
-	run_js_confirm_risk: byId("run_js_confirm_risk"),
 	usr_online: byId("usr_online"),
-	usr_online_container: byId("usr_online_container"),
-	chatfield_container: byId("chatfield_container"),
 	link_element: byId("link_element"),
-	link_div: byId("link_div")
+	link_div: byId("link_div"),
+	color_shortcuts: byId("color_shortcuts"),
+	random_color_link: byId("random_color_link")
 });
 
-var jscolorInput;
-clientOnload.push(function() {
+w.on("clientLoaded", function() {
 	jscolorInput = elm.color_input_form_input.jscolor;
-	jscolorInput.fromRGB(
-		(YourWorld.Color >> 16) & 255, 
-		(YourWorld.Color >> 8) & 255, 
-		 YourWorld.Color & 255);
+	var r = (YourWorld.Color >> 16) & 255;
+	var g = (YourWorld.Color >> 8) & 255;
+	var b = YourWorld.Color & 255;
+	setRGBColorPicker(r, g, b);
+	elm.random_color_link.onclick = setColorPickerRandom;
 });
 
-function random_color() {
-	jscolorInput.fromRGB(Math.floor(Math.random() * 256),
-		Math.floor(Math.random() * 256),
-		Math.floor(Math.random() * 256));
+function setRGBColorPicker(r, g, b) {
+	jscolorInput.fromRGB(r, g, b);
+}
+
+function setColorPickerRandom() {
+	var r = Math.floor(Math.random() * 256);
+	var g = Math.floor(Math.random() * 256);
+	var b = Math.floor(Math.random() * 256);
+	setRGBColorPicker(r, g, b);
 }
 
 function updateCoordDisplay() {
@@ -194,6 +202,43 @@ function updateCoordDisplay() {
 	var centerX = Math.floor(tileCoordX / coordSizeX);
 	elm.coord_Y.innerText = centerY;
 	elm.coord_X.innerText = centerX;
+}
+
+function createColorButton(color) {
+	var celm = document.createElement("span");
+	var colorInt = resolveColorValue(color);
+	var colorValues = int_to_rgb(colorInt);
+	celm.className = "color_btn";
+	celm.style.backgroundColor = int_to_hex(colorInt);
+	celm.onclick = function() {
+		setRGBColorPicker(colorValues[0], colorValues[1], colorValues[2]);
+		w._ui.colorInputModal.onSubmit();
+	}
+	return celm;
+}
+
+function addColorShortcuts() {
+	var colors = [
+		"#000000",
+		"#FFFFFF",
+		"#FF0000",
+		"#00AA00",
+		"#0000FF",
+		"#FFFF00",
+		"#00FFFF",
+		"#FF00FF"
+	];
+	for(var i = 0; i < colors.length; i++) {
+		var col = colors[i];
+		elm.color_shortcuts.appendChild(createColorButton(col));
+	}
+	var rand = document.createElement("span");
+	rand.className = "color_btn";
+	rand.style.backgroundColor = "#FFFFFF";
+	rand.style.float = "right";
+	rand.innerText = "?";
+	rand.onclick = setColorPickerRandom;
+	elm.color_shortcuts.appendChild(rand);
 }
 
 init_dom();
@@ -277,22 +322,19 @@ function resizeChat(width, height) {
 	if(height < 56) height = 56;
 	elm.chat_window.style.width = width + "px";
 	elm.chat_window.style.height = height + "px";
-	elm.chatfield_container.style.height = (height - 55) + "px";
-	elm.page_chatfield.style.height = (height - 55) + "px";
-	elm.global_chatfield.style.height = (height - 55) + "px";
-	elm.page_chatfield.style.width = (width - 8) + "px";
-	elm.global_chatfield.style.width = (width - 8) + "px";
 	return [width, height];
 }
 
 draggable_element(elm.chat_window, null, [
-	elm.chatbar, elm.chatsend, elm.chat_close, elm.chat_page_tab, elm.chat_global_tab, elm.chatfield_container
+	elm.chatbar, elm.chatsend, elm.chat_close, elm.chat_page_tab, elm.chat_global_tab, elm.page_chatfield, elm.global_chatfield
 ], function() {
 	if(chatResizing) {
 		return -1;
 	}
 });
-draggable_element(elm.confirm_js);
+draggable_element(elm.confirm_js, null, [
+	elm.confirm_js_code
+]);
 
 function resizable_chat() {
 	var state = 0;
@@ -340,55 +382,42 @@ function resizable_chat() {
 		if(!isDown) return;
 		var offX = e.pageX - downX;
 		var offY = e.pageY - downY;
-		switch(state) {
-			case 0x1: // top
-				var dimY = chatHeight - offY;
-				var res = resizeChat(chatWidth, dimY);
-				chat_window.style.top = (elmY + offY + (dimY - res[1])) + "px";
-				break;
-			case 0x2: // left
-				var dimX = chatWidth - offX;
-				var res = resizeChat(dimX, chatHeight);
-				chat_window.style.left = (elmX + offX + (dimX - res[0])) + "px";
-				break;
-			case 0x3: // top left
-				var dimX = chatWidth - offX;
-				var dimY = chatHeight - offY;
-				var res = resizeChat(dimX, dimY);
-				chat_window.style.left = (elmX + offX + (dimX - res[0])) + "px";
-				chat_window.style.top = (elmY + offY + (dimY - res[1])) + "px";
-				break;
-			case 0x4: // right
-				chat_window.style.left = chat_window.offsetLeft + "px";
-				chat_window.style.right = "";
-				resizeChat(chatWidth + offX, chatHeight);
-				break;
-			case 0x5: // top right
-				chat_window.style.left = chat_window.offsetLeft + "px";
-				chat_window.style.right = "";
-				var dimY = chatHeight - offY;
-				var res = resizeChat(chatWidth + offX, dimY);
-				chat_window.style.top = (elmY + offY + (dimY - res[1])) + "px";
-				break;
-			case 0x8: // bottom
-				chat_window.style.top = chat_window.offsetTop + "px";
-				chat_window.style.bottom = "";
-				resizeChat(chatWidth, chatHeight + offY);
-				break;
-			case 0xA: // bottom left
-				chat_window.style.top = chat_window.offsetTop + "px";
-				chat_window.style.bottom = "";
-				var dimX = chatWidth - offX;
-				var res = resizeChat(dimX, chatHeight + offY);
-				chat_window.style.left = (elmX + offX + (dimX - res[0])) + "px";
-				break;
-			case 0xC: // bottom right
-				chat_window.style.left = chat_window.offsetLeft + "px";
-				chat_window.style.right = "";
-				chat_window.style.top = chat_window.offsetTop + "px";
-				chat_window.style.bottom = "";
-				resizeChat(chatWidth + offX, chatHeight + offY);
-				break;
+		var resize_bottom = state >> 3 & 1;
+		var resize_right = state >> 2 & 1;
+		var resize_left = state >> 1 & 1;
+		var resize_top = state & 1;
+
+		var width_delta = 0;
+		var height_delta = 0;
+		var abs_top = chat_window.offsetTop;
+		var abs_left = chat_window.offsetLeft;
+		var snap_bottom = chat_window.style.bottom == "0px";
+		var snap_right = chat_window.style.right == "0px";
+
+		if(resize_top) {
+			height_delta = -offY;
+		} else if(resize_bottom) {
+			height_delta = offY;
+		}
+		if(resize_left) {
+			width_delta = -offX;
+		} else if(resize_right) {
+			width_delta = offX;
+		}
+		var res = resizeChat(chatWidth + width_delta, chatHeight + height_delta);
+		if(resize_top && !snap_bottom) {
+			chat_window.style.top = (elmY + (chatHeight - res[1])) + "px";
+		}
+		if(resize_bottom && snap_bottom) {
+			chat_window.style.bottom = "";
+			chat_window.style.top = abs_top + "px";
+		}
+		if(resize_right && snap_right) {
+			chat_window.style.right = "";
+			chat_window.style.left = abs_left + "px";
+		}
+		if(resize_left && !snap_right) {
+			chat_window.style.left = (elmX + (chatWidth - res[0])) + "px";
 		}
 	});
 }
@@ -655,14 +684,26 @@ function changeZoom(percentage) {
 }
 
 function setZoombarValue() {
-	// zoombar is logarithmic
-	var val = zoom;
+	// zoombar is logarithmic. work in reverse.
+	zoombar.value = fromLogZoom(zoom) * 100;
+}
+
+function fromLogZoom(val) {
 	if(val <= 1) {
 		val = 2 ** (-1 / val);
 	} else {
 		val = 1 - (2 ** (-val));
 	}
-	zoombar.value = val * 100;
+	return val;
+}
+
+function toLogZoom(val) {
+	if(val <= 0.5) {
+		val = -1 / Math.log2(val);
+	} else {
+		val = -Math.log2(1 - val);
+	}
+	return val;
 }
 
 function browserZoomAdjust(retry) {
@@ -828,18 +869,6 @@ function removeAllTilesFromPools() {
 	}
 }
 
-function removeAlpha(data) {
-	var res = [];
-	var len = data.length / 4;
-	for(var i = 0; i < len; i++) {
-		var indx = i * 4;
-		res.push(data[indx + 0]);
-		res.push(data[indx + 1]);
-		res.push(data[indx + 2]);
-	}
-	return res;
-}
-
 var tileProtectAuto = {
 	selected: {},
 	selectedTile: null,
@@ -852,7 +881,7 @@ var tileProtectAuto = {
 	ctrlDown: false,
 	shiftDown: false,
 	clearSelections: function() {
-		for(var i in tileProtectAuto.selected){
+		for(var i in tileProtectAuto.selected) {
 			tiles[i].backgroundColor = "";
 			delete tileProtectAuto.selected[i];
 		}
@@ -1361,9 +1390,17 @@ document.addEventListener("keydown", event_keydown_copy_color);
 
 // convert color value to rgb24 int
 function resolveColorValue(val) {
+	if(typeof val == "number") {
+		if(!isFinite(val)) return 0;
+		if(isNaN(val)) return 0;
+		val = Math.trunc(val);
+		if(val < 0) return 0;
+		if(val > 16777215) return 16777215;
+		return val;
+	}
 	if(typeof val != "string" || !val) return 0;
 	var orig = val;
-	if(val[0] == "#") val = substr(1);
+	if(val[0] == "#") val = val.substr(1);
 	if(isHexString(val)) {
 		if(val.length == 3) {
 			return parseInt(val[0] + val[0] + val[1] + val[1] + val[2] + val[2], 16);
@@ -1397,11 +1434,10 @@ var currentPositionInitted = false;
 var currentMousePosition = [0, 0, 0, 0]; // [x, y, pageX, pageY]; Position of mouse cursor.
 
 var Tile = {};
-var tileCount = 0;
 Tile.set = function(tileX, tileY, data) {
 	var str = tileY + "," + tileX;
 	if(!(str in tiles)) {
-		tileCount++;
+		w.tile.count++;
 	}
 	tiles[str] = data;
 	return data;
@@ -1412,12 +1448,34 @@ Tile.delete = function(tileX, tileY) {
 	w.periodDeletedTiles++;
 	if(str in tiles) {
 		delete tiles[str];
-		tileCount--;
+		w.tile.count--;
 	}
 }
 Tile.get = function(tileX, tileY) {
 	var tile = tiles[tileY + "," + tileX];
 	return tile;
+}
+// does this tile exist (or is reserved) in memory?
+Tile.exists = function(tileX, tileY) {
+	var str = tileY + "," + tileX;
+	return str in tiles;
+}
+// is this tile fully loaded?
+Tile.loaded = function(tileX, tileY) {
+	return !!Tile.get(tileX, tileY);
+}
+Tile.visible = function(tileX, tileY) {
+	var tilePosX = tileX * tileW + positionX + Math.trunc(owotWidth / 2);
+	var tilePosY = tileY * tileH + positionY + Math.trunc(owotHeight / 2);
+	// too far left/top. check if the right/bottom edge of tile is also too far left/top
+	if((tilePosX < 0 || tilePosY < 0) && (tilePosX + tileW - 1 < 0 || tilePosY + tileH - 1 < 0)) {
+		return false;
+	}
+	// too far right/bottom
+	if(tilePosX >= owotWidth || tilePosY >= owotHeight) {
+		return false;
+	}
+	return true;
 }
 
 var poolCleanupInterval = setInterval(function() {
@@ -1466,48 +1524,6 @@ function menu_color(color) {
 		document.head.appendChild(menuStyle);
 	}
 	menuStyle.innerHTML = "#menu.hover, #nav { background: " + color + "; }";
-}
-
-function ajaxRequest(settings) {
-	var req = new XMLHttpRequest();
-
-	var formData = "";
-	var ampAppend = false;
-	if(settings.data) {
-		for(var i in settings.data) {
-			if(ampAppend) formData += "&";
-			ampAppend = true;
-			formData += encodeURIComponent(i) + "=" + encodeURIComponent(settings.data[i]);
-		}
-	}
-	// append form data to url if this is a GET
-	if(settings.type == "GET" && formData) {
-		settings.url += "?" + formData;
-	}
-	var async = !!settings.async;
-	req.open(settings.type, settings.url, !async);
-	req.onload = function() {
-		if(req.status >= 200 && req.status < 400) {
-			if(settings.done) {
-				settings.done(req.responseText, req);
-			}
-		} else {
-			if(settings.error) {
-				settings.error(req);
-			}
-		}
-	}
-	req.onerror = function() {
-		if(settings.error) {
-			settings.error(req);
-		}
-	}
-	if(settings.type == "POST") {
-		if(formData) req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-		req.send(formData);
-	} else {
-		req.send();
-	}
 }
 
 function defaultStyles() {
@@ -1929,22 +1945,25 @@ function is_link(tileX, tileY, charX, charY) {
 	return [props[charY][charX].link];
 }
 
-var writeBuffer = [];
-
 function flushWrites() {
 	if(w.socket.socket.readyState != WebSocket.OPEN) return;
 	network.write(writeBuffer);
 	writeBuffer.splice(0); // clear buffer
 }
 
-var writeInterval = setInterval(function() {
-	if(!writeBuffer.length) return;
-	try {
-		flushWrites();
-	} catch(e) {
-		console.log(e);
-	}
-}, 1000);
+var writeInterval;
+function setWriteInterval() {
+	clearInterval(writeInterval);
+	writeInterval = setInterval(function() {
+		if(!writeBuffer.length) return;
+		try {
+			flushWrites();
+		} catch(e) {
+			console.log(e);
+		}
+	}, writeFlushRate);
+}
+setWriteInterval();
 
 function moveCursor(direction, preserveVertPos) {
 	if(!cursorCoords) return;
@@ -2093,68 +2112,6 @@ function writeChar(char, doNotMoveCursor, temp_color, noNewline) {
 	}
 }
 
-function spliceArray(array, A, B) {
-	if(!array) return;
-	if(Array.isArray(array)) {
-		// list of arrays
-		for(var i = 0; i < array.length; i++) {
-			if(!array[i]) continue;
-			array[i].splice(A, B);
-		}
-	} else {
-		array.splice(A, B);
-	}
-}
-
-function spaceTrim(str_array, left, right, gaps, secondary_array) {
-	// secondary_array is an optional argument where elements are trimmed in parallel with str_array
-	var marginLeft = 0;
-	var marginRight = 0;
-	var countL = left;
-	var countR = right;
-	var whitespaces = "\u0009\u000a\u000b\u000d\u0020\u0085\u00a0";
-	for(var i = 0; i < str_array.length; i++) {
-		var idxL = i;
-		var idxR = str_array.length - 1 - i;
-		if(whitespaces.indexOf(str_array[idxL]) > -1 && countL) {
-			marginLeft++;
-		} else {
-			countL = false;
-		}
-		if(whitespaces.indexOf(str_array[idxR]) > -1 && countR) {
-			marginRight++;
-		} else {
-			countR = false;
-		}
-		if(!countL && !countR) break;
-	}
-	if(marginLeft) {
-		str_array.splice(0, marginLeft);
-		spliceArray(secondary_array, 0, marginLeft);
-	}
-	if(marginRight) {
-		str_array.splice(str_array.length - marginRight);
-		spliceArray(secondary_array, secondary_array.length - marginRight);
-	}
-	if(gaps) {
-		var spaceFreq = 0;
-		for(var i = 0; i < str_array.length; i++) {
-			var chr = str_array[i];
-			if(whitespaces.indexOf(chr) > -1) {
-				spaceFreq++;
-			} else {
-				spaceFreq = 0;
-			}
-			if(spaceFreq > 1) {
-				str_array.splice(i, 1);
-				spliceArray(secondary_array, i, 1);
-				i--;
-			}
-		}
-	}
-	return str_array;
-}
-
 function coordinateAdd(tileX1, tileY1, charX1, charY1, tileX2, tileY2, charX2, charY2) {
 	return [
 		tileX1 + tileX2 + Math.floor((charX1 + charX2) / tileC),
@@ -2164,7 +2121,7 @@ function coordinateAdd(tileX1, tileY1, charX1, charY1, tileX2, tileY2, charX2, c
 	];
 }
 
-function propagatePosition(coords, char, noEnter) {
+function propagatePosition(coords, char, noEnter, noVertPos) {
 	// coords: {tileX, tileY, charX, charY}
 	// char: <string>
 	var newline = char == "\n" || char == "\r";
@@ -2182,8 +2139,13 @@ function propagatePosition(coords, char, noEnter) {
 				coords.tileY--;
 			}
 		}
-		coords.tileX = verticalEnterPos[0];
-		coords.charX = verticalEnterPos[1];
+		if(noVertPos) {
+			coords.tileX = 0;
+			coords.charX = 0;
+		} else {
+			coords.tileX = verticalEnterPos[0];
+			coords.charX = verticalEnterPos[1];
+		}
 	} else {
 		if(pasteDirRight) {
 			coords.charX++;
@@ -2259,13 +2221,15 @@ function textcode_parser(value, coords, defaultColor) {
 					buf = buf.split(",");
 					var coordTileX = parseFloat(buf[0].trim());
 					var coordTileY = parseFloat(buf[1].trim());
+					var charPos = coordinateAdd(pos.tileX, pos.tileY, pos.charX, pos.charY,
+						off.tileX, off.tileY, off.charX, off.charY);
 					return {
 						type: "link",
 						linkType: "coord",
-						tileX: cursorCoords[0],
-						tileY: cursorCoords[1],
-						charX: cursorCoords[2],
-						charY: cursorCoords[3],
+						tileX: charPos[0],
+						tileY: charPos[1],
+						charX: charPos[2],
+						charY: charPos[3],
 						coord_tileX: coordTileX,
 						coord_tileY: coordTileY
 					};
@@ -2300,13 +2264,15 @@ function textcode_parser(value, coords, defaultColor) {
 						if(++strPoint >= value.length) break;
 					}
 					index = strPoint;
+					var charPos = coordinateAdd(pos.tileX, pos.tileY, pos.charX, pos.charY,
+						off.tileX, off.tileY, off.charX, off.charY);
 					return {
 						type: "link",
 						linkType: "url",
-						tileX: cursorCoords[0],
-						tileY: cursorCoords[1],
-						charX: cursorCoords[2],
-						charY: cursorCoords[3],
+						tileX: charPos[0],
+						tileY: charPos[1],
+						charX: charPos[2],
+						charY: charPos[3],
 						url: buf
 					};
 				}
@@ -2326,32 +2292,17 @@ function textcode_parser(value, coords, defaultColor) {
 					charX: charPos[2],
 					charY: charPos[3]
 				};
-			} else if(hCode == "\r" || hCode == "\n" || hCode == "\x1b" || hCode == "r" || hCode == "n") {
-				index++;
-				doWriteChar = true;
-				if(hCode == "\n") { // paste newline character itself
-					chr = "\n";
-					newline = false;
-				} else if(hCode == "\r") { // paste carriage return character itself
-					chr = "\r";
-					newline = false;
-				} else if(hCode == "\x1b") { // paste ESC character itself
-					chr = "\x1b";
-				} else if(hCode == "r") { // newline
-					chr = "\r";
-				} else if(hCode == "n") { // newline
-					chr = "\n";
-				}
 			} else if(hCode == "*") { // skip character
 				index++;
 				chr = "";
 				doWriteChar = true;
-			} else { // colored paste
+			} else if(hCode == "x" || hCode == "X" || (hCode >= "A" && hCode <= "F")) { // colored paste
 				var cCol = "";
 				if(hCode == "x") {
 					cCol = "000000";
 					index += 2;
 				} else if(hCode == "X") {
+					// -1 does not overwrite color
 					cCol = "-1";
 					index += 2;
 				} else {
@@ -2366,19 +2317,33 @@ function textcode_parser(value, coords, defaultColor) {
 				return {
 					type: "yield"
 				};
+			} else {
+				index += 2;
+				doWriteChar = true;
+				if(hCode == "\n") { // paste newline character itself
+					chr = "\n";
+					newline = false;
+				} else if(hCode == "\r") { // paste carriage return character itself
+					chr = "\r";
+					newline = false;
+				} else if(hCode == "\x1b") { // paste ESC character itself
+					chr = "\x1b";
+				} else {
+					chr = hCode;
+				}
 			}
 		} else {
 			index++;
 		}
 		var charPos = coordinateAdd(pos.tileX, pos.tileY, pos.charX, pos.charY,
 			off.tileX, off.tileY, off.charX, off.charY);
-		propagatePosition(pos, chr, false);
+		propagatePosition(pos, chr, false, true);
 		return {
 			type: "char",
 			char: chr,
 			color: pasteColor,
 			writable: doWriteChar,
-			newline: newline, // allowed to make newlines
+			newline: newline, // if false, interpret newline characters as characters
 			tileX: charPos[0],
 			tileY: charPos[1],
 			charX: charPos[2],
@@ -2403,6 +2368,7 @@ var write_busy = false; // busy pasting
 var pasteInterval;
 var linkQueue = [];
 var char_input_check = setInterval(function() {
+	if(w._state.uiModal) return;
 	if(write_busy) return;
 	write_busy = true;
 	var value = elm.textInput.value;
@@ -2661,19 +2627,6 @@ function event_keyup(e) {
 }
 document.addEventListener("keyup", event_keyup);
 
-var colors = ["#660066", "#003366", "#ff9900", "#ff0066", "#003300", "#ff0000", "#3a3a3a", "#006666", "#3399ff", "#3333ff", "#000000"];
-function assignColor(username) {
-	username = username.toUpperCase();
-	var colLen = colors.length;
-	var usrLen = username.length;
-	var avg = 0;
-	for(var i = 0; i < usrLen; i++) {
-		var chr = username.charCodeAt(i);
-		avg += (chr * chr | (i * chr) % 628) * (i << chr) + (chr*(i + 19 + (chr % 56))*chr);
-	}
-	return colors[(Math.abs(avg | 0)) % colLen];
-}
-
 function getTileCoordsFromMouseCoords(x, y) {
 	var tileX = 0;
 	var tileY = 0;
@@ -2700,29 +2653,18 @@ function getTileScreenPosition(tileX, tileY) {
 	return [offsetX, offsetY];
 }
 
-function getRange(x1, y1, x2, y2) {
-	var tmp;
-	if(x1 > x2) {
-		tmp = x1;
-		x1 = x2;
-		x2 = tmp;
+function getVisibleTileRange(margin) {
+	if(!margin) margin = 0;
+	var A = getTileCoordsFromMouseCoords(0 - margin, 0 - margin);
+	var B = getTileCoordsFromMouseCoords(owotWidth - 1 + margin, owotHeight - 1 + margin);
+	var startX = clipIntMax(A[0]);
+	var startY = clipIntMax(A[1]);
+	var endX = clipIntMax(B[0]);
+	var endY = clipIntMax(B[1]);
+	if(startX > endX || startY > endY || (B[0] - A[0] + 1) > 100000 || (B[1] - A[1] + 1) > 100000) {
+		throw "Invalid ranges";
 	}
-	if(y1 > y2) {
-		tmp = y1;
-		y1 = y2;
-		y2 = tmp;
-	}
-
-	assert(intmax([x1, y1, x2, y2]), "Invalid ranges");
-
-	var coords = [];
-	for(var y = y1; y <= y2; y++) {
-		for(var x = x1; x <= x2; x++) {
-			coords.push([x, y]);
-			if(coords.length >= 400000) throw "Potential memory leak";
-		}
-	}
-	return coords;
+	return [[startX, startY], [endX, endY]];
 }
 
 function getVisibleTiles(margin) {
@@ -2774,12 +2716,10 @@ function alertJS(data) {
 	js_alert_active = true;
 	elm.confirm_js.style.display = "";
 	elm.confirm_js_code.innerText = data;
-	run_js_confirm_risk.href = data;
-	run_js_confirm_risk.onclick = function() {
+	run_js_confirm.onclick = function() {
 		confirmRunJsLink(data);
 		return false;
 	}
-	run_js_confirm.href = "javascript:confirmRunJsLink(null, true);"
 	confirm_js_cancel.onclick = closeJSAlert;
 	confirm_js_cancel_x.onclick = closeJSAlert;
 }
@@ -2788,22 +2728,14 @@ function closeJSAlert() {
 	if(!js_alert_active) return;
 	js_alert_active = false;
 	elm.confirm_js.style.display = "none";
-	run_js_confirm.href = "javascript:void 0;"
-	run_js_confirm.innerText = "run";
-	run_js_confirm_risk.style.display = "none";
 }
 
-function confirmRunJsLink(data, confirmWarning) {
-	if(confirmWarning) {
-		run_js_confirm_risk.style.display = "";
-		run_js_confirm.text = "run ▲";
-		return; 
-	}
+function confirmRunJsLink(data) {
 	var preview = data;
 	if(preview.length > 256) {
 		preview = preview.slice(0, 256) + " [...]";
 	}
-	var doRun = confirm("Are you sure you want to run this javascript link?\nPress cancel to NOT run it.\n\"" + preview + "\"");
+	var doRun = confirm("Confirm that you will be running this script.\nPress cancel to NOT run it.\n\"" + preview + "\"");
 	if(!doRun) return closeJSAlert();
 	var link = document.createElement("a");
 	link.href = "javascript:" + encodeURIComponent(data);
@@ -3093,7 +3025,6 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 }
 document.addEventListener("mousemove", event_mousemove);
 function event_touchmove(e) {
-	e.preventDefault();
 	var pos = touch_pagePos(e);
 	touchPosX = pos[0];
 	touchPosY = pos[1];
@@ -3112,6 +3043,7 @@ function event_wheel(e) {
 	if(!scrollingEnabled) return; // return if disabled
 	// if focused on chat, don't scroll world
 	if(closest(e.target, getChatfield())) return;
+	if(closest(e.target, elm.confirm_js)) return;
 	if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
 	var deltaX = Math.trunc(e.deltaX);
 	var deltaY = Math.trunc(e.deltaY);
@@ -3133,6 +3065,31 @@ function event_wheel(e) {
 }
 document.addEventListener("wheel", event_wheel);
 
+function convertKeyCode(key) {
+	switch(key) {
+		case "ESC": return "Escape";
+		case "TAB": return "Tab";
+		case "SPACE": return " ";
+		case "PAGEUP": return "PageUp";
+		case "PAGEDOWN": return "PageDown";
+		case "UP": return "ArrowUp";
+		case "DOWN": return "ArrowDown";
+		case "LEFT": return "ArrowLeft";
+		case "RIGHT": return "ArrowRight";
+		case "CAPS": return "CapsLock";
+		case "END": return "End";
+		case "HOME": return "Home";
+		case "INSERT": return "Insert";
+		case "DELETE": return "Delete";
+		case "PLUS": return "+";
+		case "MINUS": return "-";
+		case "ENTER": return "Enter";
+		case "BACKSPACE": return "Backspace";
+		case "COMMAND": return "Meta";
+	}
+	return key;
+}
+
 function checkKeyPress(e, combination) {
 	// if combination arg is an array of combinations
 	if(typeof combination == "object") {
@@ -3147,7 +3104,7 @@ function checkKeyPress(e, combination) {
 		ctrl: false,
 		shift: false,
 		alt: false,
-		anyCSA: false, // does not check for ctrl/shift/alt
+		any: false, // does not check for ctrl/shift/alt
 		key: ""
 	};
 	for(var i = 0; i < combination.length; i++) {
@@ -3156,31 +3113,11 @@ function checkKeyPress(e, combination) {
 			case "CTRL": map.ctrl = true; break;
 			case "SHIFT": map.shift = true; break;
 			case "ALT": map.alt = true; break;
-			case "*": map.anyCSA = true; break;
-
-			case "ESC": map.key = "Escape"; break;
-			case "TAB": map.key = "Tab"; break;
-			case "SPACE": map.key = " "; break;
-			case "PAGEUP": map.key = "PageUp"; break;
-			case "PAGEDOWN": map.key = "PageDown"; break;
-			case "UP": map.key = "ArrowUp"; break;
-			case "DOWN": map.key = "ArrowDown"; break;
-			case "LEFT": map.key = "ArrowLeft"; break;
-			case "RIGHT": map.key = "ArrowRight"; break;
-			case "CAPS": map.key = "CapsLock"; break;
-			case "END": map.key = "End"; break;
-			case "HOME": map.key = "Home"; break;
-			case "INSERT": map.key = "Insert"; break;
-			case "DELETE": map.key = "Delete"; break;
-			case "PLUS": map.key = "+"; break;
-			case "MINUS": map.key = "-"; break;
-			case "ENTER": map.key = "Enter"; break;
-			case "BACKSPACE": map.key = "Backspace"; break;
-			case "COMMAND": map.key = "Meta"; break;
-			default: map.key = key;
+			case "*": map.any = true; break;
+			default: map.key = convertKeyCode(key);
 		}
 	}
-	if(!map.anyCSA) {
+	if(!map.any) {
 		if(map.ctrl != e.ctrlKey) return false;
 		if(map.shift != e.shiftKey) return false;
 		if(map.alt != e.altKey) return false;
@@ -3198,7 +3135,8 @@ function checkKeyPress(e, combination) {
 	return true;
 }
 
-// check if any specific group of keys are down
+// complex checking of key patterns
+// e.g. Ctrl + A + B
 function checkKeyPatterns(combination) {
 	// if combination arg is an array of combinations
 	if(typeof combination == "object") {
@@ -3209,6 +3147,77 @@ function checkKeyPatterns(combination) {
 		return res;
 	}
 	combination = combination.split("+");
+	var keyMap = {};
+	for(var i = 0; i < combination.length; i++) {
+		var key = combination[i];
+		switch(key) {
+			case "CTRL": keyMap.Ctrl = 1; break;
+			case "SHIFT": keyMap.Shift = 1; break;
+			case "ALT": keyMap.Alt = 1; break;
+			default: keyMap[convertKeyCode(key)] = 1;
+		}
+	}
+	for(var k in keyMap) {
+		if(!keydownTable[k]) return false;
+	}
+	for(var k in keydownTable) {
+		if(!keyMap[k]) return false;
+	}
+	return true;
+}
+
+var fetchInterval;
+var timesConnected = 0;
+function createSocket() {
+	socket = new ReconnectingWebSocket(ws_path);
+	w.socket = socket;
+	timesConnected++;
+
+	socket.onmessage = function(msg) {
+		var data = JSON.parse(msg.data);
+		var kind = data.kind;
+		if(ws_functions[kind]) {
+			ws_functions[kind](data);
+		}
+	}
+
+	socket.onopen = function(msg) {
+		console.log("Connected socket");
+		for(var tile in tiles) {
+			if(tiles[tile] == null) {
+				delete tiles[tile];
+				w.tile.count--;
+			}
+		}
+		w.fetchUnloadedTiles();
+		clearInterval(fetchInterval);
+		fetchInterval = setInterval(function() {
+			w.fetchUnloadedTiles();
+		}, checkTileFetchInterval);
+		if(timesConnected == 1) {
+			if(Permissions.can_chat(state.userModel, state.worldModel)) {
+				network.chathistory();
+			}
+		}
+		timesConnected++;
+		if(w.receivingBroadcasts) {
+			w.broadcastReceive(true);
+		}
+	}
+
+	socket.onclose = function() {
+		console.log("Socket has closed. Reconnecting...");
+		for(var i in network.callbacks) {
+			var cb = network.callbacks[i];
+			if(typeof cb == "function") {
+				cb(null, true);
+			}
+		}
+	}
+
+	socket.onerror = function(err) {
+		console.log("Socket error:", err);
+	}
 }
 
 function cullRanges(map, width, height) {
@@ -3264,7 +3273,7 @@ function cullRanges(map, width, height) {
 		var endY = startY + hLen - 1;
 		for(var y = startY; y <= endY; y++) {
 			for(var x = startX; x <= endX; x++) {
-				map[y * width + x] = 1;
+				map[y * width + x] = true;
 			}
 		}
 		lastStartX = startX;
@@ -3302,78 +3311,25 @@ function cullRanges(map, width, height) {
 	return ranges;
 }
 
-var fetchInterval;
-var timesConnected = 0;
-function createSocket() {
-	socket = new ReconnectingWebSocket(ws_path);
-	w.socket = socket;
-	timesConnected++;
-
-	socket.onmessage = function(msg) {
-		var data = JSON.parse(msg.data);
-		var kind = data.kind;
-		if(ws_functions[kind]) {
-			ws_functions[kind](data);
-		}
-	}
-
-	socket.onopen = function(msg) {
-		console.log("Connected socket");
-		for(var tile in tiles) {
-			if(tiles[tile] == null) {
-				delete tiles[tile];
-				tileCount--;
-			}
-		}
-		getAndFetchTiles();
-		clearInterval(fetchInterval);
-		fetchInterval = setInterval(function() {
-			getAndFetchTiles();
-		}, checkTileFetchInterval)
-		if(timesConnected == 1) {
-			if(Permissions.can_chat(state.userModel, state.worldModel)) {
-				network.chathistory();
-			}
-			timesConnected++;
-		}
-		if(w.receivingBroadcasts) {
-			w.broadcastReceive(true);
-		}
-	}
-
-	socket.onclose = function() {
-		console.log("Socket has closed. Reconnecting...");
-	}
-
-	socket.onerror = function(err) {
-		console.log("Socket error:", err);
-	}
-}
-
 // fetches only unloaded tiles
 function getAndFetchTiles() {
-	var data = getVisibleTiles(fetchClientMargin);
-	if(!data.length) return;
-	
-	var startX = data[0][0];
-	var startY = data[0][1];
+	var viewWidth = getWidth(fetchClientMargin);
+	var viewHeight = getHeight(fetchClientMargin);
+	var viewArea = viewWidth * viewHeight;
+	if(!viewArea) return;
 
-	// fill the map
+	var visibleRange = getVisibleTileRange(fetchClientMargin);
+	var startX = visibleRange[0][0];
+	var startY = visibleRange[0][1];
+	var endX = visibleRange[1][0];
+	var endY = visibleRange[1][1];
 	var map = [];
-	for(var i = 0; i < data.length; i++) {
-		var cell = data[i];
-		var tileY = cell[1];
-		var tileX = cell[0];
-		var coord = tileY + "," + tileX;
-		if(coord in tiles) {
-			map.push(1);
-		} else {
-			map.push(0);
+	for(var y = startY; y <= endY; y++) {
+		for(var x = startX; x <= endX; x++) {
+			map.push(Tile.exists(x, y));
 		}
 	}
-	var width = getWidth(fetchClientMargin);
-	var height = Math.floor(map.length / width);
-	var ranges = cullRanges(map, width, height);
+	var ranges = cullRanges(map, viewWidth, viewHeight);
 
 	var toFetch = [];
 	for(var i = 0; i < ranges.length; i++) {
@@ -3420,13 +3376,18 @@ function clearTiles(all) {
 	}
 }
 
-function getPos(ref) {
-	ref = ref.split(",");
-	return [parseInt(ref[0]), parseInt(ref[1])];
+function clearVisibleTiles() {
+	var visibleRange = getVisibleTileRange(fetchClientMargin);
+	var startX = visibleRange[0][0];
+	var startY = visibleRange[0][1];
+	var endX = visibleRange[1][0];
+	var endY = visibleRange[1][1];
+	for(var y = startY; y <= endY; y++) {
+		for(var x = startX; x <= endX; x++) {
+			Tile.delete(x, y);
+		}
+	}
 }
-
-var highlightFlash = {};
-var highlightCount = 0;
 
 function highlight(positions) {
 	for(var i = 0; i < positions.length; i++) {
@@ -3459,6 +3420,12 @@ var flashAnimateInterval = setInterval(function() {
 				// after 500 milliseconds
 				if(getDate() - time >= 500) {
 					delete highlightFlash[tile][charY][charX];
+					if(!Object.keys(highlightFlash[tile][charY]).length) {
+						delete highlightFlash[tile][charY];
+					}
+					if(!Object.keys(highlightFlash[tile]).length) {
+						delete highlightFlash[tile];
+					}
 					highlightCount--;
 				} else {
 					// increase color brightness
@@ -3492,8 +3459,8 @@ function blankTile() {
 	return newTile;
 }
 
-// format:
 /*
+	coloredChars format:
 	{
 		"tileY,tileX": {
 			charY: {
@@ -3505,7 +3472,6 @@ function blankTile() {
 		etc...
 	}
 */
-var coloredChars = {};
 
 function colorChar(tileX, tileY, charX, charY, color, is_link_hovers) {
 	var pos = tileY + "," + tileX + "," + charY + "," + charX;
@@ -3622,23 +3588,8 @@ function generateBackgroundPixels(tileX, tileY, image, returnCanvas, isBackgroun
 	return imgData;
 }
 
-function isTileVisible(tileX, tileY) {
-	var tilePosX = tileX * tileW + positionX + Math.trunc(owotWidth / 2);
-	var tilePosY = tileY * tileH + positionY + Math.trunc(owotHeight / 2);
-	// too far left/top. check if the right/bottom edge of tile is also too far left/top
-	if((tilePosX < 0 || tilePosY < 0) && (tilePosX + tileW - 1 < 0 || tilePosY + tileH - 1 < 0)) {
-		return false;
-	}
-	// too far right/bottom
-	if(tilePosX >= owotWidth || tilePosY >= owotHeight) {
-		return false;
-	}
-	return true
-}
-
-function isTileLoaded(tileX, tileY) {
-	return !!Tile.get(tileX, tileY);
-}
+var isTileLoaded = Tile.loaded;
+var isTileVisible = Tile.visible;
 
 var brOrder = [1, 8, 2, 16, 4, 32, 64, 128];
 var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -3739,14 +3690,10 @@ function renderChar(textRender, x, y, str, content, colors, writability, props) 
 	var fontY = y * cellH;
 
 	// fill background if defined
-	if(coloredChars[str]) {
-		if(coloredChars[str][y]) {
-			if(coloredChars[str][y][x]) {
-				var color = coloredChars[str][y][x];
-				textRender.fillStyle = color;
-				textRender.fillRect(fontX, fontY, cellW, cellH);
-			}
-		}
+	if(coloredChars[str] && coloredChars[str][y] && coloredChars[str][y][x]) {
+		var color = coloredChars[str][y][x];
+		textRender.fillStyle = color;
+		textRender.fillRect(fontX, fontY, cellW, cellH);
 	}
 
 	var char = content[y * tileC + x];
@@ -3758,7 +3705,6 @@ function renderChar(textRender, x, y, str, content, colors, writability, props) 
 		if(writability == 1 && textColorOverride & 2) linkColor = styles.member_text;
 		if(writability == 2 && textColorOverride & 1) linkColor = styles.owner_text;
 	}
-	
 
 	var isLink = false;
 
@@ -3915,21 +3861,17 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 }
 
 function renderTile(tileX, tileY, redraw) {
-	if(!isTileLoaded(tileX, tileY)) return;
+	if(!Tile.loaded(tileX, tileY)) return;
 	var str = tileY + "," + tileX;
 	var tileScreenPos = getTileScreenPosition(tileX, tileY);
 	var offsetX = Math.floor(tileScreenPos[0]);
 	var offsetY = Math.floor(tileScreenPos[1]);
 
-	var tile = tiles[str];
+	var tile = Tile.get(tileX, tileY);
 	if(redraw) {
 		tile.redraw = true;
 	}
-	if(!isTileVisible(tileX, tileY)) return;
-
-	if(tile == null) {
-		tile = Tile.set(tileX, tileY, blankTile());
-	}
+	if(!Tile.visible(tileX, tileY)) return;
 
 	var writability = tile.properties.writability;
 	var cursorVisibility = cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY;
@@ -3940,16 +3882,25 @@ function renderTile(tileX, tileY, redraw) {
 		gridColor = "#" + ("00000" + (16777215 - parseInt(owotCtx.fillStyle.substr(1), 16)).toString(16)).padStart(6, 0);
 	} else {
 		var backgroundUpdated = false;
-		if(highlightFlash[tileY + "," + tileX]) {
+		var hasHighlightFlash = highlightFlash[tileY + "," + tileX];
+		if(hasHighlightFlash) {
+			tile.tp_highlight = true;
 			backgroundUpdated = true;
+		} else {
+			if(tile.tp_highlight) {
+				delete tile.tp_highlight;
+				backgroundUpdated = true;
+			}
 		}
-		var tcp = tile.tempCursorPos;
-		if(!tcp && cursorVisibility) {
+		if(cursorVisibility) {
 			backgroundUpdated = true;
-		} else if(cursorCoords && tcp && (tcp[0] != cursorCoords[0] || tcp[1] != cursorCoords[1] || tcp[2] != cursorCoords[2] || tcp[3] != cursorCoords[3])) {
-			backgroundUpdated = true;
+			tile.tp_cursor = true;
+		} else {
+			if(tile.tp_cursor) {
+				delete tile.tp_cursor;
+				backgroundUpdated = true;
+			}
 		}
-		tile.tempCursorPos = cursorCoords;
 		if(backgroundUpdated) {
 			tile.redraw = true;
 		}
@@ -4061,10 +4012,13 @@ function renderTiles(redraw) {
 	owotCtx.clearRect(0, 0, owotWidth, owotHeight);
 	if(redraw) w.setRedraw();
 	// render all visible tiles
-	var pointA = getTileCoordsFromMouseCoords(0, 0);
-	var pointB = getTileCoordsFromMouseCoords(owotWidth - 1, owotHeight - 1);
-	for(var y = pointA[1]; y <= pointB[1]; y++) {
-		for(var x = pointA[0]; x <= pointB[0]; x++) {
+	var visibleRange = getVisibleTileRange();
+	var startX = visibleRange[0][0];
+	var startY = visibleRange[0][1];
+	var endX = visibleRange[1][0];
+	var endY = visibleRange[1][1];
+	for(var y = startY; y <= endY; y++) {
+		for(var x = startX; x <= endX; x++) {
 			renderTile(x, y, redraw);
 		}
 	}
@@ -4072,10 +4026,13 @@ function renderTiles(redraw) {
 }
 
 function renderTilesSelective() {
-	var pointA = getTileCoordsFromMouseCoords(0, 0);
-	var pointB = getTileCoordsFromMouseCoords(owotWidth - 1, owotHeight - 1);
-	for(var y = pointA[1]; y <= pointB[1]; y++) {
-		for(var x = pointA[0]; x <= pointB[0]; x++) {
+	var visibleRange = getVisibleTileRange();
+	var startX = visibleRange[0][0];
+	var startY = visibleRange[0][1];
+	var endX = visibleRange[1][0];
+	var endY = visibleRange[1][1];
+	for(var y = startY; y <= endY; y++) {
+		for(var x = startX; x <= endX; x++) {
 			var tile = Tile.get(x, y);
 			if(!tile) continue;
 			if(tile.rerender) {
@@ -4129,7 +4086,7 @@ function buildMenu() {
 	homeLinkIcon.src = "/static/external_link.png";
 	homeLink.appendChild(homeLinkIcon);
 	menu.addEntry(homeLink);
-	menu.addCheckboxOption(" Show coordinates", function() {
+	menu.addCheckboxOption("Show coordinates", function() {
 		return elm.coords.style.display = "";
 	}, function() {
 		return elm.coords.style.display = "none";
@@ -4201,11 +4158,7 @@ function buildMenu() {
 		var val = this.value;
 		val /= 100;
 		if(val < 0 || val > 1) val = 0.5;
-		if(val <= 0.5) {
-			val = -1 / Math.log2(val);
-		} else {
-			val = -Math.log2(1 - val);
-		}
+		val = toLogZoom(val);
 		changeZoom(val * 100);
 	}
 	zoomBar.ondblclick = function() {
@@ -4217,39 +4170,8 @@ function buildMenu() {
 	zoomBar.min = 1;
 	zoomBar.max = 100;
 	zoomBar.id = "zoombar";
-	menu.addEntry(zoomBar);
-}
-
-function orderRangeABCoords(coordA, coordB) {
-	var tmp;
-	if(coordA[0] > coordB[0]) {
-		// swap X coords
-		tmp = coordA[0];
-		coordA[0] = coordB[0];
-		coordB[0] = tmp;
-		tmp = coordA[2];
-		coordA[2] = coordB[2];
-		coordB[2] = tmp;
-	} else if(coordA[0] == coordB[0] && coordA[2] > coordB[2]) {
-		// swap X char coords
-		tmp = coordA[2];
-		coordA[2] = coordB[2];
-		coordB[2] = tmp;
-	}
-	if(coordA[1] > coordB[1]) {
-		// swap Y coords
-		tmp = coordA[1];
-		coordA[1] = coordB[1];
-		coordB[1] = tmp;
-		tmp = coordA[3];
-		coordA[3] = coordB[3];
-		coordB[3] = tmp;
-	} else if(coordA[1] == coordB[1] && coordA[3] > coordB[3]) {
-		// swap Y char coords
-		tmp = coordA[3];
-		coordA[3] = coordB[3];
-		coordB[3] = tmp;
-	}
+	var zoombarId = menu.addEntry(zoomBar);
+	menu.zoombarId = zoombarId;
 }
 
 var regionSelections = [];
@@ -4538,8 +4460,9 @@ var networkHTTP = {
 
 var network = {
 	latestID: 0,
+	callbacks: {},
 	http: networkHTTP,
-	protect: function(position, type, callback) {
+	protect: function(position, type) {
 		// position: {tileX, tileY, [charX, charY]}
 		// type: <unprotect, public, member-only, owner-only>
 		var isPrecise = "charX" in position && "charY" in position;
@@ -4559,13 +4482,14 @@ var network = {
 			}
 			data.precise = true;
 		}
-		w.socket.send(JSON.stringify({
+		var protReq = {
 			kind: "protect",
 			data: data,
 			action: type == "unprotect" ? type : "protect"
-		}));
+		};
+		w.socket.send(JSON.stringify(protReq));
 	},
-	link: function(position, type, args, callback) {
+	link: function(position, type, args) {
 		// position: {tileX, tileY, charX, charY}
 		// type: <url, coord>
 		// args: {url} or {x, y}
@@ -4614,7 +4538,9 @@ var network = {
 			preserve_links: opts.preserve_links
 		};
 		if(callback) {
-			writeReq.request = network.latestID++;
+			var id = network.latestID;
+			writeReq.request = id;
+			network.callbacks[id] = callback;
 		}
 		w.socket.send(JSON.stringify(writeReq));
 	},
@@ -4623,7 +4549,8 @@ var network = {
 			kind: "chathistory"
 		}));
 	},
-	fetch: function(fetches, opts) {
+	fetch: function(fetches, opts, callback) {
+		// fetches: [{minX: <x1>, minY: <y1>, maxX: <x2>, maxY: <y2>}...]
 		if(!opts) opts = {};
 		if(typeof fetches == "object" && !Array.isArray(fetches)) fetches = [fetches];
 		var fetchReq = {
@@ -4634,6 +4561,11 @@ var network = {
 			content_only: opts.content_only,
 			concat: opts.concat
 		};
+		if(callback) {
+			var id = network.latestID;
+			fetchReq.request = id;
+			network.callbacks[id] = callback;
+		}
 		w.socket.send(JSON.stringify(fetchReq));
 	},
 	chat: function(message, location, nickname, color) {
@@ -4703,6 +4635,16 @@ Object.assign(w, {
 		rmod: 0,
 		alpha: 1
 	},
+	tile: {
+		count: 0,
+		set: Tile.set,
+		delete: Tile.delete,
+		get: Tile.get,
+		cache: tiles,
+		exists: Tile.exists,
+		loaded: Tile.loaded,
+		visible: Tile.visible
+	},
 	doAnnounce: function(text) {
 		if(text) {
 			w._ui.announce_text.innerHTML = text;
@@ -4737,9 +4679,6 @@ Object.assign(w, {
 		positionX = Math.floor(-x * tileW * coordSizeX);
 		positionY = Math.floor(y * tileH * coordSizeY);
 		w.render();
-	},
-	getCenterCoords: function() {
-		return [-positionY / tileH, -positionX / tileW];
 	},
 	doUrlLink: function(url) {
 		linkAuto.active = true;
@@ -4808,7 +4747,7 @@ Object.assign(w, {
 	getChar: getChar,
 	socketChannel: null,
 	moveCursor: moveCursor,
-	fetchUpdates: getAndFetchTiles,
+	fetchUnloadedTiles: getAndFetchTiles,
 	acceptOwnEdits: false,
 	receivingBroadcasts: false,
 	getTileVisibility: function() {
@@ -4830,6 +4769,9 @@ Object.assign(w, {
 			centerY: centerY,
 			centerX: centerX
 		};
+	},
+	getCenterCoords: function() { // [y, x]
+		return [-positionY / tileH, -positionX / tileW];
 	},
 	chat: {
 		send: api_chat_send
@@ -5048,16 +4990,17 @@ Object.assign(w, {
 		clearInterval(fetchInterval);
 	},
 	changeColor: function(color) {
-		if(!color) color = 0;
+		color = resolveColorValue(color);
 		YourWorld.Color = color;
 		localStorage.setItem("color", color);
 		// update color textbox in "change color" menu
-		elm.color_input_form_input.value = ("00000" + color.toString(16)).slice(-6);
+		var rgb = int_to_rgb(color);
+		setRGBColorPicker(rgb[0], rgb[1], rgb[2]);
 	},
 	fetchUpdates: function(margin) {
 		if(!margin) margin = 0;
-		var top_left = getTileCoordsFromMouseCoords(0 - margin, 0 - margin, true);
-		var bottom_right = getTileCoordsFromMouseCoords(owotWidth - 1 + margin, owotHeight - 1 + margin, true);
+		var top_left = getTileCoordsFromMouseCoords(0 - margin, 0 - margin);
+		var bottom_right = getTileCoordsFromMouseCoords(owotWidth - 1 + margin, owotHeight - 1 + margin);
 		network.fetch({
 			minX: top_left[0],
 			minY: top_left[1],
@@ -5071,6 +5014,14 @@ Object.assign(w, {
 		} else {
 			return w.split(str, false, false, true);
 		}
+	},
+	shiftZoombar: function() {
+		w.menu.moveEntryLast(w.menu.zoombarId);
+	},
+	setFlushInterval: function(rate) {
+		if(typeof rate != "number" || rate < 0 || isNaN(rate) || !isFinite(rate) || rate > 1000000) rate = 1000;
+		writeFlushRate = rate;
+		setWriteInterval();
 	}
 });
 
@@ -5082,8 +5033,6 @@ if (state.announce) {
 w._ui.announce_close.onclick = function() {
 	w._ui.announce.style.display = "none";
 }
-
-elm.random_color_link.onclick = random_color;
 
 elm.owot.oncontextmenu = function() {
 	if(ignoreCanvasContext) {
@@ -5169,6 +5118,13 @@ function tile_offset_object(data, tileOffX, tileOffY) {
 
 var ws_functions = {
 	fetch: function(data) {
+		if("request" in data) {
+			var id = data.request;
+			var cb = network.callbacks[id];
+			if(typeof cb == "function") {
+				cb(data.tiles, null);
+			}
+		}
 		if(tileFetchOffsetX || tileFetchOffsetY) {
 			tile_offset_object(data.tiles, tileFetchOffsetX, tileFetchOffsetY);
 		}
@@ -5190,7 +5146,7 @@ var ws_functions = {
 		w.emit("afterFetch", data);
 		// too many tiles, remove tiles outside of the viewport
 		var tileLim = Math.floor(getArea(fetchClientMargin) * 1.5 / zoom + 1000);
-		if(tileCount > tileLim && unloadTilesAuto) {
+		if(w.tile.count > tileLim && unloadTilesAuto) {
 			clearTiles();
 		}
 	},
@@ -5283,12 +5239,19 @@ var ws_functions = {
 		}
 		if(highlights.length > 0 && useHighlight) highlight(highlights);
 		var tileLim = Math.floor(getArea(fetchClientMargin) * 1.5 / zoom + 1000);
-		if(tileCount > tileLim && unloadTilesAuto) {
+		if(w.tile.count > tileLim && unloadTilesAuto) {
 			clearTiles();
 		}
 		w.emit("afterTileUpdate", data);
 	},
 	write: function(data) {
+		if("request" in data) {
+			var id = data.request;
+			var cb = network.callbacks[id];
+			if(typeof cb == "function") {
+				cb(data, null);
+			}
+		}
 		w.emit("writeResponse", data);
 		// after user has written text, the client should expect list of all edit ids that passed
 		for(var i = 0; i < data.accepted.length; i++) {

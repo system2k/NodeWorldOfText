@@ -1459,8 +1459,8 @@ var options = {};
 
 function manage_https() {
 	var private_key = settings.ssl.private_key;
-	var cert		= settings.ssl.cert;
-	var chain	   = settings.ssl.chain;
+	var cert = settings.ssl.cert;
+	var chain = settings.ssl.chain;
 
 	if(settings.ssl_enabled) {
 		// check if paths exist
@@ -1813,10 +1813,6 @@ async function process_request(req, res) {
 	if(sub.length == 1 && valid_subdomains.indexOf(sub[0]) > -1) {
 		URL = "other/" + sub[0] + "/" + URL;
 	}
-
-	var fullPath = URLparse.path;
-	if(fullPath.charAt(0) == "/") { fullPath = fullPath.substr(1); }
-	try { fullPath = decodeURIComponent(fullPath); } catch (e) {};
 
 	var request_resolved = false;
 
@@ -2554,6 +2550,13 @@ var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	write:			[256, 1000, 0], // rate-limiting handled separately
 	paste:			[10, 500, 0]
 };
+
+/*
+	Rate limits:
+	20000 chars per second
+	800 tile changes per second
+	
+*/
 
 function can_process_req_kind(lims, kind) {
 	if(!ws_limits[kind]) return true;

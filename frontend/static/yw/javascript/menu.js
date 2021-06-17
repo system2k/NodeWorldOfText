@@ -60,13 +60,17 @@ function Menu(titleEl, menuEl) {
 		slideMenu("down", _this.menuEl, _this._SPEED);
 		_this.titleEl.classList.add("hover");
 	}
-	this.addEntry = function(liContents) {
+	this.getEntryContainer = function() {
 		var mainUl = _this.menuEl.getElementsByTagName("ul");
 		var entryLi = null;
 		if(mainUl.length) {
 			entryLi = document.createElement("li");
 			mainUl[0].appendChild(entryLi);
 		}
+		return entryLi;
+	}
+	this.addEntry = function(liContents) {
+		var entryLi = _this.getEntryContainer();
 		if(!entryLi) {
 			throw "Cannot locate space for new entry";
 		}
@@ -108,6 +112,17 @@ function Menu(titleEl, menuEl) {
 		if(!entry) return;
 		var elm = entry.element;
 		elm.style.display = "";
+	}
+	this.moveEntryLast = function(id) {
+		var entry = _this.entriesById[id];
+		if(!entry) return;
+		var elm = entry.element;
+		var entryLi = _this.getEntryContainer();
+		if(!entryLi) {
+			throw "Entry container not found";
+		}
+		elm.remove();
+		entryLi.appendChild(elm);
 	}
 	this.pin = function() {
 		_this.pinned = true;

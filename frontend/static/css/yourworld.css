@@ -10,9 +10,6 @@ html, body {
     touch-action: pan-down;
 }
 .screen_canvas {
-    position: absolute;
-    left: 0px;
-    top: 0px;
     overflow: hidden;
 }
 body {
@@ -209,24 +206,33 @@ a:visited {
 #chat_open:active {
     background-color: #0e2961;
 }
+#usr_online {
+	padding-left: 16px;
+	display: inline-block;
+}
+#chatsend {
+	padding: 1px 6px 1px 6px;
+}
 .chat_tab_button {
     border: solid 1px black;
-    height: 16px;
     text-align: center;
     font-family: Verdana;
     font-size: 13px;
     cursor: default;
+	display: inline-block;
+	margin-top: 1px;
+	padding-left: 16px;
+	padding-right: 16px;
 }
 .chatfield {
-    position: absolute;
-    top: 27px;
-    left: 3px;
-    border-style: solid;
-    border-width: 1px;
+    border: solid 1px black;
     background-color: white;
     overflow: scroll;
     overflow-x: hidden;
     overflow-wrap: break-word;
+	margin: 3px;
+	margin-bottom: 0px;
+	height: 100%;
 }
 .unread {
     color: red;
@@ -238,8 +244,9 @@ a:visited {
 #chat_window {
     position: absolute;
     background-color: #e0e0e0;
-    border-style: solid;
-    border-width: 1px;
+    border: solid 1px black;
+	display: flex;
+	flex-flow: column;
 }
 #chat_close {
     background-color: red;
@@ -251,6 +258,8 @@ a:visited {
     font-family: monospace;
     font-size: 16px;
     cursor: default;
+	float: right;
+	margin-top: -1px;
 }
 #confirm_js {
     width: 441px;
@@ -325,13 +334,6 @@ a:visited {
     top: 220px;
     left: 20px;
 }
-#run_js_confirm_risk {
-    position: absolute;
-    color: blue;
-    text-decoration: underline;
-    top: 205px;
-    left: 50px;
-}
 .region_selection {
     position: absolute;
     border: 1px solid black;
@@ -372,4 +374,26 @@ a:visited {
 }
 #zoombar {
 	width: 100%;
+}
+.color_btn {
+	background-color: black;
+	width: 16px;
+	height: 16px;
+	border-radius: 4px;
+	border: solid 1px black;
+	display: inline-block;
+	font-weight: bold;
+	font-family: verdana;
+	text-align: center;
+	cursor: default;
+	font-size: 0.8em;
+	overflow: hidden;
+	margin: 3px;
+	user-select: none;
+}
+.color_btn:hover {
+	border-color: orange;
+}
+.color_btn:active {
+	border-color: rgb(165, 107, 0);
 }

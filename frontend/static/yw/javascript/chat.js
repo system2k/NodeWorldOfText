@@ -151,13 +151,13 @@ var client_commands = {
 		clientChatResponse("Changed grid size to " + width + "x" + height);
 	},
 	color: function(args) {
-		var color = args[0];
+		var color = args.join(" ");
 		color = resolveColorValue(color);
 		YourWorld.Color = color;
 		clientChatResponse("Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase());
 	},
 	chatcolor: function(args) {
-		var color = args[0];
+		var color = args.join(" ");
 		if(!color) {
 			localStorage.removeItem("chatcolor");
 			defaultChatColor = null;
@@ -338,6 +338,14 @@ elm.chat_open.addEventListener("click", function() {
 			elm.global_chatfield.scrollTop = elm.global_chatfield.scrollHeight;
 		}
 	}
+	var chatWidth = chat_window.offsetWidth - 2;
+	var chatHeight = chat_window.offsetHeight - 2;
+	var screenRatio = window.devicePixelRatio;
+	if(!screenRatio) screenRatio = 1;
+	var virtWidth = owotWidth / screenRatio;
+	if(chatWidth > virtWidth) {
+		resizeChat(virtWidth - 2, chatHeight);
+	}
 });
 
 elm.chat_page_tab.addEventListener("click", function() {
@@ -407,10 +415,12 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 		message = message.join("");
 	}
 
-	if(!op) message = html_tag_esc(message);
-	if(!op) nickname = html_tag_esc(nickname);
+	if(!op) {
+		message = html_tag_esc(message);
+		nickname = html_tag_esc(nickname);
+	}
 
-	 // do not give the tag to [ Server ]
+	// do not give the tag to [ Server ]
 	var hasTagDom = (op || admin || staff || dataObj.rankName) && !(!id && op);
 
 	var tagDom;

@@ -16,12 +16,11 @@
 - invalid world color syntax causes graphical glitches
 - warning when clicking on urls
 - when zoomed out, client is slow
-- reduced calls for drawImage on tiles
 - multiple custom user roles
 - world owners can delete individual messages in chatbox. admins can delete from global
 - menu too big? some scrollbar if longer than screen height
 - language settings?
-- a more memory-efficient server
+- a more memory-efficient server (vague)
 - garbage-collect world data objects (objects that store temporary information like a list of clients)
 - cache user sessions to speed up page load times
 - select an area to move
@@ -31,7 +30,7 @@
 - world_props complete
 - admin world restore
 - put adm-zip in /lib
-- classic account system :: fix up storing sessions, uses json
+- classic account system -> fix up storing sessions, uses json
 - revise ugly 403 page?
 - race condition world name changing
 - tile offset buffers

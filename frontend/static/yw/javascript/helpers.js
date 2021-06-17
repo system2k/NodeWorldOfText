@@ -58,6 +58,192 @@ function lineGen(x0, y0, x1, y1, max) {
 	return list;
 }
 
+function orderRangeABCoords(coordA, coordB) {
+	var tmp;
+	if(coordA[0] > coordB[0]) {
+		// swap X coords
+		tmp = coordA[0];
+		coordA[0] = coordB[0];
+		coordB[0] = tmp;
+		tmp = coordA[2];
+		coordA[2] = coordB[2];
+		coordB[2] = tmp;
+	} else if(coordA[0] == coordB[0] && coordA[2] > coordB[2]) {
+		// swap X char coords
+		tmp = coordA[2];
+		coordA[2] = coordB[2];
+		coordB[2] = tmp;
+	}
+	if(coordA[1] > coordB[1]) {
+		// swap Y coords
+		tmp = coordA[1];
+		coordA[1] = coordB[1];
+		coordB[1] = tmp;
+		tmp = coordA[3];
+		coordA[3] = coordB[3];
+		coordB[3] = tmp;
+	} else if(coordA[1] == coordB[1] && coordA[3] > coordB[3]) {
+		// swap Y char coords
+		tmp = coordA[3];
+		coordA[3] = coordB[3];
+		coordB[3] = tmp;
+	}
+}
+
+function ajaxRequest(settings) {
+	var req = new XMLHttpRequest();
+
+	var formData = "";
+	var ampAppend = false;
+	if(settings.data) {
+		for(var i in settings.data) {
+			if(ampAppend) formData += "&";
+			ampAppend = true;
+			formData += encodeURIComponent(i) + "=" + encodeURIComponent(settings.data[i]);
+		}
+	}
+	// append form data to url if this is a GET
+	if(settings.type == "GET" && formData) {
+		settings.url += "?" + formData;
+	}
+	var async = !!settings.async;
+	req.open(settings.type, settings.url, !async);
+	req.onload = function() {
+		if(req.status >= 200 && req.status < 400) {
+			if(settings.done) {
+				settings.done(req.responseText, req);
+			}
+		} else {
+			if(settings.error) {
+				settings.error(req);
+			}
+		}
+	}
+	req.onerror = function() {
+		if(settings.error) {
+			settings.error(req);
+		}
+	}
+	if(settings.type == "POST") {
+		if(formData) req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+		req.send(formData);
+	} else {
+		req.send();
+	}
+}
+
+function removeAlpha(data) {
+	var res = [];
+	var len = data.length / 4;
+	for(var i = 0; i < len; i++) {
+		var indx = i * 4;
+		res.push(data[indx + 0]);
+		res.push(data[indx + 1]);
+		res.push(data[indx + 2]);
+	}
+	return res;
+}
+
+function getRange(x1, y1, x2, y2) {
+	var tmp;
+	if(x1 > x2) {
+		tmp = x1;
+		x1 = x2;
+		x2 = tmp;
+	}
+	if(y1 > y2) {
+		tmp = y1;
+		y1 = y2;
+		y2 = tmp;
+	}
+
+	assert(intmax([x1, y1, x2, y2]), "Invalid ranges");
+
+	var coords = [];
+	for(var y = y1; y <= y2; y++) {
+		for(var x = x1; x <= x2; x++) {
+			coords.push([x, y]);
+			if(coords.length >= 400000) throw "Potential memory leak";
+		}
+	}
+	return coords;
+}
+
+var colors = ["#660066", "#003366", "#ff9900", "#ff0066", "#003300", "#ff0000", "#3a3a3a", "#006666", "#3399ff", "#3333ff", "#000000"];
+function assignColor(username) {
+	username = username.toUpperCase();
+	var colLen = colors.length;
+	var usrLen = username.length;
+	var avg = 0;
+	for(var i = 0; i < usrLen; i++) {
+		var chr = username.charCodeAt(i);
+		avg += (chr * chr | (i * chr) % 628) * (i << chr) + (chr*(i + 19 + (chr % 56))*chr);
+	}
+	return colors[(Math.abs(avg | 0)) % colLen];
+}
+
+function spaceTrim(str_array, left, right, gaps, secondary_array) {
+	// secondary_array is an optional argument where elements are trimmed in parallel with str_array
+	var marginLeft = 0;
+	var marginRight = 0;
+	var countL = left;
+	var countR = right;
+	var whitespaces = "\u0009\u000a\u000b\u000d\u0020\u0085\u00a0";
+	for(var i = 0; i < str_array.length; i++) {
+		var idxL = i;
+		var idxR = str_array.length - 1 - i;
+		if(whitespaces.indexOf(str_array[idxL]) > -1 && countL) {
+			marginLeft++;
+		} else {
+			countL = false;
+		}
+		if(whitespaces.indexOf(str_array[idxR]) > -1 && countR) {
+			marginRight++;
+		} else {
+			countR = false;
+		}
+		if(!countL && !countR) break;
+	}
+	if(marginLeft) {
+		str_array.splice(0, marginLeft);
+		spliceArray(secondary_array, 0, marginLeft);
+	}
+	if(marginRight) {
+		str_array.splice(str_array.length - marginRight);
+		spliceArray(secondary_array, secondary_array.length - marginRight);
+	}
+	if(gaps) {
+		var spaceFreq = 0;
+		for(var i = 0; i < str_array.length; i++) {
+			var chr = str_array[i];
+			if(whitespaces.indexOf(chr) > -1) {
+				spaceFreq++;
+			} else {
+				spaceFreq = 0;
+			}
+			if(spaceFreq > 1) {
+				str_array.splice(i, 1);
+				spliceArray(secondary_array, i, 1);
+				i--;
+			}
+		}
+	}
+	return str_array;
+}
+
+function spliceArray(array, A, B) {
+	if(!array) return;
+	if(Array.isArray(array)) {
+		// list of arrays
+		for(var i = 0; i < array.length; i++) {
+			if(!array[i]) continue;
+			array[i].splice(A, B);
+		}
+	} else {
+		array.splice(A, B);
+	}
+}
+
 function byId(a) {
 	return document.getElementById(a);
 }
@@ -76,7 +262,7 @@ function keydownTableUp(e) {
 	var key = e.key;
 	if(!key) return;
 	if(keydownTable[key]) {
-		delete keydownTable[key]
+		delete keydownTable[key];
 	}
 }
 document.addEventListener("keydown", keydownTableDown);
@@ -123,6 +309,11 @@ function escapeURLQuote(url) {
 		return "";
 	}
 	return encodeURIComponent(escapeQuote(decode));
+}
+
+function getPos(ref) {
+	ref = ref.split(",");
+	return [parseInt(ref[0]), parseInt(ref[1])];
 }
 
 function getPoolDimensions(tileWidth, tileHeight) {
@@ -195,6 +386,21 @@ function convertToDate(epoch) {
 	}
 	str += hour + ":" + ("0" + minute).slice(-2) + " " + per;
 	return str;
+}
+
+function int_to_rgb(value) {
+	var r = (value >> 16) & 255;
+	var g = (value >> 8) & 255;
+	var b = value & 255;
+	return [r, g, b];
+}
+
+function int_to_hex(value) {
+	return "#" + value.toString(16).padStart(6, 0);
+}
+
+function rgb_to_int(r, g, b) {
+	return b | g << 8 | r << 16;
 }
 
 if(!Math.trunc) {

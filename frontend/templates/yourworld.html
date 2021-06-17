@@ -114,9 +114,10 @@
 						<label for="color_input">Color Code: </label>
 						<input class="jscolor" value="000000" id="color_input_form_input">
 						<div id="color_input_submit">
-							<a href="javascript:void 0;" id="random_color_link">Random</a>
 							<input type="submit" value="   Go   "> or <span id="color_input_cancel" class="simplemodal-close simplemodal-closelink">cancel</span>
+							<a href="javascript:void 0;" id="random_color_link">Random</a>
 						</div>
+						<div id="color_shortcuts"></div>
 					</form>
 				</div>
 			</div>
@@ -147,47 +148,24 @@
 			<span>Chat&nbsp;<b id="total_unread" class="unread" style="display: none;">(-)</b></span>
 		</div>
 		<div id="chat_window" style="width: 400px; height: 300px; bottom: 0px; left: 0px; display: none;">
-			<table style="width: 100%; height: 100%;">
-				<tbody>
-					<tr style="height: 22px; margin-left: 6px;">
-						<td style="padding-left: 1px;">
-							<div class="chat_tab_button" id="chat_page_tab" style="background-color: #8c8c8c; color: white; width: 100px;">
-								This page&nbsp;<b id="page_unread" class="unread" style="display: none;">(-)</b>
-							</div>
-						</td>
-						<td style="padding-left: 3px;">
-							<div class="chat_tab_button" id="chat_global_tab" style="width: 80px;">
-								Global&nbsp;<b id="global_unread" class="unread" style="display: none;">(-)</b>
-							</div>
-						</td>
-						<td id="usr_online_container" style="width: 100%; padding-top: 2px;">
-							<span id="usr_online" style="padding-left: 16px;"></span>
-						</td>
-						<td style="float: right; margin-right: 1px;">
-							<div id="chat_close">
-								X
-							</div>
-						</td>
-					</tr>
-					<tr>
-						<td id="chatfield_container" colspan="4" style="padding-left: 1px; padding-right: 3px; height: 245px;">
-							<div class="chatfield" id="page_chatfield" style="width: 392px; height: 245px;"></div>
-							<div class="chatfield" id="global_chatfield" style="display: none; width: 392px; height: 245px;"></div>
-						</td>
-					</tr>
-					<tr style="height: 21px;">
-						<td style="width: 100%; padding-left: 1px; padding-right: 5px;" colspan="3">
-							<input style="width: 100%;" id="chatbar">
-						</td>
-						<td>
-							<button id="chatsend">Send</button>
-						</td>
-					</tr>
-				</tbody>
-			</table>
+			<div id="chat_upper" style="padding: 3px; padding-bottom: 0px;">
+				<div class="chat_tab_button" id="chat_page_tab" style="background-color: #8c8c8c; color: white;">
+					This page&nbsp;<b id="page_unread" class="unread" style="display: none;">(-)</b>
+				</div>
+				<div class="chat_tab_button" id="chat_global_tab">
+					Global&nbsp;<b id="global_unread" class="unread" style="display: none;">(-)</b>
+				</div>
+				<span id="usr_online"></span>
+				<div id="chat_close">X</div>
+			</div>
+			<div class="chatfield" id="page_chatfield"></div>
+			<div class="chatfield" id="global_chatfield" style="display: none;"></div>
+			<div id="chat_lower" style="width: 100%; display: flex;">
+				<input style="width: 100%; margin: 3px; margin-right: 0px;" id="chatbar">
+				<button id="chatsend" style="margin: 3px;">Send</button>
+			</div>
 		</div>
 		<div id="confirm_js" style="display: none; top: 50px; left: 100px;">
-			<a href="javascript:void 0;" id="run_js_confirm_risk" style="display: none;">Accept the risk and run</a>
 			<a href="javascript:void 0;" id="run_js_confirm">run</a>
 			<span id="confirm_js_msg">
 				Are you sure you want to run this javascript link?

@@ -17,7 +17,7 @@ admclrActivated.style.fontWeight = "bold";
 admclrActivated.style.display = "none";
 atcInfo.appendChild(admclrActivated);
 
-menu.addCheckboxOption(" Clear Tiles", function() {
+menu.addCheckboxOption("Clear Tiles", function() {
 	// activated
 	atcInfo.style.display = "";
 	admclr.activated = true;

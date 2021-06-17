@@ -237,7 +237,8 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	}
 
 	var do_write = await modules.write_data({
-		edits: edits_parsed
+		edits: edits_parsed,
+		bypass: post_data.bypass
 	}, vars, evars);
 
 	serve(JSON.stringify(do_write.accepted));

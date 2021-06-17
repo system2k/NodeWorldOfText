@@ -1,5 +1,3 @@
-PRAGMA encoding="UTF-16";
-
 CREATE TABLE "auth_user" (
     "id" integer NOT NULL PRIMARY KEY,
     "username" varchar(30) NOT NULL UNIQUE,
