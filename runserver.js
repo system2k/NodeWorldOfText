@@ -3010,7 +3010,8 @@ var global_data = {
 	arrayIsEntirely,
 	normalizeCacheTile,
 	parse_textcode,
-	acme_stat: function() { return { enabled: acmeEnabled, pass: acmePass } }
+	acme_stat: function() { return { enabled: acmeEnabled, pass: acmePass } },
+	uviasSendIdentifier
 };
 
 async function sysLoad() {

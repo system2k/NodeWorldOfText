@@ -66,12 +66,12 @@ var verticalEnterPos       = [0, 0]; // position to go when pressing enter (tile
 var imgPatterns            = {};
 var tileCanvasPool         = [];
 var textColorOverride      = 0; // public-member-owner bitfield
-var transparentBackground  = true;
-var writeFlushRate         = 1000;
 var writeBuffer            = [];
 var highlightFlash         = {};
 var highlightCount         = 0;
 var coloredChars           = {}; // highlighted chars
+var images_to_load         = {}; // background images
+var shiftOptState          = { prevX: 0, prevY: 0, x1: 0, y1: 0, x2: 0, y2: 0, prevZoom: -1 };
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -116,10 +116,9 @@ var classicTileProcessing  = false; // directly process utf32 only
 var unloadedPatternPanning = true;
 var cursorRenderingEnabled = true;
 var unobstructCursor       = false;
-
-var images_to_load = {
-	unloaded: "/static/unloaded.png"
-};
+var shiftOptimization      = false;
+var transparentBackground  = true;
+var writeFlushRate         = 1000;
 
 var keyConfig = {
 	reset: "ESC",
@@ -452,8 +451,12 @@ var backImg = imgToArrayCanvas.getContext("2d"); // temporary canvas used to pul
 
 var img_load_index = 0;
 function loadImgPixelData(callback) {
-	var loadImageElm = new Image();
 	var img_key = img_load_keys[img_load_index];
+	if(!img_key) {
+		callback();
+		return;
+	}
+	var loadImageElm = new Image();
 	loadImageElm.src = images_to_load[img_key];
 	var error = false;
 	loadImageElm.onload = function() {
@@ -498,6 +501,8 @@ function loadImgPixelData(callback) {
 
 function keydown_regionSelect(e) {
 	if(!checkKeyPress(e, keyConfig.copyRegion) || regionSelectionsActive()) return;
+	if(w._state.uiModal) return;
+	if(!worldFocused) return;
 	e.preventDefault();
 	w.regionSelect.startSelection();
 }
@@ -690,9 +695,9 @@ function setZoombarValue() {
 
 function fromLogZoom(val) {
 	if(val <= 1) {
-		val = 2 ** (-1 / val);
+		val = Math.pow(2, -1 / val); 
 	} else {
-		val = 1 - (2 ** (-val));
+		val = 1 - Math.pow(2, -val);
 	}
 	return val;
 }
@@ -1237,6 +1242,9 @@ function adjust_scaling_DOM(ratio) {
 	// make the display size the size of the viewport
 	elm.owot.style.width = window_width + "px";
 	elm.owot.style.height = window_height + "px";
+	if(shiftOptimization) {
+		shiftOptState.zoom = -1;
+	}
 }
 
 function event_resize() {
@@ -2370,7 +2378,6 @@ var linkQueue = [];
 var char_input_check = setInterval(function() {
 	if(w._state.uiModal) return;
 	if(write_busy) return;
-	write_busy = true;
 	var value = elm.textInput.value;
 	if(!value) return;
 	clearInterval(pasteInterval);
@@ -2397,8 +2404,6 @@ var char_input_check = setInterval(function() {
 			requestNextItem = true;
 		}
 		if(item == -1)  {
-			elm.textInput.value = "";
-			write_busy = false;
 			return -1;
 		}
 		if(item.type == "char") {
@@ -2443,9 +2448,14 @@ var char_input_check = setInterval(function() {
 		}
 		return;
 	}
+	write_busy = true;
 	pasteInterval = setInterval(function() {
 		var res = pasteFunc();
-		if(res == -1) clearInterval(pasteInterval);
+		if(res == -1) {
+			clearInterval(pasteInterval);
+			write_busy = false;
+			elm.textInput.value = "";
+		}
 	}, 1);
 }, 10);
 
@@ -3403,7 +3413,7 @@ function highlight(positions) {
 			highlightFlash[tileY + "," + tileX][charY] = {};
 		}
 		if(!highlightFlash[tileY + "," + tileX][charY][charX]) {
-			highlightFlash[tileY + "," + tileX][charY][charX] = [getDate(), 128];
+			highlightFlash[tileY + "," + tileX][charY][charX] = [getDate(), 153];
 			highlightCount++;
 		}
 	}
@@ -3428,11 +3438,8 @@ var flashAnimateInterval = setInterval(function() {
 					}
 					highlightCount--;
 				} else {
-					// increase color brightness
-					highlightFlash[tile][charY][charX][1] += 2;
-					if(highlightFlash[tile][charY][charX][1] >= 255) {
-						highlightFlash[tile][charY][charX][1] = 255;
-					}
+					var pos = easeOutQuad(diff, 0, 1, 500);
+					highlightFlash[tile][charY][charX][1] = 153 + 102 * pos;
 				}
 				// mark tile to re-render
 				tileGroup[tile] = 1;
@@ -3860,6 +3867,14 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 	}
 }
 
+function clearTile(tileX, tileY) {
+	if(!Tile.visible(tileX, tileY)) return;
+	var tileScreenPos = getTileScreenPosition(tileX, tileY);
+	var offsetX = Math.floor(tileScreenPos[0]);
+	var offsetY = Math.floor(tileScreenPos[1]);
+	owotCtx.clearRect(offsetX, offsetY, tileWidth, tileHeight);
+}
+
 function renderTile(tileX, tileY, redraw) {
 	if(!Tile.loaded(tileX, tileY)) return;
 	var str = tileY + "," + tileX;
@@ -4009,7 +4024,14 @@ function renderTiles(redraw) {
 	if(unloadedPatternPanning) {
 		elm.owot.style.backgroundPosition = positionX + "px " + positionY + "px";
 	}
-	owotCtx.clearRect(0, 0, owotWidth, owotHeight);
+	var shifted = false;
+	var canOptimizeShift = shiftOptimization && zoom <= 0.5 && shiftOptState.zoom != -1 && shiftOptState.zoom == zoom;
+	if(!canOptimizeShift) {
+		owotCtx.clearRect(0, 0, owotWidth, owotHeight);
+	} else {
+		owotCtx.drawImage(owot, positionX - shiftOptState.prevX, positionY - shiftOptState.prevY);
+		shifted = true;
+	}
 	if(redraw) w.setRedraw();
 	// render all visible tiles
 	var visibleRange = getVisibleTileRange();
@@ -4019,8 +4041,31 @@ function renderTiles(redraw) {
 	var endY = visibleRange[1][1];
 	for(var y = startY; y <= endY; y++) {
 		for(var x = startX; x <= endX; x++) {
-			renderTile(x, y, redraw);
+			var tile = Tile.get(x, y);
+			var shouldRender = false;
+			if(tile) {
+				shouldRender = tile.redraw || tile.rerender;
+			}
+			if(shifted && !shouldRender) {
+				if(!(shiftOptState.x1 < x && x < shiftOptState.x2 && shiftOptState.y1 < y && y < shiftOptState.y2)) {
+					renderTile(x, y);
+				}
+			} else {
+				renderTile(x, y);
+			}
+			if(shifted && !Tile.loaded(x, y)) {
+				clearTile(x, y);
+			}
 		}
+	}
+	if(shiftOptimization) {
+		shiftOptState.prevX = positionX;
+		shiftOptState.prevY = positionY;
+		shiftOptState.x1 = startX;
+		shiftOptState.y1 = startY;
+		shiftOptState.x2 = endX;
+		shiftOptState.y2 = endY;
+		shiftOptState.zoom = zoom;
 	}
 	w.emit("tilesRendered");
 }

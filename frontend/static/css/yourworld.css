@@ -221,8 +221,12 @@ a:visited {
     cursor: default;
 	display: inline-block;
 	margin-top: 1px;
-	padding-left: 16px;
-	padding-right: 16px;
+}
+#chat_page_tab {
+	width: 100px;
+}
+#chat_global_tab {
+	width: 80px;
 }
 .chatfield {
     border: solid 1px black;

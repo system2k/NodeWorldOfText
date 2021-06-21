@@ -165,10 +165,6 @@ function Menu(titleEl, menuEl) {
 	}
 }
 
-function easeOutQuad(h, f, j, i) {
-	return -j * (h /= i) * (h - 2) + f;
-}
-
 var menuAnimationState = "up";
 var menuAnimationActive = false;
 function slideMenu(direction, element, speed) {

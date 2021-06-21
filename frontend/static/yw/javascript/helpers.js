@@ -403,6 +403,10 @@ function rgb_to_int(r, g, b) {
 	return b | g << 8 | r << 16;
 }
 
+function easeOutQuad(h, f, j, i) {
+	return -j * (h /= i) * (h - 2) + f;
+}
+
 if(!Math.trunc) {
 	Math.trunc = function(v) {
 		v = +v;
@@ -449,6 +453,12 @@ if(!String.prototype.padStart) {
 	String.prototype.padStart = function(count, fillStr) {
 		fillStr += "";
 		return (fillStr.repeat(count) + this).slice(-count);
+	}
+}
+
+if(!Math.log2) {
+	Math.log2 = function(x) {
+		return Math.log(x) * Math.LOG2E;
 	}
 }
 
