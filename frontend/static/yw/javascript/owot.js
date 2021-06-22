@@ -2412,7 +2412,7 @@ var char_input_check = setInterval(function() {
 				if(res === null) {
 					// pause until tile loads
 					requestNextItem = false;
-					return;
+					return false;
 				}
 				charCount++;
 			}
@@ -2440,12 +2440,14 @@ var char_input_check = setInterval(function() {
 				}, ["public", "member-only", "owner-only"][protType]);
 			}
 		}
+		return true;
 	};
 	if(!pastePerm) {
 		while(true) {
 			var res = pasteFunc();
-			if(res == -1 || charCount >= 4) break;
+			if(!res || res == -1 || charCount >= 4) break;
 		}
+		elm.textInput.value = "";
 		return;
 	}
 	write_busy = true;
@@ -3427,8 +3429,9 @@ var flashAnimateInterval = setInterval(function() {
 			for(var charX in highlightFlash[tile][charY]) {
 				var data = highlightFlash[tile][charY][charX];
 				var time = data[0];
+				var diff = getDate() - time;
 				// after 500 milliseconds
-				if(getDate() - time >= 500) {
+				if(diff >= 500) {
 					delete highlightFlash[tile][charY][charX];
 					if(!Object.keys(highlightFlash[tile][charY]).length) {
 						delete highlightFlash[tile][charY];
@@ -4025,11 +4028,11 @@ function renderTiles(redraw) {
 		elm.owot.style.backgroundPosition = positionX + "px " + positionY + "px";
 	}
 	var shifted = false;
-	var canOptimizeShift = shiftOptimization && zoom <= 0.5 && shiftOptState.zoom != -1 && shiftOptState.zoom == zoom;
+	var canOptimizeShift = shiftOptimization && zoom <= 0.5 && shiftOptState.zoom == zoom;
 	if(!canOptimizeShift) {
 		owotCtx.clearRect(0, 0, owotWidth, owotHeight);
 	} else {
-		owotCtx.drawImage(owot, positionX - shiftOptState.prevX, positionY - shiftOptState.prevY);
+		owotCtx.drawImage(owot, Math.floor(positionX) - shiftOptState.prevX, Math.floor(positionY) - shiftOptState.prevY);
 		shifted = true;
 	}
 	if(redraw) w.setRedraw();
@@ -4059,8 +4062,8 @@ function renderTiles(redraw) {
 		}
 	}
 	if(shiftOptimization) {
-		shiftOptState.prevX = positionX;
-		shiftOptState.prevY = positionY;
+		shiftOptState.prevX = Math.floor(positionX);
+		shiftOptState.prevY = Math.floor(positionY);
 		shiftOptState.x1 = startX;
 		shiftOptState.y1 = startY;
 		shiftOptState.x2 = endX;

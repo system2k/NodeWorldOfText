@@ -371,7 +371,7 @@ a:visited {
 }
 #owot {
 	background-image: url("/static/unloaded.png");
-	background-repeat: "repeat";
+	background-repeat: repeat;
 }
 #owot.nightmode {
 	background-image: url("/static/unloaded_night.png");
