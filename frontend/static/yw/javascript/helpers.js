@@ -395,7 +395,7 @@ function int_to_rgb(value) {
 	return [r, g, b];
 }
 
-function int_to_hex(value) {
+function int_to_hexcode(value) {
 	return "#" + value.toString(16).padStart(6, 0);
 }
 
@@ -462,6 +462,9 @@ if(!Math.log2) {
 	}
 }
 
+// compatibility (deprecated)
+var blankColor = new Array(128).fill(0);
+
 if(state.worldModel.nsfw) {
 	var check = localStorage.getItem("nsfw_yes");
 	if(check) {
@@ -516,7 +519,7 @@ function ReconnectingWebSocket(url) {
 
 // split a mixed string with surrogates and combining characters
 function advancedSplit(str, noSurrog, noComb, norm) {
-	if(str && str.constructor == Array) return str;
+	if(str && str.constructor == Array) return str.slice(0);
 	var chars = [];
 	var buffer = "";
 	var surrogMode = false;

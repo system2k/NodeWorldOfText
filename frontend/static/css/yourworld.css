@@ -109,6 +109,8 @@ a:visited {
     color: #555;
     border-left: 1px solid #ccc;
     border-bottom: 1px solid #ccc;
+	overflow: hidden;
+	max-height: 100%;
 }
 #nav li {
     display: block;

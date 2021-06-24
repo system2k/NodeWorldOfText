@@ -85,7 +85,7 @@ var linksRendered          = true;
 var colorsEnabled          = true;
 var backgroundEnabled      = true; // render backgrounds if any
 var scrollingEnabled       = true;
-var zoomRatio              = window.devicePixelRatio; // browser's zoom ratio
+var zoomRatio              = deviceRatio(); // browser's zoom ratio
 var ws_path                = createWsPath();
 var protectPrecision       = 0; // 0 being tile and 1 being char
 var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
@@ -105,6 +105,7 @@ var combiningCharsEnabled  = true;
 var surrogateCharsEnabled  = true;
 var defaultCoordLinkColor  = "#008000";
 var defaultURLLinkColor    = "#0000FF";
+var defaultHighlightColor  = [0xFF, 0xFF, 0x99];
 var secureJSLink           = true; // display warning prompt when clicking on javascript links
 var priorityOverwriteChar  = false; // render cells in the following order: Owner, Member, Public
 var pasteDirRight          = true; // move cursor right when writing
@@ -208,7 +209,7 @@ function createColorButton(color) {
 	var colorInt = resolveColorValue(color);
 	var colorValues = int_to_rgb(colorInt);
 	celm.className = "color_btn";
-	celm.style.backgroundColor = int_to_hex(colorInt);
+	celm.style.backgroundColor = int_to_hexcode(colorInt);
 	celm.onclick = function() {
 		setRGBColorPicker(colorValues[0], colorValues[1], colorValues[2]);
 		w._ui.colorInputModal.onSubmit();
@@ -276,11 +277,9 @@ function draggable_element(dragger, dragged, exclusions, onDrag) {
 	// when the element is being dragged
 	draggable_element_mousemove.push(function(e, arg_pageX, arg_pageY) {
 		if(!dragging) return;
-
 		if(onDrag) {
 			if(onDrag() == -1) return;
 		}
-
 		dragged.style.top = "";
 		dragged.style.bottom = "";
 		dragged.style.left = "";
@@ -712,7 +711,7 @@ function toLogZoom(val) {
 }
 
 function browserZoomAdjust(retry) {
-	var ratio = window.devicePixelRatio;
+	var ratio = deviceRatio();
 	if(!ratio) ratio = 1;
 	if(zoomRatio == ratio && !retry) return; // ratio is still the same, do nothing
 	positionX /= zoomRatio;
@@ -722,7 +721,6 @@ function browserZoomAdjust(retry) {
 	positionY *= zoomRatio;
 	positionX = Math.trunc(positionX); // remove decimals
 	positionY = Math.trunc(positionY);
-
 	adjust_scaling_DOM(ratio);
 	doZoom(ratio * 100);
 }
@@ -852,6 +850,7 @@ function loadTileFromPool(tileX, tileY, doNotCreate) {
 	tilePixelCache[pos] = newTile;
 	return newTile;
 }
+
 function shiftAllTilesInPools() {
 	if(tileCanvasPool.length <= 1) return;
 	for(var tile in tilePixelCache) {
@@ -1228,8 +1227,6 @@ function onKeyUp(e) {
 }
 document.body.addEventListener("keyup", onKeyUp);
 
-// adjust canvas width, canvas display width, and variable width to
-// disobey the browser zoom so that the custom zoom can be used
 function adjust_scaling_DOM(ratio) {
 	var window_width = getWndWidth();
 	var window_height = getWndHeight();
@@ -1248,12 +1245,10 @@ function adjust_scaling_DOM(ratio) {
 }
 
 function event_resize() {
-	var ratio = window.devicePixelRatio;
+	var ratio = deviceRatio();
 	if(!ratio) ratio = 1;
 	w.emit("resize", ratio);
-
 	adjust_scaling_DOM(ratio);
-
 	browserZoomAdjust();
 	w.render();
 }
@@ -2082,7 +2077,6 @@ function writeChar(char, doNotMoveCursor, temp_color, noNewline) {
 	var charX = cursor[2];
 	var charY = cursor[3];
 	var newLine = (char == "\n" || char == "\r") && !noNewline;
-	// first, attempt to move the cursor
 	if(!doNotMoveCursor) {
 		var pos = propagatePosition({
 			tileX: cursor[0],
@@ -3415,7 +3409,10 @@ function highlight(positions) {
 			highlightFlash[tileY + "," + tileX][charY] = {};
 		}
 		if(!highlightFlash[tileY + "," + tileX][charY][charX]) {
-			highlightFlash[tileY + "," + tileX][charY][charX] = [getDate(), 153];
+			var r = defaultHighlightColor[0];
+			var g = defaultHighlightColor[1];
+			var b = defaultHighlightColor[2];
+			highlightFlash[tileY + "," + tileX][charY][charX] = [getDate(), [r, g, b]];
 			highlightCount++;
 		}
 	}
@@ -3424,6 +3421,7 @@ function highlight(positions) {
 var flashAnimateInterval = setInterval(function() {
 	if(!highlightCount) return;
 	var tileGroup = {}; // tiles to re-render after highlight
+	var flashDuration = 500;
 	for(var tile in highlightFlash) {
 		for(var charY in highlightFlash[tile]) {
 			for(var charX in highlightFlash[tile][charY]) {
@@ -3431,7 +3429,7 @@ var flashAnimateInterval = setInterval(function() {
 				var time = data[0];
 				var diff = getDate() - time;
 				// after 500 milliseconds
-				if(diff >= 500) {
+				if(diff >= flashDuration) {
 					delete highlightFlash[tile][charY][charX];
 					if(!Object.keys(highlightFlash[tile][charY]).length) {
 						delete highlightFlash[tile][charY];
@@ -3441,8 +3439,14 @@ var flashAnimateInterval = setInterval(function() {
 					}
 					highlightCount--;
 				} else {
-					var pos = easeOutQuad(diff, 0, 1, 500);
-					highlightFlash[tile][charY][charX][1] = 153 + 102 * pos;
+					var pos = easeOutQuad(diff, 0, 1, flashDuration);
+					var r = defaultHighlightColor[0];
+					var g = defaultHighlightColor[1];
+					var b = defaultHighlightColor[2];
+					var flashRGB = highlightFlash[tile][charY][charX][1];
+					flashRGB[0] = r + (255 - r) * pos;
+					flashRGB[1] = g + (255 - g) * pos;
+					flashRGB[2] = b + (255 - b) * pos;
 				}
 				// mark tile to re-render
 				tileGroup[tile] = 1;
@@ -3828,6 +3832,7 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 	} else {
 		renderCtx.fillStyle = tile.backgroundColor;
 	}
+	var backColor = renderCtx.fillStyle;
 
 	// fill tile background color
 	renderCtx.fillRect(offsetX, offsetY, tileWidth, tileHeight);
@@ -3861,13 +3866,15 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 			for(var x = 0; x < tileC; x++) {
 				if(highlight[y]) {
 					if(highlight[y][x] !== void 0) {
-						renderCtx.fillStyle = "rgb(255,255," + highlight[y][x][1] + ")";
+						var flashRGB = highlight[y][x][1];
+						renderCtx.fillStyle = "rgb(" + flashRGB[0] + "," + flashRGB[1] + "," + flashRGB[2] + ")";
 						renderCtx.fillRect(offsetX + x * cellW, offsetY + y * cellH, cellW, cellH);
 					}
 				}
 			}
 		}
 	}
+	return backColor;
 }
 
 function clearTile(tileX, tileY) {
@@ -3896,28 +3903,28 @@ function renderTile(tileX, tileY, redraw) {
 
 	var gridColor = "#000000";
 	if(transparentBackground) {
-		renderTileBackground(owotCtx, offsetX, offsetY, tile, tileX, tileY, cursorVisibility);
-		gridColor = "#" + ("00000" + (16777215 - parseInt(owotCtx.fillStyle.substr(1), 16)).toString(16)).padStart(6, 0);
+		var backColor = renderTileBackground(owotCtx, offsetX, offsetY, tile, tileX, tileY, cursorVisibility);
+		if(gridEnabled) {
+			gridColor = int_to_hexcode(0xFFFFFF - resolveColorValue(backColor));
+		}
 	} else {
 		var backgroundUpdated = false;
 		var hasHighlightFlash = highlightFlash[tileY + "," + tileX];
 		if(hasHighlightFlash) {
-			tile.tp_highlight = true;
 			backgroundUpdated = true;
+			tile.tp_highlight = true;
 		} else {
 			if(tile.tp_highlight) {
-				delete tile.tp_highlight;
 				backgroundUpdated = true;
+				delete tile.tp_highlight;
 			}
 		}
 		if(cursorVisibility) {
 			backgroundUpdated = true;
 			tile.tp_cursor = true;
-		} else {
-			if(tile.tp_cursor) {
-				delete tile.tp_cursor;
-				backgroundUpdated = true;
-			}
+		} else if(tile.tp_cursor) {
+			backgroundUpdated = true;
+			delete tile.tp_cursor;
 		}
 		if(backgroundUpdated) {
 			tile.redraw = true;
@@ -3962,6 +3969,11 @@ function renderTile(tileX, tileY, redraw) {
 		if(background_data) {
 			textRenderCtx.drawImage(background_data, 0, 0, tileWidth, tileHeight);
 		}
+	}
+
+	// temp compat
+	if(typeof tile.content == "string") {
+		tile.content = w.split(tile.content);
 	}
 
 	var content = tile.content;
@@ -4027,13 +4039,13 @@ function renderTiles(redraw) {
 	if(unloadedPatternPanning) {
 		elm.owot.style.backgroundPosition = positionX + "px " + positionY + "px";
 	}
-	var shifted = false;
+	var optShifted = false;
 	var canOptimizeShift = shiftOptimization && zoom <= 0.5 && shiftOptState.zoom == zoom;
 	if(!canOptimizeShift) {
 		owotCtx.clearRect(0, 0, owotWidth, owotHeight);
 	} else {
 		owotCtx.drawImage(owot, Math.floor(positionX) - shiftOptState.prevX, Math.floor(positionY) - shiftOptState.prevY);
-		shifted = true;
+		optShifted = true;
 	}
 	if(redraw) w.setRedraw();
 	// render all visible tiles
@@ -4049,14 +4061,14 @@ function renderTiles(redraw) {
 			if(tile) {
 				shouldRender = tile.redraw || tile.rerender;
 			}
-			if(shifted && !shouldRender) {
+			if(optShifted && !shouldRender) {
 				if(!(shiftOptState.x1 < x && x < shiftOptState.x2 && shiftOptState.y1 < y && y < shiftOptState.y2)) {
 					renderTile(x, y);
 				}
 			} else {
 				renderTile(x, y);
 			}
-			if(shifted && !Tile.loaded(x, y)) {
+			if(optShifted && !Tile.loaded(x, y)) {
 				clearTile(x, y);
 			}
 		}
