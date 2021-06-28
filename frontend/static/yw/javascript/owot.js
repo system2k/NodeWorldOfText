@@ -85,11 +85,12 @@ var linksRendered          = true;
 var colorsEnabled          = true;
 var backgroundEnabled      = true; // render backgrounds if any
 var scrollingEnabled       = true;
-var zoomRatio              = deviceRatio(); // browser's zoom ratio
+var zoomRatio              = deviceRatio(); // browser's default zoom ratio
 var ws_path                = createWsPath();
 var protectPrecision       = 0; // 0 being tile and 1 being char
 var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
-var zoom                   = decimal(100); // zoom value
+var zoom                   = decimal(100); // absolute zoom value
+var userZoom               = decimal(100); // user zoom setting
 var unloadTilesAuto        = true; // automatically unload tiles to free up memory
 var useHighlight           = true; // highlight new edits
 var highlightLimit         = 10; // max chars to highlight at a time
@@ -431,7 +432,7 @@ function getStoredNickname() {
 }
 function storeNickname() {
 	if(window.localStorage && localStorage.setItem) {
-		localStorage.setItem("nickname", YourWorld.Nickname)
+		localStorage.setItem("nickname", YourWorld.Nickname);
 	}
 }
 
@@ -646,13 +647,16 @@ backgroundImageCanvasRenderer.width = tileWidth;
 backgroundImageCanvasRenderer.height = tileHeight;
 var backgroundImageCtx = backgroundImageCanvasRenderer.getContext("2d");
 
-// performs the zoom calculations and changes all constants
+// set absolute zoom
 function doZoom(percentage) {
-	if(percentage < 20) percentage = 20;
+	if(percentage < 3) percentage = 3;
 	if(percentage > 1000) percentage = 1000;
 	percentage = decimal(percentage);
 	zoom = percentage;
 
+	if(zoom < 0.20) {
+		shiftOptimization = true;
+	}
 	updateScaleConsts();
 
 	if(tileWidth * tileHeight > 100000000) {
@@ -674,11 +678,14 @@ function doZoom(percentage) {
 	}
 }
 
-// called from the zoombar, adjusts client position to be in center
+// set user zoom
 function changeZoom(percentage) {
 	positionX /= zoom;
 	positionY /= zoom;
-	doZoom(percentage);
+	userZoom = percentage / 100;
+	if(userZoom < 0.2) userZoom = 0.2;
+	if(userZoom > 10) userZoom = 10;
+	doZoom(userZoom * deviceRatio() * 100);
 	positionX *= zoom;
 	positionY *= zoom;
 	positionX = Math.trunc(positionX); // remove decimals
@@ -689,7 +696,7 @@ function changeZoom(percentage) {
 
 function setZoombarValue() {
 	// zoombar is logarithmic. work in reverse.
-	zoombar.value = fromLogZoom(zoom) * 100;
+	zoombar.value = fromLogZoom(userZoom) * 100;
 }
 
 function fromLogZoom(val) {
@@ -710,19 +717,19 @@ function toLogZoom(val) {
 	return val;
 }
 
-function browserZoomAdjust(retry) {
-	var ratio = deviceRatio();
-	if(!ratio) ratio = 1;
-	if(zoomRatio == ratio && !retry) return; // ratio is still the same, do nothing
-	positionX /= zoomRatio;
-	positionY /= zoomRatio;
-	zoomRatio = ratio;
-	positionX *= zoomRatio;
-	positionY *= zoomRatio;
-	positionX = Math.trunc(positionX); // remove decimals
+function browserZoomAdjust(initial) {
+	zoomRatio = deviceRatio();
+	var absZoom = zoomRatio * userZoom;
+	if(zoom == absZoom && !initial) return false; // if no zoom change is detected, do nothing
+	positionX /= zoom;
+	positionY /= zoom;
+	adjust_scaling_DOM(zoomRatio);
+	doZoom(absZoom * 100);
+	positionX *= zoom;
+	positionY *= zoom;
+	positionX = Math.trunc(positionX);
 	positionY = Math.trunc(positionY);
-	adjust_scaling_DOM(ratio);
-	doZoom(ratio * 100);
+	return true;
 }
 
 function createTilePool() {
@@ -1248,8 +1255,9 @@ function event_resize() {
 	var ratio = deviceRatio();
 	if(!ratio) ratio = 1;
 	w.emit("resize", ratio);
-	adjust_scaling_DOM(ratio);
-	browserZoomAdjust();
+	if(!browserZoomAdjust()) {
+		adjust_scaling_DOM(ratio);
+	}
 	w.render();
 }
 window.addEventListener("resize", event_resize);
@@ -2714,16 +2722,15 @@ function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
 	// add center offsets
 	x += Math.trunc(owotWidth / 2);
 	y += Math.trunc(owotHeight / 2);
-	return [Math.trunc(x/zoomRatio), Math.trunc(y/zoomRatio)];
+	return [Math.trunc(x / zoomRatio), Math.trunc(y / zoomRatio)];
 }
 
 function alertJS(data) {
-	if(js_alert_active) return;
 	js_alert_active = true;
 	elm.confirm_js.style.display = "";
 	elm.confirm_js_code.innerText = data;
 	run_js_confirm.onclick = function() {
-		confirmRunJsLink(data);
+		confirmRunJSLink(data);
 		return false;
 	}
 	confirm_js_cancel.onclick = closeJSAlert;
@@ -2736,28 +2743,27 @@ function closeJSAlert() {
 	elm.confirm_js.style.display = "none";
 }
 
-function confirmRunJsLink(data) {
+function executeJS(code) {
+	var jsCode = new Function(code);
+	return jsCode();
+}
+
+function confirmRunJSLink(data) {
 	var preview = data;
 	if(preview.length > 256) {
 		preview = preview.slice(0, 256) + " [...]";
 	}
 	var doRun = confirm("Confirm that you will be running this script.\nPress cancel to NOT run it.\n\"" + preview + "\"");
 	if(!doRun) return closeJSAlert();
-	var link = document.createElement("a");
-	link.href = "javascript:" + encodeURIComponent(data);
-	link.click();
-	link.remove();
+	executeJS(data);
 	closeJSAlert();
 }
 
-function runJsLink(data) {
+function runJSLink(data) {
 	if(secureJSLink) {
 		alertJS(data);
 	} else {
-		var link = document.createElement("a");
-		link.href = "javascript:" + encodeURIComponent(data);
-		link.click();
-		link.remove();
+		executeJS(data);
 	}
 }
 
@@ -2782,7 +2788,7 @@ linkElm.onclick = function(e) {
 	var prot = linkParams.protocol;
 	var url = linkParams.url;
 	if(prot == "javascript") {
-		runJsLink(url);
+		runJSLink(url);
 		return false;
 	} else if(prot == "com") {
 		w.broadcastCommand(url);
@@ -2818,7 +2824,7 @@ function url_link_click(evt) {
 	return returnValue[0];
 }
 
-function updateHoveredLink(mouseX, mouseY, evt) {
+function updateHoveredLink(mouseX, mouseY, evt, safe) {
 	if(mouseX == void 0 && mouseY == void 0) {
 		mouseX = currentMousePosition[0];
 		mouseY = currentMousePosition[1];
@@ -2831,9 +2837,13 @@ function updateHoveredLink(mouseX, mouseY, evt) {
 	if(evt) {
 		if(!closest(evt.target, elm.main_view) && evt.target != linkDiv) return;
 	}
-	var link = is_link(tileX, tileY, charX, charY);
+	var link = getLink(tileX, tileY, charX, charY);
+	if(safe) {
+		if(!link) return;
+		if(link.type != "coord") return;
+	}
 	if(link && linksEnabled && !regionSelectionsActive()) {
-		currentSelectedLink = link[0];
+		currentSelectedLink = link;
 		currentSelectedLinkCoords = coords;
 		var pos = tileAndCharsToWindowCoords(tileX, tileY, charX, charY);
 		elm.owot.style.cursor = "pointer";
@@ -2844,9 +2854,9 @@ function updateHoveredLink(mouseX, mouseY, evt) {
 		linkElm.href = "";
 		linkElm.rel = "";
 		linkElm.title = "";
-		if(link[0].type == "url") {
+		if(link.type == "url") {
 			linkParams.coord = false;
-			var URL_Link = link[0].url;
+			var URL_Link = link.url;
 			linkElm.href = URL_Link;
 			linkElm.rel = "noopener noreferrer";
 			var linkProtocol = linkElm.protocol;
@@ -2873,13 +2883,13 @@ function updateHoveredLink(mouseX, mouseY, evt) {
 				linkParams.url = URL_Link;
 			}
 			if(!linkElm.title) linkElm.title = "Link to URL " + linkElm.href;
-		} else if(link[0].type == "coord") {
+		} else if(link.type == "coord") {
 			linkParams.coord = true;
 			linkParams.protocol = "";
 			linkElm.target = "";
 			linkElm.href = "javascript:void(0);";
 			linkElm.target = "";
-			var pos = link[0].link_tileX + "," + link[0].link_tileY;
+			var pos = link.link_tileX + "," + link.link_tileY;
 			linkElm.title = "Link to coordinates " + pos;
 		}
 	} else {
@@ -4109,12 +4119,13 @@ function renderTilesSelective() {
 function renderLoop() {
 	if(w.hasUpdated) {
 		renderTiles();
+		updateHoveredLink(null, null, null, true);
 	} else if(w.hasSelectiveUpdated) {
 		renderTilesSelective();
 	}
+	w.emit("frame"); // before update flags are reset
 	w.hasUpdated = false;
 	w.hasSelectiveUpdated = false;
-	w.emit("frame");
 	requestAnimationFrame(renderLoop);
 }
 
@@ -5204,6 +5215,7 @@ var ws_functions = {
 			w.setTileRedraw(pos[1], pos[0]);
 		}
 		w.emit("afterFetch", data);
+		updateHoveredLink(null, null, null, true);
 		// too many tiles, remove tiles outside of the viewport
 		var tileLim = Math.floor(getArea(fetchClientMargin) * 1.5 / zoom + 1000);
 		if(w.tile.count > tileLim && unloadTilesAuto) {

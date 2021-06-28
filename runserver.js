@@ -2553,7 +2553,7 @@ var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 
 /*
 	Rate limits:
-	20000 chars per second
+	20480 chars per second
 	800 tile changes per second
 	
 */

@@ -1,212 +1,212 @@
 * {
-    margin: 0;
-    padding: 0;
+	margin: 0;
+	padding: 0;
 }
 html, body {
-    overflow: hidden;
-    width: 100%;
-    height: 100%;
-    overscroll-behavior: contain;
-    touch-action: pan-down;
+	overflow: hidden;
+	width: 100%;
+	height: 100%;
+	overscroll-behavior: contain;
+	touch-action: pan-down;
 }
 .screen_canvas {
-    overflow: hidden;
+	overflow: hidden;
 }
 body {
-    background: #ccc;
+	background: #ccc;
 }
 img {
-    border: 0;
-    text-decoration: none;
+	border: 0;
+	text-decoration: none;
 }
 a,
 a:link,
 a:hover,
 a:active,
 a:visited {
-    text-decoration: none;
-    color: inherit;
+	text-decoration: none;
+	color: inherit;
 }
 #topbar {
-    position: absolute;
-    top: 0;
-    width: 100%;
+	position: absolute;
+	top: 0;
+	width: 100%;
 }
 #topbar_inner {
-    width: 100%;
-    position: absolute;
+	width: 100%;
+	position: absolute;
 }
 #announce {
-    text-align: center;
+	text-align: center;
 }
 #announce_close {
-    font-size: 11px;
-    font-weight: bold;
-    color: #636060;
-    background-color: #C5C2C2;
-    border-radius: 2px;
-    padding: 0 3px;
+	font-size: 11px;
+	font-weight: bold;
+	color: #636060;
+	background-color: #C5C2C2;
+	border-radius: 2px;
+	padding: 0 3px;
 }
 #announce_close:hover {
-    background: #928E8E;
-    color: white;
-    cursor: pointer;
+	background: #928E8E;
+	color: white;
+	cursor: pointer;
 }
 .ui {
-    color: #888;
-    font-family: Verdana;
-    font-size: 12px;
-    z-index: 1;
+	color: #888;
+	font-family: Verdana;
+	font-size: 12px;
+	z-index: 1;
 }
 .ui-vis {
-    background-color: rgba(0, 0, 255, .1);
-    padding: 2px;
+	background-color: rgba(0, 0, 255, .1);
+	padding: 2px;
 }
 .tab {
-    padding-top: 0;
-    top: 0px;
-    position: absolute;
+	padding-top: 0;
+	top: 0px;
+	position: absolute;
 }
 .message {
-    margin-left: auto;
-    margin-right: auto;
-    padding: 5px 0px;
-    width: 60%;
-    text-align: center;
-    background: #E5E5FF;
-    color: #333;
+	margin-left: auto;
+	margin-right: auto;
+	padding: 5px 0px;
+	width: 60%;
+	text-align: center;
+	background: #E5E5FF;
+	color: #333;
 }
 .message a {
-    color: blue;
+	color: blue;
 }
 #loading {
-    font-family: Verdana;
+	font-family: Verdana;
 }
 #coords {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    color: #555;
-    background: #E5E5FF;
+	position: absolute;
+	bottom: 0;
+	right: 0;
+	color: #555;
+	background: #E5E5FF;
 }
 .menu {
-    right: 0;
+	right: 0;
 }
 #menu {
-    cursor: pointer;
+	cursor: pointer;
 }
 #menu.hover {
-    color: #555;
-    background: #E5E5FF;
-    border-left: 1px solid #ccc;
+	color: #555;
+	background: #E5E5FF;
+	border-left: 1px solid #ccc;
 }
 #nav {
-    position: absolute;
-    text-align: right;
-    top: 1.5em;
-    background: #E5E5FF;
-    width: 8em;
-    color: #555;
-    border-left: 1px solid #ccc;
-    border-bottom: 1px solid #ccc;
+	position: absolute;
+	text-align: right;
+	top: 1.5em;
+	background: #E5E5FF;
+	width: 8em;
+	color: #555;
+	border-left: 1px solid #ccc;
+	border-bottom: 1px solid #ccc;
 	overflow: hidden;
 	max-height: 100%;
 }
 #nav li {
-    display: block;
-    list-style: none;
-    position: relative;
-    cursor: pointer;
-    border-top: 1px solid #ccc;
+	display: block;
+	list-style: none;
+	position: relative;
+	cursor: pointer;
+	border-top: 1px solid #ccc;
 }
 #nav li:first-child {
-    border-top: 0;
+	border-top: 0;
 }
 #nav a {
-    display: block;
+	display: block;
 }
 * html #nav ul {
-    line-height: 0;
+	line-height: 0;
 }
 #nav li.hover {
-    background-color: white;
+	background-color: white;
 }
 #simplemodal-overlay {
-    background-color: #000;
-    cursor: default;
+	background-color: #000;
+	cursor: default;
 }
 .simplemodal-container {
-    color: #333;
-    background-color: #e5e5ff;
-    border: 6px solid #c3c3ff;
-    padding: 12px;
+	color: #333;
+	background-color: #e5e5ff;
+	border: 6px solid #c3c3ff;
+	padding: 12px;
 }
 .simplemodal-container a {
-    color: #ddd;
+	color: #ddd;
 }
 .simplemodal-closelink {
-    color: blue;
-    text-decoration: underline;
-    cursor: pointer
+	color: blue;
+	text-decoration: underline;
+	cursor: pointer
 }
 .simplemodal-closebutton {
-    position: absolute;
-    top: -15px;
-    right: -15px;
-    cursor: pointer;
-    font-size: 160%;
+	position: absolute;
+	top: -15px;
+	right: -15px;
+	cursor: pointer;
+	font-size: 160%;
 }
 #goto_submit {
-    margin-left: 1em;
-    margin-top: 3px;
+	margin-left: 1em;
+	margin-top: 3px;
 }
 #protect_precision {
-    position: absolute;
-    left: 0px;
-    top: 30px;
-    background-color: #626262;
-    color: white;
+	position: absolute;
+	left: 0px;
+	top: 30px;
+	background-color: #626262;
+	color: white;
 	padding: 4px;
 }
 #char_choice {
 	margin-left: 14px;
 }
 .protect_button {
-    border: solid 1px white;
-    text-align: center;
-    cursor: pointer;
+	border: solid 1px white;
+	text-align: center;
+	cursor: pointer;
 	min-width: 40px;
 	display: inline-block;
 }
 .auto_prog_panel {
-    position: absolute;
-    left: 0px;
-    top: 90px;
-    width: 150px;
-    height: 30px;
-    background-color: rgb(104, 104, 104);
-    text-align: center;
-    color: white;
+	position: absolute;
+	left: 0px;
+	top: 90px;
+	width: 150px;
+	height: 30px;
+	background-color: rgb(104, 104, 104);
+	text-align: center;
+	color: white;
 }
 #chat_open {
-    position: absolute;
-    bottom: 0px;
-    left: 0px;
-    width: 70px;
-    text-align: center;
-    background-color: #003399;
-    color: white;
-    height: 20px;
-    border-style: solid;
-    border-width: 1px;
-    border-color: #000033;
-    cursor: default;
+	position: absolute;
+	bottom: 0px;
+	left: 0px;
+	width: 70px;
+	text-align: center;
+	background-color: #003399;
+	color: white;
+	height: 20px;
+	border-style: solid;
+	border-width: 1px;
+	border-color: #000033;
+	cursor: default;
 }
 #chat_open:hover {
-    background-color: #2763dc;
+	background-color: #2763dc;
 }
 #chat_open:active {
-    background-color: #0e2961;
+	background-color: #0e2961;
 }
 #usr_online {
 	padding-left: 16px;
@@ -216,11 +216,11 @@ a:visited {
 	padding: 1px 6px 1px 6px;
 }
 .chat_tab_button {
-    border: solid 1px black;
-    text-align: center;
-    font-family: Verdana;
-    font-size: 13px;
-    cursor: default;
+	border: solid 1px black;
+	text-align: center;
+	font-family: Verdana;
+	font-size: 13px;
+	cursor: default;
 	display: inline-block;
 	margin-top: 1px;
 }
@@ -231,145 +231,145 @@ a:visited {
 	width: 80px;
 }
 .chatfield {
-    border: solid 1px black;
-    background-color: white;
-    overflow: scroll;
-    overflow-x: hidden;
-    overflow-wrap: break-word;
+	border: solid 1px black;
+	background-color: white;
+	overflow: scroll;
+	overflow-x: hidden;
+	overflow-wrap: break-word;
 	margin: 3px;
 	margin-bottom: 0px;
 	height: 100%;
 }
 .unread {
-    color: red;
-    font-size: 11px;
+	color: red;
+	font-size: 11px;
 }
 #total_unread {
-    font-size: 15px;
+	font-size: 15px;
 }
 #chat_window {
-    position: absolute;
-    background-color: #e0e0e0;
-    border: solid 1px black;
+	position: absolute;
+	background-color: #e0e0e0;
+	border: solid 1px black;
 	display: flex;
 	flex-flow: column;
 }
 #chat_close {
-    background-color: red;
-    width: 20px;
-    height: 20px;
-    text-align: center;
-    color: white;
-    border: solid 1px black;
-    font-family: monospace;
-    font-size: 16px;
-    cursor: default;
+	background-color: red;
+	width: 20px;
+	height: 20px;
+	text-align: center;
+	color: white;
+	border: solid 1px black;
+	font-family: monospace;
+	font-size: 16px;
+	cursor: default;
 	float: right;
 	margin-top: -1px;
 }
 #confirm_js {
-    width: 441px;
-    height: 256px;
-    position: absolute;
-    background-color: #dbdbdb;
-    border-width: 2px;
-    border-style: solid;
-    border-color: black;
+	width: 441px;
+	height: 256px;
+	position: absolute;
+	background-color: #dbdbdb;
+	border-width: 2px;
+	border-style: solid;
+	border-color: black;
 }
 #confirm_js_code {
-    background-color: #e6e6e6;
-    position: absolute;
-    width: 365px;
-    height: 110px;
-    top: 90px;
-    left: 35px;
-    padding: 3px;
-    font-family: "Courier New", monospace;
-    word-wrap: break-word;
-    word-break: break-all;
-    overflow: scroll;
-    overflow-x: hidden;
+	background-color: #e6e6e6;
+	position: absolute;
+	width: 365px;
+	height: 110px;
+	top: 90px;
+	left: 35px;
+	padding: 3px;
+	font-family: "Courier New", monospace;
+	word-wrap: break-word;
+	word-break: break-all;
+	overflow: scroll;
+	overflow-x: hidden;
 }
 #confirm_js_cancel {
-    position: absolute;
-    font-family: Helvetica;
-    background-color: green;
-    border-style: solid;
-    width: 80px;
-    height: 17px;
-    top: 220px;
-    left: 340px;
-    border-width: 1px;
-    padding: 2px;
-    text-align: center;
-    font-size: 15px;
-    color: white;
-    border-color: black;
-    cursor: pointer;
+	position: absolute;
+	font-family: Helvetica;
+	background-color: green;
+	border-style: solid;
+	width: 80px;
+	height: 17px;
+	top: 220px;
+	left: 340px;
+	border-width: 1px;
+	padding: 2px;
+	text-align: center;
+	font-size: 15px;
+	color: white;
+	border-color: black;
+	cursor: pointer;
 }
 #confirm_js_cancel_x {
-    background-color: red;
-    width: 20px;
-    height: 20px;
-    position: absolute;
-    right: 3px;
-    top: 2px;
-    text-align: center;
-    color: white;
-    font-family: monospace;
-    font-size: 16px;
-    border-style: solid;
-    border-width: 1px;
-    border-color: black;
-    cursor: pointer;
+	background-color: red;
+	width: 20px;
+	height: 20px;
+	position: absolute;
+	right: 3px;
+	top: 2px;
+	text-align: center;
+	color: white;
+	font-family: monospace;
+	font-size: 16px;
+	border-style: solid;
+	border-width: 1px;
+	border-color: black;
+	cursor: pointer;
 }
 #confirm_js_msg {
-    text-align: center;
-    position: absolute;
-    left: 20px;
-    font-family: verdana;
-    top: 40px;
+	text-align: center;
+	position: absolute;
+	left: 20px;
+	font-family: verdana;
+	top: 40px;
 }
 #confirm_js_cancel:hover {
-    background-color: #00AE00;
+	background-color: #00AE00;
 }
 #run_js_confirm {
-    position: absolute;
-    color: blue;
-    text-decoration: underline;
-    top: 220px;
-    left: 20px;
+	position: absolute;
+	color: blue;
+	text-decoration: underline;
+	top: 220px;
+	left: 20px;
 }
 .region_selection {
-    position: absolute;
-    border: 1px solid black;
-    pointer-events: none;
+	position: absolute;
+	border: 1px solid black;
+	pointer-events: none;
 }
 #area_results {
-    width: 100%;
-    height: 200px;
-    white-space: pre;
-    overflow: auto;
-    overflow-x: scroll;
+	width: 100%;
+	height: 200px;
+	white-space: pre;
+	overflow: auto;
+	overflow-x: scroll;
 }
 #area_cancel {
-    position: absolute;
-    right: 0px;
-    bottom: 0px;
-    margin-right: 8px;
-    margin-bottom: 8px;
+	position: absolute;
+	right: 0px;
+	bottom: 0px;
+	margin-right: 8px;
+	margin-bottom: 8px;
 }
 #random_color_link {
-    float: right;
-    color: blue;
-    text-decoration: underline;
+	float: right;
+	color: blue;
+	text-decoration: underline;
 }
 #link_element {
-    position: absolute;
-    display: block;
+	position: absolute;
+	display: block;
 }
 #textInput {
-    font-size: 16px; /* prevent zooming on mobile keyboard */
+	font-size: 16px; /* prevent zooming on mobile keyboard */
 }
 #owot {
 	background-image: url("/static/unloaded.png");
