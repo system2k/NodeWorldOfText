@@ -21,12 +21,12 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var user = evars.user;
 
 	var dispage = vars.dispage;
-	var get_third = vars.get_third;
+	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var filename_sanitize = vars.filename_sanitize;
 	var world_get_or_create = vars.world_get_or_create;
 
-	var world_name = get_third(path, "accounts", "download");
+	var world_name = checkURLParam("/accounts/download/:world", path).world;
 
 	var world = await world_get_or_create(world_name);
 	if(!world) {

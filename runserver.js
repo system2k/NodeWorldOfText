@@ -28,11 +28,9 @@ const WebSocket   = require("ws");
 const zip         = require("adm-zip");
 const zlib        = require("zlib");
 
-const chat_mgr       = require("./backend/utils/chat_mgr.js");
-const bin_packet     = require("./backend/utils/bin_packet.js");
-const utils          = require("./backend/utils/utils.js");
-const parse_textcode = require("./backend/utils/parse_textcode.js");
-const templates      = require("./backend/utils/templates.js");
+const bin_packet = require("./backend/utils/bin_packet.js");
+const utils      = require("./backend/utils/utils.js");
+const templates  = require("./backend/utils/templates.js");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -41,8 +39,7 @@ var san_dp               = utils.san_dp;
 var toUpper              = utils.toUpper;
 var NCaseCompare         = utils.NCaseCompare;
 var split_limit          = utils.split_limit;
-var get_third            = utils.get_third;
-var get_fourth           = utils.get_fourth;
+var checkURLParam        = utils.checkURLParam;
 var removeLastSlash      = utils.removeLastSlash;
 var parseCookie          = utils.parseCookie;
 var ar_str_trim          = utils.ar_str_trim;
@@ -68,18 +65,7 @@ var parseAcceptEncoding  = utils.parseAcceptEncoding;
 var dump_dir             = utils.dump_dir;
 var arrayIsEntirely      = utils.arrayIsEntirely;
 var normalizeCacheTile   = utils.normalizeCacheTile;
-
-var prepare_chat_db     = chat_mgr.prepare_chat_db;
-var init_chat_history   = chat_mgr.init_chat_history;
-var retrieveChatHistory = chat_mgr.retrieveChatHistory;
-var add_to_chatlog      = chat_mgr.add_to_chatlog;
-var clearChatlog        = chat_mgr.clearChatlog;
-var updateChatLogData   = chat_mgr.updateChatLogData;
-
-parse_textcode.initialize({
-	advancedSplit,
-	san_nbr
-});
+var parseTextcode        = utils.parseTextcode;
 
 var gzipEnabled = true;
 
@@ -718,9 +704,9 @@ function load_modules(default_dir) {
 }
 
 console.log("Loading page files");
-const pages	  = load_modules("./backend/pages/");
+const pages = load_modules("./backend/pages/");
 const websockets = load_modules("./backend/websockets/");
-const modules	= load_modules("./backend/modules/");
+const modules = load_modules("./backend/modules/");
 const subsystems = load_modules("./backend/subsystems/");
 
 function asyncDbSystem(database) {
@@ -937,12 +923,10 @@ async function initialize_server() {
 	if(accountSystem == "uvias") {
 		await uvias_init();
 	}
-		
-	prepare_chat_db({ db, db_ch, intv, handle_error });
+
 	if(accountSystem == "local") {
 		await loadEmail();
 	}
-	await init_chat_history();
 	await init_image_database();
 	if(!await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='server_info'")) {
 		// table to inform that the server is initialized
@@ -1300,7 +1284,7 @@ var url_regexp = [ // regexp , function/redirect to , options
 	[/^favicon\.ico[\/]?$/g, "/static/favicon.png", { no_login: true }],
 	[/^robots\.txt[\/]?$/g, "/static/robots.txt", { no_login: true }],
 	[/^home[\/]?$/g, pages.home],
-	[/^.well-known\/(.*)/g, pages.well_known, { no_login: true, binary_post_data: true }],
+	[/^\.well-known\/(.*)/g, pages.well_known, { no_login: true, binary_post_data: true }],
 
 	[/^accounts\/login[\/]?$/g, pages.login],
 	[/^accounts\/logout[\/]?$/g, pages.logout],
@@ -1544,8 +1528,8 @@ async function get_user_info(cookies, is_websocket, include_cookies) {
 				user.email = userauth.email;
 
 				user.operator = level == 3;
-				user.superuser = level == 2;
-				user.staff = level == 1;
+				user.superuser = level == 2 || level == 3;
+				user.staff = level == 1 || level == 2 || level == 3;
 
 				if(user.staff && !is_websocket) {
 					user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id);
@@ -1603,8 +1587,8 @@ async function get_user_info(cookies, is_websocket, include_cookies) {
 						var level = rank_data.level;
 
 						user.operator = level == 3;
-						user.superuser = level == 2;
-						user.staff = level == 1;
+						user.superuser = level == 2 || level == 3;
+						user.staff = level == 1 || level == 2 || level == 3;
 					}
 
 					if(user.staff && !is_websocket) {
@@ -2424,7 +2408,7 @@ async function initialize_server_components() {
 		}
 	});
 
-	// initialize the subsystems (tile database handling)
+	// initialize the subsystems (tile database; chat manager)
 	await sysLoad();
 
 	// initialize variables in page handlers
@@ -2949,8 +2933,7 @@ var global_data = {
 	send_email,
 	crypto,
 	filename_sanitize,
-	get_third,
-	get_fourth,
+	checkURLParam,
 	create_date,
 	get_user_info,
 	world_get_or_create,
@@ -2967,19 +2950,17 @@ var global_data = {
 	decodeCharProt,
 	advancedSplit,
 	change_char_in_array,
-	add_to_chatlog,
 	getWorldData,
-	clearChatlog,
 	html_tag_esc,
 	wss, // this is undefined by default, but will get a value once wss is initialized
 	topActiveWorlds,
 	NCaseCompare,
 	handle_error,
-	retrieveChatHistory,
 	client_ips,
 	modify_bypass_key,
 	trimHTML,
 	tile_database: subsystems.tile_database,
+	chat_mgr: subsystems.chat_mgr,
 	intv,
 	WebSocket,
 	fixColors,
@@ -2999,7 +2980,7 @@ var global_data = {
 	monitorEventSockets,
 	arrayIsEntirely,
 	normalizeCacheTile,
-	parse_textcode,
+	parseTextcode,
 	acme_stat: function() { return { enabled: acmeEnabled, pass: acmePass } },
 	uviasSendIdentifier
 };
@@ -3053,7 +3034,6 @@ function stopServer(restart, maintenance) {
 		}
 
 		try {
-			await updateChatLogData(true);
 			if(accountSystem == "local") {
 				await clear_expired_sessions(true);
 			}

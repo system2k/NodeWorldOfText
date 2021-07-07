@@ -15,7 +15,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var user = evars.user;
 
 	var url = vars.url;
-	var get_third = vars.get_third;
+	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var dispage = vars.dispage;
 	var world_get_or_create = vars.world_get_or_create;
@@ -26,8 +26,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		});
 	}
 
-	// gets world name from /accounts/timemachine/{world}/
-	var world_name = get_third(path, "accounts", "timemachine")
+	var world_name = checkURLParam("/accounts/timemachine/:world", path).world;
 
 	var sp = world_name.split("/");
 	if(sp.length > 1) {

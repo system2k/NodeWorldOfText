@@ -3,7 +3,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var HTML = evars.HTML;
 
 	var dispage = vars.dispage;
-	var get_third = vars.get_third;
+	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var filename_sanitize = vars.filename_sanitize;
 	var world_get_or_create = vars.world_get_or_create;
@@ -22,7 +22,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var user = evars.user;
 
 	var db = vars.db;
-	var get_third = vars.get_third;
+	var checkURLParam = vars.checkURLParam;
 	var dispage = vars.dispage;
 	var url = vars.url;
 	var san_nbr = vars.san_nbr;

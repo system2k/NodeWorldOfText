@@ -2,11 +2,13 @@ var db_ch;
 var intv;
 var handle_error;
 var db;
-function prepare_chat_db(vars) {
+module.exports.main = async function(vars) {
 	db_ch = vars.db_ch;
 	intv = vars.intv;
 	handle_error = vars.handle_error;
 	db = vars.db;
+
+	await init_chat_history();
 
 	// every 5 minutes, clear the chat cache
 	intv.invalidate_chat_cache = setInterval(function() {
@@ -14,6 +16,10 @@ function prepare_chat_db(vars) {
 			invalidate_chat_cache(i);
 		}
 	}, 60000 * 5);
+}
+
+module.exports.server_exit = async function() {
+	await updateChatLogData(true);
 }
 
 async function init_chat_history() {
@@ -238,11 +244,8 @@ async function updateChatLogData(no_timeout) {
 	if(!no_timeout) intv.updateChatLogData = setTimeout(updateChatLogData, 5000);
 }
 
-module.exports = {
-	prepare_chat_db,
-	init_chat_history,
-	retrieveChatHistory,
-	add_to_chatlog,
-	clearChatlog,
-	updateChatLogData
-};
+module.exports.init_chat_history = init_chat_history;
+module.exports.retrieveChatHistory = retrieveChatHistory;
+module.exports.add_to_chatlog = add_to_chatlog;
+module.exports.clearChatlog = clearChatlog;
+module.exports.updateChatLogData = updateChatLogData;

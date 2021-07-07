@@ -3,7 +3,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var HTML = evars.HTML;
 	var user = evars.user;
 
-	var get_third = vars.get_third;
+	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var dispage = vars.dispage;
 	var db_misc = vars.db_misc;
@@ -14,7 +14,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
 
-	var username = get_third(path, "administrator", "user");
+	var username = checkURLParam("/administrator/user/:username", path).username;
 	
 	var user_edit;
 	if(accountSystem == "uvias") {
@@ -56,7 +56,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var db = vars.db;
 	var db_edits = vars.db_edits;
-	var get_third = vars.get_third;
+	var checkURLParam = vars.checkURLParam;
 	var dispage = vars.dispage;
 	var url = vars.url;
 	var uvias = vars.uvias;
@@ -67,7 +67,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		return;
 	}
 
-	var username = get_third(path, "administrator", "user");
+	var username = checkURLParam("/administrator/user/:username", path).username;
 
 	var user_edit;
 	if(accountSystem == "uvias") {

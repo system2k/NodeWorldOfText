@@ -3,7 +3,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var HTML = evars.HTML;
 	var user = evars.user;
 
-	var get_fourth = vars.get_fourth;
+	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var dispage = vars.dispage;
 	var uvias = vars.uvias;
@@ -14,7 +14,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
 
-	var username = get_fourth(path, "administrator", "users", "by_username");
+	var username = checkURLParam("/administrator/users/by_username/:username", path).username;
 	
 	var user_info;
 	if(accountSystem == "uvias") {

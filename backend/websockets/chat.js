@@ -40,7 +40,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var db_ch = vars.db_ch;
 	var san_nbr = vars.san_nbr;
 	var ws_broadcast = vars.ws_broadcast; // site-wide broadcast
-	var add_to_chatlog = vars.add_to_chatlog;
+	var chat_mgr = vars.chat_mgr;
 	var html_tag_esc = vars.html_tag_esc;
 	var topActiveWorlds = vars.topActiveWorlds;
 	var wss = vars.wss;
@@ -48,6 +48,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var ranks_cache = vars.ranks_cache;
 	var accountSystem = vars.accountSystem;
 	var create_date = vars.create_date;
+
+	var add_to_chatlog = chat_mgr.add_to_chatlog;
 
 	var ipHeaderAddr = ws.sdata.ipAddress;
 
@@ -157,7 +159,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 		[0, "night", null, "enable night mode", null], // client-side
 		[0, "day", null, "disable night mode", null], // client-side
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
-		[0, "whoami", null, "display who you are logged into"]
+		[0, "whoami", null, "display your identity"]
 	];
 
 	function generate_command_list() {
@@ -396,7 +398,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 				}
 			}
 			idstr += "Login username: " + user_login + "<br>";
-			idstr += "Display username: " + user_disp;
+			idstr += "Display username: " + user_disp + "<br>";
+			idstr += "Chat ID: " + clientId;
 			return serverChatResponse(idstr, data.location);
 		}
 	}
@@ -408,9 +411,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 		var command = args[0].toLowerCase();
 		isCommand = true;
 
-		var operator  = user.operator;
+		var operator = user.operator;
 		var superuser = user.superuser;
-		var staff	  = user.staff;
+		var staff = user.staff;
 
 		switch(command) {
 			case "worlds":

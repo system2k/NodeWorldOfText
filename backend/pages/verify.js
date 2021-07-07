@@ -2,7 +2,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var path = evars.path;
 
 	var url = vars.url;
-	var get_third = vars.get_third;
+	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var dispage = vars.dispage;
 	var accountSystem = vars.accountSystem;
@@ -11,8 +11,8 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		return;
 	}
 
-	// gets id from /accounts/verify/{world}/
-	var verification_key = get_third(path, "accounts", "verify");
+	// gets id from /accounts/verify/{key}/
+	var verification_key = checkURLParam("/accounts/verify/:key", path).key;
 
 	if(verification_key == "complete") {
 		return await dispage("activate_complete", null, req, serve, vars, evars);

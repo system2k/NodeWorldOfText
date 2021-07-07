@@ -87,7 +87,7 @@ function mousemove_admclr(e) {
 		admclr.handleClear(currentPosition[0], currentPosition[1]);
 	}
 }
-document.body.addEventListener("mousemove", mousemove_admclr)
+document.body.addEventListener("mousemove", mousemove_admclr);
 
 // a key is released
 function keyup_admclr(e) {

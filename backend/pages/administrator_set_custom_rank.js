@@ -3,7 +3,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var HTML = evars.HTML;
 	var user = evars.user;
 
-	var get_third = vars.get_third;
+	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var dispage = vars.dispage;
 	var ranks_cache = vars.ranks_cache;
@@ -14,7 +14,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
 
-	var username = get_third(path, "administrator", "set_custom_rank");
+	var username = checkURLParam("/administrator/set_custom_rank/:username", path).username;
 
 	var user_edit;
 	if(accountSystem == "uvias") {
@@ -64,7 +64,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var user = evars.user;
 
 	var db = vars.db;
-	var get_third = vars.get_third;
+	var checkURLParam = vars.checkURLParam;
 	var dispage = vars.dispage;
 	var url = vars.url;
 	var ranks_cache = vars.ranks_cache;
@@ -77,7 +77,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		return;
 	}
 
-	var username = get_third(path, "administrator", "set_custom_rank");
+	var username = checkURLParam("/administrator/set_custom_rank/:username", path).username;
 	
 	var user_edit;
 	if(accountSystem == "uvias") {

@@ -26,7 +26,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var user = evars.user;
 
 	var url = vars.url;
-	var get_third = vars.get_third;
+	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var dispage = vars.dispage;
 	var world_get_or_create = vars.world_get_or_create;
@@ -40,7 +40,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	}
 
 	// gets world name from /accounts/configure/{world}/
-	var world_name = get_third(path, "accounts", "configure")
+	var world_name = checkURLParam("/accounts/configure/:world", path).world;
 
 	var world = await world_get_or_create(world_name)
 	if(!world) {
@@ -177,7 +177,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var db = vars.db;
 	var db_edits = vars.db_edits;
-	var get_third = vars.get_third;
+	var checkURLParam = vars.checkURLParam;
 	var dispage = vars.dispage;
 	var url = vars.url;
 	var world_get_or_create = vars.world_get_or_create;
@@ -186,7 +186,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var advancedSplit = vars.advancedSplit;
 	var decodeCharProt = vars.decodeCharProt;
 	var encodeCharProt = vars.encodeCharProt;
-	var clearChatlog = vars.clearChatlog;
+	var chat_mgr = vars.chat_mgr;
 	var tile_database = vars.tile_database;
 	var uvias = vars.uvias;
 	var accountSystem = vars.accountSystem;
@@ -194,11 +194,13 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var san_nbr = vars.san_nbr;
 	var san_dp = vars.san_dp;
 
+	var clearChatlog = chat_mgr.clearChatlog;
+
 	if(!user.authenticated) {
 		return serve();
 	}
 
-	var world_name = get_third(path, "accounts", "configure");
+	var world_name = checkURLParam("/accounts/configure/:world", path).world;
 
 	var world = await world_get_or_create(world_name);
 	if(!world) {

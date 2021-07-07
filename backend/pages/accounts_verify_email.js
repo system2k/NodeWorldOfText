@@ -9,7 +9,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var handle_error = vars.handle_error;
 	var db = vars.db;
 	var new_token = vars.new_token;
-	var get_third = vars.get_third;
+	var checkURLParam = vars.checkURLParam;
 	var accountSystem = vars.accountSystem;
 
 	if(accountSystem == "uvias") {
@@ -29,7 +29,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		}));
 	}
 
-	var url_csrftoken = get_third(path, "accounts", "verify_email");
+	var url_csrftoken = checkURLParam("/accounts/verify_email/:token", path).token;
 	
 	// invalid csrftoken
 	if(user.csrftoken != url_csrftoken) {

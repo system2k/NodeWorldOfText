@@ -10,7 +10,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var modules = vars.modules;
 	var ws_broadcast = vars.ws_broadcast; // site-wide broadcast
 	var getWorldData = vars.getWorldData;
-	var retrieveChatHistory = vars.retrieveChatHistory;
+	var chat_mgr = vars.chat_mgr;
+
+	var retrieveChatHistory = chat_mgr.retrieveChatHistory;
 
 	var props = JSON.parse(world.properties);
 	var chat_perm = props.chat_permission;

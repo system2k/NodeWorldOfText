@@ -12,7 +12,7 @@ var encodeCharProt;
 var advancedSplit;
 var change_char_in_array;
 var memTileCache;
-var parse_textcode;
+var parseTextcode;
 var broadcastMonitorEvent;
 
 var server_exiting = false;
@@ -34,7 +34,7 @@ module.exports.main = function(vars) {
 	advancedSplit = vars.advancedSplit;
 	change_char_in_array = vars.change_char_in_array;
 	memTileCache = vars.memTileCache;
-	parse_textcode = vars.parse_textcode;
+	parseTextcode = vars.parseTextcode;
 	broadcastMonitorEvent = vars.broadcastMonitorEvent;
 
 	databaseClock();
@@ -1313,7 +1313,7 @@ function processComplexRequest(call_id, type, data) {
 			var can_color_text = data.can_color_text;
 			var text = data.text;
 
-			var parsed_text = parse_textcode.parse(text);
+			var parsed_text = parseTextcode(text);
 			var promiseList = [];
 			var modifiedTiles = {};
 
