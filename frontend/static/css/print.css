@@ -1,0 +1,12 @@
+body {
+	line-height: 1.5;
+	font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+	color: #000;
+	background: none;
+	font-size: 10pt;
+}
+
+a:link:after, a:visited:after {
+	content: " (" attr(href) ")";
+	font-size: 90%;
+}

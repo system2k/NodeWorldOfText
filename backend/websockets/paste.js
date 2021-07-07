@@ -25,11 +25,11 @@ module.exports = async function(ws, data, send, vars, evars) {
 	if(charY > CONST.tileRows - 1) charY = CONST.tileRows - 1;
 
 	var call_id = tile_database.newCallId();
+	tile_database.reserveCallId(call_id);
 
 	var is_owner = user.id == world.owner_id || (user.superuser && world.name == "");
 	var is_member = user.stats.member || is_owner || (user.superuser && world.name == "");
 
-	tile_database.reserveCallId(call_id);
 	tile_database.write(call_id, tile_database.types.paste, {
 		world, user,
 		is_owner, is_member,

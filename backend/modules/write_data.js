@@ -1,9 +1,71 @@
 var emptyWriteResponse = { accepted: [], rejected: {} };
 
+var editRateLimits = {};
+var tileRateLimits = {};
+
+var charRatePerSecond = 20480;
+var tileRatePerSecond = 800;
+
+/*
+	Limit of 20480 edits per second, and 800 unique tiles per second
+*/
+
+var editReqLimit = 512;
+var superuserEditReqLimit = 1280;
+
+function checkCharRateLimit(ipObj, editCount) {
+	var sec = Math.floor(Date.now() / 1000);
+	var currentSec = ipObj.currentSecond;
+	ipObj.currentSecond = sec;
+	if(currentSec != sec || ipObj.value == null) {
+		ipObj.value = editCount;
+		return true;
+	}
+	ipObj.value += editCount;
+	if(ipObj.value > charRatePerSecond) {
+		return false;
+	}
+	return true;
+}
+
+function checkTileRateLimit(ipObj, tileX, tileY, worldId) {
+	var sec = Math.floor(Date.now() / 1000);
+	var currentSec = ipObj.currentSecond;
+	ipObj.currentSecond = sec;
+	if(currentSec != sec || ipObj.value == null) {
+		ipObj.value = {};
+		return true;
+	}
+	ipObj.value[tileY + "," + tileX + "," + worldId] = 1;
+	var tileCount = Object.keys(ipObj.value).length;
+	if(tileCount > tileRatePerSecond) {
+		return false;
+	}
+	return true;
+}
+
+function prepareRateLimiter(limObj, ipAddress) {
+	var obj = limObj[ipAddress];
+	if(obj) return obj;
+	obj = {
+		currentSecond: 0,
+		value: null
+	};
+	limObj[ipAddress] = obj;
+	return obj;
+}
+
 module.exports = async function(data, vars, evars) {
 	var user = evars.user;
 	var channel = evars.channel;
 	var world = evars.world;
+	
+	var ipAddress;
+	if(evars.sdata) {
+		ipAddress = evars.sdata.ipAddress;
+	} else {
+		ipAddress = evars.ipAddress;
+	}
 
 	var san_nbr = vars.san_nbr;
 	var advancedSplit = vars.advancedSplit;
@@ -20,15 +82,16 @@ module.exports = async function(data, vars, evars) {
 	var public_only = data.public_only;
 	var preserve_links = data.preserve_links;
 
-	var edits_limit = 512;
+	var editLimit = editReqLimit;
 	if(user.superuser) {
-		edits_limit = 1280;
+		editLimit = superuserEditReqLimit;
 	}
 
 	var worldProps = JSON.parse(world.properties);
+	var world_id = world.id;
 
 	var no_log_edits = !!worldProps.no_log_edits;
-	var color_text   = !!worldProps.color_text;
+	var color_text = !!worldProps.color_text;
 
 	var is_owner = user.id == world.owner_id;
 	var is_member = user.stats.member;
@@ -43,51 +106,58 @@ module.exports = async function(data, vars, evars) {
 	if(!edits) return emptyWriteResponse;
 	if(!Array.isArray(edits)) return emptyWriteResponse;
 	
-	var total_edits = 0;
+	var tileLimiter = prepareRateLimiter(tileRateLimits, ipAddress);
+	var editLimiter = prepareRateLimiter(editRateLimits, ipAddress);
+
+	var totalEdits = 0;
 	var tiles = {};
 	var tileCount = 0;
 	// organize edits into tile coordinates
 	for(var i = 0; i < edits.length; i++) {
 		var segment = edits[i];
 		if(!segment || !Array.isArray(segment)) continue;
-
-		total_edits++;
-		if(typeof segment[5] != "string") {
-			continue;
-		}
-		segment[0] = san_nbr(segment[0]);
-		segment[1] = san_nbr(segment[1]);
-
-		if (!tiles[segment[0] + "," + segment[1]]) {
-			tiles[segment[0] + "," + segment[1]] = [];
-			tileCount++;
-		}
-		tiles[segment[0] + "," + segment[1]].push(segment)
-		if(total_edits >= edits_limit) { // edit limit reached
+		var tileY = san_nbr(segment[0]);
+		var tileX = san_nbr(segment[1]);
+		var tileStr = tileY + "," + tileX;
+		var char = segment[5];
+		if(typeof char != "string") continue;
+		if(!checkCharRateLimit(editLimiter, 1)) {
 			break;
 		}
+		if(!tiles[tileStr]) {
+			if(!checkTileRateLimit(tileLimiter, tileX, tileY, world_id)) {
+				break;
+			}
+			tiles[tileStr] = [];
+			tileCount++;
+		}
+		totalEdits++;
+		if(totalEdits >= editLimit) { // edit limit reached
+			break;
+		}
+		tiles[tileStr].push(segment);
 	}
 
 	if(evars && evars.ws && vars.monitorEventSockets.length) {
-		var textLog = evars.ws.sdata.ipAddress + ", [" + evars.ws.sdata.clientId + ", '" + channel + "'] sent 'write' on world ['" + world.name + "', " + world.id + "]. " + tileCount + " modified tiles, " + total_edits + " edits";
+		var textLog = evars.ws.sdata.ipAddress + ", [" + evars.ws.sdata.clientId + ", '" + channel + "'] sent 'write' on world ['" + world.name + "', " + world.id + "]. " + tileCount + " modified tiles, " + totalEdits + " edits";
 		broadcastMonitorEvent(textLog);
 	}
 
 	var call_id = tile_database.newCallId();
-
 	tile_database.reserveCallId(call_id);
 
-	var DateNow = Date.now();
+	var currentDate = Date.now();
 	var tile_edits = [];
 
 	for(var i in tiles) {
 		var incomingEdits = tiles[i];
-
 		var changes = [];
 
 		for(var k = 0; k < incomingEdits.length; k++) {
 			var editIncome = incomingEdits[k];
 
+			editIncome[0] = san_nbr(editIncome[0]);
+			editIncome[1] = san_nbr(editIncome[1]);
 			var charX = san_nbr(editIncome[3]);
 			var charY = san_nbr(editIncome[2]);
 			var charInsIdx = charY * CONST.tileCols + charX;
@@ -156,7 +226,7 @@ module.exports = async function(data, vars, evars) {
 
 	// send to tile database manager
 	tile_database.write(call_id, tile_database.types.write, {
-		date: DateNow,
+		date: currentDate,
 		tile_edits,
 		user, world, is_owner, is_member,
 		can_color_text, public_only, no_log_edits, preserve_links,

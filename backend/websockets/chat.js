@@ -156,7 +156,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 		[0, "chatcolor", ["color code"], "change your chat color", "#FF00FF"], // client-side
 		[0, "night", null, "enable night mode", null], // client-side
 		[0, "day", null, "disable night mode", null], // client-side
-		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"]
+		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
+		[0, "whoami", null, "display who you are logged into"]
 	];
 
 	function generate_command_list() {
@@ -381,6 +382,22 @@ module.exports = async function(ws, data, send, vars, evars) {
 				cnt++;
 			}
 			return serverChatResponse("Unmuted " + cnt + " user(s)", data.location);
+		},
+		whoami: function() {
+			var idstr = "Who Am I:<br>";
+			var user_login = "(anonymous)";
+			var user_disp = "(anonymous)";
+			if(user.authenticated) {
+				user_disp = username_to_display;
+				if(accountSystem == "uvias") {
+					user_login = user.username;
+				} else {
+					user_login = user_disp;
+				}
+			}
+			idstr += "Login username: " + user_login + "<br>";
+			idstr += "Display username: " + user_disp;
+			return serverChatResponse(idstr, data.location);
 		}
 	}
 
@@ -419,6 +436,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 				return;
 			case "clearmutes":
 				if(staff) com.clearmutes();
+				return;
+			case "whoami":
+				com.whoami();
 				return;
 			default:
 				serverChatResponse("Invalid command: " + html_tag_esc(msg));

@@ -1935,12 +1935,12 @@ function event_touchend(e) {
 	event_mouseup(e, touchPosX, touchPosY);
 }
 document.addEventListener("touchend", event_touchend);
-function event_mouseleave() {
-	stopDragging();
+function event_mouseleave(e) {
+	w.emit("mouseLeave");
 }
 document.addEventListener("mouseleave", event_mouseleave);
 function event_mouseenter() {
-	stopDragging();
+	w.emit("mouseEnter");
 }
 document.addEventListener("mouseenter", event_mouseenter);
 
@@ -2932,7 +2932,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 		draggable_element_mousemove[i](e, e.pageX, e.pageY);
 	}
 	updateHoveredLink(pageX, pageY, e);
-	if(e.target != elm.owot && e.target != linkDiv) return;
+	if(e.target != elm.owot && e.target != linkDiv && !isDragging) return;
 
 	// region selecting
 	for(var i = 0; i < regionSelections.length; i++) {
@@ -3028,9 +3028,6 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 			}
 		}
 	}
-
-	// if dragging beyond window, stop
-	if(pageX >= owotWidth || pageY >= owotHeight || pageX < 0 || pageY < 0) stopDragging();
 
 	if(!isDragging || regionSelectionsActive()) return;
 

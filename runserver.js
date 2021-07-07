@@ -1533,8 +1533,7 @@ async function get_user_info(cookies, is_websocket, include_cookies) {
 	};
 	if(accountSystem == "local" && cookies.sessionid) {
 		// user data from session
-		var s_data = await db.get("SELECT * FROM auth_session WHERE session_key=?", 
-			cookies.sessionid);
+		var s_data = await db.get("SELECT * FROM auth_session WHERE session_key=?", cookies.sessionid);
 		if(s_data) {
 			user = JSON.parse(s_data.session_data);
 			if(cookies.csrftoken == user.csrftoken) { // verify csrftoken
@@ -1544,13 +1543,9 @@ async function get_user_info(cookies, is_websocket, include_cookies) {
 				user.is_active = !!userauth.is_active;
 				user.email = userauth.email;
 
-				var operator = level == 3;
-				var superuser = level == 2;
-				var staff = level == 1;
-
-				user.operator = operator;
-				user.superuser = superuser || operator;
-				user.staff = staff || superuser || operator;
+				user.operator = level == 3;
+				user.superuser = level == 2;
+				user.staff = level == 1;
 
 				if(user.staff && !is_websocket) {
 					user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id);
@@ -1603,17 +1598,13 @@ async function get_user_info(cookies, is_websocket, include_cookies) {
 					user.superuser = false;
 					user.staff = false;
 					
-					var rank_data = await db_misc.get("SELECT level FROM admin_ranks WHERE id=?", [user.id]);
+					var rank_data = await db_misc.get("SELECT level FROM admin_ranks WHERE id=?", user.id);
 					if(rank_data) {
 						var level = rank_data.level;
 
-						var operator = level == 3;
-						var superuser = level == 2;
-						var staff = level == 1;
-
-						user.operator = operator;
-						user.superuser = superuser || operator;
-						user.staff = staff || superuser || operator;
+						user.operator = level == 3;
+						user.superuser = level == 2;
+						user.staff = level == 1;
 					}
 
 					if(user.staff && !is_websocket) {
@@ -2535,7 +2526,7 @@ var ip_address_conn_limit = {};
 // {ip: ws_limits}
 var ip_address_req_limit = {}; // TODO: Cleanup objects
 
-var ws_req_per_second = 20000;
+var ws_req_per_second = 1000;
 var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	chat:			[256, 1000, 0], // rate-limiting handled separately
 	chathistory:	[10, 1000, 0],
@@ -2546,7 +2537,6 @@ var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	fetch:			[256, 1000, 0],
 	link:			[400, 1000, 0],
 	protect:		[400, 1000, 0],
-	set_tile:		[10, 1000, 0],
 	write:			[256, 1000, 0], // rate-limiting handled separately
 	paste:			[10, 500, 0]
 };
