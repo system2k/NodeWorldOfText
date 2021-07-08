@@ -987,20 +987,28 @@ function normalizeCacheTile(ctile) {
 }
 
 // example: checkURLParam("/accounts/configure/:world/", "/accounts/configure/test/") -> {world: "test"}
+// checkURLParam("/accounts/configure/*world/", "/accounts/configure/Sub/World/") -> {world: "Sub/World"}
 function checkURLParam(mask, url) {
 	mask = trimSlash(mask).split("/");
 	url = trimSlash(url).split("/");
-	if(mask.length != url.length) return {};
 	var values = {};
 	for(var i = 0; i < mask.length; i++) {
 		var maskv = mask[i];
 		var urlv = url[i];
 		if(maskv[0] == ":") {
 			values[maskv.substr(1)] = urlv;
+		} else if(maskv[0] == "*") {
+			var rest = [];
+			for(var x = i; x < url.length; x++) {
+				rest.push(url[x]);
+			}
+			values[maskv.substr(1)] = rest.join("/");
+			return values;
 		} else {
 			if(maskv != urlv) return {};
 		}
 	}
+	if(mask.length != url.length) return {};
 	return values;
 }
 

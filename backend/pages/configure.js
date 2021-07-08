@@ -39,8 +39,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		})
 	}
 
-	// gets world name from /accounts/configure/{world}/
-	var world_name = checkURLParam("/accounts/configure/:world", path).world;
+	// gets world name from /accounts/configure/{world...}/
+	var world_name = checkURLParam("/accounts/configure/*world", path).world;
 
 	var world = await world_get_or_create(world_name)
 	if(!world) {
