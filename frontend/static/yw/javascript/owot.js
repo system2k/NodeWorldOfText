@@ -70,8 +70,10 @@ var writeBuffer            = [];
 var highlightFlash         = {};
 var highlightCount         = 0;
 var coloredChars           = {}; // highlighted chars
-var images_to_load         = {}; // background images
 var shiftOptState          = { prevX: 0, prevY: 0, x1: 0, y1: 0, x2: 0, y2: 0, prevZoom: -1 };
+var backgroundImage        = null;
+var backgroundPattern      = null;
+var backgroundPatternSize  = [0, 0];
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -438,64 +440,21 @@ function storeNickname() {
 
 getStoredNickname();
 
-if(state.background) { // add the background image (if it already exists)
-	images_to_load.background = state.background.path;
-}
-for(var i in images_to_load) { // add blank image object so that client knows it exists, but not loaded
-	images[i] = null;
-}
-var img_load_keys = Object.keys(images_to_load);
-
-var imgToArrayCanvas = document.createElement("canvas");
-var backImg = imgToArrayCanvas.getContext("2d"); // temporary canvas used to pull data from images
-
-var img_load_index = 0;
-function loadImgPixelData(callback) {
-	var img_key = img_load_keys[img_load_index];
-	if(!img_key) {
-		callback();
-		return;
+function loadBackgroundData(cb) {
+	if(!backgroundEnabled || !state.background) {
+		return cb();
 	}
-	var loadImageElm = new Image();
-	loadImageElm.src = images_to_load[img_key];
-	var error = false;
-	loadImageElm.onload = function() {
-		var width = loadImageElm.width;
-		var height = loadImageElm.height;
-		// resize background images based on configuration
-		if(img_key == "background") {
-			if(w.backgroundInfo.w) {
-				width = w.backgroundInfo.w;
-			}
-			if(w.backgroundInfo.h) {
-				height = w.backgroundInfo.h;
-			}
-		}
-		if(error) {
-			width = 1;
-			height = 1;
-			backImg.fillStyle = "#DDDDDD";
-			backImg.fillRect(0, 0, 1, 1);
-		}
-		imgToArrayCanvas.width = width;
-		imgToArrayCanvas.height = height;
-		backImg.drawImage(loadImageElm, 0, 0, width, height);
-		var rawPixelData = backImg.getImageData(0, 0, width, height).data;
-		images[img_key] = [rawPixelData, width, height, loadImageElm];
-
-		img_load_index++;
-		if(img_load_index >= img_load_keys.length) {
-			// once all the images are loaded
-			w.render();
-			callback();
-		} else {
-			// continue loading
-			loadImgPixelData(callback);
-		}
+	var backPath = state.background.path;
+	var backImgElm = new Image();
+	backImgElm.src = backPath;
+	backImgElm.onload = function() {
+		backgroundImage = backImgElm;
+		backgroundPattern = owotCtx.createPattern(backImgElm, "repeat");
+		backgroundPatternSize = [backImgElm.width, backImgElm.height];
+		cb();
 	}
-	loadImageElm.onerror = function() {
-		error = true;
-		loadImageElm.onload();
+	backImgElm.onerror = function() {
+		backImgElm.onload();
 	}
 }
 
@@ -640,12 +599,6 @@ function setupTextRenderCtx() {
 
 setupTextRenderCtx();
 updateScaleConsts();
-
-// used to stretch background images
-var backgroundImageCanvasRenderer = document.createElement("canvas");
-backgroundImageCanvasRenderer.width = tileWidth;
-backgroundImageCanvasRenderer.height = tileHeight;
-var backgroundImageCtx = backgroundImageCanvasRenderer.getContext("2d");
 
 // set absolute zoom
 function doZoom(percentage) {
@@ -1426,9 +1379,9 @@ function resolveColorValue(val) {
 		if(num > 16777215) num = 16777215;
 		return num;
 	}
-	backImg.fillStyle = "#000000";
-	backImg.fillStyle = orig;
-	var fs = backImg.fillStyle;
+	owotCtx.fillStyle = "#000000";
+	owotCtx.fillStyle = orig;
+	var fs = owotCtx.fillStyle;
 	if(fs[0] == "#" && fs.length == 7) {
 		return parseInt(fs.substr(1).slice(0, 6), 16);
 	}
@@ -1609,7 +1562,7 @@ function begin() {
 		}
 		checkTextColorOverride();
 		menu_color(styles.menu);
-		loadImgPixelData(function() {
+		loadBackgroundData(function() {
 			owotCtx.clearRect(0, 0, owotWidth, owotHeight);
 			renderLoop();
 			createSocket();
@@ -3523,92 +3476,6 @@ function uncolorChar(tileX, tileY, charX, charY) {
 	}
 }
 
-function generateBackgroundPixels(tileX, tileY, image, returnCanvas, isBackground, writability) {
-	var backTileWidth = tileWidth;
-	var backTileHeight = tileHeight;
-	if(returnCanvas) {
-		backTileWidth = dTileW;
-		backTileHeight = dTileH;
-	}
-	if(backTileWidth <= 0 || backTileHeight <= 0) {
-		return false;
-	}
-	var imgData = owotCtx.createImageData(backTileWidth, backTileHeight);
-	if(!image) { // image doesn't exist
-		return false;
-	}
-	var invert = false;
-	if(image == images.unloaded && w.nightMode == 1) {
-		invert = true;
-	}
-	var alphaMult = isBackground ? w.backgroundInfo.alpha : -1;
-	var repeatMode = isBackground ? w.backgroundInfo.rmod : 0;
-	var fromData = image[0]; // pixel data (RGBA)
-	var img_width = image[1];
-	var img_height = image[2];
-	// where the tile starts in the client (offset relative to 0,0)
-	var startX = tileX * backTileWidth;
-	var startY = tileY * backTileHeight;
-	if(isBackground) {
-		startX += w.backgroundInfo.x;
-		startY += w.backgroundInfo.y;
-		if(w.backgroundInfo.w) {
-			img_width = w.backgroundInfo.w;
-		}
-		if(w.backgroundInfo.h) {
-			img_height = w.backgroundInfo.h;
-		}
-	}
-	if(repeatMode == 1) {
-		startX += Math.floor(img_width / 2);
-		startY += Math.floor(img_height / 2);
-	}
-	var brightnessOffset = 0;
-	if(writability == 1) {
-		brightnessOffset = -30;
-	} else if(writability == 2) {
-		brightnessOffset = -60;
-	}
-	// start drawing the pixels
-	for(var y = 0; y < backTileHeight; y++) {
-		for(var x = 0; x < backTileWidth; x++) {
-			var posX = startX + x;
-			var posY = startY + y;
-			if((posX < 0 || posY < 0 || posX >= img_width || posY >= img_height) && (repeatMode == 1 || repeatMode == 2)) continue;
-			posX = posX - Math.floor(posX / img_width) * img_width;
-			posY = posY - Math.floor(posY / img_height) * img_height;
-			var index = (posY * img_width + posX) * 4;
-			var destIndex = (y * backTileWidth + x) * 4;
-			var R = fromData[index + 0];
-			var G = fromData[index + 1];
-			var B = fromData[index + 2];
-			var A = fromData[index + 3];
-			if(alphaMult == -1) {
-				A = 255;
-			} else {
-				A *= alphaMult;
-			}
-			if(invert) {
-				R = 255 - R;
-				G = 255 - G;
-				B = 255 - B;
-			}
-			R += brightnessOffset;
-			G += brightnessOffset;
-			B += brightnessOffset;
-			imgData.data[destIndex + 0] = R;
-			imgData.data[destIndex + 1] = G;
-			imgData.data[destIndex + 2] = B;
-			imgData.data[destIndex + 3] = A;
-		}
-	}
-	if(returnCanvas) { // return canvas version of background
-		backgroundImageCtx.putImageData(imgData, 0, 0);
-		return backgroundImageCanvasRenderer;
-	}
-	return imgData;
-}
-
 var isTileLoaded = Tile.loaded;
 var isTileVisible = Tile.visible;
 
@@ -3884,6 +3751,53 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 	return backColor;
 }
 
+function renderTileBackgroundImage(renderCtx, tileX, tileY) {
+	var startX = tileX * tileW;
+	var startY = tileY * tileH;
+	var backRatioW = tileWidth / dTileW;
+	var backRatioH = tileHeight / dTileH;
+
+	var imgWidth = backgroundPatternSize[0];
+	var imgHeight = backgroundPatternSize[1];
+
+	var repeat = w.backgroundInfo.rmod;
+	var offX = w.backgroundInfo.x;
+	var offY = w.backgroundInfo.y;
+	var patWidth = w.backgroundInfo.w;
+	var patHeight = w.backgroundInfo.h;
+
+	if(!patWidth) patWidth = imgWidth;
+	if(!patHeight) patHeight = imgHeight;
+
+	startX += offX * backRatioW;
+	startY += offY * backRatioH;
+
+	backRatioW *= patWidth / imgWidth;
+	backRatioH *= patHeight / imgHeight;
+
+	/*
+		0: repeat
+		1: center
+		2: singular
+	*/
+	if(repeat == 0) {
+		if(!window.DOMMatrix || !backgroundPattern) return false;
+		backgroundPattern.setTransform(new DOMMatrix([backRatioW, 0, 0, backRatioH, -startX, -startY]));
+		renderCtx.fillStyle = backgroundPattern;
+		renderCtx.fillRect(0, 0, tileWidth, tileHeight);
+		return true;
+	} else if(repeat == 1 || repeat == 2) {
+		if(!backgroundImage) return false;
+		if(repeat == 1) {
+			startX += Math.floor(imgWidth / 2);
+			startY += Math.floor(imgHeight / 2);
+		}
+		renderCtx.drawImage(backgroundImage, -startX, -startY, imgWidth * backRatioW, imgHeight * backRatioH);
+		return true;
+	}
+	return false;
+}
+
 function clearTile(tileX, tileY) {
 	if(!Tile.visible(tileX, tileY)) return;
 	var tileScreenPos = getTileScreenPosition(tileX, tileY);
@@ -3971,11 +3885,8 @@ function renderTile(tileX, tileY, redraw) {
 		renderTileBackground(textRenderCtx, 0, 0, tile, tileX, tileY, cursorVisibility);
 	}
 
-	if(images.background && backgroundEnabled) {
-		var background_data = generateBackgroundPixels(tileX, tileY, images.background, true, true, computed_writability);
-		if(background_data) {
-			textRenderCtx.drawImage(background_data, 0, 0, tileWidth, tileHeight);
-		}
+	if(backgroundEnabled) {
+		renderTileBackgroundImage(textRenderCtx, tileX, tileY);
 	}
 
 	// temp compat
@@ -4212,7 +4123,7 @@ function buildMenu() {
 	}, function() {
 		w.disableColors();
 	}, true);
-	if("background" in images) {
+	if(state.background) {
 		menu.addCheckboxOption("Background", function() {
 			backgroundEnabled = true;
 			w.render(true);
