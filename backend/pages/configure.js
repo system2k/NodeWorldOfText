@@ -200,7 +200,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		return serve();
 	}
 
-	var world_name = checkURLParam("/accounts/configure/:world", path).world;
+	var world_name = checkURLParam("/accounts/configure/*world", path).world;
 
 	var world = await world_get_or_create(world_name);
 	if(!world) {

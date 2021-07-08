@@ -26,7 +26,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var filename_sanitize = vars.filename_sanitize;
 	var world_get_or_create = vars.world_get_or_create;
 
-	var world_name = checkURLParam("/accounts/download/:world", path).world;
+	var world_name = checkURLParam("/accounts/download/*world", path).world;
 
 	var world = await world_get_or_create(world_name);
 	if(!world) {

@@ -26,7 +26,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		});
 	}
 
-	var world_name = checkURLParam("/accounts/timemachine/:world", path).world;
+	var world_name = checkURLParam("/accounts/timemachine/*world", path).world;
 
 	var sp = world_name.split("/");
 	if(sp.length > 1) {

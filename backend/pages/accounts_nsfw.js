@@ -4,7 +4,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 
 	var checkURLParam = vars.checkURLParam;
 
-	var world_name = checkURLParam("/accounts/nsfw/:world", path).world;
+	var world_name = checkURLParam("/accounts/nsfw/*world", path).world;
 	var data = {
 		world_name
 	};
