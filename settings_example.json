@@ -57,6 +57,7 @@
 	"bypass_key": "../data/bypass_key.txt",
 
 	"email": {
+		"enabled": false,
 		"username": "email@site.com",
 		"password": "password123",
 		"display_email": "\"Our World of Text\" <email@site.com>"

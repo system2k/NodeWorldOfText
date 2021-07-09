@@ -825,6 +825,7 @@ var transporter;
 var email_available = true;
 
 async function loadEmail() {
+	if(!settings.email.enabled) return;
 	try {
 		if(isTestServer) throw "This is a test server";
 		transporter = nodemailer.createTransport({

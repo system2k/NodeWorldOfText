@@ -2344,6 +2344,10 @@ var char_input_check = setInterval(function() {
 	}
 	var pastePerm = Permissions.can_paste(state.userModel, state.worldModel);
 	var requestNextItem = true;
+	if(!cursorCoords) {
+		elm.textInput.value = "";
+		return;
+	}
 	var parser = textcode_parser(value, {
 		tileX: cursorCoords[0],
 		tileY: cursorCoords[1],
