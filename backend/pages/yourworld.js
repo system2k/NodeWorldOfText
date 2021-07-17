@@ -97,8 +97,10 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			mime: "application/json; charset=utf-8"
 		});
 	} else { // the HTML page
-		if(!worldViews[world.id]) worldViews[world.id] = 0;
-		worldViews[world.id]++;
+		if(!query_data.hide) {
+			if(!worldViews[world.id]) worldViews[world.id] = 0;
+			worldViews[world.id]++;
+		}
 
 		var pathname = world.name;
 		if(pathname != "") {
@@ -110,6 +112,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		}
 		var chat_permission = world_properties.chat_permission;
 		if(!chat_permission) chat_permission = 0;
+		var show_cursor = world_properties.show_cursor
+		if(show_cursor == void 0) show_cursor = -1;
 		var color_text = world_properties.color_text;
 		if(!color_text) color_text = 0;
 		var username = user.username;
@@ -138,7 +142,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 				feature_coord_link: world.feature_coord_link,
 				pathname,
 				chat_permission,
-				color_text
+				color_text,
+				show_cursor
 			}
 		};
 		if(CONST.tileRows != 8) {

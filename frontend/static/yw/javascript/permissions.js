@@ -53,6 +53,9 @@ var Permissions = {
 	can_chat: function(user, world) {
 		return Permissions.user_matches_perm(user, world, world.chat_permission);
 	},
+	can_show_cursor: function(user, world) {
+		return Permissions.user_matches_perm(user, world, world.show_cursor);
+	},
 	can_color_text: function(user, world) {
 		return Permissions.user_matches_perm(user, world, world.color_text);
 	},

@@ -1662,6 +1662,7 @@ async function world_get_or_create(name, do_not_create, force_create) {
 
 				// views: 0,
 				// chat_permission: 0,
+				// show_cursor: 0,
 				// color_text: 0,
 				// custom_menu_color: "",
 				// custom_public_text_color: "",
@@ -2234,6 +2235,7 @@ async function clear_expired_sessions(no_timeout) {
 	if(!no_timeout) intv.clearExpiredSessions = setTimeout(clear_expired_sessions, ms.minute);
 }
 
+var client_cursor_pos = {};
 var client_ips = {};
 var closed_client_limit = 1000 * 60 * 60; // 1 hour
 function setupClearClosedClientsInterval() {
@@ -2514,7 +2516,7 @@ var ip_address_req_limit = {}; // TODO: Cleanup objects
 var ws_req_per_second = 1000;
 var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	chat:			[256, 1000, 0], // rate-limiting handled separately
-	chathistory:	[10, 1000, 0],
+	chathistory:	[2, 1000, 0],
 	clear_tile:		[1000, 1000, 0],
 	cmd_opt:		[10, 1000, 0],
 	cmd:			[256, 1000, 0],
@@ -2523,7 +2525,8 @@ var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	link:			[400, 1000, 0],
 	protect:		[400, 1000, 0],
 	write:			[256, 1000, 0], // rate-limiting handled separately
-	paste:			[10, 500, 0]
+	paste:			[10, 500, 0],
+	cursor:			[70, 1000, 0]
 };
 
 /*
@@ -2600,7 +2603,11 @@ async function manageWebsocketConnection(ws, req) {
 	if(!serverLoaded) await waitForServerLoad();
 	if(isStopping) return;
 	ws.sdata = {
-		terminated: false
+		userClient: false,
+		monitorSocket: false,
+		terminated: false,
+		hasBroadcastedCursorPosition: false,
+		cursorPositionHidden: false
 	};
 	
 	// process ip address headers from cloudflare/nginx
@@ -2686,7 +2693,7 @@ async function manageWebsocketConnection(ws, req) {
 		pre_queue.push(msg);
 	}
 	ws.on("message", pre_message);
-	var status, clientId = void 0, worldObj;
+	var status, clientId = void 0, worldObj, world_name;
 	ws.on("close", function() {
 		remove_ip_address_connection(ws.sdata.ipAddress);
 		ws.sdata.terminated = true;
@@ -2699,9 +2706,26 @@ async function manageWebsocketConnection(ws, req) {
 		if(worldObj && !ws.sdata.hide_user_count) {
 			worldObj.user_count--;
 		}
+		if(ws.sdata.hasBroadcastedCursorPosition && !ws.sdata.cursorPositionHidden && world_name != void 0 && ws.sdata.channel) {
+			global_data.ws_broadcast({
+				kind: "cursor",
+				hidden: true,
+				channel: ws.sdata.channel
+			}, world_name);
+			if(ws.sdata.world) {
+				var channel = ws.sdata.channel;
+				var world = ws.sdata.world;
+				var worldId = world.id;
+				if(client_cursor_pos[worldId]) {
+					delete client_cursor_pos[worldId][channel];
+				}
+				if(Object.keys(client_cursor_pos[worldId]).length == 0) {
+					delete client_cursor_pos[worldId];
+				}
+			}
+		}
 	});
 	if(ws.sdata.terminated) return; // in the event of an immediate close
-	var world_name;
 	if(location.match(/(\/ws\/$)/)) {
 		world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
 	} else {
@@ -2714,6 +2738,7 @@ async function manageWebsocketConnection(ws, req) {
 	var user = await get_user_info(cookies, true);
 	if(ws.sdata.terminated) return;
 	var channel = new_token(7);
+	ws.sdata.channel = channel;
 
 	var vars = global_data;
 	var evars = {
@@ -2773,6 +2798,10 @@ async function manageWebsocketConnection(ws, req) {
 	if(!chat_permission) chat_permission = 0;
 	ws.sdata.chat_permission = chat_permission;
 
+	var show_cursor = properties.show_cursor;
+	if(show_cursor == void 0) show_cursor = -1;
+	ws.sdata.show_cursor = show_cursor;
+
 	var can_chat = chat_permission == 0 || (chat_permission == 1 && status.permission.member) || (chat_permission == 2 && status.permission.owner);
 	ws.sdata.can_chat = can_chat;
 
@@ -2813,6 +2842,28 @@ async function manageWebsocketConnection(ws, req) {
 		id: sentClientId,
 		initial_user_count
 	}));
+
+	if(client_cursor_pos[status.world.id]) {
+		var world_cursors = client_cursor_pos[status.world.id];
+		for(var csr_channel in world_cursors) {
+			var csr = world_cursors[csr_channel];
+			if(csr.hidden) continue;
+			var tileX = csr.tileX;
+			var tileY = csr.tileY;
+			var isCenter = -24 <= tileX && tileX <= 24 && -24 <= tileY && tileY <= 24;
+			if(!isCenter) continue;
+			send_ws(JSON.stringify({
+				kind: "cursor",
+				position: {
+					tileX: csr.tileX,
+					tileY: csr.tileY,
+					charX: csr.charX,
+					charY: csr.charY
+				},
+				channel: csr_channel
+			}));
+		}
+	}
 
 	ws.off("message", pre_message);
 	ws.on("message", handle_message);
@@ -2866,7 +2917,9 @@ async function manageWebsocketConnection(ws, req) {
 				send_ws(JSON.stringify(msg));
 			}
 			function broadcast(data, opts) {
-				data.source = kind;
+				if(data.kind && data.kind != kind) {
+					data.source = kind;
+				}
 				global_data.ws_broadcast(data, world_name, opts);
 			}
 			var res;
@@ -2983,7 +3036,8 @@ var global_data = {
 	normalizeCacheTile,
 	parseTextcode,
 	acme_stat: function() { return { enabled: acmeEnabled, pass: acmePass } },
-	uviasSendIdentifier
+	uviasSendIdentifier,
+	client_cursor_pos
 };
 
 async function sysLoad() {

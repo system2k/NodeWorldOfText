@@ -483,6 +483,7 @@ function ReconnectingWebSocket(url) {
 	this.onclose = null;
 	this.onmessage = null;
 	this.onerror = null;
+	this.reconnectTimeout = 100;
 	var closed = false;
 	var self = this;
 	function connect() {
@@ -490,7 +491,7 @@ function ReconnectingWebSocket(url) {
 		self.socket.onclose = function(r) {
 			if(self.onclose) self.onclose(r);
 			if(closed) return;
-			setTimeout(connect, 1000);
+			setTimeout(connect, self.reconnectTimeout);
 		}
 		self.socket.onopen = function(e) {
 			self.socket.binaryType = self.binaryType;

@@ -186,7 +186,7 @@
 						</td>
 					</tr>
 					<tr>
-						<td class="feature_name">Change text colors</td>
+						<td class="feature_name">Change text color</td>
 						<td>
 							<select name="color_text">
 								<option value="0"{%if color_text==0%} selected{%endif%}>anyone</option>
@@ -196,6 +196,20 @@
 						</td>
 						<td class="feature_description">
 							Change the color of your text.
+						</td>
+					</tr>
+					<tr>
+						<td class="feature_name">Show cursor to everyone</td>
+						<td>
+							<select name="show_cursor">
+								<option value="0"{%if show_cursor==0%} selected{%endif%}>anyone</option>
+								<option value="1"{%if show_cursor==1%} selected{%endif%}>me and members</option>
+								<option value="2"{%if show_cursor==2%} selected{%endif%}>only me</option>
+								<option value="-1"{%if show_cursor==-1%} selected{%endif%}>disabled</option>
+							</select>
+						</td>
+						<td class="feature_description">
+							Make your cursor visible to others.
 						</td>
 					</tr>
 				</table>
@@ -259,14 +273,14 @@
 						<td class="feature_description">
 						</td>
 					</tr>
-					<!--<tr>
+					<tr>
 						<td class="feature_name">Guest cursor color</td>
 						<td>
 							<input name="cursor_guest_color" value="{{ cursor_guest_color }}" maxlength="20">
 						</td>
 						<td class="feature_description">
 						</td>
-					</tr>-->
+					</tr>
 					<tr>
 						<td class="feature_name">Background color</td>
 						<td>

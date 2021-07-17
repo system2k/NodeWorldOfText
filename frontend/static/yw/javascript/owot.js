@@ -74,6 +74,9 @@ var shiftOptState          = { prevX: 0, prevY: 0, x1: 0, y1: 0, x2: 0, y2: 0, p
 var backgroundImage        = null;
 var backgroundPattern      = null;
 var backgroundPatternSize  = [0, 0];
+var guestCursorsByTile     = {};
+var guestCursors           = {};
+var clientGuestCursorPos   = { tileX: 0, tileY: 0, charX: 0, charY: 0, hidden: false, updated: false };
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -119,7 +122,9 @@ var fetchClientMargin      = 200;
 var classicTileProcessing  = false; // directly process utf32 only
 var unloadedPatternPanning = true;
 var cursorRenderingEnabled = true;
-var unobstructCursor       = false;
+var guestCursorsEnabled    = true; // render guest cursors
+var showMyGuestCursor      = true; // show my cursor to everyone if the world allows it
+var unobstructCursor       = false; // render cursor on top of characters that may block it
 var shiftOptimization      = false;
 var transparentBackground  = true;
 var writeFlushRate         = 1000;
@@ -440,20 +445,37 @@ function storeNickname() {
 
 getStoredNickname();
 
-function loadBackgroundData(cb) {
+function loadBackgroundData(cb, timeout_cb) {
 	if(!backgroundEnabled || !state.background) {
 		return cb();
 	}
 	var backPath = state.background.path;
 	var backImgElm = new Image();
+	var error = false;
+	var timeout = false;
+	var loadTimeout = setTimeout(function() {
+		timeout = true;
+		cb();
+	}, 300);
 	backImgElm.src = backPath;
 	backImgElm.onload = function() {
+		clearTimeout(loadTimeout);
+		if(error) {
+			if(!timeout) cb();
+			return;
+		}
 		backgroundImage = backImgElm;
 		backgroundPattern = owotCtx.createPattern(backImgElm, "repeat");
 		backgroundPatternSize = [backImgElm.width, backImgElm.height];
-		cb();
+		if(timeout) {
+			// if it eventually loaded after timing out
+			if(timeout_cb) timeout_cb();
+		} else {
+			cb();
+		}
 	}
 	backImgElm.onerror = function() {
+		error = true;
 		backImgElm.onload();
 	}
 }
@@ -1496,7 +1518,7 @@ function defaultStyles() {
 		member: "#eee",
 		public: "#fff",
 		cursor: "#ff0",
-		guestCursor: "#ffe",
+		guestCursor: "#ffa",
 		text: "#000",
 		menu: "#e5e5ff",
 		public_text: "#000",
@@ -1567,6 +1589,8 @@ function begin() {
 			renderLoop();
 			createSocket();
 			elm.loading.style.display = "none";
+		}, function() {
+			w.redraw();
 		});
 	});
 }
@@ -1760,16 +1784,20 @@ function renderCursor(coords) {
 	var selCharX = coords[2];
 	var selCharY = coords[3];
 	if(!Permissions.can_edit_tile(state.userModel, state.worldModel, thisTile, selCharX, selCharY)) {
-		if(cursorCoords) {
-			cursorCoords = null;
-			w.setTileRender(tileX, tileY);
-		}
+		removeCursor();
 		return false;
 	}
 
 	if(cursorCoords) {
 		cursorCoords = null;
 		w.setTileRender(tileX, tileY);
+	} else {
+		w.emit("cursorShow", {
+			tileX: coords[0],
+			tileY: coords[1],
+			charX: coords[2],
+			charY: coords[3]
+		});
 	}
 	cursorCoords = coords.slice(0);
 	cursorCoordsCurrent = coords.slice(0);
@@ -1809,13 +1837,19 @@ function renderCursor(coords) {
 	});
 }
 
-// remove cursor from view
 function removeCursor() {
-	if(!cursorCoords) return; // no cursor?
+	if(!cursorCoords) return;
 	var remTileX = cursorCoords[0];
 	var remTileY = cursorCoords[1];
+	var cursorPos = {
+		tileX: cursorCoords[0],
+		tileY: cursorCoords[1],
+		charX: cursorCoords[2],
+		charY: cursorCoords[3]
+	};
 	cursorCoords = null;
 	w.setTileRender(remTileX, remTileY);
+	w.emit("cursorHide", cursorPos);
 }
 
 function stopDragging() {
@@ -1911,8 +1945,8 @@ function is_link(tileX, tileY, charX, charY) {
 
 function flushWrites() {
 	if(w.socket.socket.readyState != WebSocket.OPEN) return;
-	network.write(writeBuffer);
-	writeBuffer.splice(0); // clear buffer
+	network.write(writeBuffer.slice(0, 512));
+	writeBuffer.splice(0, 512);
 }
 
 var writeInterval;
@@ -1922,6 +1956,7 @@ function setWriteInterval() {
 		if(!writeBuffer.length) return;
 		try {
 			flushWrites();
+			sendCursorPosition();
 		} catch(e) {
 			console.log(e);
 		}
@@ -1975,7 +2010,7 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY) {
 	var color = Tile.get(tileX, tileY).properties.color;
 	if(!color) color = new Array(tileArea).fill(0);
 
-	// delete link
+	// delete link locally
 	if(cell_props[charY]) {
 		if(cell_props[charY][charX]) {
 			delete cell_props[charY][charX];
@@ -1990,6 +2025,7 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY) {
 	// update cell properties (link positions)
 	Tile.get(tileX, tileY).properties.cell_props = cell_props;
 
+	// set char locally
 	var con = Tile.get(tileX, tileY).content;
 	con[charY * tileC + charX] = char;
 	w.setTileRedraw(tileX, tileY);
@@ -2049,14 +2085,12 @@ function writeChar(char, doNotMoveCursor, temp_color, noNewline) {
 			pos.tileX, pos.tileY,
 			pos.charX, pos.charY
 		]);
-		// check if cursor hasn't moved
+		// wait if the tile hasn't loaded
 		if(cursorCoords) {
 			var compare = cursor.slice(0);
 			if(cursorCoords[0] == compare[0] && cursorCoords[1] == compare[1] &&
 			   cursorCoords[2] == compare[2] && cursorCoords[3] == compare[3]) {
 				return null;
-				// for the purpose of putting the paste feature on hold while
-				// the tile is still loading
 			}
 		}
 	}
@@ -3143,6 +3177,7 @@ function createSocket() {
 	w.socket = socket;
 	timesConnected++;
 
+	socket.binaryType = "arraybuffer";
 	socket.onmessage = function(msg) {
 		var data = JSON.parse(msg.data);
 		var kind = data.kind;
@@ -3730,6 +3765,10 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 		}
 	}
 
+	if(guestCursorsEnabled) {
+		renderGuestCursors(renderCtx, offsetX, offsetY, tile, tileX, tileY);
+	}
+
 	// render cursor
 	if(cursorVisibility) {
 		var charX = cursorCoords[2];
@@ -3769,6 +3808,7 @@ function renderTileBackgroundImage(renderCtx, tileX, tileY) {
 	var offY = w.backgroundInfo.y;
 	var patWidth = w.backgroundInfo.w;
 	var patHeight = w.backgroundInfo.h;
+	var alpha = w.backgroundInfo.alpha;
 
 	if(!patWidth) patWidth = imgWidth;
 	if(!patHeight) patHeight = imgHeight;
@@ -3788,7 +3828,9 @@ function renderTileBackgroundImage(renderCtx, tileX, tileY) {
 		if(!window.DOMMatrix || !backgroundPattern) return false;
 		backgroundPattern.setTransform(new DOMMatrix([backRatioW, 0, 0, backRatioH, -startX, -startY]));
 		renderCtx.fillStyle = backgroundPattern;
+		renderCtx.globalAlpha = alpha;
 		renderCtx.fillRect(0, 0, tileWidth, tileHeight);
+		renderCtx.globalAlpha = 1;
 		return true;
 	} else if(repeat == 1 || repeat == 2) {
 		if(!backgroundImage) return false;
@@ -3796,7 +3838,9 @@ function renderTileBackgroundImage(renderCtx, tileX, tileY) {
 			startX += Math.floor(imgWidth / 2);
 			startY += Math.floor(imgHeight / 2);
 		}
+		renderCtx.globalAlpha = alpha;
 		renderCtx.drawImage(backgroundImage, -startX, -startY, imgWidth * backRatioW, imgHeight * backRatioH);
+		renderCtx.globalAlpha = 1;
 		return true;
 	}
 	return false;
@@ -4007,6 +4051,7 @@ function renderTiles(redraw) {
 	w.emit("tilesRendered");
 }
 
+// re-render only tiles that have changed to the screen
 function renderTilesSelective() {
 	var visibleRange = getVisibleTileRange();
 	var startX = visibleRange[0][0];
@@ -4028,6 +4073,19 @@ function renderTilesSelective() {
 	}
 }
 
+function renderGuestCursors(renderCtx, offsetX, offsetY, tile, tileX, tileY) {
+	var tilePos = tileY + "," + tileX;
+	var list = guestCursorsByTile[tilePos];
+	for(var channel in list) {
+		var cursor = list[channel];
+		var charX = cursor.charX;
+		var charY = cursor.charY;
+		if(!Permissions.can_edit_tile(state.userModel, state.worldModel, tile, charX, charY)) continue;
+		renderCtx.fillStyle = styles.guestCursor;
+		renderCtx.fillRect(offsetX + charX * cellW, offsetY + charY * cellH, cellW, cellH);
+	}
+}
+
 function renderLoop() {
 	if(w.hasUpdated) {
 		renderTiles();
@@ -4035,9 +4093,10 @@ function renderLoop() {
 	} else if(w.hasSelectiveUpdated) {
 		renderTilesSelective();
 	}
-	w.emit("frame"); // before update flags are reset
+	w.emit("frame"); // emitted before update flags are reset
 	w.hasUpdated = false;
 	w.hasSelectiveUpdated = false;
+	if(!writeBuffer.length) sendCursorPosition();
 	requestAnimationFrame(renderLoop);
 }
 
@@ -4281,6 +4340,41 @@ w.on("tilesRendered", function() {
 		if(reg.regionCoordA && reg.regionCoordB) reg.setSelection(reg.regionCoordA, reg.regionCoordB);
 	}
 });
+
+w.on("cursorMove", function(pos) {
+	setClientGuestCursorPosition(pos.tileX, pos.tileY, pos.charX, pos.charY);
+});
+
+w.on("cursorHide", function() {
+	setClientGuestCursorPosition(0, 0, 0, 0, true);
+});
+
+function setClientGuestCursorPosition(tileX, tileY, charX, charY, hidden) {
+	var pos = clientGuestCursorPos;
+	var pTileX = pos.tileX;
+	var pTileY = pos.tileY;
+	var pCharX = pos.charX;
+	var pCharY = pos.charY;
+	var pHidden = pos.hidden;
+	if(tileX == pTileX && tileY == pTileY && charX == pCharX && charY == pCharY && pHidden == hidden) return;
+	clientGuestCursorPos = {
+		tileX: tileX,
+		tileY: tileY,
+		charX: charX,
+		charY: charY,
+		hidden: hidden,
+		updated: true
+	};
+}
+
+function sendCursorPosition() {
+	if(!showMyGuestCursor) return;
+	if(!Permissions.can_show_cursor(state.userModel, state.worldModel)) return;
+	var pos = clientGuestCursorPos;
+	if(!pos.updated) return;
+	pos.updated = false;
+	network.cursor(pos.tileX, pos.tileY, pos.charX, pos.charY, pos.hidden);
+}
 
 var networkHTTP = {
 	fetch: function(x1, y1, x2, y2, opts, callback) {
@@ -4571,6 +4665,22 @@ var network = {
 			tileX: x,
 			tileY: y
 		}));
+	},
+	cursor: function(tileX, tileY, charX, charY, hidden) {
+		var data = {
+			kind: "cursor"
+		};
+		if(hidden) {
+			data.hidden = true;
+		} else {
+			data.position = {
+				tileX: tileX,
+				tileY: tileY,
+				charX: charX,
+				charY: charY
+			}
+		}
+		w.socket.send(JSON.stringify(data));
 	}
 };
 
@@ -5208,7 +5318,7 @@ var ws_functions = {
 						oldColors[g] = nCol;
 					}
 					// briefly highlight these edits (10 at a time)
-					if(useHighlight) highlights.push([tileX, tileY, charX, charY]);
+					if(useHighlight && Tile.visible(tileX, tileY)) highlights.push([tileX, tileY, charX, charY]);
 				}
 				charX++;
 				if(charX >= tileC) {
@@ -5349,6 +5459,53 @@ var ws_functions = {
 	},
 	cmd: function(data) {
 		w.emit("cmd", data);
+	},
+	cursor: function(data) {
+		w.emit("guestCursor", data);
+		// TODO disable cursors if ywot server detected
+		var channel = data.channel;
+		var hidden = data.hidden;
+		var position = data.position;
+		if(hidden) {
+			var csr = guestCursors[channel];
+			if(!csr) return;
+			var tileX = csr.tileX;
+			var tileY = csr.tileY;
+			delete guestCursors[channel];
+			var tilePos = tileY + "," + tileX;
+			if(guestCursorsByTile[tilePos]) {
+				delete guestCursorsByTile[tilePos][channel];
+				if(Object.keys(guestCursorsByTile[tilePos]).length == 0) {
+					delete guestCursorsByTile[tilePos];
+				}
+			}
+			w.setTileRedraw(tileX, tileY);
+		} else if(position) {
+			var csr = guestCursors[channel];
+			if(!csr) {
+				csr = {};
+				guestCursors[channel] = csr;
+			} else {
+				var prevTilePos = csr.tileY + "," + csr.tileX;
+				if(guestCursorsByTile[prevTilePos]) {
+					delete guestCursorsByTile[prevTilePos][channel];
+				}
+				if(Object.keys(guestCursorsByTile[prevTilePos]).length == 0) {
+					delete guestCursorsByTile[prevTilePos];
+				}
+				w.setTileRedraw(csr.tileX, csr.tileY);
+			}
+			csr.tileX = position.tileX;
+			csr.tileY = position.tileY;
+			csr.charX = position.charX;
+			csr.charY = position.charY;
+			tilePos = csr.tileY + "," + csr.tileX;
+			if(!guestCursorsByTile[tilePos]) {
+				guestCursorsByTile[tilePos] = {};
+			}
+			guestCursorsByTile[tilePos][channel] = csr;
+			w.setTileRedraw(csr.tileX, csr.tileY);
+		}
 	},
 	error: function(data) {
 		var code = data.code;

@@ -118,6 +118,13 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		mixed_chars = true;
 	}
 
+	var value_chat_permission = properties.chat_permission;
+	var value_color_text = properties.color_text;
+	var value_show_cursor = properties.show_cursor;
+	if(value_chat_permission == void 0) value_chat_permission = 0;
+	if(value_color_text == void 0) value_color_text = 0;
+	if(value_show_cursor == void 0) value_show_cursor = -1;
+
 	var data = {
 		user,
 
@@ -135,8 +142,9 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		url_link: world.feature_url_link,
 		paste: world.feature_paste,
 		membertiles_addremove: world.feature_membertiles_addremove,
-		chat_permission: properties.chat_permission || 0,
-		color_text: properties.color_text || 0,
+		chat_permission: value_chat_permission,
+		color_text: value_color_text,
+		show_cursor: value_show_cursor,
 
 		color,
 		cursor_color,
@@ -331,6 +339,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		var url_link = validatePerms(post_data.url_link, 2);
 		var paste = validatePerms(post_data.paste, 2);
 		var chat = validatePerms(post_data.chat, 2, true);
+		var show_cursor = validatePerms(post_data.show_cursor, 2, true);
 		var color_text = validatePerms(post_data.color_text, 2);
 		var membertiles_addremove = post_data.membertiles_addremove;
 		if(membertiles_addremove == "false") {
@@ -342,6 +351,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		}
 		properties.chat_permission = chat;
 		properties.color_text = color_text;
+		properties.show_cursor = show_cursor;
 
 		// update properties in cached world objects for all clients
 		var newProps = JSON.stringify(properties);
@@ -355,6 +365,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				e.sdata.world.feature_coord_link = coord_link;
 				e.sdata.world.feature_url_link = url_link;
 				e.sdata.chat_permission = chat;
+				e.sdata.show_cursor = show_cursor;
 			}
 		});
 		await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link,properties)=(?,?,?,?,?,?) WHERE id=?",
@@ -394,13 +405,14 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			delete properties.custom_owner_text_color;
 		}
 
-		await db.run("UPDATE world SET (custom_bg,custom_cursor,custom_color,custom_tile_owner,custom_tile_member,properties)=(?,?,?,?,?,?) WHERE id=?",
-			[bg, cursor_color, color, owner_color, member_color, JSON.stringify(properties), world.id]);
+		await db.run("UPDATE world SET (custom_bg,custom_cursor,custom_guest_cursor,custom_color,custom_tile_owner,custom_tile_member,properties)=(?,?,?,?,?,?,?) WHERE id=?",
+			[bg, cursor_color, cursor_guest_color, color, owner_color, member_color, JSON.stringify(properties), world.id]);
 		
 		ws_broadcast({
 			kind: "colors",
 			colors: {
 				cursor: cursor_color || "#ff0",
+				guest_cursor: cursor_guest_color || "#ffa",
 				text: color || "#000",
 				member_area: member_color || "#eee",
 				background: bg || "#fff",

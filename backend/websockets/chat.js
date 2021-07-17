@@ -75,6 +75,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 		});
 	}
 	
+	// -1: cannot chat at all
+	// by default, chat_permission is 0. undefined is equivalent to 0.
 	var can_chat = false;
 	if(!chat_perm) can_chat = true;
 	if(chat_perm === 1 && (is_member || is_owner)) can_chat = true;
