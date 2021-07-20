@@ -6,6 +6,7 @@ function Menu(titleEl, menuEl) {
 	this._SPEED = 250;
 	this.entries = [];
 	this.pinned = false;
+	this.visible = false;
 	this.lastEntryId = 1;
 	this.entriesById = {};
 	this.addOption = function(text, action) {
@@ -42,6 +43,7 @@ function Menu(titleEl, menuEl) {
 	}
 	this.hideNow = function() {
 		if(_this.pinned) return;
+		_this.visible = false;
 		slideMenu("up", _this.menuEl, _this._SPEED);
 		_this.titleEl.classList.remove("hover");
 	}
@@ -56,6 +58,7 @@ function Menu(titleEl, menuEl) {
 		}), 500);
 	}
 	this.show = function() {
+		_this.visible = true;
 		_this.cancelHide = true;
 		slideMenu("down", _this.menuEl, _this._SPEED);
 		_this.titleEl.classList.add("hover");
@@ -150,13 +153,19 @@ function Menu(titleEl, menuEl) {
 
 	this.menuEl.style.top = (this.titleEl.getBoundingClientRect().top + document.body.scrollTop) + this.titleEl.offsetHeight + "px";
 
+	// "Menu" button
 	this.titleEl.onmouseenter = this.show;
 	this.titleEl.onmouseleave = this.hide;
 
+	// menu list
 	this.menuEl.onmouseenter = this.show;
 	this.menuEl.onmouseleave = this.hide;
 
 	this.titleEl.onclick = function() {
+		if(!_this.visible) {
+			_this.show();
+			return;
+		}
 		if(_this.pinned) {
 			_this.unpin(true);
 		} else {

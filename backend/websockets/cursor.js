@@ -59,8 +59,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 					cli_tileX = cli_cursor.tileX;
 					cli_tileY = cli_cursor.tileY;
 				}
-				var dist = Math.sqrt((cli_tileX - tileX) ** 2 + (cli_tileY - tileY) ** 2);
-				if(dist > 24) return;
+				var dist = (cli_tileX - tileX) ** 2 + (cli_tileY - tileY) ** 2;
+				if(dist > 128 * 128) return; // do not broadcast the cursor further than 128 tiles from this client's cursor
 				try {
 					client.send(JSON.stringify({
 						kind: "cursor",

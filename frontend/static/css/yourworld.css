@@ -9,6 +9,9 @@ html, body {
 	overscroll-behavior: contain;
 	touch-action: pan-down;
 }
+#announce_text {
+	text-align: center;
+}
 .screen_canvas {
 	overflow: hidden;
 }
@@ -216,13 +219,16 @@ a:visited {
 	padding: 1px 6px 1px 6px;
 }
 .chat_tab_button {
+	height: 20px;
 	border: solid 1px black;
 	text-align: center;
 	font-family: Verdana;
 	font-size: 13px;
 	cursor: default;
-	display: inline-block;
-	margin-top: 1px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-right: 3px;
 }
 #chat_page_tab {
 	width: 100px;
@@ -265,7 +271,6 @@ a:visited {
 	font-size: 16px;
 	cursor: default;
 	float: right;
-	margin-top: -1px;
 }
 #confirm_js {
 	width: 441px;

@@ -94,8 +94,8 @@ var zoomRatio              = deviceRatio(); // browser's default zoom ratio
 var ws_path                = createWsPath();
 var protectPrecision       = 0; // 0 being tile and 1 being char
 var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
-var zoom                   = decimal(100); // absolute zoom value
-var userZoom               = decimal(100); // user zoom setting
+var zoom                   = decimal(100); // absolute zoom value (product of zoomRatio and userZoom)
+var userZoom               = decimal(100); // user zoom setting (menubar zoom)
 var unloadTilesAuto        = true; // automatically unload tiles to free up memory
 var useHighlight           = true; // highlight new edits
 var highlightLimit         = 10; // max chars to highlight at a time
@@ -140,6 +140,7 @@ var keyConfig = {
 	autoApply: ["CTRL+S", "ALT+S"],
 	autoDeselect: "SHIFT",
 	erase: "BACKSPACE+*",
+	cellErase: "DELETE+*",
 	cursorUp: "UP+*",
 	cursorDown: "DOWN+*",
 	cursorLeft: "LEFT+*",
@@ -325,7 +326,7 @@ function draggable_element(dragger, dragged, exclusions, onDrag) {
 function resizeChat(width, height) {
 	// default: 400 x 300
 	if(width < 350) width = 350;
-	if(height < 56) height = 56;
+	if(height < 57) height = 57;
 	elm.chat_window.style.width = width + "px";
 	elm.chat_window.style.height = height + "px";
 	return [width, height];
@@ -468,7 +469,7 @@ function loadBackgroundData(cb, timeout_cb) {
 		backgroundPattern = owotCtx.createPattern(backImgElm, "repeat");
 		backgroundPatternSize = [backImgElm.width, backImgElm.height];
 		if(timeout) {
-			// if it eventually loaded after timing out
+			// if it eventually loads after timing out
 			if(timeout_cb) timeout_cb();
 		} else {
 			cb();
@@ -557,8 +558,8 @@ var defaultSizes = {
 	tileW: null,
 	tileH: null,
 	// in characters
-	tileC: 16, // columns
-	tileR: 8 // rows
+	tileC: 16, // columns (width)
+	tileR: 8 // rows (height)
 }
 if(state.worldModel.square_chars) defaultSizes.cellW = 18;
 if(state.worldModel.half_chars) defaultSizes.cellH = 20;
@@ -783,7 +784,7 @@ function reallocateTile(obj) {
 	var newPool = newObj.pool;
 	var newPX = newObj.poolX;
 	var newPY = newObj.poolY;
-	// transfer rendered text data
+	// transfer rendered text data if it has moved to a new spot
 	if(pX != newPX || pY != newPY || pool != newPool) {
 		newPool.ctx.clearRect(newPX, newPY, tileWidth, tileHeight);
 		newPool.ctx.drawImage(pool.canv, pX, pY, tileWidth, tileHeight, newPX, newPY, tileWidth, tileHeight);
@@ -1572,29 +1573,6 @@ function getWorldProps(world, type, cb) {
 	});
 }
 
-// begin OWOT's client
-function begin() {
-	manageCoordHash();
-	getWorldProps(state.worldModel.name, "style", function(style, error) {
-		if(error) {
-			console.warn("An error occurred while loading the world style");
-			styles = defaultStyles();
-		} else {
-			styles = style;
-		}
-		checkTextColorOverride();
-		menu_color(styles.menu);
-		loadBackgroundData(function() {
-			owotCtx.clearRect(0, 0, owotWidth, owotHeight);
-			renderLoop();
-			createSocket();
-			elm.loading.style.display = "none";
-		}, function() {
-			w.redraw();
-		});
-	});
-}
-
 function stopLinkUI() {
 	if(!lastLinkHover) return;
 	if(!w.isLinking) return;
@@ -1696,8 +1674,6 @@ var isDragging = false;
 var hasDragged = false;
 var draggingEnabled = true;
 function event_mousedown(e, arg_pageX, arg_pageY) {
-	currentMousePosition[0] = e.pageX * zoomRatio;
-	currentMousePosition[1] = e.pageY * zoomRatio;
 	currentMousePosition[0] = e.pageX;
 	currentMousePosition[1] = e.pageY;
 	var target = e.target;
@@ -1721,9 +1697,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
 		dragPosY = positionY;
 		isDragging = true;
 	}
-
 	e.preventDefault();
-	elm.textInput.focus(); // for mobile typing
 	stopPasting();
 	if(w.isLinking) {
 		doLink();
@@ -1864,6 +1838,7 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 	var pageY = Math.trunc(e.pageY * zoomRatio);
 	if(arg_pageX != void 0) pageX = arg_pageX;
 	if(arg_pageY != void 0) pageY = arg_pageY;
+	var canShowMobileKeyboard = !hasDragged;
 	stopDragging();
 
 	for(var i = 0; i < draggable_element_mouseup.length; i++) {
@@ -1895,6 +1870,10 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 		}
 	}
 	if(foundActiveSelection) return;
+
+	if(closest(e.target, elm.main_view) && canShowMobileKeyboard) {
+		elm.textInput.focus();
+	}
 
 	// set cursor
 	var pos = getTileCoordsFromMouseCoords(pageX, pageY);
@@ -2360,7 +2339,6 @@ function textcode_parser(value, coords, defaultColor) {
 	};
 }
 
-// write characters inputted
 var write_busy = false; // busy pasting
 var pasteInterval;
 var linkQueue = [];
@@ -2368,10 +2346,15 @@ var char_input_check = setInterval(function() {
 	if(w._state.uiModal) return;
 	if(write_busy) return;
 	var value = elm.textInput.value;
-	if(!value) return;
+	if(!value) {
+		elm.textInput.value = "\x7F";
+		elm.textInput.selectionEnd = elm.textInput.value.length;
+		return;
+	}
+	if(value == "\x7F") return;
 	clearInterval(pasteInterval);
 	value = w.split(value.replace(/\r\n/g, "\n"));
-	if(value.length == 1) {
+	if(value.length == 1 && value != "\x7F") {
 		writeChar(value[0]);
 		elm.textInput.value = "";
 		return;
@@ -2401,6 +2384,9 @@ var char_input_check = setInterval(function() {
 		}
 		if(item.type == "char") {
 			if(item.writable) {
+				if(item.char == "\x7F") {
+					return true;
+				}
 				var res = writeChar(item.char, false, item.color, !item.newline);
 				if(res === null) {
 					// pause until tile loads
@@ -2451,7 +2437,7 @@ var char_input_check = setInterval(function() {
 			write_busy = false;
 			elm.textInput.value = "";
 		}
-	}, 1);
+	}, Math.floor(1000 / 230));
 }, 10);
 
 function stopPasting() {
@@ -2617,6 +2603,9 @@ function event_keydown(e) {
 	}
 	if(checkKeyPress(e, keyConfig.erase)) { // erase character
 		moveCursor("left", true);
+		writeChar(" ", true);
+	}
+	if(checkKeyPress(e, keyConfig.cellErase)) {
 		writeChar(" ", true);
 	}
 	if(checkKeyPress(e, keyConfig.tab)) { // tab
@@ -3188,6 +3177,7 @@ function createSocket() {
 
 	socket.onopen = function(msg) {
 		console.log("Connected socket");
+		clearAllGuestCursors();
 		for(var tile in tiles) {
 			if(tiles[tile] == null) {
 				delete tiles[tile];
@@ -3394,13 +3384,13 @@ function clearVisibleTiles() {
 	}
 }
 
-function highlight(positions) {
+function highlight(positions, limitless) {
 	for(var i = 0; i < positions.length; i++) {
 		var tileX = positions[i][0];
 		var tileY = positions[i][1];
 		var charX = positions[i][2];
 		var charY = positions[i][3];
-		if(highlightCount > highlightLimit) return;
+		if(highlightCount > highlightLimit && !limitless) return;
 		if(!highlightFlash[tileY + "," + tileX]) {
 			highlightFlash[tileY + "," + tileX] = {};
 		}
@@ -4080,9 +4070,21 @@ function renderGuestCursors(renderCtx, offsetX, offsetY, tile, tileX, tileY) {
 		var cursor = list[channel];
 		var charX = cursor.charX;
 		var charY = cursor.charY;
-		if(!Permissions.can_edit_tile(state.userModel, state.worldModel, tile, charX, charY)) continue;
 		renderCtx.fillStyle = styles.guestCursor;
 		renderCtx.fillRect(offsetX + charX * cellW, offsetY + charY * cellH, cellW, cellH);
+	}
+}
+
+function clearAllGuestCursors() {
+	for(var i in guestCursorsByTile) {
+		var pos = i.split(",");
+		var tileX = parseInt(pos[1]);
+		var tileY = parseInt(pos[0]);
+		for(var x in guestCursorsByTile[i]) {
+			delete guestCursors[x];
+			delete guestCursorsByTile[i][x];
+		}
+		w.setTileRedraw(tileX, tileY);
 	}
 }
 
@@ -4370,6 +4372,8 @@ function setClientGuestCursorPosition(tileX, tileY, charX, charY, hidden) {
 function sendCursorPosition() {
 	if(!showMyGuestCursor) return;
 	if(!Permissions.can_show_cursor(state.userModel, state.worldModel)) return;
+	if(!w.socket) return;
+	if(w.socket.socket.url.startsWith("wss://www.yourworldoftext.com/")) return;
 	var pos = clientGuestCursorPos;
 	if(!pos.updated) return;
 	pos.updated = false;
@@ -5249,6 +5253,7 @@ var ws_functions = {
 		w.emit("colors", data);
 		styles.public = data.colors.background;
 		styles.cursor = data.colors.cursor;
+		styles.guestCursor = data.colors.guest_cursor;
 		styles.member = data.colors.member_area;
 		styles.menu = data.colors.menu;
 		styles.owner = data.colors.owner_area;
@@ -5257,7 +5262,7 @@ var ws_functions = {
 		styles.member_text = data.colors.member_text;
 		styles.owner_text = data.colors.owner_text;
 		checkTextColorOverride();
-		w.render(true); // render all tiles with new colors
+		w.render(true);
 		menu_color(styles.menu);
 	},
 	tileUpdate: function(data) {
@@ -5462,10 +5467,10 @@ var ws_functions = {
 	},
 	cursor: function(data) {
 		w.emit("guestCursor", data);
-		// TODO disable cursors if ywot server detected
 		var channel = data.channel;
 		var hidden = data.hidden;
 		var position = data.position;
+		if(channel == w.socketChannel) return;
 		if(hidden) {
 			var csr = guestCursors[channel];
 			if(!csr) return;
@@ -5522,5 +5527,27 @@ var ws_functions = {
 		}
 	}
 };
+
+function begin() {
+	manageCoordHash();
+	getWorldProps(state.worldModel.name, "style", function(style, error) {
+		if(error) {
+			console.warn("An error occurred while loading the world style");
+			styles = defaultStyles();
+		} else {
+			styles = style;
+		}
+		checkTextColorOverride();
+		menu_color(styles.menu);
+		loadBackgroundData(function() {
+			owotCtx.clearRect(0, 0, owotWidth, owotHeight);
+			renderLoop();
+			createSocket();
+			elm.loading.style.display = "none";
+		}, function() {
+			w.redraw();
+		});
+	});
+}
 
 begin();

@@ -4,7 +4,7 @@
 		<title>{{ page_title }}</title>
 		<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
 		<link rel="shortcut icon" type="image/png" href="/static/favicon.png">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 		{% if meta_desc %}<meta name="description" content="{{meta_desc}}">{% else %}<meta name="description" content="An infinite grid of text editable by anyone. This is a recreation of YourWorldOfText from scratch.">{% endif %}
 		<meta property="og:image" content="/static/logo.png">
 		<link type="text/css" rel="stylesheet" href="/static/css/yourworld.css">
@@ -20,7 +20,7 @@
 		<div id="topbar" class="ui">
 			<div id="topbar_inner">
 				<div id="announce" class="ui-vis" style="display: none;">
-					<span align="center" id="announce_text"></span>
+					<span id="announce_text"></span>
 					<span id="announce_close" class="announce_close">X</span>
 				</div>
 				<span id="menu" class="ui-vis tab menu" style="display: none;">
@@ -151,8 +151,7 @@
 			<div id="chat_upper" style="padding: 3px; padding-bottom: 0px;">
 				<div class="chat_tab_button" id="chat_page_tab" style="background-color: #8c8c8c; color: white;">
 					This page&nbsp;<b id="page_unread" class="unread" style="display: none;">(-)</b>
-				</div>
-				<div class="chat_tab_button" id="chat_global_tab">
+				</div><div class="chat_tab_button" id="chat_global_tab">
 					Global&nbsp;<b id="global_unread" class="unread" style="display: none;">(-)</b>
 				</div>
 				<span id="usr_online"></span>
