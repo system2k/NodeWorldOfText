@@ -643,8 +643,8 @@ function doZoom(percentage) {
 	textRenderCtx.font = font;
 
 	// change size of invisible link
-	linkDiv.style.width = cellW + "px";
-	linkDiv.style.height = cellH + "px";
+	linkDiv.style.width = (cellW / zoomRatio) + "px";
+	linkDiv.style.height = (cellH / zoomRatio) + "px";
 
 	// rerender everything
 	if(tileCanvasPool.length) {
@@ -1697,7 +1697,6 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
 		dragPosY = positionY;
 		isDragging = true;
 	}
-	e.preventDefault();
 	stopPasting();
 	if(w.isLinking) {
 		doLink();
@@ -1734,6 +1733,14 @@ function event_touchstart(e) {
 	var pos = touch_pagePos(e);
 	touchPosX = pos[0];
 	touchPosY = pos[1];
+	event_mousemove(e, touchPosX, touchPosY);
+	if(w.isProtecting) {
+		var cp = currentPosition;
+		lastTileHover = [protectPrecision, cp[0], cp[1], cp[2], cp[3]];
+	}
+	if(w.isLinking) {
+		lastLinkHover = currentPosition;
+	}
 	event_mousedown(e, pos[0], pos[1]);
 }
 document.addEventListener("touchstart", event_touchstart, { passive: false });
@@ -1896,17 +1903,20 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 		}
 	}
 }
+window.onerror = function() {
+    alert("Error caught");
+};
 document.addEventListener("mouseup", event_mouseup);
 function event_touchend(e) {
 	event_mouseup(e, touchPosX, touchPosY);
 }
 document.addEventListener("touchend", event_touchend);
 function event_mouseleave(e) {
-	w.emit("mouseLeave");
+	w.emit("mouseLeave", e);
 }
 document.addEventListener("mouseleave", event_mouseleave);
-function event_mouseenter() {
-	w.emit("mouseEnter");
+function event_mouseenter(e) {
+	w.emit("mouseEnter", e);
 }
 document.addEventListener("mouseenter", event_mouseenter);
 
@@ -2752,8 +2762,8 @@ var linkParams = {
 	url: "",
 	coord: false
 };
-linkDiv.style.width = cellW + "px";
-linkDiv.style.height = cellH + "px";
+linkDiv.style.width = (cellW / zoomRatio) + "px";
+linkDiv.style.height = (cellH / zoomRatio) + "px";
 linkElm.style.top = "-1000px";
 linkElm.style.left = "-1000px";
 linkElm.ondragstart = function() {
@@ -2885,8 +2895,6 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 var touchPosX = 0;
 var touchPosY = 0;
 function event_mousemove(e, arg_pageX, arg_pageY) {
-	currentMousePosition[0] = e.pageX * zoomRatio;
-	currentMousePosition[1] = e.pageY * zoomRatio;
 	currentMousePosition[0] = e.pageX;
 	currentMousePosition[1] = e.pageY;
 	var pageX = e.pageX * zoomRatio;
@@ -3384,13 +3392,13 @@ function clearVisibleTiles() {
 	}
 }
 
-function highlight(positions, limitless) {
+function highlight(positions, unlimited) {
 	for(var i = 0; i < positions.length; i++) {
 		var tileX = positions[i][0];
 		var tileY = positions[i][1];
 		var charX = positions[i][2];
 		var charY = positions[i][3];
-		if(highlightCount > highlightLimit && !limitless) return;
+		if(highlightCount > highlightLimit && !unlimited) return;
 		if(!highlightFlash[tileY + "," + tileX]) {
 			highlightFlash[tileY + "," + tileX] = {};
 		}
