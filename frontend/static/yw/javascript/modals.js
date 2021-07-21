@@ -13,6 +13,16 @@ function setModalPosition() {
 	}
 }
 
+function setModalScroll() {
+	if(!ModalOverlay || !document.documentElement) return;
+	setTimeout(function() {
+		var scrollheight = document.documentElement.scrollHeight;
+		if(!scrollheight) return;
+		var halfPos = Math.floor((scrollheight - window.innerHeight) / 2);
+		window.scrollTo(0, halfPos);
+	}, 200);
+}
+
 window.addEventListener("resize", setModalPosition);
 window.addEventListener("orientationchange", setModalPosition);
 
@@ -76,6 +86,7 @@ var URLInputModal = (function() {
 		this.panel.style.width = el_width + "px";
 		this.panel.style.height = el_height + "px";
 		setModalPosition();
+		setModalScroll();
 	};
 	return URLInputModal;
 }());
@@ -147,6 +158,7 @@ var CoordinateInputModal = (function() {
 		this.panel.style.width = el_width + "px";
 		this.panel.style.height = el_height + "px";
 		setModalPosition();
+		setModalScroll();
 	};
 	return CoordinateInputModal;
 }());
@@ -196,6 +208,7 @@ var ColorInputModal = (function() {
 		this.panel.style.width = el_width + "px";
 		this.panel.style.height = el_height + "px";
 		setModalPosition();
+		setModalScroll();
 	};
 	return ColorInputModal;
 }());
@@ -351,6 +364,7 @@ var SelectionModal = (function() {
 		simplemodal_onopen();
 		this.setDimensions();
 		setModalPosition();
+		setModalScroll();
 		this.updateTextOutput();
 	}
 	return SelectionModal;

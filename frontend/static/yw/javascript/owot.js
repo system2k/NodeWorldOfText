@@ -8,7 +8,7 @@ var linkElm, linkDiv;
 var jscolorInput;
 function init_dom() {
 	owot = document.getElementById("owot");
-	owot.hidden = false;
+	owot.style.display = "block";
 	owot.style.cursor = defaultCursor;
 	owotCtx = owot.getContext("2d");
 	textInput = document.getElementById("textInput");
@@ -1903,9 +1903,7 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 		}
 	}
 }
-window.onerror = function() {
-    alert("Error caught");
-};
+
 document.addEventListener("mouseup", event_mouseup);
 function event_touchend(e) {
 	event_mouseup(e, touchPosX, touchPosY);
@@ -3029,6 +3027,9 @@ function event_touchmove(e) {
 	var pos = touch_pagePos(e);
 	touchPosX = pos[0];
 	touchPosY = pos[1];
+	if(closest(e.target, elm.main_view) || w._state.uiModal) {
+		e.preventDefault();
+	}
 	event_mousemove(e, pos[0], pos[1]);
 }
 document.addEventListener("touchmove", event_touchmove, { passive: false });
@@ -4726,7 +4727,6 @@ Object.assign(w, {
 		announce_text: elm.announce_text,
 		announce_close: elm.announce_close,
 		coordinateInputModal: new CoordinateInputModal(),
-		scrolling: null,
 		urlInputModal: new URLInputModal(),
 		colorInputModal: new ColorInputModal(),
 		selectionModal: new SelectionModal()
@@ -5166,7 +5166,6 @@ document.onselectstart = function(e) {
 	return w._state.uiModal;
 }
 
-w._state.goToCoord = {};
 w._state.uiModal = false; // is the UI open? (coord, url, go to coord)
 
 buildMenu();

@@ -59,7 +59,7 @@ a:visited {
 	color: #888;
 	font-family: Verdana;
 	font-size: 12px;
-	z-index: 1;
+	z-index: 100;
 }
 .ui-vis {
 	background-color: rgba(0, 0, 255, .1);
@@ -372,9 +372,6 @@ a:visited {
 #link_element {
 	position: absolute;
 	display: block;
-}
-#textInput {
-	font-size: 16px; /* prevent zooming on mobile keyboard */
 }
 #owot {
 	background-image: url("/static/unloaded.png");
