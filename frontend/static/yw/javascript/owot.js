@@ -62,6 +62,7 @@ var chatResizing           = false;
 var tiles                  = {}; // All loaded tiles
 var images                 = {}; // { name: [data RGBA, width, height] }
 var keysPressed            = {};
+var previousErase          = 0;
 var verticalEnterPos       = [0, 0]; // position to go when pressing enter (tileX, charX)
 var imgPatterns            = {};
 var tileCanvasPool         = [];
@@ -997,7 +998,7 @@ function keydown_tileProtectAuto(e) {
 		var types = ["owner-only", "member-only", "public"];
 		var keys = Object.keys(selected);
 		if(keys.length == 0) return;
-		if(e.ctrlKey) e.preventDefault();
+		e.preventDefault();
 		autoTotal += keys.length;
 		updateAutoProg();
 
@@ -1130,7 +1131,7 @@ function keydown_linkAuto(e) {
 		var selected = linkAuto.selected;
 		var keys = Object.keys(selected);
 		if(keys.length == 0) return;
-		if(e.ctrlKey) e.preventDefault();
+		e.preventDefault();
 		autoTotal += keys.length;
 		updateAutoProg();
 
@@ -1677,7 +1678,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
 	currentMousePosition[0] = e.pageX;
 	currentMousePosition[1] = e.pageY;
 	var target = e.target;
-	if(closest(target, getChatfield()) || target == elm.chatbar) {
+	if(closest(target, getChatfield()) || target == elm.chatbar || target == elm.confirm_js_code) {
 		worldFocused = false;
 	} else {
 		worldFocused = true;
@@ -2347,26 +2348,41 @@ function textcode_parser(value, coords, defaultColor) {
 	};
 }
 
-var write_busy = false; // busy pasting
+function stabilizeTextInput() {
+	elm.textInput.selectionEnd = elm.textInput.value.length;
+	elm.textInput.selectionStart = elm.textInput.selectionEnd;
+}
+
+elm.textInput.addEventListener("keydown", stabilizeTextInput);
+
+var write_busy = false; // currently pasting
 var pasteInterval;
 var linkQueue = [];
 var char_input_check = setInterval(function() {
 	if(w._state.uiModal) return;
 	if(write_busy) return;
 	var value = elm.textInput.value;
+	var hasErased = getDate() - previousErase < 1000;
 	if(!value) {
-		elm.textInput.value = "\x7F";
-		elm.textInput.selectionEnd = elm.textInput.value.length;
+		if(hasErased) {
+			elm.textInput.value = "\x7F";
+		}
 		return;
 	}
-	if(value == "\x7F") return;
-	clearInterval(pasteInterval);
-	value = w.split(value.replace(/\r\n/g, "\n"));
-	if(value.length == 1 && value != "\x7F") {
+	if(value == "\x7F") {
+		if(!hasErased) {
+			elm.textInput.value = "";
+		}
+		return;
+	}
+	stabilizeTextInput();
+	value = w.split(value.replace(/\r\n/g, "\n").replace(/\x7F/g, ""));
+	if(value.length == 1) {
 		writeChar(value[0]);
 		elm.textInput.value = "";
 		return;
 	}
+	clearInterval(pasteInterval);
 	var pastePerm = Permissions.can_paste(state.userModel, state.worldModel);
 	var requestNextItem = true;
 	if(!cursorCoords) {
@@ -2575,6 +2591,7 @@ function event_keydown(e) {
 	if(!worldFocused) return;
 	if(w._state.uiModal) return;
 	if(actElm == elm.chatbar) return;
+	if(actElm == elm.confirm_js_code) return;
 	if(actElm.tagName == "INPUT" && actElm.type == "text" && actElm != elm.textInput) return;
 	if(actElm != elm.textInput) elm.textInput.focus();
 	stopPasting();
@@ -2612,6 +2629,7 @@ function event_keydown(e) {
 	if(checkKeyPress(e, keyConfig.erase)) { // erase character
 		moveCursor("left", true);
 		writeChar(" ", true);
+		previousErase = getDate();
 	}
 	if(checkKeyPress(e, keyConfig.cellErase)) {
 		writeChar(" ", true);

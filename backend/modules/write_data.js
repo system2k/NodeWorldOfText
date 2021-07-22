@@ -132,7 +132,7 @@ module.exports = async function(data, vars, evars) {
 			tileCount++;
 		}
 		totalEdits++;
-		if(totalEdits >= editLimit) { // edit limit reached
+		if(totalEdits > editLimit) { // edit limit reached
 			break;
 		}
 		tiles[tileStr].push(segment);

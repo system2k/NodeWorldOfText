@@ -11,6 +11,8 @@ var serverPingTime       = 0;
 var chatLimitCombChars   = true;
 var chatWriteTmpBuffer   = "";
 var defaultChatColor     = window.localStorage ? parseInt(localStorage.getItem("chatcolor")) : null; // 24-bit Uint
+var chatPageUnreadBar    = null;
+var chatGlobalUnreadBar  = null;
 
 if(isNaN(defaultChatColor)) {
 	defaultChatColor = null;
@@ -96,10 +98,6 @@ function api_chat_send(message, opts) {
 			client_commands[command](args);
 			return;
 		}
-	}
-	var isCommand = false;
-	if(!exclude_commands && message.startsWith("/")) {
-		isCommand = true;
 	}
 
 	network.chat(message, location, nick, chatColor);
@@ -382,6 +380,18 @@ elm.chat_global_tab.addEventListener("click", function() {
 	}
 });
 
+function evaluateChatfield(chatfield) {
+	var field;
+	if(chatfield == "page") {
+		field = elm.page_chatfield;
+	} else if(chatfield == "global") {
+		field = elm.global_chatfield;
+	} else {
+		field = getChatfield();
+	}
+	return field;
+}
+
 /*
 	[type]:
 	* "user"	  :: registered non-renamed nick
@@ -397,14 +407,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 	if(!color) color = assignColor(nickname);
 	var dateStr = "";
 	if(date) dateStr = convertToDate(date);
-	var field;
-	if(chatfield == "page") {
-		field = elm.page_chatfield;
-	} else if(chatfield == "global") {
-		field = elm.global_chatfield;
-	} else {
-		field = getChatfield();
-	}
+	var field = evaluateChatfield(chatfield);
 	var pm = dataObj.privateMessage;
 
 	if(chatLimitCombChars) {
@@ -541,6 +544,31 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 	if(doScrollBottom) {
 		field.scrollTop = maxScroll;
 	}
+}
+
+function addUnreadChatBar(chatfield, message, checkSituation) {
+	var field = evaluateChatfield(chatfield);
+	if(checkSituation) {
+		var maxScroll = field.scrollHeight - field.clientHeight;
+		var scroll = field.scrollTop;
+		var remScroll = maxScroll - scroll;
+		if(chatfield == "page") {
+			if(chatPageUnreadBar || selectedChatTab == 0) return;
+		}
+		if(chatfield == "global") {
+			if(chatGlobalUnreadBar || selectedChatTab == 1) return;
+		}
+	}
+	var msg = "New messages";
+	if(message) msg = message;
+	var bar = document.createElement("div");
+	var barText = document.createElement("span");
+	bar.className = "unread_bar";
+	barText.className = "unread_bar_msg";
+	barText.innerText = msg;
+	bar.appendChild(barText);
+	field.appendChild(bar);
+	return bar;
 }
 
 function getChatfield() {

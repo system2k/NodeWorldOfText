@@ -162,6 +162,10 @@ module.exports = async function(ws, data, send, vars, evars) {
 		[0, "day", null, "disable night mode", null], // client-side
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
 		[0, "whoami", null, "display your identity"]
+
+		// hidden by default
+		// "/search Phrase" (client) -> searches for Phrase within a 25 tile radius
+		// "/stats" -> view stats of a world; only available for front page
 	];
 
 	function generate_command_list() {
@@ -403,6 +407,16 @@ module.exports = async function(ws, data, send, vars, evars) {
 			idstr += "Display username: " + user_disp + "<br>";
 			idstr += "Chat ID: " + clientId;
 			return serverChatResponse(idstr, data.location);
+		},
+		stats: function() {
+			if(world.name != "") return;
+			var stat = "Stats for main world<br>";
+			stat += "Creation date: " + html_tag_esc(create_date(world.created_at)) + "<br>";
+			var props = JSON.parse(world.properties);
+			var viewcount = props.views;
+			if(!viewcount) props.views = 0;
+			stat += "View count: " + html_tag_esc(viewcount);
+			return serverChatResponse(stat, data.location);
 		}
 	}
 
@@ -444,6 +458,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 				return;
 			case "whoami":
 				com.whoami();
+				return;
+			case "stats":
+				com.stats();
 				return;
 			default:
 				serverChatResponse("Invalid command: " + html_tag_esc(msg));
