@@ -20,6 +20,7 @@ function init_dom() {
 		owot: owot,
 		textInput: textInput
 	});
+	addColorShortcuts();
 }
 function getWndWidth() {
 	return document.body.clientWidth;
@@ -181,8 +182,7 @@ defineElements({ // elm[<name>]
 	usr_online: byId("usr_online"),
 	link_element: byId("link_element"),
 	link_div: byId("link_div"),
-	color_shortcuts: byId("color_shortcuts"),
-	random_color_link: byId("random_color_link")
+	color_shortcuts: byId("color_shortcuts")
 });
 
 w.on("clientLoaded", function() {
@@ -191,7 +191,6 @@ w.on("clientLoaded", function() {
 	var g = (YourWorld.Color >> 8) & 255;
 	var b = YourWorld.Color & 255;
 	setRGBColorPicker(r, g, b);
-	elm.random_color_link.onclick = setColorPickerRandom;
 });
 
 function setRGBColorPicker(r, g, b) {
@@ -230,13 +229,10 @@ function createColorButton(color) {
 function addColorShortcuts() {
 	var colors = [
 		"#000000",
-		"#FFFFFF",
 		"#FF0000",
-		"#00AA00",
+		"#008000",
 		"#0000FF",
-		"#FFFF00",
-		"#00FFFF",
-		"#FF00FF"
+		"#FFFFFF"
 	];
 	for(var i = 0; i < colors.length; i++) {
 		var col = colors[i];
