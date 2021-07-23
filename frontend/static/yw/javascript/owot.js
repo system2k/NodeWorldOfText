@@ -218,7 +218,9 @@ function createColorButton(color) {
 	var colorInt = resolveColorValue(color);
 	var colorValues = int_to_rgb(colorInt);
 	celm.className = "color_btn";
-	celm.style.backgroundColor = int_to_hexcode(colorInt);
+	var hex = int_to_hexcode(colorInt);
+	celm.style.backgroundColor = hex;
+	celm.title = hex.toUpperCase();
 	celm.onclick = function() {
 		setRGBColorPicker(colorValues[0], colorValues[1], colorValues[2]);
 		w._ui.colorInputModal.onSubmit();
@@ -241,8 +243,8 @@ function addColorShortcuts() {
 	var rand = document.createElement("span");
 	rand.className = "color_btn";
 	rand.style.backgroundColor = "#FFFFFF";
-	rand.style.float = "right";
 	rand.innerText = "?";
+	rand.title = "Random color";
 	rand.onclick = setColorPickerRandom;
 	elm.color_shortcuts.appendChild(rand);
 }

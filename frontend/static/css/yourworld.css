@@ -382,11 +382,6 @@ a:visited {
 	margin-right: 8px;
 	margin-bottom: 8px;
 }
-#random_color_link {
-	float: right;
-	color: blue;
-	text-decoration: underline;
-}
 #link_element {
 	position: absolute;
 	display: block;
@@ -422,4 +417,12 @@ a:visited {
 }
 .color_btn:active {
 	border-color: rgb(165, 107, 0);
+}
+#color_shortcuts {
+	background-color: #C3C3FF;
+	margin-left: -12px;
+	margin-right: -12px;
+	margin-bottom: -12px;
+	text-align: right;
+	padding-top: 3px;
 }

@@ -199,14 +199,6 @@ var ColorInputModal = (function() {
 		this.overlay.style.display = "";
 		this.input.focus();
 		simplemodal_onopen();
-		this.panel.style.width = "";
-		this.panel.style.height = "";
-		var el_width = this.el.offsetWidth;
-		var el_height = this.el.offsetHeight;
-		if(el_height < 80) el_height = 80;
-		if(el_width < 160) el_width = 160;
-		this.panel.style.width = el_width + "px";
-		this.panel.style.height = el_height + "px";
 		setModalPosition();
 		setModalScroll();
 	};
