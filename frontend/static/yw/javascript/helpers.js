@@ -602,11 +602,13 @@ var w = {
 		textarea: null,
 		init: function() {
 			var area = document.createElement("textarea");
-			area.value = ""
+			area.value = "";
+			area.id = "textCopy";
 			area.style.width = "1px";
 			area.style.height = "1px";
 			area.style.position = "absolute";
 			area.style.left = "-1000px";
+			area.style.top = "-1000px";
 			document.body.appendChild(area);
 			w.clipboard.textarea = area;
 		},
