@@ -78,7 +78,9 @@
 			var outputPanel = document.getElementById("outputPanel");
 			function appendLine(string) {
 				var line = document.createElement("span");
-				line.innerText = string;
+				string = string.replace(/\&/g, "&amp;").replace(/\</g, "&lt;").replace(/\>/g, "&gt;");
+				string = string.replace(/(?:^[0-9]{1,3}(?:\.[0-9]{1,3}){3})|(?:^[0-9a-f]{4}(?::[0-9a-f]{4}){7})/, "<a target='_blank' href='http://rwhois.he.net/whois.php?query=$&'>$&</a>")
+				line.innerHTML = string;
 				var scrollBottom = false;
 				if((outputPanel.scrollHeight - outputPanel.clientHeight) - outputPanel.scrollTop < 20) {
 					scrollBottom = true;
