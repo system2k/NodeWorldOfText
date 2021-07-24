@@ -65,6 +65,7 @@ var images                 = {}; // { name: [data RGBA, width, height] }
 var keysPressed            = {};
 var previousErase          = 0;
 var verticalEnterPos       = [0, 0]; // position to go when pressing enter (tileX, charX)
+var lastX                  = verticalEnterPos; // Deprecated; temp compat
 var imgPatterns            = {};
 var tileCanvasPool         = [];
 var textColorOverride      = 0; // public-member-owner bitfield
@@ -1892,7 +1893,8 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 		pageY: pageY
 	});
 	if(cursorEnabled && Tile.get(pos[0], pos[1]) !== void 0) {
-		verticalEnterPos = [pos[0], pos[2]];
+		verticalEnterPos[0] = pos[0];
+		verticalEnterPos[1] = pos[2];
 		// change position of the cursor and get results
 		if(renderCursor(pos) == false) {
 			// cursor should be removed if on area where user cannot write
@@ -1980,7 +1982,8 @@ function moveCursor(direction, preserveVertPos) {
 		}
 	}
 	if(!preserveVertPos) {
-		verticalEnterPos = [pos[0], pos[2]];
+		verticalEnterPos[0] = pos[0];
+		verticalEnterPos[1] = pos[2];
 	}
 	return renderCursor(pos);
 }
