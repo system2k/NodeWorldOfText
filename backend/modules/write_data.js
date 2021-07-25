@@ -61,12 +61,12 @@ module.exports = async function(data, vars, evars) {
 	var world = evars.world;
 	
 	var ipAddress;
-	if(evars.sdata) {
-		ipAddress = evars.sdata.ipAddress;
+	if(evars.ws && evars.ws.sdata) {
+		ipAddress = evars.ws.sdata.ipAddress;
 	} else {
 		ipAddress = evars.ipAddress;
 	}
-
+	
 	var san_nbr = vars.san_nbr;
 	var advancedSplit = vars.advancedSplit;
 	var get_bypass_key = vars.get_bypass_key;
