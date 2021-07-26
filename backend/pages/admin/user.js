@@ -91,7 +91,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	}
 
 	if(user_edit.id == user.id) {
-		return await dispage("administrator_user", {
+		return await dispage("admin/user", {
 			message: "You cannot set your own rank"
 		}, req, serve, vars, evars);
 	}
@@ -130,7 +130,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		} else {
 			return serve("Invalid rank");
 		}
-		return await dispage("administrator_user", {
+		return await dispage("admin/user", {
 			message: "Successfully set " + user_edit.username + "'s rank to " + ["Default", "Staff", "Superuser", "Operator"][rank]
 		}, req, serve, vars, evars);
 	}

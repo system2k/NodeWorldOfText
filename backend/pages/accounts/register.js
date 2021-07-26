@@ -103,7 +103,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	   form_email_errors.length	 ||
 	   form_password1_errors.length ||
 	   form_password2_errors.length) {
-		 return await dispage("register", {
+		 return await dispage("accounts/register", {
 			 form_username_errors,
 			 form_email_errors,
 			 form_password1_errors,
@@ -124,7 +124,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	if(!email) {
 		await db.run("UPDATE auth_user SET is_active=1 WHERE id=?", user_id);
 	}
-	await dispage("login", {
+	await dispage("accounts/login", {
 		username: username,
 		password: password1,
 		registered: true

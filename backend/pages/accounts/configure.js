@@ -237,7 +237,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		}
 
 		if(!adduser) {
-			return await dispage("configure", { message: "User not found" }, req, serve, vars, evars);
+			return await dispage("accounts/configure", { message: "User not found" }, req, serve, vars, evars);
 		}
 
 		if(accountSystem == "uvias") {
@@ -247,21 +247,21 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		}
 		
 		if(user_id == world.owner_id) {
-			return await dispage("configure", {
+			return await dispage("accounts/configure", {
 				message: "User is already the owner of \"" + world_name + "\""
 			}, req, serve, vars, evars);
 		}
 		var whitelist = await db.get("SELECT * FROM whitelist WHERE user_id=? AND world_id=?",
 			[user_id, world.id]);
 		if(whitelist) {
-			return await dispage("configure", {
+			return await dispage("accounts/configure", {
 				message: "User is already part of this world"
 			}, req, serve, vars, evars);
 		}
 
 		await db.run("INSERT into whitelist VALUES(null, ?, ?, ?)", [user_id, world.id, date]);
 
-		return await dispage("configure", {
+		return await dispage("accounts/configure", {
 			message: adduser.username + " is now a member of the \"" + world_name + "\" world"
 		}, req, serve, vars, evars);
 	} else if(post_data.form == "access_perm") { // access_perm
@@ -469,7 +469,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		if(typeof new_name == "string" && new_name && new_name != world.name) { // changing world name
 			var validate = await validate_claim_worldname(new_name, vars, evars, true, world.id);
 			if(validate.error) { // error with renaming
-				return await dispage("configure", {
+				return await dispage("accounts/configure", {
 					misc_message: validate.message
 				}, req, serve, vars, evars);
 			}

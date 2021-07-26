@@ -98,7 +98,7 @@
 		</div>
 	</div>
 
-	<div class="content_set clearfix">
+	<div class="content_set">
 		<div class="content_set_title">Features</div>
 		<div class="content_set_content" id="world_features">
 			<p class="set_description">
@@ -402,14 +402,21 @@
 							<br><textarea name="meta_desc" style="width: 400px; height: 32px;" maxlength="600">{{meta_desc}}</textarea>
 						</div>
 					</div>
-					<div>
-						This page is NSFW
-						<input name="nsfw_page" type="checkbox"{%if page_is_nsfw%} checked{%endif%}>
+					<div style="background-color: #EEEEEE;">
+						<div>
+							<b>Options</b>
+							<br>
+							<div>
+								This page is NSFW
+								<input name="nsfw_page" type="checkbox"{%if page_is_nsfw%} checked{%endif%}>
+							</div>
+							<div>
+								Do not log edits
+								<input name="no_log_edits" type="checkbox"{%if no_log_edits%} checked{%endif%}>
+							</div>
+						</div>
 					</div>
-					<div>
-						Do not log edits
-						<input name="no_log_edits" type="checkbox"{%if no_log_edits%} checked{%endif%}>
-					</div>
+					<br>
 				</div>
 				<input type="hidden" name="form" value="misc">
 				<input type="submit" value="Submit">

@@ -100,14 +100,14 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var message = null;
 	if(post_data.form == "claim") {
 		if(user.uv_rank == 3) {
-			return await dispage("profile", {
+			return await dispage("accounts/profile", {
 				message: "Guests cannot claim worlds"
 			}, req, serve, vars, evars);
 		} else {
 			var worldname = post_data.worldname + "";
 			var validate = await validate_claim_worldname(worldname, vars, evars);
 			if(validate.error) { // an error occurred while claiming
-				return await dispage("profile", {
+				return await dispage("accounts/profile", {
 					message: validate.message
 				}, req, serve, vars, evars);
 			}
@@ -124,7 +124,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			}
 		}
 	}
-	await dispage("profile", {
+	await dispage("accounts/profile", {
 		message
 	}, req, serve, vars, evars);
 }

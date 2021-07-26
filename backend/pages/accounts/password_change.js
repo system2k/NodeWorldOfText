@@ -37,19 +37,19 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var valid = checkHash(old_hash, old_pass);
 	if(!valid) {
-		return await dispage("password_change", {
+		return await dispage("accounts/password_change", {
 			error: "Your old password was entered incorrectly. Please enter it again."
 		}, req, serve, vars, evars);
 	}
 
 	if(confirm_pass_1 != confirm_pass_2) {
-		return await dispage("password_change", {
+		return await dispage("accounts/password_change", {
 			error: "The passwords do not match."
 		}, req, serve, vars, evars);
 	}
 
 	if(confirm_pass_1.length < 3 || confirm_pass_1.length > 128) {
-		return await dispage("password_change", {
+		return await dispage("accounts/password_change", {
 			error: "The new password must be 3 - 128 characters."
 		}, req, serve, vars, evars);
 	}

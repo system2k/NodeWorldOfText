@@ -692,22 +692,93 @@ function setupZipLog() {
 }
 setupZipLog();
 
-// load all modules from directory. EG: "test.js" -> "test"
-function load_modules(default_dir) {
-	var pages = fs.readdirSync(default_dir);
-	var obj = {};
-	for(var i = 0; i < pages.length; i++) {
-		var name = pages[i].split(".js")[0];
-		obj[name] = require(default_dir + pages[i]);
-	}
-	return obj;
-}
-
 console.log("Loading page files");
-const pages = load_modules("./backend/pages/");
-const websockets = load_modules("./backend/websockets/");
-const modules = load_modules("./backend/modules/");
-const subsystems = load_modules("./backend/subsystems/");
+
+var pages = {
+	accounts: {
+		configure: require("./backend/pages/accounts/configure.js"),
+		download: require("./backend/pages/accounts/download.js"),
+		login: require("./backend/pages/accounts/login.js"),
+		logout: require("./backend/pages/accounts/logout.js"),
+		member_autocomplete: require("./backend/pages/accounts/member_autocomplete.js"),
+		nsfw: require("./backend/pages/accounts/nsfw.js"),
+		password_change: require("./backend/pages/accounts/password_change.js"),
+		password_change_done: require("./backend/pages/accounts/password_change_done.js"),
+		private: require("./backend/pages/accounts/private.js"),
+		profile: require("./backend/pages/accounts/profile.js"),
+		register: require("./backend/pages/accounts/register.js"),
+		register_complete: require("./backend/pages/accounts/register_complete.js"),
+		sso: require("./backend/pages/accounts/sso.js"),
+		tabular: require("./backend/pages/accounts/tabular.js"),
+		timemachine: require("./backend/pages/accounts/timemachine.js"),
+		verify: require("./backend/pages/accounts/verify.js"),
+		verify_email: require("./backend/pages/accounts/verify_email.js")
+	},
+	admin: {
+		administrator: require("./backend/pages/admin/administrator.js"),
+		backgrounds: require("./backend/pages/admin/backgrounds.js"),
+		file_list: require("./backend/pages/admin/file_list.js"),
+		files: require("./backend/pages/admin/files.js"),
+		manage_ranks: require("./backend/pages/admin/manage_ranks.js"),
+		monitor: require("./backend/pages/admin/monitor.js"),
+		set_custom_rank: require("./backend/pages/admin/set_custom_rank.js"),
+		user: require("./backend/pages/admin/user.js"),
+		user_list: require("./backend/pages/admin/user_list.js"),
+		users_by_id: require("./backend/pages/admin/users_by_id.js"),
+		users_by_username: require("./backend/pages/admin/users_by_username.js"),
+		world_restore: require("./backend/pages/admin/world_restore.js")
+	},
+	other: {
+		ipaddress: require("./backend/pages/other/ipaddress.js"),
+		load_backgrounds: require("./backend/pages/other/load_backgrounds.js"),
+		random_color: require("./backend/pages/other/random_color.js"),
+		test: require("./backend/pages/other/test.js")
+	},
+	"404": require("./backend/pages/404.js"),
+	activate_complete: require("./backend/pages/activate_complete.js"),
+	coordlink: require("./backend/pages/coordlink.js"),
+	home: require("./backend/pages/home.js"),
+	protect: require("./backend/pages/protect.js"),
+	protect_char: require("./backend/pages/protect_char.js"),
+	register_failed: require("./backend/pages/register_failed.js"),
+	script_edit: require("./backend/pages/script_edit.js"),
+	script_manager: require("./backend/pages/script_manager.js"),
+	script_view: require("./backend/pages/script_view.js"),
+	static: require("./backend/pages/static.js"),
+	unprotect: require("./backend/pages/unprotect.js"),
+	unprotect_char: require("./backend/pages/unprotect_char.js"),
+	urllink: require("./backend/pages/urllink.js"),
+	well_known: require("./backend/pages/well_known.js"),
+	world_props: require("./backend/pages/world_props.js"),
+	world_style: require("./backend/pages/world_style.js"),
+	yourworld: require("./backend/pages/yourworld.js")
+};
+
+var websockets = {
+	chat: require("./backend/websockets/chat.js"),
+	chathistory: require("./backend/websockets/chathistory.js"),
+	clear_tile: require("./backend/websockets/clear_tile.js"),
+	cmd: require("./backend/websockets/cmd.js"),
+	cmd_opt: require("./backend/websockets/cmd_opt.js"),
+	cursor: require("./backend/websockets/cursor.js"),
+	fetch: require("./backend/websockets/fetch.js"),
+	link: require("./backend/websockets/link.js"),
+	paste: require("./backend/websockets/paste.js"),
+	protect: require("./backend/websockets/protect.js"),
+	write: require("./backend/websockets/write.js")
+};
+
+var modules = {
+	fetch_tiles: require("./backend/modules/fetch_tiles.js"),
+	protect_areas: require("./backend/modules/protect_areas.js"),
+	write_data: require("./backend/modules/write_data.js"),
+	write_links: require("./backend/modules/write_links.js")
+};
+
+var subsystems = {
+	chat_mgr: require("./backend/subsystems/chat_mgr.js"),
+	tile_database: require("./backend/subsystems/tile_database.js")
+};
 
 function asyncDbSystem(database) {
 	const db = {
@@ -1014,9 +1085,9 @@ async function initialize_ranks_db() {
 	}
 }
 
-prompt.message   = ""; // do not display "prompt" before each question
+prompt.message = ""; // do not display "prompt" before each question
 prompt.delimiter = ""; // do not display ":" after "prompt"
-prompt.colors	= false; // disable dark gray color in a black console
+prompt.colors = false; // disable dark gray color in a black console
 
 var pw_encryption = "sha512WithRSAEncryption";
 const encryptHash = function(pass, salt) {
@@ -1287,26 +1358,26 @@ var url_regexp = [ // regexp , function/redirect to , options
 	[/^home[\/]?$/g, pages.home],
 	[/^\.well-known\/(.*)/g, pages.well_known, { no_login: true, binary_post_data: true }],
 
-	[/^accounts\/login[\/]?$/g, pages.login],
-	[/^accounts\/logout[\/]?$/g, pages.logout],
-	[/^accounts\/register[\/]?$/g, pages.register],
-	[/^accounts\/profile$/g, "/accounts/profile/"],
-	[/^accounts\/profile[\/]?$/g, pages.profile],
-	[/^accounts\/private[\/]?$/g, pages.private],
-	[/^accounts\/configure\/$/g, pages.configure], // for front page configuring
-	[/^accounts\/configure\/(.*)\/$/g, pages.configure],
-	[/^accounts\/member_autocomplete[\/]?$/g, pages.member_autocomplete],
-	[/^accounts\/timemachine\/(.*)\/$/g, pages.timemachine],
-	[/^accounts\/register\/complete[\/]?$/g, pages.register_complete],
-	[/^accounts\/verify\/(.*)\/$/g, pages.verify],
-	[/^accounts\/download\/$/g, pages.accounts_download], // for front page downloading
-	[/^accounts\/download\/(.*)\/$/g, pages.accounts_download],
-	[/^accounts\/password_change[\/]?$/g, pages.password_change],
-	[/^accounts\/password_change\/done[\/]?$/g, pages.password_change_done],
-	[/^accounts\/nsfw\/(.*)[\/]?$/g, pages.accounts_nsfw],
-	[/^accounts\/tabular[\/]?$/g, pages.accounts_tabular],
-	[/^accounts\/verify_email\/(.*)[\/]?$/g, pages.accounts_verify_email],
-	[/^accounts\/sso[\/]?$/g, pages.sso],
+	[/^accounts\/login[\/]?$/g, pages.accounts.login],
+	[/^accounts\/logout[\/]?$/g, pages.accounts.logout],
+	[/^accounts\/register[\/]?$/g, pages.accounts.register],
+	[/^accounts\/profile$/g, "/accounts/profile/"], // use valid format
+	[/^accounts\/profile[\/]?$/g, pages.accounts.profile],
+	[/^accounts\/private[\/]?$/g, pages.accounts.private],
+	[/^accounts\/configure\/$/g, pages.accounts.configure], // for front page configuring
+	[/^accounts\/configure\/(.*)\/$/g, pages.accounts.configure],
+	[/^accounts\/member_autocomplete[\/]?$/g, pages.accounts.member_autocomplete],
+	[/^accounts\/timemachine\/(.*)\/$/g, pages.accounts.timemachine],
+	[/^accounts\/register\/complete[\/]?$/g, pages.accounts.register_complete],
+	[/^accounts\/verify\/(.*)\/$/g, pages.accounts.verify],
+	[/^accounts\/download\/$/g, pages.accounts.download], // for front page downloading
+	[/^accounts\/download\/(.*)\/$/g, pages.accounts.download],
+	[/^accounts\/password_change[\/]?$/g, pages.accounts.password_change],
+	[/^accounts\/password_change\/done[\/]?$/g, pages.accounts.password_change_done],
+	[/^accounts\/nsfw\/(.*)[\/]?$/g, pages.accounts.nsfw],
+	[/^accounts\/tabular[\/]?$/g, pages.accounts.tabular],
+	[/^accounts\/verify_email\/(.*)[\/]?$/g, pages.accounts.verify_email],
+	[/^accounts\/sso[\/]?$/g, pages.accounts.sso],
 
 	[/^ajax\/protect[\/]?$/g, pages.protect],
 	[/^ajax\/unprotect[\/]?$/g, pages.unprotect],
@@ -1315,18 +1386,18 @@ var url_regexp = [ // regexp , function/redirect to , options
 	[/^ajax\/coordlink[\/]?$/g, pages.coordlink],
 	[/^ajax\/urllink[\/]?$/g, pages.urllink],
 	
-	[/^administrator\/$/g, pages.administrator],
-	[/^administrator\/user\/(.*)\/$/g, pages.administrator_user],
-	[/^administrator\/users\/by_username\/(.*)[\/]?$/g, pages.administrator_users_by_username],
-	[/^administrator\/users\/by_id\/(.*)[\/]?$/g, pages.administrator_users_by_id],
-	[/^administrator\/world_restore[\/]?$/g, pages.administrator_world_restore],
-	[/^administrator\/backgrounds[\/]?$/g, pages.administrator_backgrounds, { binary_post_data: true }],
-	[/^administrator\/files[\/]?$/g, pages.administrator_files, { binary_post_data: true }],
-	[/^administrator\/manage_ranks[\/]?$/g, pages.administrator_manage_ranks],
-	[/^administrator\/set_custom_rank\/(.*)\/$/g, pages.administrator_set_custom_rank],
-	[/^administrator\/user_list[\/]?$/g, pages.administrator_user_list],
-	[/^administrator\/file_list[\/]?$/g, pages.administrator_file_list],
-	[/^administrator\/monitor[\/]?$/g, pages.monitor],
+	[/^administrator\/$/g, pages.admin.administrator],
+	[/^administrator\/user\/(.*)\/$/g, pages.admin.user],
+	[/^administrator\/users\/by_username\/(.*)[\/]?$/g, pages.admin.users_by_username],
+	[/^administrator\/users\/by_id\/(.*)[\/]?$/g, pages.admin.users_by_id],
+	[/^administrator\/world_restore[\/]?$/g, pages.admin.world_restore],
+	[/^administrator\/backgrounds[\/]?$/g, pages.admin.backgrounds, { binary_post_data: true }],
+	[/^administrator\/files[\/]?$/g, pages.admin.files, { binary_post_data: true }],
+	[/^administrator\/manage_ranks[\/]?$/g, pages.admin.manage_ranks],
+	[/^administrator\/set_custom_rank\/(.*)\/$/g, pages.admin.set_custom_rank],
+	[/^administrator\/user_list[\/]?$/g, pages.admin.user_list],
+	[/^administrator\/file_list[\/]?$/g, pages.admin.file_list],
+	[/^administrator\/monitor[\/]?$/g, pages.admin.monitor],
 
 	[/^script_manager\/$/g, pages.script_manager],
 	[/^script_manager\/edit\/(.*)\/$/g, pages.script_edit],
@@ -1335,10 +1406,10 @@ var url_regexp = [ // regexp , function/redirect to , options
 	[/^world_style[\/]?$/g, pages.world_style],
 	[/^world_props[\/]?$/g, pages.world_props],
 
-	[/^other\/random_color[\/]?$/g, pages.random_color, { no_login: true }],
-	[/^other\/backgrounds\/(.*)[\/]?$/g, pages.load_backgrounds, { no_login: true }],
-	[/^other\/test\/(.*)[\/]?$/g, pages.test, { no_login: true }],
-	[/^other\/ipaddress[\/]?$/g, pages.ipaddress],
+	[/^other\/random_color[\/]?$/g, pages.other.random_color, { no_login: true }],
+	[/^other\/backgrounds\/(.*)[\/]?$/g, pages.other.load_backgrounds, { no_login: true }],
+	[/^other\/test\/(.*)[\/]?$/g, pages.other.test, { no_login: true }],
+	[/^other\/ipaddress[\/]?$/g, pages.other.ipaddress],
 
 	[/^static\/(.*)[\/]?$/g, pages.static, { no_login: true }],
 	[/^static[\/]?$/g, pages.static, { no_login: true }],
@@ -1353,8 +1424,8 @@ var url_regexp = [ // regexp , function/redirect to , options
 	usage: this is to be used in the page modules when
 	the module wants to dispatch a different page module.
 	EG: return dispage("404", { extra parameters for page }, req, serve, vars, evars, "POST")
+	EG: return dispage("accounts/login", { extra parameters for page }, req, serve, vars, evars)
 	(req, serve, and vars should already be defined by the parameters)
-	("POST" is only needed if you need to post something. otherwise, don't include anything)
 */
 async function dispage(page, params, req, serve, vars, evars, method) {
 	if(!method || !valid_method(method)) {
@@ -1367,7 +1438,12 @@ async function dispage(page, params, req, serve, vars, evars, method) {
 	if(!vars) {
 		vars = {};
 	}
-	await pages[page][method](req, serve, vars, evars, params);
+	var pageObj = pages;
+	page = page.split("/");
+	for(var i = 0; i < page.length; i++) {
+		pageObj = pageObj[page[i]];
+	}
+	await pageObj[method](req, serve, vars, evars, params);
 }
 
 // transfer all values from one object to a main object containing all imports
@@ -1492,7 +1568,7 @@ function parseToken(token) {
 	};
 }
 
-async function get_user_info(cookies, is_websocket, include_cookies) {
+async function get_user_info(cookies, is_websocket, dispatch) {
 	/*
 		User Levels:
 		3: Superuser (Operator)
@@ -1604,8 +1680,8 @@ async function get_user_info(cookies, is_websocket, include_cookies) {
 		}
 		if(!success) {
 			// if the token is invalid, delete the cookie
-			if(include_cookies) {
-				include_cookies.push("sessionid=; expires=" + http_time(0) + "; path=/");
+			if(dispatch) {
+				dispatch.addCookie("sessionid=; expires=" + http_time(0) + "; path=/");
 			}
 		}
 	}
@@ -1770,64 +1846,48 @@ function setupHTTPServer() {
 }
 setupHTTPServer();
 
-var valid_subdomains = ["test"];
-
-async function process_request(req, res) {
-	if(!serverLoaded) await waitForServerLoad();
-	if(isStopping) return;
-	var hostname = req.headers.host;
-	if(!hostname) hostname = "www.ourworldoftext.com";
+function parseHostname(hostname) {
+	if(!hostname) hostname = "ourworldoftext.com";
 	hostname = hostname.slice(0, 1000);
 	var subdomains = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
 	var sub = subdomains.slice(2);
 	for(var i = 0; i < sub.length; i++) sub[i] = sub[i].toLowerCase();
+	return sub;
+}
 
-	var URLparse = url.parse(req.url);
-	var URL = URLparse.pathname;
-	if(URL.charAt(0) == "/") { URL = URL.substr(1); }
-	try { URL = decodeURIComponent(URL); } catch (e) {};
-
-	if(sub.length == 1 && valid_subdomains.indexOf(sub[0]) > -1) {
-		URL = "other/" + sub[0] + "/" + URL;
-	}
-
-	var request_resolved = false;
-
-	// server will return cookies to the client if it needs to
-	var include_cookies = [];
-
-	var acceptEncoding = parseAcceptEncoding(req.headers["accept-encoding"]);
-
-	var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
-	var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
-	var remIp = req.socket.remoteAddress;
-	var ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
-
+function createDispatcher(opts) {
+	var encoding = opts.encoding;
+	if(!encoding) encoding = [];
+	var gzip = opts.gzip;
+	var res = opts.res;
+	
+	var requestResolved = false;
+	var isStreaming = false;
+	var cookiesToReturn = [];
 	function dispatch(data, status_code, params) {
-		if(request_resolved) return; // if request is already sent
-		request_resolved = true;
+		if(requestResolved) return; // if request response is already sent
+		requestResolved = true;
 		/* params: {
 			cookie: the cookie data
 			mime: mime type (ex: text/plain)
 			redirect: url to redirect to
 			download_file: force browser to download this file as .txt. specifies its name
 			headers: header data
-			streamed_length: don't set content length because it's streamed
 		} (all optional)*/
 		var info = {};
 		if(!params) {
 			params = {};
 		}
 		if(typeof params.cookie == "string") {
-			include_cookies.push(params.cookie)
+			cookiesToReturn.push(params.cookie)
 		} else if(typeof params.cookie == "object") {
-			include_cookies = include_cookies.concat(params.cookie)
+			cookiesToReturn = cookiesToReturn.concat(params.cookie)
 		}
-		if(include_cookies.length == 1) {
-			include_cookies = include_cookies[0];
+		if(cookiesToReturn.length == 1) {
+			cookiesToReturn = cookiesToReturn[0];
 		}
-		if(include_cookies.length > 0) {
-			info["Set-Cookie"] = include_cookies;
+		if(cookiesToReturn.length > 0) {
+			info["Set-Cookie"] = cookiesToReturn;
 		}
 		if(params.download_file) {
 			info["Content-disposition"] = "attachment; filename=" + params.download_file;
@@ -1854,7 +1914,7 @@ async function process_request(req, res) {
 		if(!data) {
 			data = "";
 		}
-		if(gzipEnabled && (acceptEncoding.includes("gzip") || acceptEncoding.includes("*") && !params.streamed_length)) {
+		if(gzip && (encoding.includes("gzip") || encoding.includes("*") && !isStreaming)) {
 			var doNotEncode = false;
 			if(data.length < 1450) {
 				doNotEncode = true;
@@ -1871,19 +1931,66 @@ async function process_request(req, res) {
 				data = zlib.gzipSync(data);
 			}
 		}
-		if(!params.streamed_length) info["Content-Length"] = Buffer.byteLength(data);
+		if(!isStreaming) info["Content-Length"] = Buffer.byteLength(data);
 		res.writeHead(status_code, info);
-		if(!params.streamed_length) {
+		if(!isStreaming) {
 			res.write(data);
 			res.end();
 		}
 	}
-	dispatch.res = res;
-	dispatch.write = function(data) {
+	dispatch.isResolved = function() {
+		return requestResolved;
+	}
+	dispatch.addCookie = function(cookie) {
+		cookiesToReturn.push(cookie);
+	}
+	dispatch.startStream = function() {
+		isStreaming = true;
+	}
+	dispatch.endStream = function() {
+		if(requestResolved) return;
+		requestResolved = true;
+		res.end();
+	}
+	dispatch.writeStream = function(data) {
+		if(requestResolved) return;
+		if(!isStreaming) return;
 		return new Promise(function(resolve) {
 			res.write(data, resolve);
 		});
 	}
+	return dispatch;
+}
+
+var valid_subdomains = ["test"];
+
+async function process_request(req, res) {
+	if(!serverLoaded) await waitForServerLoad();
+	if(isStopping) return;
+
+	var hostname = parseHostname(req.headers.host);
+
+	var URLparse = url.parse(req.url);
+	var URL = URLparse.pathname;
+	if(URL.charAt(0) == "/") { URL = URL.substr(1); }
+	try { URL = decodeURIComponent(URL); } catch (e) {};
+
+	if(hostname.length == 1 && valid_subdomains.indexOf(hostname[0]) > -1) {
+		URL = "other/" + hostname[0] + "/" + URL;
+	}
+
+	var acceptEncoding = parseAcceptEncoding(req.headers["accept-encoding"]);
+
+	var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
+	var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
+	var remIp = req.socket.remoteAddress;
+	var ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
+
+	var dispatch = createDispatcher({
+		res,
+		encoding: acceptEncoding,
+		gzip: gzipEnabled
+	});
 
 	var page_resolved = false;
 	for(var i in url_regexp) {
@@ -1904,13 +2011,13 @@ async function process_request(req, res) {
 				if(no_login) {
 					user = {};
 				} else {
-					user = await get_user_info(cookies, false, include_cookies);
+					user = await get_user_info(cookies, false, dispatch);
 					// check if user is logged in
 					if(!cookies.csrftoken) {
 						var token = new_token(32);
 						var date = Date.now();
 						// TODO: introduce only for forms
-						include_cookies.push("csrftoken=" + token + "; expires=" + http_time(date + ms.year) + "; path=/;");
+						dispatch.addCookie("csrftoken=" + token + "; expires=" + http_time(date + ms.year) + "; path=/;");
 						user.csrftoken = token;
 					} else {
 						user.csrftoken = cookies.csrftoken;
@@ -1977,7 +2084,7 @@ async function process_request(req, res) {
 		}
 	}
 
-	if(!page_resolved || !request_resolved) {
+	if(!page_resolved || !dispatch.isResolved()) {
 		return dispatch("HTTP 404: The resource cannot be found", 404);
 	}
 
@@ -2415,7 +2522,7 @@ async function initialize_server_components() {
 	await sysLoad();
 
 	// initialize variables in page handlers
-	await sintLoad();
+	await sintLoad(pages);
 
 	initPingAuto();
 
@@ -2965,7 +3072,7 @@ var global_data = {
 	isTestServer,
 	announcement: function() { return announcement_cache },
 	get_bypass_key: function() { return bypass_key_cache },
-	add_background_cache: pages.load_backgrounds.add_cache,
+	add_background_cache: pages.other.load_backgrounds.add_cache, // TODO: move 'add_cache' somewhere else
 	template_data,
 	uvias,
 	accountSystem,
@@ -3048,12 +3155,17 @@ async function sysLoad() {
 	}
 }
 
-async function sintLoad() {
+async function sintLoad(obj) {
 	// if page modules contain a startup function, run it
-	for(var i in pages) {
-		var mod = pages[i];
-		if(mod.startup_internal) {
-			await mod.startup_internal(global_data);
+	for(var i in obj) {
+		var mod = obj[i];
+		var isPage = mod.GET || mod.POST;
+		if(isPage) {
+			if(mod.startup_internal) {
+				await mod.startup_internal(global_data);
+			}
+		} else {
+			await sintLoad(mod);
 		}
 	}
 }

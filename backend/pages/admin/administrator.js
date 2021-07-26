@@ -102,7 +102,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	if("set_bypass_key" in post_data) {
 		var new_bypass_key = post_data.set_bypass_key;
 		modify_bypass_key(new_bypass_key);
-		return await dispage("administrator", {
+		return await dispage("admin/administrator", {
 			cons_update_msg: "Bypass key updated successfully"
 		}, req, serve, vars, evars);
 	}
@@ -122,7 +122,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				}
 			})]);
 	
-		return await dispage("administrator", {
+		return await dispage("admin/administrator", {
 			announcement_update_msg: "Announcement updated"
 		}, req, serve, vars, evars);
 	}

@@ -124,7 +124,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		delete ranks_cache.users[user_edit.id];
 	}
 
-	return await dispage("administrator_set_custom_rank", {
+	return await dispage("admin/set_custom_rank", {
 		message: "Successfully set " + user_edit.username + "'s rank to " + rankName
 	}, req, serve, vars, evars);
 }

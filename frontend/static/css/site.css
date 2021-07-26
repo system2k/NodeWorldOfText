@@ -42,7 +42,7 @@ h1 {
 }
 .content_set_title {
 	background-color: #eee;
-	float: left;
+	display: inline-block;
 	font-size: 120%;
 	margin-left: 1px;
 	margin-top: 1px;
@@ -126,4 +126,7 @@ ul {
 .action_desc {
 	font-size: 10px;
 	color: #2e2e2e;
+}
+.content_set_title {
+	cursor: pointer;
 }

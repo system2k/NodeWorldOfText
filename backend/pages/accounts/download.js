@@ -50,27 +50,28 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var count = (await db.get("SELECT count(*) AS cnt FROM tile WHERE world_id=?", world.id)).cnt;
 
 	if(count > 500000 && !user.superuser) {
-		return serve("World is too large to download, email OWOT");
+		return serve("World is too large to download");
 	}
 
 	var groupSize = 2048;
 
+	serve.startStream();
+
 	// set up headers
 	serve(null, null, {
-		streamed_length: true,
 		mime: "application/force-download; charset=utf-8",
 		download_file: filename_sanitize("World_" + world_name + ".json")
 	});
 
 	var groups = Math.ceil(count / groupSize);
-	var status = await serve.write("[");
+	var status = await serve.writeStream("[");
 	if(status) return; // socket aborted
 	var loopEnded = false;
 	for(var i = 0; i < groups; i++) {
 		var data = await db.all("SELECT * FROM tile WHERE world_id=? ORDER BY rowid LIMIT ?,?",
 			[world.id, i * groupSize, groupSize]);
 		if(!data || data.length == 0) {
-			var status = await serve.write("]");
+			var status = await serve.writeStream("]");
 			if(status) return; // socket aborted
 			loopEnded = true;
 			break;
@@ -89,13 +90,13 @@ module.exports.GET = async function(req, serve, vars, evars) {
 				created_at: tile.created_at
 			});
 		}
-		var status = await serve.write(tileData);
+		var status = await serve.writeStream(tileData);
 		if(status) return; // socket aborted
 	}
 	if(!loopEnded) {
-		var status = await serve.write("]");
+		var status = await serve.writeStream("]");
 		if(status) return; // socket aborted
 	}
 
-	serve.res.end();
+	serve.endStream();
 }

@@ -49,11 +49,11 @@ module.exports.POST = async function(req, serve, vars, evars, params) {
 
 	var loginuser = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username)
 	if(!loginuser) {
-		return await dispage("login", {errors: true, username}, req, serve, vars, evars);
+		return await dispage("accounts/login", {errors: true, username}, req, serve, vars, evars);
 	}
 	var valid = checkHash(loginuser.password, password)
 	if(!valid) { // wrong password
-		return await dispage("login", {errors: true, username}, req, serve, vars, evars);
+		return await dispage("accounts/login", {errors: true, username}, req, serve, vars, evars);
 	}
 
 	var date_now = Date.now();
