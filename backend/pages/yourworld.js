@@ -41,7 +41,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var query_data = evars.query_data;
 	var path = evars.path;
 	var user = evars.user;
-	var redirect = evars.redirect;
 	var HTML = evars.HTML;
 
 	var dispage = vars.dispage;
@@ -65,7 +64,9 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var read_permission = await can_view_world(world, user, db);
 	if(!read_permission) {
-		return redirect("/accounts/private/");
+		return dispatch(null, null, {
+			redirect: "/accounts/private/"
+		});
 	}
 
 	if(query_data.fetch == 1) { // fetch request

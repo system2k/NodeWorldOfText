@@ -1,3 +1,19 @@
+// TODO: move to utils & refactor
+function checkDuplicateCookie(cookieStr, key) {
+	if(typeof cookieStr != "string") return false;
+	cookieStr = cookieStr.split(";");
+	key = key.toLowerCase();
+	var cnt = 0;
+	for(var i = 0; i < cookieStr.length; i++) {
+		var cook = cookieStr[i].split("=");
+		var keyData = cook[0].trim().toLowerCase();
+		if(keyData != key) continue;
+		cnt++;
+		if(cnt > 1) return true;
+	}
+	return false;
+}
+
 module.exports.GET = async function(req, serve, vars, evars) {
 	var query_data = evars.query_data;
 
@@ -14,16 +30,31 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		return serve("No token specified");
 	}
 
+	var cookieResponse = [];
+	var hostnameAvailable = false;
+
 	// uvias redirects you to ourworldoftext.com, preventing users from being able
 	// to access their accounts on www.ourworldoftext.com
 	var host = req.headers.host;
-	if(typeof host != "string") host = "ourworldoftext.com";
-	host = "." + host;
+	if(typeof host == "string") {
+		if(host[0] == ".") host = host.substr(1);
+		if(host[host.length - 1] == ".") host = host.slice(0, -1);
+		host = host.toLowerCase().split(".");
+		// ".ourworldoftext.com"
+		var wildcardHost = "." + host.join(".");
+		// there are duplicate cookie instances from the botched July 2021 deployment
+		var tokenCorrupted = checkDuplicateCookie(req.headers.cookie, "token");
+		// delete cookie for ".ourworldoftext.com"
+		if(tokenCorrupted) {
+			cookieResponse.push("token=; expires=" + http_time(0) + "; path=/; domain=" + wildcardHost + "; HttpOnly;");
+		}
+		hostnameAvailable = true;
+	}
 
 	if(token.length > 1000) {
 		return serve("Token is too long.");
 	}
-		
+	
 	var dat = await uvias.get("SELECT uid, to_hex(uid) as uid_hex, session_id, accounts.build_token(uid, session_id) as token FROM accounts.get_and_del_sso_token(decode($1::CHAR(32), 'hex'), $2::text)", [token, uvias.id]);
 
 	if(!dat) {
@@ -39,8 +70,12 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	}
 	var expires = session.expires.getTime();
 	
+	cookieResponse.push("token=" + token + "; expires=" + http_time(expires + ms.year) + "; path=/; HttpOnly;");
+	if(hostnameAvailable && host.length == 2 && host[0] == "ourworldoftext") {
+		cookieResponse.push("token=" + token + "; expires=" + http_time(expires + ms.year) + "; path=/; domain=www.ourworldoftext.com; HttpOnly;");
+	}
 	serve(null, null, {
-		cookie: "token=" + token + "; expires=" + http_time(expires + ms.year) + "; path=/; domain=" + encodeURIComponent(host) + "; HttpOnly;",
+		cookie: cookieResponse,
 		redirect: "/accounts/profile/"
 	});
 }

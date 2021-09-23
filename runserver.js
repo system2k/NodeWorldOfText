@@ -1361,7 +1361,7 @@ var url_regexp = [ // regexp , function/redirect to , options
 	[/^accounts\/login[\/]?$/g, pages.accounts.login],
 	[/^accounts\/logout[\/]?$/g, pages.accounts.logout],
 	[/^accounts\/register[\/]?$/g, pages.accounts.register],
-	[/^accounts\/profile$/g, "/accounts/profile/"], // use valid format
+	[/^accounts\/profile$/g, "/accounts/profile/"], // ensure there is always an ending slash
 	[/^accounts\/profile[\/]?$/g, pages.accounts.profile],
 	[/^accounts\/private[\/]?$/g, pages.accounts.private],
 	[/^accounts\/configure\/$/g, pages.accounts.configure], // for front page configuring
@@ -1625,8 +1625,10 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 		if(parsed) {
 			var uid = parsed.uid;
 			var session_id = parsed.session_id;
+			// check if this session id belongs to a user
 			var session = await uvias.get("SELECT * FROM accounts.get_session($1::bigint, $2::bytea)", [uid, session_id]);
 			if(session) {
+				// both guests and users are included
 				var user_account = await uvias.get("SELECT to_hex(uid) as uid, username, rank_id FROM accounts.users WHERE uid=$1::bigint", uid);
 				if(user_account) {
 					success = true;
@@ -1640,6 +1642,7 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 							var is_persistent = ref_res.is_persistent;
 						}
 					}
+					// only users, not guests
 					var links_local = await uvias.get("SELECT to_hex(uid) as uid, login_name, email, email_verified FROM accounts.links_local WHERE uid=$1::bigint", uid);
 					user.authenticated = true;
 					user.display_username = user_account.username;
@@ -1678,12 +1681,12 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 				}
 			}
 		}
-		if(!success) {
+		/*if(!success) {
 			// if the token is invalid, delete the cookie
 			if(dispatch) {
-				dispatch.addCookie("sessionid=; expires=" + http_time(0) + "; path=/");
+				dispatch.addCookie("token=; expires=" + http_time(0) + "; path=/");
 			}
-		}
+		}*/
 	}
 	return user;
 }
@@ -1697,6 +1700,8 @@ function plural(int, plEnding) {
 	return p;
 }
 
+// TODO: refactor
+// this prevents a user from claiming /w/<world>
 function is_unclaimable_worldname(world) {
 	if(!world) return false;
 	world = world.split("/");
@@ -1709,12 +1714,14 @@ function is_unclaimable_worldname(world) {
 	return true;
 }
 
+// TODO: remove force_create. this is used when creating subworlds
 async function world_get_or_create(name, do_not_create, force_create) {
 	name += "";
 	if(typeof name != "string") name = "";
 	if(name.length > 10000) {
 		do_not_create = true;
 	}
+	// TODO: fix race condition
 	var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
 	if(!world) { // world doesn't exist, create it
 		if(((name.match(/^([\w\.\-]*)$/g) || is_unclaimable_worldname(name)) && !do_not_create) || force_create) {
@@ -1738,7 +1745,7 @@ async function world_get_or_create(name, do_not_create, force_create) {
 
 				// views: 0,
 				// chat_permission: 0,
-				// show_cursor: 0,
+				// show_cursor: -1,
 				// color_text: 0,
 				// custom_menu_color: "",
 				// custom_public_text_color: "",
@@ -1772,6 +1779,11 @@ async function world_get_or_create(name, do_not_create, force_create) {
 	return world;
 }
 
+// TODO: proper caching
+async function user_is_member(world_id, user_id) {
+	return await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?", [world_id, user_id]);
+}
+
 async function can_view_world(world, user) {
 	var permissions = {
 		member: false,
@@ -1784,8 +1796,7 @@ async function can_view_world(world, user) {
 		return false;
 	}
 
-	var is_member = await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?",
-		[world.id, user.id]);
+	var is_member = await user_is_member(world.id, user.id);
 
 	// member and owner only
 	if(world.readability == 1 && !is_member && !is_owner) {
@@ -1855,18 +1866,19 @@ function parseHostname(hostname) {
 	return sub;
 }
 
-function createDispatcher(opts) {
+function createDispatcher(res, opts) {
 	var encoding = opts.encoding;
 	if(!encoding) encoding = [];
 	var gzip = opts.gzip;
-	var res = opts.res;
 	
 	var requestResolved = false;
-	var isStreaming = false;
+	var requestStreaming = false;
 	var cookiesToReturn = [];
 	function dispatch(data, status_code, params) {
 		if(requestResolved) return; // if request response is already sent
-		requestResolved = true;
+		if(!requestStreaming) {
+			requestResolved = true;
+		}
 		/* params: {
 			cookie: the cookie data
 			mime: mime type (ex: text/plain)
@@ -1879,9 +1891,9 @@ function createDispatcher(opts) {
 			params = {};
 		}
 		if(typeof params.cookie == "string") {
-			cookiesToReturn.push(params.cookie)
+			cookiesToReturn.push(params.cookie);
 		} else if(typeof params.cookie == "object") {
-			cookiesToReturn = cookiesToReturn.concat(params.cookie)
+			cookiesToReturn = cookiesToReturn.concat(params.cookie);
 		}
 		if(cookiesToReturn.length == 1) {
 			cookiesToReturn = cookiesToReturn[0];
@@ -1914,7 +1926,7 @@ function createDispatcher(opts) {
 		if(!data) {
 			data = "";
 		}
-		if(gzip && (encoding.includes("gzip") || encoding.includes("*") && !isStreaming)) {
+		if(gzip && (encoding.includes("gzip") || encoding.includes("*") && !requestStreaming)) {
 			var doNotEncode = false;
 			if(data.length < 1450) {
 				doNotEncode = true;
@@ -1931,9 +1943,9 @@ function createDispatcher(opts) {
 				data = zlib.gzipSync(data);
 			}
 		}
-		if(!isStreaming) info["Content-Length"] = Buffer.byteLength(data);
+		if(!requestStreaming) info["Content-Length"] = Buffer.byteLength(data);
 		res.writeHead(status_code, info);
-		if(!isStreaming) {
+		if(!requestStreaming) {
 			res.write(data);
 			res.end();
 		}
@@ -1945,7 +1957,7 @@ function createDispatcher(opts) {
 		cookiesToReturn.push(cookie);
 	}
 	dispatch.startStream = function() {
-		isStreaming = true;
+		requestStreaming = true;
 	}
 	dispatch.endStream = function() {
 		if(requestResolved) return;
@@ -1954,7 +1966,7 @@ function createDispatcher(opts) {
 	}
 	dispatch.writeStream = function(data) {
 		if(requestResolved) return;
-		if(!isStreaming) return;
+		if(!requestStreaming) return;
 		return new Promise(function(resolve) {
 			res.write(data, resolve);
 		});
@@ -1986,8 +1998,7 @@ async function process_request(req, res) {
 	var remIp = req.socket.remoteAddress;
 	var ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
 
-	var dispatch = createDispatcher({
-		res,
+	var dispatch = createDispatcher(res, {
 		encoding: acceptEncoding,
 		gzip: gzipEnabled
 	});
@@ -1999,10 +2010,18 @@ async function process_request(req, res) {
 		var pageRes = pattern[1];
 		var options = pattern[2];
 		if(!options) options = {};
+
+		var no_login = options.no_login;
+		var binary_post_data = options.binary_post_data;
+		var remove_end_slash = options.remove_end_slash;
+
+		/*
+		TODO: refactor
+		possible options: no_login; binary_post_data; remove_end_slash
+		*/
 		if(URL.match(urlReg)) {
 			page_resolved = true;
 			if(typeof pageRes == "object") {
-				var no_login = options.no_login;
 				var method = req.method.toUpperCase();
 				var post_data = {};
 				var query_data = querystring.parse(url.parse(req.url).query);
@@ -2023,21 +2042,15 @@ async function process_request(req, res) {
 						user.csrftoken = cookies.csrftoken;
 					}
 				}
-				function redirect(path) {
-					dispatch(null, null, {
-						redirect: path
-					});
-				}
 				if(method == "POST") {
-					var dat = await wait_response_data(req, dispatch, options.binary_post_data, user.superuser);
-					if(!dat) {
-						return dispatch("Post error", 400);
+					var dat = await wait_response_data(req, dispatch, binary_post_data, user.superuser);
+					if(dat) {
+						post_data = dat;
 					}
-					post_data = dat;
 				}
 				var URL_mod = URL; // modified url
 				// remove end slash if enabled
-				if(options.remove_end_slash) {
+				if(remove_end_slash) {
 					URL_mod = removeLastSlash(URL_mod);
 				}
 				// return compiled HTML pages
@@ -2056,13 +2069,12 @@ async function process_request(req, res) {
 					data.accountSystem = accountSystem;
 					return template_data[path](data);
 				}
-				var evars = { // extra information
+				var evars = { // request-specific variables
 					cookies,
 					post_data,
 					query_data,
 					path: URL_mod,
 					user,
-					redirect,
 					referer: req.headers.referer,
 					broadcast: global_data.ws_broadcast,
 					HTML,
@@ -2115,6 +2127,7 @@ async function modify_bypass_key(key) {
 	bypass_key_cache = key;
 }
 
+// command-line only
 function announce(text) {
 	(async function() {
 		await MODIFY_ANNOUNCEMENT(text);
@@ -2475,6 +2488,7 @@ async function initialize_server_components() {
 		command_prompt();
 	});
 
+	// TODO: Fix per-message deflate
 	wss = new WebSocket.Server({ server });
 	global_data.wss = wss;
 
@@ -2825,9 +2839,9 @@ async function manageWebsocketConnection(ws, req) {
 				var worldId = world.id;
 				if(client_cursor_pos[worldId]) {
 					delete client_cursor_pos[worldId][channel];
-				}
-				if(Object.keys(client_cursor_pos[worldId]).length == 0) {
-					delete client_cursor_pos[worldId];
+					if(Object.keys(client_cursor_pos[worldId]).length == 0) {
+						delete client_cursor_pos[worldId];
+					}
 				}
 			}
 		}

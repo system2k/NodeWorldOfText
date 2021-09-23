@@ -23,10 +23,10 @@ function init_dom() {
 	addColorShortcuts();
 }
 function getWndWidth() {
-	return document.body.clientWidth;
+	return window.innerWidth;
 }
 function getWndHeight() {
-	return document.body.clientHeight;
+	return window.innerHeight;
 }
 function decimal(percentage) {
 	return percentage / 100;
@@ -123,7 +123,7 @@ var defaultCursor          = "text";
 var defaultDragCursor      = "move";
 var fetchClientMargin      = 200;
 var classicTileProcessing  = false; // directly process utf32 only
-var unloadedPatternPanning = true;
+var unloadedPatternPanning = false;
 var cursorRenderingEnabled = true;
 var guestCursorsEnabled    = true; // render guest cursors
 var showMyGuestCursor      = true; // show my cursor to everyone if the world allows it
