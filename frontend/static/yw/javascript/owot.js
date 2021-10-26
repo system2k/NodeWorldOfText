@@ -3778,7 +3778,12 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 				if(code == 0) renderCtx.fillStyle = styles.public;
 				if(code == 1) renderCtx.fillStyle = styles.member;
 				if(code == 2) renderCtx.fillStyle = styles.owner;
-				renderCtx.fillRect(offsetX + cX * cellW, offsetY + cY * cellH, cellW, cellH);
+				var rPadding = 0;
+				var bPadding = 0;
+				// clamp to right and bottom sides
+				if(cX == tileC - 1) rPadding = 1;
+				if(cY == tileR - 1) bPadding = 1;
+				renderCtx.fillRect(Math.floor(offsetX + cX * cellW), Math.floor(offsetY + cY * cellH), Math.ceil(cellW) + rPadding, Math.ceil(cellH) + bPadding);
 			}
 		}
 	}

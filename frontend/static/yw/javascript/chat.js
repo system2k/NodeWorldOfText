@@ -144,7 +144,7 @@ var client_commands = {
 		defaultSizes.cellW = width;
 		defaultSizes.cellH = height;
 		updateScaleConsts();
-		for(var i in tilePixelCache) delete tilePixelCache[i];
+		// TODO
 		renderTiles(true);
 		clientChatResponse("Changed grid size to " + width + "x" + height);
 	},

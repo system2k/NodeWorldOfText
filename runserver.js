@@ -1714,6 +1714,29 @@ function is_unclaimable_worldname(world) {
 	return true;
 }
 
+var world_default_props = {
+	views: 0,
+	chat_permission: 0,
+	show_cursor: -1,
+	color_text: 0,
+	custom_menu_color: "",
+	custom_public_text_color: "",
+	custom_member_text_color: "",
+	custom_owner_text_color: "",
+	page_is_nsfw: false,
+	square_chars: false,
+	no_log_edits: false,
+	half_chars: false,
+	background: "",
+	background_x: 0,
+	background_y: 0,
+	background_w: 0,
+	background_h: 0,
+	background_rmod: 0,
+	background_alpha: 1,
+	meta_desc: ""
+};
+
 // TODO: remove force_create. this is used when creating subworlds
 async function world_get_or_create(name, do_not_create, force_create) {
 	name += "";
@@ -1740,30 +1763,7 @@ async function world_get_or_create(name, do_not_create, force_create) {
 			var custom_tile_member = "";
 			var writability = 0;
 			var readability = 0;
-			var properties = JSON.stringify({
-				// default property values. by default, they are not present in this object.
-
-				// views: 0,
-				// chat_permission: 0,
-				// show_cursor: -1,
-				// color_text: 0,
-				// custom_menu_color: "",
-				// custom_public_text_color: "",
-				// custom_member_text_color: "",
-				// custom_owner_text_color: "",
-				// page_is_nsfw: false,
-				// square_chars: false,
-				// no_log_edits: false,
-				// half_chars: false,
-				// background: "",
-				// background_x: 0,
-				// background_y: 0,
-				// background_w: 0,
-				// background_h: 0,
-				// background_rmod: 0,
-				// background_alpha: 1,
-				// meta_desc: "",
-			});
+			var properties = JSON.stringify({});
 
 			var rw = await db.run("INSERT INTO world VALUES(null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
 				name, date,
