@@ -144,8 +144,7 @@ var client_commands = {
 		defaultSizes.cellW = width;
 		defaultSizes.cellH = height;
 		updateScaleConsts();
-		// TODO
-		renderTiles(true);
+		w.reloadRenderer();
 		clientChatResponse("Changed grid size to " + width + "x" + height);
 	},
 	color: function(args) {

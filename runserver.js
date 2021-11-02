@@ -1737,6 +1737,261 @@ var world_default_props = {
 	meta_desc: ""
 };
 
+function validateWorldname(name) {
+	return /^([\w\.\-]*)$/g.test(name);
+}
+
+function sanitizeWorldname(name) {
+	if(typeof name != "string") return null;
+	if(name.charAt(0) == "/") name = name.slice(1);
+	if(name.charAt(name.length - 1) == "/") name = name.slice(0, -1);
+	name = name.split("/");
+	for(var i = 0; i < name.length; i++) {
+		var segment = name[i];
+		if(!validateWorldname(segment)) return null;
+	}
+	return name;
+}
+
+async function insertWorld(name) {
+	var date = Date.now();
+			
+	var feature_go_to_coord = 1;
+	var feature_membertiles_addremove = false;
+	var feature_paste = 1;
+	var feature_coord_link = 1;
+	var feature_url_link = 0;
+	var custom_bg = "";
+	var custom_cursor = "";
+	var custom_guest_cursor = "";
+	var custom_color = "";
+	var custom_tile_owner = "";
+	var custom_tile_member = "";
+	var writability = 0;
+	var readability = 0;
+	var properties = JSON.stringify({});
+
+	var rw = await db.run("INSERT INTO world VALUES(null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+		name, date,
+		feature_go_to_coord, feature_membertiles_addremove, feature_paste, feature_coord_link, feature_url_link,
+		custom_bg, custom_cursor, custom_guest_cursor, custom_color, custom_tile_owner, custom_tile_member,
+		writability, readability, properties
+	]);
+	var worldId = await db.get("SELECT * FROM world WHERE id=?", rw.lastID);
+	return worldId;
+}
+
+/*
+var world_default_props = {
+	views: 0,
+	chat_permission: 0,
+	show_cursor: -1,
+	color_text: 0,
+	custom_menu_color: "",
+	custom_public_text_color: "",
+	custom_member_text_color: "",
+	custom_owner_text_color: "",
+	page_is_nsfw: false,
+	square_chars: false,
+	no_log_edits: false,
+	half_chars: false,
+	background: "",
+	background_x: 0,
+	background_y: 0,
+	background_w: 0,
+	background_h: 0,
+	background_rmod: 0,
+	background_alpha: 1,
+	meta_desc: ""
+};*/
+
+async function fetchWorld(name) {
+	var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
+	return world;
+}
+async function fetchWorldMembers(name) {
+
+}
+
+function makeWorldObject() {
+	var world = {
+		exists: false,
+		id: 0,
+		name: "", // raw db name
+		ownerId: null, // integer (classic account system); string (uvias account system)
+		creationDate: 0,
+		views: 0,
+		feature: {
+			goToCoord: 1,
+			memberTilesAddRemove: false,
+			paste: 1,
+			coordLink: 1,
+			urlLink: 0,
+			chat: 0,
+			showCursor: -1,
+			colorText: 0
+		},
+		theme: {
+			bg: "",
+			cursor: "",
+			guestCursor: "",
+			color: "",
+			tileOwner: "",
+			tileMember: "",
+			menu: "",
+			publicText: "",
+			memberText: "",
+			ownerText: ""
+		},
+		opts: {
+			nsfw: false,
+			squareChars: false,
+			noLogEdits: false,
+			halfChars: false,
+			desc: ""
+		},
+		background: {
+			url: "",
+			x: 0,
+			y: 0,
+			w: 0,
+			h: 0,
+			rmod: 0,
+			alpha: 1
+		},
+		writability: 0,
+		readability: 0,
+		members: {
+			map: null, // hash-map of member user-ids (null if not loaded)
+			updates: [] // membership updates in database
+		}
+	};
+	return world;
+}
+
+function getAndProcWorldProp(wprops, propName) {
+	if(propName in wprops) {
+		return wprops[propName];
+	}
+	return world_default_props[propName];
+}
+
+var worldCache = {}; // TODO
+var worldFetchQueueIndex = {};
+async function getWorld(name, canCreate, loadMembers) {
+	if(typeof name != "string") name = "";
+	var fetchOnly = false;
+	if(name.length > 10000) {
+		fetchOnly = true;
+	}
+	var worldHash = name.toUpperCase();
+	if(worldFetchQueueIndex[worldHash]) {
+		var qobj = worldFetchQueueIndex[worldHash];
+		return new Promise(function(res) {
+			qobj.promises.push(res);
+		});
+	}
+	if(worldCache[worldHash]) {
+		return worldCache[worldHash];
+	}
+	var qobj = {
+		promises: [] // to be resolved after loading
+	};
+	worldFetchQueueIndex[worldHash] = qobj;
+	var prom = new Promise(function(res) {
+		qobj.promises.push({
+			promiseResolve: res,
+			loadMembers: loadMembers
+		});
+	});
+	var world = await fetchWorld(name); // TODO: Validate
+	if(world) {
+		var wobj = makeWorldObject();
+		wobj.exists = true;
+		
+		var worldId = world.id;
+
+		wobj.id = worldId;
+		wobj.name = world.name;
+		wobj.ownerId = world.owner_id;
+		wobj.creationDate = world.created_at;
+		
+		wobj.writability = world.writability;
+		wobj.readability = world.readability;
+
+		var wprops = JSON.parse(world.properties);
+
+		wobj.feature.goToCoord = world.feature_go_to_coord;
+		wobj.feature.memberTilesAddRemove = Boolean(world.feature_membertiles_addremove);
+		wobj.feature.paste = world.feature_paste;
+		wobj.feature.coordLink = world.feature_coord_link;
+		wobj.feature.urlLink = world.feature_url_link;
+		wobj.feature.chat = getAndProcWorldProp(wprops, "chat_permission");
+		wobj.feature.showCursor = getAndProcWorldProp(wprops, "show_cursor");
+		wobj.feature.colorText = getAndProcWorldProp(wprops, "color_text");
+
+		wobj.theme.bg = world.custom_bg;
+		wobj.theme.cursor = world.custom_cursor;
+		wobj.theme.guestCursor = world.custom_guest_cursor;
+		wobj.theme.color = world.custom_color;
+		wobj.theme.tileOwner = world.custom_tile_owner;
+		wobj.theme.tileMember = world.custom_tile_member;
+		wobj.theme.menu = getAndProcWorldProp(wprops, "custom_menu_color");
+		wobj.theme.publicText = getAndProcWorldProp(wprops, "custom_public_text_color");
+		wobj.theme.memberText = getAndProcWorldProp(wprops, "custom_member_text_color");
+		wobj.theme.ownerText = getAndProcWorldProp(wprops, "custom_owner_text_color");
+
+		wobj.opts.nsfw = getAndProcWorldProp(wprops, "page_is_nsfw");
+		wobj.opts.squareChars = getAndProcWorldProp(wprops, "square_chars");
+		wobj.opts.noLogEdits = getAndProcWorldProp(wprops, "no_log_edits");
+		wobj.opts.halfChars = getAndProcWorldProp(wprops, "half_chars");
+		wobj.opts.desc = getAndProcWorldProp(wprops, "meta_desc");
+
+		wobj.background.url = getAndProcWorldProp(wprops, "background");
+		wobj.background.x = getAndProcWorldProp(wprops, "background_x");
+		wobj.background.y = getAndProcWorldProp(wprops, "background_y");
+		wobj.background.w = getAndProcWorldProp(wprops, "background_w");
+		wobj.background.h = getAndProcWorldProp(wprops, "background_h");
+		wobj.background.rmod = getAndProcWorldProp(wprops, "background_rmod");
+		wobj.background.alpha = getAndProcWorldProp(wprops, "background_alpha");
+
+		wobj.views = getAndProcWorldProp(wprops, "views");
+
+		worldCache[worldHash] = wobj;
+		var resQueue = worldFetchQueueIndex[worldHash].promises;
+		for(var i = 0; i < resQueue.length; i++) {
+			var queueObj = resQueue[i];
+			// first return world object to promises that don't care about the members list
+			if(!queueObj.loadMembers) {
+				queueObj.promiseResolve(wobj);
+				resQueue.splice(i, 1);
+				i--;
+			}
+		}
+		if(loadMembers) {
+			var members = await db.all("SELECT * FROM whitelist WHERE world_id=?", worldId);
+			var map = {};
+			for(var i = 0; i < members.length; i++) {
+				var key = members[i].user_id;
+				map[key] = true;
+			}
+			wobj.members.map = map;
+		}
+		// return world object to the rest of the promises
+		for(var i = 0; i < resQueue.length; i++) {
+			var queueObj = resQueue[i];
+			queueObj.promiseResolve(wobj);
+		}
+		delete worldFetchQueueIndex[worldHash];
+	} else {
+		
+	}
+	return prom;
+}
+// TODO
+//(async function(){console.log(await getWorld("", false, true))})()
+
+
 // TODO: remove force_create. this is used when creating subworlds
 async function world_get_or_create(name, do_not_create, force_create) {
 	name += "";
@@ -1771,7 +2026,9 @@ async function world_get_or_create(name, do_not_create, force_create) {
 				custom_bg, custom_cursor, custom_guest_cursor, custom_color, custom_tile_owner, custom_tile_member,
 				writability, readability, properties
 			]);
+			console.log(rw)
 			world = await db.get("SELECT * FROM world WHERE id=?", rw.lastID);
+			console.log(world)
 		} else { // special world names that must not be created
 			return false;
 		}

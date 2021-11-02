@@ -623,6 +623,14 @@ function setupTextRenderCtx() {
 setupTextRenderCtx();
 updateScaleConsts();
 
+function reloadRenderer() {
+	if(tileCanvasPool.length) {
+		removeAllTilesFromPools();
+		deleteAllPools();
+		w.render(true);
+	}
+}
+
 // set absolute zoom
 function doZoom(percentage) {
 	if(percentage < 3) percentage = 3;
@@ -647,11 +655,7 @@ function doZoom(percentage) {
 	linkDiv.style.height = (cellH / zoomRatio) + "px";
 
 	// rerender everything
-	if(tileCanvasPool.length) {
-		removeAllTilesFromPools();
-		deleteAllPools();
-		w.render(true);
-	}
+	reloadRenderer();
 }
 
 // set user zoom
@@ -3627,6 +3631,72 @@ function encodeCharProt(array, encoding) {
 	return str;
 }
 
+function fillBlockChar(charCode, textRender, x, y) {
+	if((charCode & 0x1FB00) != 0x1FB00 && (charCode & 0x2500) != 0x2500) return false; // symbols for legacy computing
+	var transform = [0, 1]; // (left, right, up, down = 0, 1, 2, 3), percentage
+	switch(charCode) { // 1/8 blocks
+		case 0x2580: transform = [2, 4/8]; break;
+		case 0x2581: transform = [3, 1/8]; break;
+		case 0x2582: transform = [3, 2/8]; break;
+		case 0x2583: transform = [3, 3/8]; break;
+		case 0x2584: transform = [3, 4/8]; break;
+		case 0x2585: transform = [3, 5/8]; break;
+		case 0x2586: transform = [3, 6/8]; break;
+		case 0x2587: transform = [3, 7/8]; break;
+		case 0x2588: transform = [0, 8/8]; break;
+		case 0x2589: transform = [0, 7/8]; break;
+		case 0x258A: transform = [0, 6/8]; break;
+		case 0x258B: transform = [0, 5/8]; break;
+		case 0x258C: transform = [0, 4/8]; break;
+		case 0x258D: transform = [0, 3/8]; break;
+		case 0x258E: transform = [0, 2/8]; break;
+		case 0x258F: transform = [0, 1/8]; break;
+		case 0x2590: transform = [1, 4/8]; break;
+		case 0x2594: transform = [2, 1/8]; break;
+		case 0x2595: transform = [1, 1/8]; break;
+		case 0x1FB82: transform = [2, 2/8]; break;
+		case 0x1FB83: transform = [2, 3/8]; break;
+		case 0x1FB84: transform = [2, 5/8]; break;
+		case 0x1FB85: transform = [2, 6/8]; break;
+		case 0x1FB86: transform = [2, 7/8]; break;
+		case 0x1FB87: transform = [1, 2/8]; break;
+		case 0x1FB88: transform = [1, 3/8]; break;
+		case 0x1FB89: transform = [1, 5/8]; break;
+		case 0x1FB8A: transform = [1, 6/8]; break;
+		case 0x1FB8B: transform = [1, 7/8]; break;
+		default:
+			if(charCode >= 0x2596 && charCode <= 0x259F) { // 2x2 blocks
+				var pattern = [2, 1, 8, 11, 9, 14, 13, 4, 6, 7][charCode - 0x2596];
+				if(pattern & 8) textRender.fillRect(x, y, cellW / 2, cellH / 2);
+				if(pattern & 4) textRender.fillRect(x + cellW / 2, y, cellW / 2, cellH / 2);
+				if(pattern & 2) textRender.fillRect(x, y + cellH / 2, cellW / 2, cellH / 2);
+				if(pattern & 1) textRender.fillRect(x + cellW / 2, y + cellH / 2, cellW / 2, cellH / 2);
+				return true;
+			} else if(charCode >= 0x1FB00 && charCode <= 0x1FB3B) { // 2x3 blocks
+				var code = 0;
+				if(charCode >= 0x1FB00 && charCode <= 0x1FB13) code = charCode - 0x1FB00 + 1;
+				if(charCode >= 0x1FB14 && charCode <= 0x1FB27) code = charCode - 0x1FB00 + 2;
+				if(charCode >= 0x1FB28 && charCode <= 0x1FB3B) code = charCode - 0x1FB00 + 3;
+				for(var i = 0; i < 6; i++) {
+					if(!(code >> i & 1)) continue;
+					textRender.fillRect(x + (cellW / 2) * (i & 1), y + (cellH / 3) * (i >> 1), cellW / 2, cellH / 3);
+				}
+				return true;
+			} else {
+				return false;
+			}
+	}
+	var dir = transform[0];
+	var frac = transform[1];
+	switch(dir) {
+		case 0: textRender.fillRect(x, y, cellW * frac, cellH); break;
+		case 1: textRender.fillRect(x + cellW - (cellW * frac), y, cellW * frac, cellH); break;
+		case 2: textRender.fillRect(x, y, cellW, cellH * frac); break;
+		case 3: textRender.fillRect(x, y + cellH - (cellH * frac), cellW, cellH * frac);
+	}
+	return true;
+}
+
 function renderChar(textRender, x, y, str, content, colors, writability, props) {
 	// adjust baseline
 	var textYOffset = cellH - (5 * zoom);
@@ -3670,7 +3740,7 @@ function renderChar(textRender, x, y, str, content, colors, writability, props) 
 		}
 	}
 	if(!char) char = " ";
-	var cCode = char.charCodeAt(0);
+	var cCode = char.codePointAt(0);
 
 	// if text has no color, use default text color. otherwise, colorize it
 	if(color == 0 || !colorsEnabled || (isLink && !colorizeLinks)) {
@@ -3690,23 +3760,15 @@ function renderChar(textRender, x, y, str, content, colors, writability, props) 
 	// don't render whitespaces
 	if(cCode == 0x0020 || cCode == 0x00A0) return;
 
-	if(brBlockFill && cCode >= 0x2800 && cCode <= 0x28FF) { // render braille chars as rectangles
+	if(brBlockFill && (cCode & 0x2800) == 0x2800) { // render braille chars as rectangles
 		var dimX = cellW / 2;
 		var dimY = cellH / 4;
 		for(var b = 0; b < 8; b++) {
 			if((cCode & brOrder[b]) == 0) continue;
 			textRender.fillRect(fontX + (b % 2) * dimX, fontY + ((b / 2) | 0) * dimY, dimX, dimY);
 		}
-	} else if(ansiBlockFill && cCode == 0x2580) { // ▀ top half block
-		textRender.fillRect(fontX, fontY, cellW, Math.trunc(cellH / 2));
-	} else if(ansiBlockFill && cCode == 0x2584) { // ▄ bottom half block
-		textRender.fillRect(fontX, fontY + Math.trunc(cellH / 2), cellW, Math.trunc(cellH / 2));
-	} else if(ansiBlockFill && cCode == 0x2588) { // █ full block
-		textRender.fillRect(fontX, fontY, cellW, cellH);
-	} else if(ansiBlockFill && cCode == 0x258C) { // ▌ left half block
-		textRender.fillRect(fontX, fontY, Math.trunc(cellW / 2), cellH);
-	} else if(ansiBlockFill && cCode == 0x2590) { // ▐ right half block
-		textRender.fillRect(fontX + Math.trunc(cellW / 2), fontY, Math.trunc(cellW / 2), cellH);
+	} else if(ansiBlockFill && fillBlockChar(cCode, textRender, fontX, fontY)) {
+		return;
 	} else { // character rendering
 		if(char.length > 1 ) textRender.font = specialCharFont;
 		textRender.fillText(char, Math.round(fontX + XPadding), Math.round(fontY + textYOffset));
@@ -3778,12 +3840,18 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 				if(code == 0) renderCtx.fillStyle = styles.public;
 				if(code == 1) renderCtx.fillStyle = styles.member;
 				if(code == 2) renderCtx.fillStyle = styles.owner;
-				var rPadding = 0;
-				var bPadding = 0;
-				// clamp to right and bottom sides
-				if(cX == tileC - 1) rPadding = 1;
-				if(cY == tileR - 1) bPadding = 1;
-				renderCtx.fillRect(Math.floor(offsetX + cX * cellW), Math.floor(offsetY + cY * cellH), Math.ceil(cellW) + rPadding, Math.ceil(cellH) + bPadding);
+				if(cellW >= 1 && cellH >= 1) {
+					// clamp to nearest axis
+					var tmpCellW = tileWidth / tileC;
+					var tmpCellH = tileHeight / tileR;
+					var sx = Math.floor(cX * tmpCellW);
+					var sy = Math.floor(cY * tmpCellH);
+					var x2 = Math.floor((cX + 1) * tmpCellW);
+					var y2 = Math.floor((cY + 1) * tmpCellH);
+					renderCtx.fillRect(offsetX + sx, offsetY + sy, x2 - sx, y2 - sy);
+				} else {
+					renderCtx.fillRect(offsetX + cX * cellW, offsetY + cY * cellH, cellW, cellH);
+				}
 			}
 		}
 	}
@@ -3858,8 +3926,8 @@ function renderTileBackgroundImage(renderCtx, tileX, tileY) {
 	} else if(repeat == 1 || repeat == 2) {
 		if(!backgroundImage) return false;
 		if(repeat == 1) {
-			startX += Math.floor(imgWidth / 2);
-			startY += Math.floor(imgHeight / 2);
+			startX += Math.floor(imgWidth / 2) * backRatioW;
+			startY += Math.floor(imgHeight / 2) * backRatioH;
 		}
 		renderCtx.globalAlpha = alpha;
 		renderCtx.drawImage(backgroundImage, -startX, -startY, imgWidth * backRatioW, imgHeight * backRatioH);
@@ -4920,6 +4988,9 @@ Object.assign(w, {
 	},
 	redraw: function() {
 		renderTiles(true);
+	},
+	reloadRenderer: function() {
+		reloadRenderer();
 	},
 	setRedraw: function() {
 		for(var t in tiles) {
