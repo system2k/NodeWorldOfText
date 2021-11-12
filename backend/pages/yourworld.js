@@ -15,6 +15,7 @@ module.exports.server_exit = async function() {
 	await worldViewCommit(true);
 }
 
+// TODO: get rid
 async function worldViewCommit(no_interval) {
 	try {
 		for(var i in worldViews) {

@@ -138,8 +138,18 @@ module.exports = async function(data, vars, evars) {
 		tiles[tileStr].push(segment);
 	}
 
-	if(evars && evars.ws && vars.monitorEventSockets.length) {
-		var textLog = evars.ws.sdata.ipAddress + ", [" + evars.ws.sdata.clientId + ", '" + channel + "'] sent 'write' on world ['" + world.name + "', " + world.id + "]. " + tileCount + " modified tiles, " + totalEdits + " edits";
+	if(evars && vars.monitorEventSockets.length) {
+		var ip = "", cliId = "", chan = "";
+		if(evars.ws) {
+			ip = evars.ws.sdata.ipAddress;
+			cliId = evars.ws.sdata.clientId;
+			chan = channel;
+		} else {
+			ip = ipAddress;
+			cliId = "--";
+			chan = "(Via HTTP)";
+		}
+		var textLog = ip + ", [" + cliId + ", '" + chan + "'] sent 'write' on world ['" + world.name + "', " + world.id + "]. " + tileCount + " modified tiles, " + totalEdits + " edits";
 		broadcastMonitorEvent(textLog);
 	}
 

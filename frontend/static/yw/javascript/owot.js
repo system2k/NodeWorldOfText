@@ -3631,6 +3631,7 @@ function encodeCharProt(array, encoding) {
 	return str;
 }
 
+// TODO
 function fillBlockChar(charCode, textRender, x, y) {
 	if((charCode & 0x1FB00) != 0x1FB00 && (charCode & 0x2500) != 0x2500) return false; // symbols for legacy computing
 	var transform = [0, 1]; // (left, right, up, down = 0, 1, 2, 3), percentage
@@ -3665,14 +3666,14 @@ function fillBlockChar(charCode, textRender, x, y) {
 		case 0x1FB8A: transform = [1, 6/8]; break;
 		case 0x1FB8B: transform = [1, 7/8]; break;
 		default:
-			if(charCode >= 0x2596 && charCode <= 0x259F) { // 2x2 blocks
+			/*if(charCode >= 0x2596 && charCode <= 0x259F) { // 2x2 blocks
 				var pattern = [2, 1, 8, 11, 9, 14, 13, 4, 6, 7][charCode - 0x2596];
 				if(pattern & 8) textRender.fillRect(x, y, cellW / 2, cellH / 2);
 				if(pattern & 4) textRender.fillRect(x + cellW / 2, y, cellW / 2, cellH / 2);
 				if(pattern & 2) textRender.fillRect(x, y + cellH / 2, cellW / 2, cellH / 2);
 				if(pattern & 1) textRender.fillRect(x + cellW / 2, y + cellH / 2, cellW / 2, cellH / 2);
 				return true;
-			} else if(charCode >= 0x1FB00 && charCode <= 0x1FB3B) { // 2x3 blocks
+			} else */if(charCode >= 0x1FB00 && charCode <= 0x1FB3B) { // 2x3 blocks
 				var code = 0;
 				if(charCode >= 0x1FB00 && charCode <= 0x1FB13) code = charCode - 0x1FB00 + 1;
 				if(charCode >= 0x1FB14 && charCode <= 0x1FB27) code = charCode - 0x1FB00 + 2;

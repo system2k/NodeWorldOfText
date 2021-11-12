@@ -1781,54 +1781,32 @@ async function insertWorld(name) {
 	return worldId;
 }
 
-/*
-var world_default_props = {
-	views: 0,
-	chat_permission: 0,
-	show_cursor: -1,
-	color_text: 0,
-	custom_menu_color: "",
-	custom_public_text_color: "",
-	custom_member_text_color: "",
-	custom_owner_text_color: "",
-	page_is_nsfw: false,
-	square_chars: false,
-	no_log_edits: false,
-	half_chars: false,
-	background: "",
-	background_x: 0,
-	background_y: 0,
-	background_w: 0,
-	background_h: 0,
-	background_rmod: 0,
-	background_alpha: 1,
-	meta_desc: ""
-};*/
-
 async function fetchWorld(name) {
 	var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
 	return world;
 }
-async function fetchWorldMembers(name) {
-
+async function fetchWorldMembersById(worldId) {
+	var members = await db.all("SELECT * FROM whitelist WHERE world_id=?", worldId);
+	return members;
 }
 
 function makeWorldObject() {
+	// return world object with all values "zeroed"
 	var world = {
 		exists: false,
-		id: 0,
+		id: null, // integer
 		name: "", // raw db name
 		ownerId: null, // integer (classic account system); string (uvias account system)
 		creationDate: 0,
 		views: 0,
 		feature: {
-			goToCoord: 1,
+			goToCoord: 0,
 			memberTilesAddRemove: false,
-			paste: 1,
-			coordLink: 1,
+			paste: 0,
+			coordLink: 0,
 			urlLink: 0,
 			chat: 0,
-			showCursor: -1,
+			showCursor: 0,
 			colorText: 0
 		},
 		theme: {
@@ -1857,7 +1835,7 @@ function makeWorldObject() {
 			w: 0,
 			h: 0,
 			rmod: 0,
-			alpha: 1
+			alpha: 0
 		},
 		writability: 0,
 		readability: 0,
@@ -1876,9 +1854,11 @@ function getAndProcWorldProp(wprops, propName) {
 	return world_default_props[propName];
 }
 
+// TODO: what if world gets renamed?
 var worldCache = {}; // TODO
 var worldFetchQueueIndex = {};
-async function getWorld(name, canCreate, loadMembers) {
+// either returns world-object or null
+async function getWorld(name, canCreate) {
 	if(typeof name != "string") name = "";
 	var fetchOnly = false;
 	if(name.length > 10000) {
@@ -1891,8 +1871,18 @@ async function getWorld(name, canCreate, loadMembers) {
 			qobj.promises.push(res);
 		});
 	}
-	if(worldCache[worldHash]) {
-		return worldCache[worldHash];
+	var cacheObject = worldCache[worldHash];
+	// retrieve from cache; if a world can be created but it's marked as nonexistant in cache, then create it
+	if(cacheObject) {
+		if(!cacheObject.exists) {
+			if(canCreate) {
+				delete worldCache[worldHash];
+			} else {
+				return null;
+			}
+		} else {
+			return cacheObject;
+		}
 	}
 	var qobj = {
 		promises: [] // to be resolved after loading
@@ -1900,8 +1890,7 @@ async function getWorld(name, canCreate, loadMembers) {
 	worldFetchQueueIndex[worldHash] = qobj;
 	var prom = new Promise(function(res) {
 		qobj.promises.push({
-			promiseResolve: res,
-			loadMembers: loadMembers
+			promiseResolve: res
 		});
 	});
 	var world = await fetchWorld(name); // TODO: Validate
@@ -1959,37 +1948,36 @@ async function getWorld(name, canCreate, loadMembers) {
 
 		worldCache[worldHash] = wobj;
 		var resQueue = worldFetchQueueIndex[worldHash].promises;
-		for(var i = 0; i < resQueue.length; i++) {
-			var queueObj = resQueue[i];
-			// first return world object to promises that don't care about the members list
-			if(!queueObj.loadMembers) {
-				queueObj.promiseResolve(wobj);
-				resQueue.splice(i, 1);
-				i--;
-			}
+
+		// load all member ids
+		var members = await fetchWorldMembersById(worldId);
+		var map = {};
+		for(var i = 0; i < members.length; i++) {
+			var key = members[i].user_id;
+			map[key] = true;
 		}
-		if(loadMembers) {
-			var members = await db.all("SELECT * FROM whitelist WHERE world_id=?", worldId);
-			var map = {};
-			for(var i = 0; i < members.length; i++) {
-				var key = members[i].user_id;
-				map[key] = true;
-			}
-			wobj.members.map = map;
-		}
-		// return world object to the rest of the promises
+		wobj.members.map = map;
+
 		for(var i = 0; i < resQueue.length; i++) {
 			var queueObj = resQueue[i];
 			queueObj.promiseResolve(wobj);
 		}
 		delete worldFetchQueueIndex[worldHash];
 	} else {
-		
+		var wobj = makeWorldObject();
+		worldCache[worldHash] = wobj;
+		if(!canCreate) {
+			delete worldFetchQueueIndex[worldHash];
+			return null;
+		}
+		var worldRow = await insertWorld(name);
+		console.log(worldRow)
+		delete worldFetchQueueIndex[worldHash];
 	}
 	return prom;
 }
 // TODO
-//(async function(){console.log(await getWorld("", false, true))})()
+//(async function(){console.log(await getWorld("dasf3f", true))})()
 
 
 // TODO: remove force_create. this is used when creating subworlds
