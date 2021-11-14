@@ -726,7 +726,8 @@ var pages = {
 		user_list: require("./backend/pages/admin/user_list.js"),
 		users_by_id: require("./backend/pages/admin/users_by_id.js"),
 		users_by_username: require("./backend/pages/admin/users_by_username.js"),
-		world_restore: require("./backend/pages/admin/world_restore.js")
+		world_restore: require("./backend/pages/admin/world_restore.js"),
+		restrictions: require("./backend/pages/admin/restrictions.js")
 	},
 	other: {
 		ipaddress: require("./backend/pages/other/ipaddress.js"),
@@ -1398,6 +1399,7 @@ var url_regexp = [ // regexp , function/redirect to , options
 	[/^administrator\/user_list[\/]?$/g, pages.admin.user_list],
 	[/^administrator\/file_list[\/]?$/g, pages.admin.file_list],
 	[/^administrator\/monitor[\/]?$/g, pages.admin.monitor],
+	[/^administrator\/restrictions[\/]?$/g, pages.admin.restrictions, { binary_post_data: true }],
 
 	[/^script_manager\/$/g, pages.script_manager],
 	[/^script_manager\/edit\/(.*)\/$/g, pages.script_edit],
@@ -1505,6 +1507,14 @@ function wait_response_data(req, dispatch, binary_post_data, raise_limit) {
 			}
 		});
 	});
+}
+
+var restrictions = {};
+function setRestrictions(obj) {
+	restrictions = obj;
+}
+function getRestrictions() {
+	return restrictions;
 }
 
 function new_token(len) {
@@ -3403,7 +3413,9 @@ var global_data = {
 	parseTextcode,
 	acme_stat: function() { return { enabled: acmeEnabled, pass: acmePass } },
 	uviasSendIdentifier,
-	client_cursor_pos
+	client_cursor_pos,
+	setRestrictions,
+	getRestrictions
 };
 
 async function sysLoad() {

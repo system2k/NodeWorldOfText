@@ -1509,12 +1509,55 @@ var styles = null;
 
 var menuStyle;
 function menu_color(color) {
+	if(color.toLowerCase() == "#e5e5ff") {
+		if(window.menuStyle) {
+			window.menuStyle.remove();
+			window.menuStyle = null;
+		}
+		return;
+	}
 	// change menu color
 	if(!window.menuStyle) {
 		menuStyle = document.createElement("style");
 		document.head.appendChild(menuStyle);
 	}
-	menuStyle.innerHTML = "#menu.hover, #nav { background: " + color + "; }";
+	var rgb = int_to_rgb(resolveColorValue(color));
+	var value = Math.max(rgb[0], rgb[1], rgb[2]);
+	var bDelta = 25;
+	var hDelta = 35;
+	var tColor = "#CCCCCC";
+	if(value > 128) {
+		bDelta = -25;
+		hDelta = -35;
+		tColor = "#000000";
+	}
+	var bRgb = [
+		Math.max(0, rgb[0] + bDelta),
+		Math.max(0, rgb[1] + bDelta),
+		Math.max(0, rgb[2] + bDelta)
+	];
+	var hRgb = [
+		Math.min(255, rgb[0] + hDelta),
+		Math.min(255, rgb[1] + hDelta),
+		Math.min(255, rgb[2] + hDelta)
+	];
+	var bColor = int_to_hexcode(rgb_to_int(bRgb[0], bRgb[1], bRgb[2]));
+	var hColor = int_to_hexcode(rgb_to_int(hRgb[0], hRgb[1], hRgb[2]));
+	menuStyle.innerHTML = "#menu.hover, #nav {" +
+			"background: " + color + ";" +
+			"border-color: " + bColor + ";" +
+			"color: " + tColor + ";" +
+		"}\n" +
+			"#nav li {" +
+			"border-top-color: " + bColor + ";" +
+		"}\n" +
+		"#nav li.hover {" +
+			"background-color: " + hColor + ";" +
+		"}\n" +
+		"#coords {" +
+			"background-color: " + bColor + ";" +
+			"color: " + tColor + ";" +
+		"}";
 }
 
 function defaultStyles() {
@@ -3666,14 +3709,14 @@ function fillBlockChar(charCode, textRender, x, y) {
 		case 0x1FB8A: transform = [1, 6/8]; break;
 		case 0x1FB8B: transform = [1, 7/8]; break;
 		default:
-			/*if(charCode >= 0x2596 && charCode <= 0x259F) { // 2x2 blocks
+			if(charCode >= 0x2596 && charCode <= 0x259F) { // 2x2 blocks
 				var pattern = [2, 1, 8, 11, 9, 14, 13, 4, 6, 7][charCode - 0x2596];
 				if(pattern & 8) textRender.fillRect(x, y, cellW / 2, cellH / 2);
 				if(pattern & 4) textRender.fillRect(x + cellW / 2, y, cellW / 2, cellH / 2);
 				if(pattern & 2) textRender.fillRect(x, y + cellH / 2, cellW / 2, cellH / 2);
 				if(pattern & 1) textRender.fillRect(x + cellW / 2, y + cellH / 2, cellW / 2, cellH / 2);
 				return true;
-			} else */if(charCode >= 0x1FB00 && charCode <= 0x1FB3B) { // 2x3 blocks
+			} else if(charCode >= 0x1FB00 && charCode <= 0x1FB3B) { // 2x3 blocks
 				var code = 0;
 				if(charCode >= 0x1FB00 && charCode <= 0x1FB13) code = charCode - 0x1FB00 + 1;
 				if(charCode >= 0x1FB14 && charCode <= 0x1FB27) code = charCode - 0x1FB00 + 2;

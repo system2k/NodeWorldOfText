@@ -243,6 +243,18 @@
 	</div>
 
 	<div class="content_set">
+		<div class="content_set_title">Force-Unclaim World</div>
+		<div class="content_set_content">
+			<span style="font-size:80%">Force-unclaim worlds that users aren't able to unclaim for any reason (usually a bug).</span>
+			<form method="POST" action=".">
+				World: 
+				<input type="text" name="force_unclaim" id="force_unclaim"  style="width: 100%;">
+				<input type="submit" value="Unclaim">
+			</form>
+		</div>
+	</div>
+
+	<div class="content_set">
 		<div class="content_set_title">View User Info</div>
 		<div class="content_set_content">
 			<form onsubmit="return goto_user_by_username();">
@@ -280,6 +292,8 @@
 			<a href="/administrator/backgrounds/">Upload Page Backgrounds</a>
 			<br>
 			<a href="/administrator/files/">Manage files</a>
+			<br>
+			<a href="/administrator/restrictions/">Manage restrictions</a>
 			{% if user.operator %}<br>
 			<a href="/administrator/user_list/">User list</a>{% endif %}
 		</div>

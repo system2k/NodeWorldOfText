@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}
+	Manage Restrictions | Our World of Text
+{% endblock %}
+
+{% block header %}
+	<h1>Manage Restrictions</h1>
+	<span><a href="/administrator/">« Back to Admin Panel</a></span>
+{% endblock %}
+
+{% block content %}
+	<div class="content_set">
+		<div class="content_set_title">Restrictions</div>
+		<div class="content_set_content">
+			<span id="rexamples">
+				Example:<br>
+				ip=31.32.33.34;type=charrate;rate=30<br>
+				ip=31.32.33.34;type=charrate;rate=200;world=test123<br>
+				ip=31.32.33.34;type=color<br>
+				ip=31.32.33.34;type=color;region=-25,-25,25,25<br>
+				ip=31.32.33.34;type=color;region=-1,-1,0,0;world=test123
+			</span>
+			<textarea id="rlist">{{ rstr }}</textarea>
+			<br>
+			<button onclick="updRest();">Update</button>
+			<br>
+			<span style="display: none;" id="rank_upd_status"></span>
+		</div>
+	</div>
+	<style>
+		#rlist {
+			width: 100%;
+			box-sizing: border-box;
+			height: 200px;
+		}
+		#rexamples {
+			font-family: 'Courier New', monospace;
+		}
+	</style>
+	<script>
+		var rlist = document.getElementById("rlist");
+		function updRest() {
+			var list = rlist.value;
+
+			var xhr = new XMLHttpRequest();
+			xhr.open("POST", "/administrator/restrictions/", true);
+
+			xhr.onload = function(res, b) {
+				alert("Response: " + xhr.responseText);
+			}
+
+			xhr.send(list);
+		}
+	</script>
+{% endblock %}

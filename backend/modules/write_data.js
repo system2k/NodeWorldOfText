@@ -73,10 +73,25 @@ module.exports = async function(data, vars, evars) {
 	var tile_database = vars.tile_database;
 	var fixColors = vars.fixColors;
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
+	var getRestrictions = vars.getRestrictions;
+
+	var restrictions = getRestrictions();
 
 	var bypass_key = get_bypass_key();
 	if(!bypass_key) {
 		bypass_key = NaN;
+	}
+
+	var colorRestr = null;
+	var charRestr = null;
+	if(restrictions[ipAddress]) {
+		var clientRestr = restrictions[ipAddress];
+		if(clientRestr.color && clientRestr.color.world.toUpperCase() == world.name.toUpperCase()) {
+			colorRestr = clientRestr.color;
+		}
+		if(clientRestr.charrate && clientRestr.charrate.world.toUpperCase() == world.name.toUpperCase()) {
+			charRestr = clientRestr.charrate;
+		}
 	}
 
 	var public_only = data.public_only;
@@ -85,6 +100,10 @@ module.exports = async function(data, vars, evars) {
 	var editLimit = editReqLimit;
 	if(user.superuser) {
 		editLimit = superuserEditReqLimit;
+	}
+
+	if(charRestr) {
+		editLimit = charRestr.rate;
 	}
 
 	var worldProps = JSON.parse(world.properties);
@@ -101,6 +120,10 @@ module.exports = async function(data, vars, evars) {
 	var can_color_text = true;
 	if(color_text == 1 && !is_member && !is_owner) can_color_text = false;
 	if(color_text == 2 && !is_owner) can_color_text = false;
+
+	if(colorRestr && !colorRestr.region) {
+		can_color_text = false;
+	}
 
 	var edits = data.edits;
 	if(!edits) return emptyWriteResponse;
@@ -190,6 +213,19 @@ module.exports = async function(data, vars, evars) {
 					editIncome[7] = fixColors(editIncome[7][0]);
 				} else {
 					editIncome[7] = fixColors(editIncome[7]);
+				}
+				// client is not allowed to use color at this specific region
+				if(colorRestr && colorRestr.region) {
+					var reg = colorRestr.region;
+					var tx = editIncome[1];
+					var ty = editIncome[0];
+					var x1 = reg[0];
+					var y1 = reg[1];
+					var x2 = reg[2];
+					var y2 = reg[3];
+					if(x1 <= tx && tx <= x2 && y1 <= ty && ty <= y2) {
+						editIncome[7] = 0;
+					}
 				}
 				changes.push(editIncome);
 				continue;

@@ -143,4 +143,12 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		}
 		return;
 	}
+	if("force_unclaim" in post_data) {
+		var unclaim = post_data.force_unclaim;
+		if(typeof unclaim == "string" && unclaim != "") {
+			// TODO: Upgrade
+			await db.run("UPDATE world SET owner_id=null WHERE name=? COLLATE NOCASE", unclaim);
+		}
+		return await dispage("admin/administrator", null, req, serve, vars, evars);
+	}
 }
