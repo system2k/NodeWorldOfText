@@ -86,11 +86,19 @@ module.exports = async function(data, vars, evars) {
 	var charRestr = null;
 	if(restrictions[ipAddress]) {
 		var clientRestr = restrictions[ipAddress];
-		if(clientRestr.color && clientRestr.color.world.toUpperCase() == world.name.toUpperCase()) {
-			colorRestr = clientRestr.color;
+		if(clientRestr.color) {
+			if(clientRestr.color.world == null) {
+				colorRestr = clientRestr.color;
+			} else if(clientRestr.color.world.toUpperCase() == world.name.toUpperCase()) {
+				colorRestr = clientRestr.color;
+			}
 		}
-		if(clientRestr.charrate && clientRestr.charrate.world.toUpperCase() == world.name.toUpperCase()) {
-			charRestr = clientRestr.charrate;
+		if(clientRestr.charrate) {
+			if(clientRestr.charrate.world == null) {
+				charRestr = clientRestr.charrate;
+			} else if(clientRestr.charrate.world.toUpperCase() == world.name.toUpperCase()) {
+				charRestr = clientRestr.charrate;
+			}
 		}
 	}
 
