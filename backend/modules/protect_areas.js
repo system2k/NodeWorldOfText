@@ -9,7 +9,7 @@ module.exports = async function(data, vars, evars) {
 	var decodeCharProt = vars.decodeCharProt;
 	var tile_database = vars.tile_database;
 
-	var is_owner = user.id == world.owner_id || (user.superuser && world.name == "");
+	var is_owner = user.id == world.ownerId || (user.superuser && world.name == "");
 	var is_member = user.stats.member || (user.superuser && world.name == "");
 
 	var action = data.action;
@@ -20,8 +20,8 @@ module.exports = async function(data, vars, evars) {
 	var precise = data.precise;
 	var type = data.type;
 
-	var properties = JSON.parse(world.properties);
-	var no_log_edits = !!properties.no_log_edits;
+	//var properties = JSON.parse(world.properties);
+	var no_log_edits = world.opts.noLogEdits;//!!properties.no_log_edits;
 
 	var protect_type = void 0;
 	if(type == "owner-only") {

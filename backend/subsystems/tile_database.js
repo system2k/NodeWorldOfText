@@ -485,7 +485,7 @@ function tileWriteProtections(cacheTile, editObj) {
 	var precise = data.precise;
 	var protect_type = data.protect_type;
 
-	var feature_perm = world.feature_membertiles_addremove;
+	var feature_perm = world.feature.memberTilesAddRemove;
 	var is_owner = data.is_owner || (user.superuser && world.name == main_world_name);
 	var is_member = (data.is_member && feature_perm) || is_owner || (user.superuser && world.name == main_world_name);
 

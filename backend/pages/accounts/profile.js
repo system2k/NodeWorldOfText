@@ -6,6 +6,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var db = vars.db;
 	var plural = vars.plural;
 	var worldViews = vars.worldViews;
+	var fetchWorldMembershipsByUserId = vars.fetchWorldMembershipsByUserId;
 
 	if(!user.authenticated) {
 		return serve(null, null, {
@@ -14,9 +15,10 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	}
 
 	var world_list = [];
-	var memberships = [];
+	var html_memberships = [];
 
-	var owned = await db.all("SELECT * FROM world WHERE owner_id=? LIMIT 65536", user.id);
+	// TODO: just fix
+	var owned = await db.all("SELECT * FROM world WHERE owner_id=? LIMIT 10000", user.id);
 	for(var i = 0; i < owned.length; i++) {
 		var world = owned[i];
 		var member_total = await db.get("select world_id, count(world_id) as count from whitelist where world_id=?", world.id);
@@ -48,19 +50,30 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		return v1.name.localeCompare(v2.name, "en", { sensitivity: "base" })
 	});
 
-	var whitelists = await db.all("SELECT * FROM whitelist WHERE user_id=?", user.id);
+	// TODO: test this
+	var memberships = await fetchWorldMembershipsByUserId(user.id);
+	for(var i = 0; i < memberships.length; i++) {
+		var wid = memberships[i];
+		var name = await db.get("SELECT name from world where id=?", wid);
+		if(name) {
+			name = name.name;
+		} else {
+			name = "Error~" + wid;
+		}
+		memberships[i] = name;
+	}
+	memberships.sort();
 
-	for(var i = 0; i < whitelists.length; i++) {
-		var world_reference = whitelists[i];
-		var name = (await db.get("SELECT name from world where id=?", world_reference.world_id)).name;
-		var display_name = name;
+	for(var i = 0; i < memberships.length; i++) {
+		var wname = memberships[i];
+		var display_name = wname;
 		if(display_name == "") {
 			display_name = "/" + display_name;
 		}
-		memberships.push({
-			get_absolute_url: "/" + name,
+		html_memberships.push({
+			get_absolute_url: "/" + wname,
 			url: display_name,
-			name
+			wname
 		});
 	}
 
@@ -71,13 +84,13 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	// do not display areas if they are empty
 	if(world_list.length == 0) world_list = null;
-	if(memberships.length == 0) memberships = null;
+	if(html_memberships.length == 0) html_memberships = null;
 
 	var data = {
 		message: message,
 		csrftoken: cookies.csrftoken,
 		worlds_owned: world_list,
-		memberships: memberships,
+		memberships: html_memberships,
 		email_verified: user.is_active
 	};
 
@@ -92,6 +105,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var dispage = vars.dispage;
 	var world_get_or_create = vars.world_get_or_create;
 	var validate_claim_worldname = vars.validate_claim_worldname;
+	var modifyWorldProp = vars.modifyWorldProp;
 
 	if(!user.authenticated) {
 		return serve(null, 403);
@@ -105,21 +119,44 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			}, req, serve, vars, evars);
 		} else {
 			var worldname = post_data.worldname + "";
+
+			// TODO: still a race condition here
 			var validate = await validate_claim_worldname(worldname, vars, evars);
 			if(validate.error) { // an error occurred while claiming
 				return await dispage("accounts/profile", {
 					message: validate.message
 				}, req, serve, vars, evars);
 			}
-			await db.run("UPDATE world SET owner_id=? WHERE id=?", [user.id, validate.world_id]);
+			console.log(validate)
+			var world = validate.world;
+			world.ownerId = user.id;
+			modifyWorldProp(world, "ownerId");
+
+			//await db.run("UPDATE world SET owner_id=? WHERE id=?", [user.id, validate.world_id]);
+
+
+
 			message = validate.message;
 		}
 	} else if(post_data.form == "leave") { // user is leaving the world (terminating own membership)
 		for(var key in post_data) {
 			if(key.startsWith("leave_")) {
 				var worldName = key.substr("leave_".length);
-				await db.run("DELETE FROM whitelist WHERE world_id=(SELECT id FROM world WHERE name=?) and user_id=?",
-					[worldName, user.id]);
+				var world = await world_get_or_create(worldName);
+				if(world) {
+					var userId = user.id;
+					if(world.members.map[userId]) {
+						delete world.members.map[userId];
+					}
+					if(world.members.updates[userId]) {
+						var type = world.members.updates[userId];
+						if(type == "ADD") {
+							delete world.members.updates[userId];
+						}
+					} else {
+						world.members.updates[userId] = "REMOVE";
+					}
+				}
 				break;
 			}
 		}

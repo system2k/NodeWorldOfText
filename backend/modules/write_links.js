@@ -11,7 +11,7 @@ module.exports = async function(data, vars, evars) {
 	var decodeCharProt = vars.decodeCharProt;
 	var tile_database = vars.tile_database;
 
-	var is_owner = user.id == world.owner_id || (user.superuser && world.name == "");
+	var is_owner = user.id == world.ownerId || (user.superuser && world.name == "");
 	var is_member = user.stats.member || (user.superuser && world.name == "");
 
 	var type = data.type;
@@ -25,16 +25,16 @@ module.exports = async function(data, vars, evars) {
 	var link_tileX = san_dp(data.link_tileX);
 	var link_tileY = san_dp(data.link_tileY);
 
-	var properties = JSON.parse(world.properties);
-	var no_log_edits = !!properties.no_log_edits;
+	//var properties = JSON.parse(world.properties);
+	var no_log_edits = world.opts.noLogEdits; // !!properties.no_log_edits;
 
 	var can_link = false;
 	var feature_mode;
 
 	if(type == "url") {
-		feature_mode = world.feature_url_link;
+		feature_mode = world.feature.urlLink;
 	} else if(type == "coord") {
-		feature_mode = world.feature_coord_link;
+		feature_mode = world.feature.coordLink;
 	} else {
 		return [true, "PARAM"];
 	}

@@ -47,18 +47,18 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
 
-	if(world.owner_id != user.id && !user.superuser) {
+	if(world.ownerId != user.id && !user.superuser) {
 		return serve("Access denied", 403)
 	}
 
 	world_name = world.name;
 
-	var members = await db.all("SELECT * FROM whitelist WHERE world_id=?", world.id)
+	var members = Object.keys(world.members.map); //await db.all("SELECT * FROM whitelist WHERE world_id=?", world.id)
 	var member_list = []; // processed list of members
 	for(var i = 0; i < members.length; i++) {
 		var username;
 		if(accountSystem == "uvias") {
-			var uidt = members[i].user_id.substr(1);
+			var uidt = members[i].substr(1);
 			username = await uvias.get("SELECT * FROM accounts.users WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", uidt);
 			if(!username) {
 				username = "deleted~" + uidt;
@@ -66,7 +66,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 				username = username.username;
 			}
 		} else if(accountSystem == "local") {
-			username = await db.get("SELECT username FROM auth_user WHERE id=?", members[i].user_id);
+			username = await db.get("SELECT username FROM auth_user WHERE id=?", members[i]);
 			username = username.username;
 		}
 		member_list.push({
@@ -74,7 +74,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		});
 	}
 
-	var properties = JSON.parse(world.properties);
+	// TODO
+	//var properties = JSON.parse(world.properties);
 
 	// if empty, make sure server knows it's empty
 	// ([] is considered to not be empty through boolean conversion)
@@ -82,9 +83,10 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var owner_name = "";
 
-	if(world.owner_id) {
+	// TODO: pull correct info from cache
+	if(world.ownerId && user.superuser) {
 		if(accountSystem == "uvias") {
-			var debug1 = world.owner_id;
+			var debug1 = world.ownerId;
 			if(typeof debug1 == "string") debug1 = debug1.substr(1);
 			owner_name = await uvias.get("SELECT username FROM accounts.users WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", debug1);
 			if(owner_name) {
@@ -93,37 +95,30 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 				owner_name = "deleted~" + debug1;
 			}
 		} else if(accountSystem == "local") {
-			owner_name = (await db.get("SELECT username FROM auth_user WHERE id=?", [world.owner_id])).username;
+			owner_name = (await db.get("SELECT username FROM auth_user WHERE id=?", [world.ownerId])).username;
 		}
 	}
 
-	var color = world.custom_color || "default";
-	var cursor_color = world.custom_cursor || "default";
-	var cursor_guest_color = world.custom_guest_cursor || "default";
-	var bg = world.custom_bg || "default";
-	var owner_color = world.custom_tile_owner || "default";
-	var member_color = world.custom_tile_member || "default";
+	var color = world.theme.color || "default";
+	var cursor_color = world.theme.cursor || "default";
+	var cursor_guest_color = world.theme.guestCursor || "default";
+	var bg = world.theme.bg || "default";
+	var owner_color = world.theme.tileOwner || "default";
+	var member_color = world.theme.tileMember || "default";
 
-	var menu_color = properties.custom_menu_color || "default";
-	var public_text_color = properties.custom_public_text_color || "default";
-	var member_text_color = properties.custom_member_text_color || "default";
-	var owner_text_color = properties.custom_owner_text_color || "default";
+	var menu_color = world.theme.menu || "default";
+	var public_text_color = world.theme.publicText || "default";
+	var member_text_color = world.theme.memberText || "default";
+	var owner_text_color = world.theme.ownerText || "default";
 
-	var square_chars = !!properties.square_chars;
-	var half_chars = !!properties.half_chars;
+	var square_chars = world.opts.squareChars;
+	var half_chars = world.opts.halfChars;
 	var mixed_chars = false;
 	if(square_chars && half_chars) {
 		square_chars = false;
 		half_chars = false;
 		mixed_chars = true;
 	}
-
-	var value_chat_permission = properties.chat_permission;
-	var value_color_text = properties.color_text;
-	var value_show_cursor = properties.show_cursor;
-	if(value_chat_permission == void 0) value_chat_permission = 0;
-	if(value_color_text == void 0) value_color_text = 0;
-	if(value_show_cursor == void 0) value_show_cursor = -1;
 
 	var data = {
 		user,
@@ -137,14 +132,14 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		readability: world.readability,
 		writability: world.writability,
 
-		go_to_coord: world.feature_go_to_coord,
-		coord_link: world.feature_coord_link,
-		url_link: world.feature_url_link,
-		paste: world.feature_paste,
-		membertiles_addremove: world.feature_membertiles_addremove,
-		chat_permission: value_chat_permission,
-		color_text: value_color_text,
-		show_cursor: value_show_cursor,
+		go_to_coord: world.feature.goToCoord,
+		coord_link: world.feature.coordLink,
+		url_link: world.feature.urlLink,
+		paste: world.feature.paste,
+		membertiles_addremove: world.feature.memberTilesAddRemove,
+		chat_permission: world.feature.chat,
+		color_text: world.feature.colorText,
+		show_cursor: world.feature.showCursor,
 
 		color,
 		cursor_color,
@@ -159,20 +154,21 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		owner_text_color,
 
 		owner_name,
-		page_is_nsfw: !!properties.page_is_nsfw,
+		page_is_nsfw: world.opts.nsfw,
 		square_chars,
-		no_log_edits: !!properties.no_log_edits,
+		no_log_edits: world.opts.noLogEdits,
 		half_chars,
 		mixed_chars,
 
-		background_path: ("background" in properties) ? properties.background : "",
-		background_x: ("background_x" in properties) ? properties.background_x : "0",
-		background_y: ("background_y" in properties) ? properties.background_y : "0",
-		background_w: ("background_w" in properties) ? properties.background_w : "0",
-		background_h: ("background_h" in properties) ? properties.background_h : "0",
-		background_rmod: ("background_rmod" in properties) ? properties.background_rmod : "0",
-		background_alpha: ("background_alpha" in properties) ? properties.background_alpha : "1",
-		meta_desc: properties.meta_desc
+		// TODO: check string?
+		background_path: world.background.url,
+		background_x: world.background.x,
+		background_y: world.background.y,
+		background_w: world.background.w,
+		background_h: world.background.h,
+		background_rmod: world.background.rmod,
+		background_alpha: world.background.alpha,
+		meta_desc: world.opts.desc
 	};
 
 	serve(HTML("configure.html", data));
@@ -201,6 +197,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var wss = vars.wss;
 	var san_nbr = vars.san_nbr;
 	var san_dp = vars.san_dp;
+	var modifyWorldProp = vars.modifyWorldProp;
 
 	var clearChatlog = chat_mgr.clearChatlog;
 
@@ -217,14 +214,15 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	world_name = world.name;
 
-	if(world.owner_id != user.id && !user.superuser) {
+	if(world.ownerId != user.id && !user.superuser) {
 		return serve("Access denied", 403);
 	}
 
-	var properties = JSON.parse(world.properties);
+	//var properties = JSON.parse(world.properties);
 	var new_world_name = null;
 
 	if(post_data.form == "add_member") {
+		// TODO
 		var username = post_data.add_member;
 		var date = Date.now();
 
@@ -246,20 +244,31 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			user_id = adduser.id;
 		}
 		
-		if(user_id == world.owner_id) {
+		if(user_id == world.ownerId) {
 			return await dispage("accounts/configure", {
 				message: "User is already the owner of \"" + world_name + "\""
 			}, req, serve, vars, evars);
 		}
-		var whitelist = await db.get("SELECT * FROM whitelist WHERE user_id=? AND world_id=?",
-			[user_id, world.id]);
-		if(whitelist) {
+		/*var whitelist = await db.get("SELECT * FROM whitelist WHERE user_id=? AND world_id=?",
+			[user_id, world.id]);*/
+
+		var isWhitelisted = world.members.map[user_id];
+		if(isWhitelisted) {
 			return await dispage("accounts/configure", {
 				message: "User is already part of this world"
 			}, req, serve, vars, evars);
 		}
 
-		await db.run("INSERT into whitelist VALUES(null, ?, ?, ?)", [user_id, world.id, date]);
+		world.members.map[user_id] = true;
+		if(world.members.updates[user_id]) {
+			var type = world.members.updates[user_id];
+			if(type == "REMOVE") {
+				delete world.members.updates[user_id];
+			}
+		} else {
+			world.members.updates[user_id] = "ADD";
+		}
+		//await db.run("INSERT into whitelist VALUES(null, ?, ?, ?)", [user_id, world.id, date]);
 
 		return await dispage("accounts/configure", {
 			message: adduser.username + " is now a member of the \"" + world_name + "\" world"
@@ -278,13 +287,18 @@ module.exports.POST = async function(req, serve, vars, evars) {
 					e.close();
 					return;
 				}
-				e.sdata.world.writability = writability;
-				e.sdata.world.readability = readability;
+				//e.sdata.world.writability = writability;
+				//e.sdata.world.readability = readability;
 			}
 		});
-		await db.run("UPDATE world SET (readability,writability)=(?,?) WHERE id=?",
-			[readability, writability, world.id]);
+		world.readability = readability;
+		world.writability = writability;
+		modifyWorldProp(world, "readability");
+		modifyWorldProp(world, "writability");
+		/*await db.run("UPDATE world SET (readability,writability)=(?,?) WHERE id=?",
+			[readability, writability, world.id]);*/
 	} else if(post_data.form == "remove_member") {
+		// TODO
 		var to_remove = "";
 		for(var key in post_data) {
 			if(key.startsWith("remove_")) to_remove = key;
@@ -292,7 +306,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		var id_to_remove = void 0;
 		var validId = true;
 		var username_to_remove = to_remove.substr("remove_".length);
-		if(accountSystem == "uvias") {
+		if(accountSystem == "uvias") { // TODO
 			if(username_to_remove.startsWith("deleted~")) {
 				id_to_remove = username_to_remove.substr("deleted~".length);
 				if(id_to_remove.length < 1 || id_to_remove.length > 16) validId = false;
@@ -319,10 +333,23 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			var id_to_remove = await db.get("SELECT id FROM auth_user WHERE username=? COLLATE NOCASE", username_to_remove);
 			if(id_to_remove) {
 				id_to_remove = id_to_remove.id;
-				await db.run("DELETE FROM whitelist WHERE user_id=? AND world_id=?", [id_to_remove, world.id]);
+
+				if(world.members.map[id_to_remove]) {
+					delete world.members.map[id_to_remove];
+				}
+				if(world.members.updates[id_to_remove]) {
+					var type = world.members.updates[id_to_remove];
+					if(type == "ADD") {
+						delete world.members.updates[id_to_remove];
+					}
+				} else {
+					world.members.updates[id_to_remove] = "REMOVE";
+				}
+				//console.log(world)
+				//await db.run("DELETE FROM whitelist WHERE user_id=? AND world_id=?", [id_to_remove, world.id]);
 			}
 		}
-		if(id_to_remove) {
+		/*if(id_to_remove) {
 			wss.clients.forEach(function(e) {
 				if(!e.sdata.userClient) return;
 				if(e.sdata.user.id == id_to_remove) {
@@ -332,7 +359,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 					}
 				}
 			});
-		}
+		}*/
 	} else if(post_data.form == "features") {
 		var go_to_coord = validatePerms(post_data.go_to_coord, 2);
 		var coord_link = validatePerms(post_data.coord_link, 2);
@@ -349,13 +376,31 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		} else {
 			membertiles_addremove = 0;
 		}
-		properties.chat_permission = chat;
+
+		world.feature.goToCoord = go_to_coord;
+		world.feature.coordLink = coord_link;
+		world.feature.urlLink = url_link;
+		world.feature.paste = paste;
+		world.feature.chat = chat;
+		world.feature.showCursor = show_cursor;
+		world.feature.colorText = color_text;
+		world.feature.memberTilesAddRemove = membertiles_addremove;
+		modifyWorldProp(world, "feature/goToCoord");
+		modifyWorldProp(world, "feature/coordLink");
+		modifyWorldProp(world, "feature/urlLink");
+		modifyWorldProp(world, "feature/paste");
+		modifyWorldProp(world, "feature/chat");
+		modifyWorldProp(world, "feature/showCursor");
+		modifyWorldProp(world, "feature/colorText");
+		modifyWorldProp(world, "feature/memberTilesAddRemove");
+
+		/*properties.chat_permission = chat;
 		properties.color_text = color_text;
-		properties.show_cursor = show_cursor;
+		properties.show_cursor = show_cursor;*/
 
 		// update properties in cached world objects for all clients
-		var newProps = JSON.stringify(properties);
-		wss.clients.forEach(function(e) {
+		//var newProps = JSON.stringify(properties);
+		/*wss.clients.forEach(function(e) {
 			if(!e.sdata.userClient) return;
 			if(e.sdata.world_id == world.id) {
 				e.sdata.world.properties = newProps;
@@ -367,9 +412,9 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				e.sdata.chat_permission = chat;
 				e.sdata.show_cursor = show_cursor;
 			}
-		});
-		await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link,properties)=(?,?,?,?,?,?) WHERE id=?",
-			[go_to_coord, membertiles_addremove, paste, coord_link, url_link, newProps, world.id]);
+		});*/
+		/*await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link,properties)=(?,?,?,?,?,?) WHERE id=?",
+			[go_to_coord, membertiles_addremove, paste, coord_link, url_link, newProps, world.id]);*/
 	} else if(post_data.form == "style") {
 		var color = validateCSS(post_data.color);
 		var cursor_color = validateCSS(post_data.cursor_color);
@@ -383,7 +428,28 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		var member_text_color = validateCSS(post_data.member_text_color);
 		var owner_text_color = validateCSS(post_data.owner_text_color);
 
-		if(menu_color) {
+		world.theme.color = color;
+		world.theme.cursor = cursor_color;
+		world.theme.guestCursor = cursor_guest_color;
+		world.theme.bg = bg;
+		world.theme.tileOwner = owner_color;
+		world.theme.tileMember = member_color;
+		world.theme.menu = menu_color;
+		world.theme.publicText = public_text_color;
+		world.theme.memberText = member_text_color;
+		world.theme.ownerText = owner_text_color;
+		modifyWorldProp(world, "theme/color");
+		modifyWorldProp(world, "theme/cursor");
+		modifyWorldProp(world, "theme/guestCursor");
+		modifyWorldProp(world, "theme/bg");
+		modifyWorldProp(world, "theme/tileOwner");
+		modifyWorldProp(world, "theme/tileMember");
+		modifyWorldProp(world, "theme/menu");
+		modifyWorldProp(world, "theme/publicText");
+		modifyWorldProp(world, "theme/memberText");
+		modifyWorldProp(world, "theme/ownerText");
+
+		/*if(menu_color) {
 			properties.custom_menu_color = menu_color;
 		} else {
 			delete properties.custom_menu_color;
@@ -403,10 +469,10 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			properties.custom_owner_text_color = owner_text_color;
 		} else {
 			delete properties.custom_owner_text_color;
-		}
+		}*/
 
-		await db.run("UPDATE world SET (custom_bg,custom_cursor,custom_guest_cursor,custom_color,custom_tile_owner,custom_tile_member,properties)=(?,?,?,?,?,?,?) WHERE id=?",
-			[bg, cursor_color, cursor_guest_color, color, owner_color, member_color, JSON.stringify(properties), world.id]);
+		/*await db.run("UPDATE world SET (custom_bg,custom_cursor,custom_guest_cursor,custom_color,custom_tile_owner,custom_tile_member,properties)=(?,?,?,?,?,?,?) WHERE id=?",
+			[bg, cursor_color, cursor_guest_color, color, owner_color, member_color, JSON.stringify(properties), world.id]);*/
 		
 		ws_broadcast({
 			kind: "colors",
@@ -424,47 +490,115 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			}
 		}, world.name);
 	} else if(post_data.form == "misc") {
-		var properties_updated = false;
-		if(!post_data.world_background && user.superuser) {
-			properties_updated = true;
-			delete properties.background;
+		if(user.superuser) {
+			if(!post_data.world_background) {
+				world.background.url = "";
+			} else {
+				world.background.url = post_data.world_background;
+			}
+			modifyWorldProp(world, "background/url");
+
+			if(!post_data.world_background_x || post_data.world_background_x == "0") {
+				world.background.x = 0;
+			} else {
+				world.background.x = san_nbr(post_data.world_background_x);
+			}
+			modifyWorldProp(world, "background/x");
+
+			if(!post_data.world_background_y || post_data.world_background_y == "0") {
+				world.background.y = 0;
+			} else {
+				world.background.y = san_nbr(post_data.world_background_y);
+			}
+			modifyWorldProp(world, "background/y");
+
+			if(!post_data.world_background_w || post_data.world_background_w == "0") {
+				world.background.w = 0;
+			} else {
+				var bw = san_nbr(post_data.world_background_w);
+				if(bw < 0) bw = 0;
+				if(bw >= 2500) bw = 2500;
+				world.background.w = bw;
+			}
+			modifyWorldProp(world, "background/w");
+
+			if(!post_data.world_background_h || post_data.world_background_h == "0") {
+				world.background.h = 0;
+			} else {
+				var bh = san_nbr(post_data.world_background_h);
+				if(bh < 0) bh = 0;
+				if(bh >= 2500) bh = 2500;
+				world.background.h = bh;
+			}
+			modifyWorldProp(world, "background/h");
+
+			if(!post_data.background_repeat_mode || post_data.background_repeat_mode == "0") {
+				world.background.rmod = 0;
+			} else {
+				var rm = san_nbr(post_data.background_repeat_mode);
+				if(rm < 0) rm = 0;
+				if(rm > 2) rm = 2;
+				world.background.rmod = rm;
+			}
+			modifyWorldProp(world, "background/rmod");
+
+			if(!post_data.background_alpha || post_data.background_alpha == "1") {
+				world.background.alpha = 1;
+			} else {
+				world.background.alpha = san_dp(post_data.background_alpha); // can be -1
+			}
+			modifyWorldProp(world, "background/alpha");
 		}
-		if((!post_data.world_background_x || post_data.world_background_x == "0") && user.superuser) {
-			properties_updated = true;
-			delete properties.background_x;
+
+
+		if("nsfw_page" in post_data) {
+			world.opts.nsfw = true;
+		} else {
+			world.opts.nsfw = false;
 		}
-		if((!post_data.world_background_y || post_data.world_background_y == "0") && user.superuser) {
-			properties_updated = true;
-			delete properties.background_y;
+		modifyWorldProp(world, "opts/nsfw");
+
+		if("no_log_edits" in post_data) {
+			world.opts.noLogEdits = true;
+		} else {
+			world.opts.noLogEdits = false;
 		}
-		if((!post_data.world_background_w || post_data.world_background_w == "0") && user.superuser) {
-			properties_updated = true;
-			delete properties.background_w;
+		modifyWorldProp(world, "opts/noLogEdits");
+
+		if(post_data.meta_desc) {
+			var mdesc = post_data.meta_desc;
+			if(typeof mdesc != "string") mdesc = "";
+			mdesc = mdesc.trim();
+			mdesc = mdesc.slice(0, 600);
+			mdesc = mdesc.replace(/\r|\n/g, " ");
+			world.opts.desc = mdesc; // TODO: check
+		} else {
+			world.opts.desc = "";
 		}
-		if((!post_data.world_background_h || post_data.world_background_h == "0") && user.superuser) {
-			properties_updated = true;
-			delete properties.background_h;
+		modifyWorldProp(world, "opts/desc");
+
+
+		if(post_data.charsize == "default") {
+			world.opts.squareChars = false;
+			world.opts.halfChars = false;
+		} else if(post_data.charsize == "square") {
+			world.opts.squareChars = true;
+			world.opts.halfChars = false;
+		} else if(post_data.charsize == "half") {
+			world.opts.squareChars = false;
+			world.opts.halfChars = true;
+		} else if(post_data.charsize == "mixed") {
+			world.opts.squareChars = true;
+			world.opts.halfChars = true;
+		} else {
+			world.opts.squareChars = false;
+			world.opts.halfChars = false;
 		}
-		if((!post_data.background_repeat_mode || post_data.background_repeat_mode == "0") && user.superuser) {
-			properties_updated = true;
-			delete properties.background_rmod;
-		}
-		if((!post_data.background_alpha || post_data.background_alpha == "1") && user.superuser) {
-			properties_updated = true;
-			delete properties.background_alpha;
-		}
-		if(!("nsfw_page" in post_data)) {
-			properties_updated = true;
-			delete properties.page_is_nsfw;
-		}
-		if(!("no_log_edits" in post_data)) {
-			properties_updated = true;
-			delete properties.no_log_edits;
-		}
-		if(!post_data.meta_desc) {
-			properties_updated = true;
-			delete properties.meta_desc;
-		}
+		modifyWorldProp(world, "opts/squareChars");
+		modifyWorldProp(world, "opts/halfChars");
+
+
+/*
 		var new_name = post_data.new_world_name;
 		if(typeof new_name == "string" && new_name && new_name != world.name) { // changing world name
 			var validate = await validate_claim_worldname(new_name, vars, evars, true, world.id);
@@ -477,97 +611,10 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				await db.run("UPDATE world SET name=? WHERE id=?", [validate.new_name, world.id]);
 				new_world_name = validate.new_name;
 			}
-		}
-		if(post_data.world_background && user.superuser) {
-			properties.background = post_data.world_background;
-			properties_updated = true;
-		}
-		if(post_data.world_background_x && user.superuser) {
-			var bx = san_nbr(post_data.world_background_x);
-			if(bx != 0) {
-				properties.background_x = bx;
-				properties_updated = true;
-			}
-		}
-		if(post_data.world_background_y && user.superuser) {
-			var by = san_nbr(post_data.world_background_y);
-			if(by != 0) {
-				properties.background_y = by;
-				properties_updated = true;
-			}
-		}
-		if(post_data.world_background_w && user.superuser) {
-			var bw = san_nbr(post_data.world_background_w);
-			if(bw > 0 && bw <= 2500) { // if 0, use no value
-				properties.background_w = bw;
-				properties_updated = true;
-			}
-		}
-		if(post_data.world_background_h && user.superuser) {
-			var bh = san_nbr(post_data.world_background_h);
-			if(bh > 0 && bh <= 2500) { // if 0, use no value
-				properties.background_h = bh;
-				properties_updated = true;
-			}
-		}
-		if(post_data.background_alpha && user.superuser) {
-			var alpha = san_dp(post_data.background_alpha);
-			if((alpha >= 0 || alpha == -1) && alpha != 1) { // if 1, use no value
-				properties.background_alpha = alpha;
-				properties_updated = true;
-			}
-		}
-		if(post_data.background_repeat_mode && user.superuser) {
-			var rm = san_nbr(post_data.background_repeat_mode);
-			if(rm > 0 && rm <= 2) { // if 0, use no value
-				properties.background_rmod = rm;
-				properties_updated = true;
-			}
-		}
-		if("nsfw_page" in post_data) {
-			properties.page_is_nsfw = true;
-			properties_updated = true;
-		}
-		if("no_log_edits" in post_data) {
-			properties.no_log_edits = true;
-			properties_updated = true;
-		}
-		if(post_data.charsize == "default") {
-			properties_updated = true;
-			delete properties.half_chars;
-			delete properties.square_chars;
-		} else if(post_data.charsize == "square") {
-			properties.square_chars = true;
-			delete properties.half_chars;
-			properties_updated = true;
-		} else if(post_data.charsize == "half") {
-			delete properties.square_chars;
-			properties.half_chars = true;
-			properties_updated = true;
-		} else if(post_data.charsize == "mixed") {
-			properties.square_chars = true;
-			properties.half_chars = true;
-			properties_updated = true;
-		} else {
-			properties_updated = true;
-			delete properties.half_chars;
-			delete properties.square_chars;
-		}
-		if(post_data.meta_desc) {
-			var mdesc = post_data.meta_desc;
-			if(typeof mdesc != "string") mdesc = "";
-			mdesc = mdesc.trim();
-			mdesc = mdesc.slice(0, 600);
-			mdesc = mdesc.replace(/\r|\n/g, " ");
-			if(!mdesc) {
-				delete properties.meta_desc;
-			} else {
-				properties.meta_desc = mdesc;
-			}
-			properties_updated = true;
-		}
+		}*/
 
-		var newProps = JSON.stringify(properties);
+
+		/*var newProps = JSON.stringify(properties);
 		wss.clients.forEach(function(e) {
 			if(!e.sdata.userClient) return;
 			if(e.sdata.world_id == world.id) {
@@ -577,10 +624,12 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		if(properties_updated) {
 			await db.run("UPDATE world SET properties=? WHERE id=?",
 				[newProps, world.id]);
-		}
+		}*/
 	} else if(post_data.form == "action") {
 		if("unclaim" in post_data) {
-			await db.run("UPDATE world SET owner_id=null WHERE id=?", world.id);
+			world.ownerId = null;
+			modifyWorldProp(world, "ownerId");
+			/*await db.run("UPDATE world SET owner_id=null WHERE id=?", world.id);
 			if(id_to_remove) {
 				wss.clients.forEach(function(e) {
 					if(!e.sdata.userClient) return;
@@ -591,7 +640,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 						e.sdata.user.stats.member = false;
 					}
 				});
-			}
+			}*/
 			return serve(null, null, {
 				redirect: "/accounts/profile/"
 			});

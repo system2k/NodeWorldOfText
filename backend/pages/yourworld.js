@@ -8,11 +8,12 @@ module.exports.startup_internal = function(vars) {
 	db = vars.db;
 	worldViews = vars.worldViews;
 
-	worldViewCommit();
+	// TODO
+	//worldViewCommit();
 }
 
 module.exports.server_exit = async function() {
-	await worldViewCommit(true);
+	//await worldViewCommit(true);
 }
 
 // TODO: get rid
@@ -53,6 +54,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var san_nbr = vars.san_nbr;
 	var accountSystem = vars.accountSystem;
 
+	var modifyWorldProp = vars.modifyWorldProp;
+
 	var world_name = path;
 	if(params.timemachine) {
 		world_name = params.world;
@@ -61,7 +64,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var world = await world_get_or_create(world_name);
 	if(!world) return await dispage("404", null, req, serve, vars, evars);
 
-	var world_properties = JSON.parse(world.properties);
+	// TODO
+	//var world_properties = JSON.parse(world.properties);
 
 	var read_permission = await can_view_world(world, user, db);
 	if(!read_permission) {
@@ -100,8 +104,10 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		});
 	} else { // the HTML page
 		if(!query_data.hide) {
-			if(!worldViews[world.id]) worldViews[world.id] = 0;
-			worldViews[world.id]++;
+			/*if(!worldViews[world.id]) worldViews[world.id] = 0;
+			worldViews[world.id]++;*/
+			world.views++;
+			modifyWorldProp(world, "views");
 		}
 
 		var pathname = world.name;
@@ -112,11 +118,11 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			pathname = "/" + path;
 			if(pathname.charAt(pathname.length - 1) == "/") pathname = pathname.slice(0, -1);
 		}
-		var chat_permission = world_properties.chat_permission;
+		var chat_permission = world.feature.chat;
 		if(!chat_permission) chat_permission = 0;
-		var show_cursor = world_properties.show_cursor
+		var show_cursor = world.feature.showCursor;
 		if(show_cursor == void 0) show_cursor = -1;
-		var color_text = world_properties.color_text;
+		var color_text = world.feature.colorText;
 		if(!color_text) color_text = 0;
 		var username = user.username;
 		if(accountSystem == "uvias") {
@@ -133,15 +139,15 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 				is_operator: user.operator // Operator of OWOT?
 			},
 			worldModel: { // mirror to world_props.js
-				feature_membertiles_addremove: !!world.feature_membertiles_addremove,
+				feature_membertiles_addremove: world.feature.memberTilesAddRemove,
 				writability: world.writability,
-				feature_url_link: world.feature_url_link,
-				feature_go_to_coord: world.feature_go_to_coord,
+				feature_url_link: world.feature.urlLink,
+				feature_go_to_coord: world.feature.goToCoord,
 				name: world.name,
-				feature_paste: world.feature_paste,
-				namespace: world.name.split("/")[0],
+				feature_paste: world.feature.paste,
+				namespace: world.name.split("/")[0], // TODO: remove?
 				readability: world.readability,
-				feature_coord_link: world.feature_coord_link,
+				feature_coord_link: world.feature.coordLink,
 				pathname,
 				chat_permission,
 				color_text,
@@ -154,13 +160,13 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		if(CONST.tileCols != 16) {
 			state.worldModel.tileCols = CONST.tileCols;
 		}
-		if(world_properties.page_is_nsfw) {
+		if(world.opts.nsfw) {
 			state.worldModel.nsfw = world_properties.page_is_nsfw;
 		}
-		if(world_properties.square_chars) {
+		if(world.opts.squareChars) {
 			state.worldModel.square_chars = true;
 		}
-		if(world_properties.half_chars) {
+		if(world.opts.halfChars) {
 			state.worldModel.half_chars = true;
 		}
 		if(announcement) {
@@ -170,42 +176,42 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			state.worldModel.writability = 0;
 			state.worldModel.timemachine = true;
 		}
-		if(world_properties.background) {
+		if(world.background.url) {
 			state.background = {
-				path: world_properties.background
+				path: world.background.url
+			};
+			if(world.background.x) {
+				state.background.x = world.background.x;
 			}
-			if(world_properties.background_x) {
-				state.background.x = world_properties.background_x;
+			if(world.background.y) {
+				state.background.y = world.background.y;
 			}
-			if(world_properties.background_y) {
-				state.background.y = world_properties.background_y;
+			if(world.background.w) {
+				state.background.w = world.background.w;
 			}
-			if(world_properties.background_w) {
-				state.background.w = world_properties.background_w;
+			if(world.background.h) {
+				state.background.h = world.background.h;
 			}
-			if(world_properties.background_h) {
-				state.background.h = world_properties.background_h;
+			if(world.background.rmod) {
+				state.background.rmod = world.background.rmod;
 			}
-			if(world_properties.background_rmod) {
-				state.background.rmod = world_properties.background_rmod;
-			}
-			if("background_alpha" in world_properties) {
-				state.background.alpha = world_properties.background_alpha;
+			if(world.background.alpha) { // TODO: ensure it works properly
+				state.background.alpha = world.background.alpha;
 			}
 		}
 		var page_title = "Our World of Text";
 		if(world.name) {
 			page_title = "/" + world.name;
 		}
-		var meta_desc = world_properties.meta_desc;
+		var meta_desc = world.opts.desc;
 		if(!world.name) {
 			meta_desc = "";
 		}
 		var data = {
 			state: JSON.stringify(state),
-			world,
+			world, // TODO: useless?
 			page_title,
-			nsfw: world_properties.page_is_nsfw,
+			nsfw: world.opts.nsfw,
 			meta_desc
 		}
 		return serve(HTML("yourworld.html", data), null, {

@@ -14,8 +14,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	var retrieveChatHistory = chat_mgr.retrieveChatHistory;
 
-	var props = JSON.parse(world.properties);
-	var chat_perm = props.chat_permission;
+	//var props = JSON.parse(world.properties);
+	var chat_perm = world.feature.chat; //props.chat_permission;
 	var is_member = user.stats.member;
 	var is_owner = user.stats.owner;
 

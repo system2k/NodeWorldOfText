@@ -1,6 +1,7 @@
 module.exports.GET = async function(req, serve, vars, evars) {
 	var query_data = evars.query_data;
 	var user = evars.user;
+	// TODO: fix this
 
 	var db = vars.db;
 	var world_get_or_create = vars.world_get_or_create;

@@ -16,18 +16,18 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		return serve(null, 403);
 	}
 
-	var properties = JSON.parse(world.properties);
+	//var properties = JSON.parse(world.properties);
 
-	var backgroundColor = world.custom_color || "#000";
-	var ownerTileColor = world.custom_tile_owner || "#ddd";
-	var memberTileColor = world.custom_tile_member || "#eee";
-	var publicTileColor = world.custom_bg || "#fff";
-	var cursorColor = world.custom_cursor || "#ff0";
-	var guestCursorColor = world.custom_guest_cursor || "#ffa";
-	var menuColor = properties.custom_menu_color || "#e5e5ff";
-	var publicTextColor = properties.custom_public_text_color || "#000";
-	var memberTextColor = properties.custom_member_text_color || "#000";
-	var ownerTextColor = properties.custom_owner_text_color || "#000";
+	var backgroundColor = world.theme.color || "#000";
+	var ownerTileColor = world.theme.tileOwner || "#ddd";
+	var memberTileColor = world.theme.tileMember || "#eee";
+	var publicTileColor = world.theme.bg || "#fff";
+	var cursorColor = world.theme.cursor || "#ff0";
+	var guestCursorColor = world.theme.guestCursor || "#ffa";
+	var menuColor = world.theme.menu || "#e5e5ff";
+	var publicTextColor = world.theme.publicText || "#000";
+	var memberTextColor = world.theme.memberText || "#000";
+	var ownerTextColor = world.theme.ownerText || "#000";
 
 	var style = {
 		owner: ownerTileColor,

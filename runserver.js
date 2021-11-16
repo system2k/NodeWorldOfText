@@ -1800,6 +1800,7 @@ async function fetchWorldMembersById(worldId) {
 	return members;
 }
 
+// TODO: ensure world object does NOT expire while a request is processing a world
 function makeWorldObject() {
 	// return world object with all values "zeroed"
 	var world = {
@@ -1850,11 +1851,16 @@ function makeWorldObject() {
 		writability: 0,
 		readability: 0,
 		members: {
-			map: null, // hash-map of member user-ids (null if not loaded)
-			updates: [] // membership updates in database
-		}
+			map: {}, // hash-map of member user-ids
+			updates: {} // membership updates in database
+		},
+		modifications: {} // TODO
 	};
 	return world;
+}
+
+function modifyWorldProp(wobj, path) {
+	wobj.modifications[path] = true;
 }
 
 function getAndProcWorldProp(wprops, propName) {
@@ -1864,16 +1870,60 @@ function getAndProcWorldProp(wprops, propName) {
 	return world_default_props[propName];
 }
 
+function loadWorldIntoObject(world, wobj) {
+	wobj.id = world.id;
+	wobj.name = world.name;
+	wobj.ownerId = world.owner_id;
+	wobj.creationDate = world.created_at;
+	
+	wobj.writability = world.writability;
+	wobj.readability = world.readability;
+
+	var wprops = JSON.parse(world.properties);
+
+	wobj.feature.goToCoord = world.feature_go_to_coord;
+	wobj.feature.memberTilesAddRemove = Boolean(world.feature_membertiles_addremove);
+	wobj.feature.paste = world.feature_paste;
+	wobj.feature.coordLink = world.feature_coord_link;
+	wobj.feature.urlLink = world.feature_url_link;
+	wobj.feature.chat = getAndProcWorldProp(wprops, "chat_permission");
+	wobj.feature.showCursor = getAndProcWorldProp(wprops, "show_cursor");
+	wobj.feature.colorText = getAndProcWorldProp(wprops, "color_text");
+
+	wobj.theme.bg = world.custom_bg;
+	wobj.theme.cursor = world.custom_cursor;
+	wobj.theme.guestCursor = world.custom_guest_cursor;
+	wobj.theme.color = world.custom_color;
+	wobj.theme.tileOwner = world.custom_tile_owner;
+	wobj.theme.tileMember = world.custom_tile_member;
+	wobj.theme.menu = getAndProcWorldProp(wprops, "custom_menu_color");
+	wobj.theme.publicText = getAndProcWorldProp(wprops, "custom_public_text_color");
+	wobj.theme.memberText = getAndProcWorldProp(wprops, "custom_member_text_color");
+	wobj.theme.ownerText = getAndProcWorldProp(wprops, "custom_owner_text_color");
+
+	wobj.opts.nsfw = getAndProcWorldProp(wprops, "page_is_nsfw");
+	wobj.opts.squareChars = getAndProcWorldProp(wprops, "square_chars");
+	wobj.opts.noLogEdits = getAndProcWorldProp(wprops, "no_log_edits");
+	wobj.opts.halfChars = getAndProcWorldProp(wprops, "half_chars");
+	wobj.opts.desc = getAndProcWorldProp(wprops, "meta_desc");
+
+	wobj.background.url = getAndProcWorldProp(wprops, "background");
+	wobj.background.x = getAndProcWorldProp(wprops, "background_x");
+	wobj.background.y = getAndProcWorldProp(wprops, "background_y");
+	wobj.background.w = getAndProcWorldProp(wprops, "background_w");
+	wobj.background.h = getAndProcWorldProp(wprops, "background_h");
+	wobj.background.rmod = getAndProcWorldProp(wprops, "background_rmod");
+	wobj.background.alpha = getAndProcWorldProp(wprops, "background_alpha");
+
+	wobj.views = getAndProcWorldProp(wprops, "views");
+}
+
 // TODO: what if world gets renamed?
 var worldCache = {}; // TODO
 var worldFetchQueueIndex = {};
 // either returns world-object or null
 async function getWorld(name, canCreate) {
 	if(typeof name != "string") name = "";
-	var fetchOnly = false;
-	if(name.length > 10000) {
-		fetchOnly = true;
-	}
 	var worldHash = name.toUpperCase();
 	if(worldFetchQueueIndex[worldHash]) {
 		var qobj = worldFetchQueueIndex[worldHash];
@@ -1906,61 +1956,15 @@ async function getWorld(name, canCreate) {
 	var world = await fetchWorld(name); // TODO: Validate
 	if(world) {
 		var wobj = makeWorldObject();
+
+		loadWorldIntoObject(world, wobj);
 		wobj.exists = true;
-		
-		var worldId = world.id;
-
-		wobj.id = worldId;
-		wobj.name = world.name;
-		wobj.ownerId = world.owner_id;
-		wobj.creationDate = world.created_at;
-		
-		wobj.writability = world.writability;
-		wobj.readability = world.readability;
-
-		var wprops = JSON.parse(world.properties);
-
-		wobj.feature.goToCoord = world.feature_go_to_coord;
-		wobj.feature.memberTilesAddRemove = Boolean(world.feature_membertiles_addremove);
-		wobj.feature.paste = world.feature_paste;
-		wobj.feature.coordLink = world.feature_coord_link;
-		wobj.feature.urlLink = world.feature_url_link;
-		wobj.feature.chat = getAndProcWorldProp(wprops, "chat_permission");
-		wobj.feature.showCursor = getAndProcWorldProp(wprops, "show_cursor");
-		wobj.feature.colorText = getAndProcWorldProp(wprops, "color_text");
-
-		wobj.theme.bg = world.custom_bg;
-		wobj.theme.cursor = world.custom_cursor;
-		wobj.theme.guestCursor = world.custom_guest_cursor;
-		wobj.theme.color = world.custom_color;
-		wobj.theme.tileOwner = world.custom_tile_owner;
-		wobj.theme.tileMember = world.custom_tile_member;
-		wobj.theme.menu = getAndProcWorldProp(wprops, "custom_menu_color");
-		wobj.theme.publicText = getAndProcWorldProp(wprops, "custom_public_text_color");
-		wobj.theme.memberText = getAndProcWorldProp(wprops, "custom_member_text_color");
-		wobj.theme.ownerText = getAndProcWorldProp(wprops, "custom_owner_text_color");
-
-		wobj.opts.nsfw = getAndProcWorldProp(wprops, "page_is_nsfw");
-		wobj.opts.squareChars = getAndProcWorldProp(wprops, "square_chars");
-		wobj.opts.noLogEdits = getAndProcWorldProp(wprops, "no_log_edits");
-		wobj.opts.halfChars = getAndProcWorldProp(wprops, "half_chars");
-		wobj.opts.desc = getAndProcWorldProp(wprops, "meta_desc");
-
-		wobj.background.url = getAndProcWorldProp(wprops, "background");
-		wobj.background.x = getAndProcWorldProp(wprops, "background_x");
-		wobj.background.y = getAndProcWorldProp(wprops, "background_y");
-		wobj.background.w = getAndProcWorldProp(wprops, "background_w");
-		wobj.background.h = getAndProcWorldProp(wprops, "background_h");
-		wobj.background.rmod = getAndProcWorldProp(wprops, "background_rmod");
-		wobj.background.alpha = getAndProcWorldProp(wprops, "background_alpha");
-
-		wobj.views = getAndProcWorldProp(wprops, "views");
 
 		worldCache[worldHash] = wobj;
 		var resQueue = worldFetchQueueIndex[worldHash].promises;
 
 		// load all member ids
-		var members = await fetchWorldMembersById(worldId);
+		var members = await fetchWorldMembersById(world.id);
 		var map = {};
 		for(var i = 0; i < members.length; i++) {
 			var key = members[i].user_id;
@@ -1974,21 +1978,61 @@ async function getWorld(name, canCreate) {
 		}
 		delete worldFetchQueueIndex[worldHash];
 	} else {
-		var wobj = makeWorldObject();
-		worldCache[worldHash] = wobj;
+		var wobj = null;
 		if(!canCreate) {
+			wobj = makeWorldObject();
+			wobj.exists = false;
+			worldCache[worldHash] = wobj;
 			delete worldFetchQueueIndex[worldHash];
 			return null;
 		}
 		var worldRow = await insertWorld(name);
-		console.log(worldRow)
+		wobj = makeWorldObject();
+		loadWorldIntoObject(worldRow, wobj);
+		wobj.exists = true;
+		worldCache[worldHash] = wobj;
+		var resQueue = worldFetchQueueIndex[worldHash].promises;
+		for(var i = 0; i < resQueue.length; i++) {
+			var queueObj = resQueue[i];
+			queueObj.promiseResolve(wobj);
+		}
 		delete worldFetchQueueIndex[worldHash];
 	}
 	return prom;
 }
 // TODO
-//(async function(){console.log(await getWorld("dasf3f", true))})()
+//(async function(){console.log(await getWorld("282", true))})()
 
+async function getOrCreateWorld(name, mustCreate) {
+	if(typeof name != "string") name = "";
+	var canCreate = true;
+	if(!name.match(/^([\w\.\-]*)$/g)) {
+		canCreate = false;
+	}
+	if(is_unclaimable_worldname(name)) { // TODO: shouldn't this be false? maybe not, check
+		canCreate = true;
+	}
+	if(name.length > 10000) {
+		canCreate = false;
+	}
+	return await getWorld(name, canCreate || mustCreate);
+}
+
+async function fetchWorldMembershipsByUserId(userId) {
+	// pull membership information from the database and the cache
+	var whitelists = await db.all("SELECT * FROM whitelist WHERE user_id=?", userId);
+	var memberWorldIds = {};
+	for(var i = 0; i < whitelists.length; i++) {
+		memberWorldIds[whitelists[i].world_id] = 1;
+	}
+	for(var i in worldCache) {
+		var wobj = worldCache[i];
+		if(wobj.exists && wobj.members.map[userId]) {
+			memberWorldIds[wobj.id] = 1;
+		}
+	}
+	return Object.keys(memberWorldIds);
+}
 
 // TODO: remove force_create. this is used when creating subworlds
 async function world_get_or_create(name, do_not_create, force_create) {
@@ -2024,9 +2068,7 @@ async function world_get_or_create(name, do_not_create, force_create) {
 				custom_bg, custom_cursor, custom_guest_cursor, custom_color, custom_tile_owner, custom_tile_member,
 				writability, readability, properties
 			]);
-			console.log(rw)
 			world = await db.get("SELECT * FROM world WHERE id=?", rw.lastID);
-			console.log(world)
 		} else { // special world names that must not be created
 			return false;
 		}
@@ -2045,7 +2087,7 @@ async function can_view_world(world, user) {
 		owner: false
 	};
 
-	var is_owner = world.owner_id == user.id;
+	var is_owner = world.ownerId == user.id;
 
 	if(world.readability == 2 && !is_owner) { // owner only
 		return false;
@@ -2390,7 +2432,91 @@ function announce(text) {
 	})();
 }
 
-async function validate_claim_worldname(worldname, vars, evars, rename_casing, world_id) {
+//validateWorldClaim
+async function validate_claim_worldname(worldname, user) {
+	var worldnamePath = sanitizeWorldname(worldname);
+	if(worldname.length > 10000) {
+		return {
+			error: true,
+			message: "Worldname is too long"
+		};
+	}
+	if(!worldnamePath) {
+		return {
+			error: true,
+			message: "Invalid worldname - it must contain the following characters: a-z A-Z 0-9 . _ -"
+		};
+	}
+	if(!(worldnamePath.length == 1 && worldnamePath[0] == "")) {
+		for(var i = 0; i < worldnamePath.length; i++) {
+			if(worldnamePath[i] == "") {
+				return {
+					error: true,
+					message: "Worldname contains empty segments (make sure the name does not begin or end with /)"
+				};
+			}
+		}
+	}
+	if(worldnamePath.length == 1) {
+		var newname = worldnamePath[0];
+		if(newname == "" && !user.superuser) {
+			return {
+				error: true,
+				message: "Cannot claim world"
+			};
+		}
+		var world = await getOrCreateWorld(newname);
+		if(world) {
+			if(world.ownerId == null) {
+				return {
+					world: world,
+					message: "Successfully claimed the world"
+				};
+			} else {
+				return {
+					error: true,
+					message: "World already has an owner"
+				};
+			}
+		} else {
+			return {
+				error: true,
+				message: "Unable to create the world"
+			};
+		}
+	} else if(worldnamePath.length > 1) {
+		var baseName = worldnamePath[0];
+		var baseWorld = await getOrCreateWorld(baseName);
+		// world does not exist nor is owned by the user
+		if(!baseWorld || (baseWorld && baseWorld.ownerId != user.id)) {
+			return {
+				error: true,
+				message: "You do not own the base world in the path"
+			};
+		}
+		var fullWorldname = worldnamePath.join("/");
+		var subWorld = await getOrCreateWorld(fullWorldname, true);
+		// already owned
+		if(subWorld.ownerId != null) {
+			return {
+				error: true,
+				message: "You already own this subdirectory world"
+			};
+		}
+		// subworld is created, now claim it
+		return {
+			world: subWorld,
+			message: "Successfully claimed the subdirectory world"
+		};
+	}
+	return {
+		error: true,
+		message: "Unexpected error"
+	};
+}
+
+// TODO: Nuke this function
+async function validate_claim_worldname2(worldname, vars, evars, rename_casing, world_id) {
 	var user = evars.user;
 
 	var db = vars.db;
@@ -3015,6 +3141,7 @@ async function manageWebsocketConnection(ws, req) {
 		}));
 		ws.close();
 	}
+	// TODO: querystring is deprecated?
 
 	if(!can_connect_ip_address(ws.sdata.ipAddress)) {
 		return error_ws("CONN_LIMIT", "Too many connections");
@@ -3129,6 +3256,7 @@ async function manageWebsocketConnection(ws, req) {
 		active: false,
 		time: 0
 	};
+	// TODO: ensure /w/ works properly
 
 	var tm_check = world_name.split("/")
 	if(tm_check[0] == "accounts" && tm_check[1] == "timemachine" && tm_check[3]) {
@@ -3136,13 +3264,14 @@ async function manageWebsocketConnection(ws, req) {
 		timemachine.active = true;
 	}
 
-	var world = await world_get_or_create(world_name);
+	var world = await getOrCreateWorld(world_name);
 	if(ws.sdata.terminated) return;
 	if(!world) {
 		return error_ws("NO_EXIST", "World does not exist");
 	}
 
-	if(timemachine.active && world.owner_id != user.id && !user.superuser) {
+	// TODO: replace all instances of owner_id with ownerId
+	if(timemachine.active && world.ownerId != user.id && !user.superuser) {
 		return error_ws("NO_PERM", "No permission to view time machine");
 	}
 
@@ -3158,6 +3287,7 @@ async function manageWebsocketConnection(ws, req) {
 		if(timemachine.time > 1000000) timemachine.time = 1000000;
 	}
 
+	// TODO: refactor this. nuke this.
 	status = { permission, world, timemachine };
 
 	ws.sdata.world_id = status.world.id;
@@ -3169,12 +3299,12 @@ async function manageWebsocketConnection(ws, req) {
 	ws.sdata.world = status.world;
 	ws.sdata.user = user;
 
-	var properties = JSON.parse(status.world.properties);
-	var chat_permission = properties.chat_permission;
+	//var properties = JSON.parse(status.world.properties);
+	var chat_permission = world.feature.chat;
 	if(!chat_permission) chat_permission = 0;
 	ws.sdata.chat_permission = chat_permission;
 
-	var show_cursor = properties.show_cursor;
+	var show_cursor = world.feature.showCursor;
 	if(show_cursor == void 0) show_cursor = -1;
 	ws.sdata.show_cursor = show_cursor;
 
@@ -3366,7 +3496,7 @@ var global_data = {
 	checkURLParam,
 	create_date,
 	get_user_info,
-	world_get_or_create,
+	world_get_or_create: getOrCreateWorld,
 	can_view_world,
 	san_nbr,
 	san_dp,
@@ -3415,7 +3545,10 @@ var global_data = {
 	uviasSendIdentifier,
 	client_cursor_pos,
 	setRestrictions,
-	getRestrictions
+	getRestrictions,
+	modifyWorldProp,
+	sanitizeWorldname,
+	fetchWorldMembershipsByUserId
 };
 
 async function sysLoad() {

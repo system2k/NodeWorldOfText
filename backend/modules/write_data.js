@@ -114,13 +114,13 @@ module.exports = async function(data, vars, evars) {
 		editLimit = charRestr.rate;
 	}
 
-	var worldProps = JSON.parse(world.properties);
+	//var worldProps = JSON.parse(world.properties);
 	var world_id = world.id;
 
-	var no_log_edits = !!worldProps.no_log_edits;
-	var color_text = !!worldProps.color_text;
+	var no_log_edits = world.opts.noLogEdits; //!!worldProps.no_log_edits;
+	var color_text = world.feature.colorText; //!!worldProps.color_text;
 
-	var is_owner = user.id == world.owner_id;
+	var is_owner = user.id == world.ownerId;
 	var is_member = user.stats.member;
 
 	is_owner = is_owner || (user.superuser && world.name == "");

@@ -15,6 +15,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var world_list = [];
 
+	// TODO: have up to date info from worlds cache
 	var owned = await db.all("SELECT * FROM world WHERE owner_id=?", user.id);
 	for(var i = 0; i < owned.length; i++) {
 		var world = owned[i];
