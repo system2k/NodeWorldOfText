@@ -53,10 +53,10 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	var ipHeaderAddr = ws.sdata.ipAddress;
 
-	var props = JSON.parse(world.properties);
-	var chat_perm = props.chat_permission;
-	var is_member = user.stats.member;
-	var is_owner = user.stats.owner;
+	//var props = JSON.parse(world.properties);
+	var chat_perm = world.feature.chat; //props.chat_permission;
+	var is_member = !!world.members.map[user.id]; //user.stats.member;
+	var is_owner = world.owner_id == user.id;//user.stats.owner;
 
 	// sends `[ Server ]: <message>` in chat.
 	function serverChatResponse(message, location) {
@@ -290,7 +290,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 			wss.clients.forEach(function(ws) {
 				if(clientFound) return;
 				if(!ws.sdata.userClient) return;
-				if(ws.sdata.clientId == id && ws.sdata.world.id == world.id && ws.sdata.can_chat) {
+				if(ws.sdata.clientId == id && ws.sdata.world.id == world.id && ws.sdata.can_chat) { // TODO
 					clientFound = true;
 					var privateMessage = {
 						nickname: nick,
@@ -411,11 +411,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 		stats: function() {
 			if(world.name != "") return;
 			var stat = "Stats for main world<br>";
-			stat += "Creation date: " + html_tag_esc(create_date(world.created_at)) + "<br>";
-			var props = JSON.parse(world.properties);
-			var viewcount = props.views;
-			if(!viewcount) props.views = 0;
-			stat += "View count: " + html_tag_esc(viewcount);
+			stat += "Creation date: " + html_tag_esc(create_date(world.creationDate)) + "<br>";
+			stat += "View count: " + html_tag_esc(world.views);
 			return serverChatResponse(stat, data.location);
 		}
 	}

@@ -10,7 +10,7 @@ module.exports = async function(data, vars, evars) {
 	var tile_database = vars.tile_database;
 
 	var is_owner = user.id == world.ownerId || (user.superuser && world.name == "");
-	var is_member = user.stats.member || (user.superuser && world.name == "");
+	var is_member = !!world.members.map[user.id] || (user.superuser && world.name == "");
 
 	var action = data.action;
 	var tileX = san_nbr(data.tileX);
@@ -20,8 +20,7 @@ module.exports = async function(data, vars, evars) {
 	var precise = data.precise;
 	var type = data.type;
 
-	//var properties = JSON.parse(world.properties);
-	var no_log_edits = world.opts.noLogEdits;//!!properties.no_log_edits;
+	var no_log_edits = world.opts.noLogEdits;
 
 	var protect_type = void 0;
 	if(type == "owner-only") {

@@ -3,9 +3,6 @@ var emptyWriteResponse = { accepted: [], rejected: {} };
 var editRateLimits = {};
 var tileRateLimits = {};
 
-var charRatePerSecond = 20480;
-var tileRatePerSecond = 800;
-
 /*
 	Limit of 20480 edits per second, and 800 unique tiles per second
 */
@@ -13,7 +10,7 @@ var tileRatePerSecond = 800;
 var editReqLimit = 512;
 var superuserEditReqLimit = 1280;
 
-function checkCharRateLimit(ipObj, editCount) {
+function checkCharRateLimit(ipObj, cRate, editCount) {
 	var sec = Math.floor(Date.now() / 1000);
 	var currentSec = ipObj.currentSecond;
 	ipObj.currentSecond = sec;
@@ -22,13 +19,13 @@ function checkCharRateLimit(ipObj, editCount) {
 		return true;
 	}
 	ipObj.value += editCount;
-	if(ipObj.value > charRatePerSecond) {
+	if(ipObj.value > cRate) {
 		return false;
 	}
 	return true;
 }
 
-function checkTileRateLimit(ipObj, tileX, tileY, worldId) {
+function checkTileRateLimit(ipObj, tRate, tileX, tileY, worldId) {
 	var sec = Math.floor(Date.now() / 1000);
 	var currentSec = ipObj.currentSecond;
 	ipObj.currentSecond = sec;
@@ -38,7 +35,7 @@ function checkTileRateLimit(ipObj, tileX, tileY, worldId) {
 	}
 	ipObj.value[tileY + "," + tileX + "," + worldId] = 1;
 	var tileCount = Object.keys(ipObj.value).length;
-	if(tileCount > tileRatePerSecond) {
+	if(tileCount > tRate) {
 		return false;
 	}
 	return true;
@@ -55,16 +52,68 @@ function prepareRateLimiter(limObj, ipAddress) {
 	return obj;
 }
 
+function checkCharrateRestr(list, ipVal, ipFam, world) {
+	if(!list) return null;
+	for(var i = 0; i < list.length; i++) {
+		var item = list[i];
+
+		var range = item[0];
+		var fam = item[1];
+		var type = item[2];
+		if(fam != ipFam) continue;
+		if(!(ipVal >= range[0] && ipVal <= range[1])) continue;
+
+		if(type == "charrate") {
+			var rRate = item[3];
+			var rRorld = item[4];
+			if(rRorld == null || rRorld.toUpperCase() == world.toUpperCase()) {
+				return rRate;
+			}
+		}
+	}
+	return null;
+}
+
+function checkColorRestr(list, ipVal, ipFam, world, tileX, tileY) {
+	if(!list) return false;
+	for(var i = 0; i < list.length; i++) {
+		var item = list[i];
+
+		var range = item[0];
+		var fam = item[1];
+		var type = item[2];
+		if(fam != ipFam) continue;
+		if(!(ipVal >= range[0] && ipVal <= range[1])) continue;
+
+		if(type == "color") {
+			var rRegion = item[3];
+			var rWorld = item[4];
+			if(rWorld == null || rWorld.toUpperCase() == world.toUpperCase()) {
+				if(rRegion == null || rRegion[0] <= tileX && tileX <= rRegion[2] && rRegion[1] <= tileY && tileY <= rRegion[3]) {
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
 module.exports = async function(data, vars, evars) {
 	var user = evars.user;
 	var channel = evars.channel;
 	var world = evars.world;
 	
 	var ipAddress;
+	var ipAddressVal;
+	var ipAddressFam;
 	if(evars.ws && evars.ws.sdata) {
 		ipAddress = evars.ws.sdata.ipAddress;
+		ipAddressVal = evars.ws.sdata.ipAddressVal;
+		ipAddressFam = evars.ws.sdata.ipAddressFam;
 	} else {
 		ipAddress = evars.ipAddress;
+		ipAddressVal = evars.ipAddressVal;
+		ipAddressFam = evars.ipAddressFam;
 	}
 	
 	var san_nbr = vars.san_nbr;
@@ -75,31 +124,14 @@ module.exports = async function(data, vars, evars) {
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 	var getRestrictions = vars.getRestrictions;
 
-	var restrictions = getRestrictions();
+	var charRatePerSecond = 20480;
+	var tileRatePerSecond = 800;
+
+	var restr = getRestrictions();
 
 	var bypass_key = get_bypass_key();
 	if(!bypass_key) {
 		bypass_key = NaN;
-	}
-
-	var colorRestr = null;
-	var charRestr = null;
-	if(restrictions[ipAddress]) {
-		var clientRestr = restrictions[ipAddress];
-		if(clientRestr.color) {
-			if(clientRestr.color.world == null) {
-				colorRestr = clientRestr.color;
-			} else if(clientRestr.color.world.toUpperCase() == world.name.toUpperCase()) {
-				colorRestr = clientRestr.color;
-			}
-		}
-		if(clientRestr.charrate) {
-			if(clientRestr.charrate.world == null) {
-				charRestr = clientRestr.charrate;
-			} else if(clientRestr.charrate.world.toUpperCase() == world.name.toUpperCase()) {
-				charRestr = clientRestr.charrate;
-			}
-		}
 	}
 
 	var public_only = data.public_only;
@@ -110,28 +142,24 @@ module.exports = async function(data, vars, evars) {
 		editLimit = superuserEditReqLimit;
 	}
 
-	if(charRestr) {
-		editLimit = charRestr.rate;
+	var rrate = checkCharrateRestr(restr, ipAddressVal, ipAddressFam, world.name);
+	if(rrate != null) {
+		charRatePerSecond = rrate;
 	}
 
-	//var worldProps = JSON.parse(world.properties);
 	var world_id = world.id;
 
-	var no_log_edits = world.opts.noLogEdits; //!!worldProps.no_log_edits;
-	var color_text = world.feature.colorText; //!!worldProps.color_text;
+	var no_log_edits = world.opts.noLogEdits;
+	var color_text = world.feature.colorText;
 
 	var is_owner = user.id == world.ownerId;
-	var is_member = user.stats.member;
+	var is_member = !!world.members.map[user.id]; // TODO: test
 
 	is_owner = is_owner || (user.superuser && world.name == "");
 
 	var can_color_text = true;
 	if(color_text == 1 && !is_member && !is_owner) can_color_text = false;
 	if(color_text == 2 && !is_owner) can_color_text = false;
-
-	if(colorRestr && !colorRestr.region) {
-		can_color_text = false;
-	}
 
 	var edits = data.edits;
 	if(!edits) return emptyWriteResponse;
@@ -152,11 +180,11 @@ module.exports = async function(data, vars, evars) {
 		var tileStr = tileY + "," + tileX;
 		var char = segment[5];
 		if(typeof char != "string") continue;
-		if(!checkCharRateLimit(editLimiter, 1)) {
+		if(!checkCharRateLimit(editLimiter, charRatePerSecond, 1)) {
 			break;
 		}
 		if(!tiles[tileStr]) {
-			if(!checkTileRateLimit(tileLimiter, tileX, tileY, world_id)) {
+			if(!checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world_id)) {
 				break;
 			}
 			tiles[tileStr] = [];
@@ -194,6 +222,14 @@ module.exports = async function(data, vars, evars) {
 		var incomingEdits = tiles[i];
 		var changes = [];
 
+		var canColor = true;
+		var pos = i.split(",");
+		var tileX = parseInt(pos[1]);
+		var tileY = parseInt(pos[0]);
+		if(checkColorRestr(restr, ipAddressVal, ipAddressFam, world.name, tileX, tileY)) {
+			canColor = false;
+		}
+
 		for(var k = 0; k < incomingEdits.length; k++) {
 			var editIncome = incomingEdits[k];
 
@@ -222,18 +258,9 @@ module.exports = async function(data, vars, evars) {
 				} else {
 					editIncome[7] = fixColors(editIncome[7]);
 				}
-				// client is not allowed to use color at this specific region
-				if(colorRestr && colorRestr.region) {
-					var reg = colorRestr.region;
-					var tx = editIncome[1];
-					var ty = editIncome[0];
-					var x1 = reg[0];
-					var y1 = reg[1];
-					var x2 = reg[2];
-					var y2 = reg[3];
-					if(x1 <= tx && tx <= x2 && y1 <= ty && ty <= y2) {
-						editIncome[7] = 0;
-					}
+				// client is restricted from using colors at specific parameters
+				if(!canColor) {
+					editIncome[7] = 0;
 				}
 				changes.push(editIncome);
 				continue;

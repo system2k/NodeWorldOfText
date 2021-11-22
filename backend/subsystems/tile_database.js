@@ -129,7 +129,7 @@ function sendTileUpdatesToClients() {
 		// broadcast to clients
 		wss.clients.forEach(function(client) {
 			if(!client.sdata.userClient) return;
-			if(client.sdata.world_id == worldID && client.readyState == WebSocket.OPEN) {
+			if(client.sdata.world.id == worldID && client.readyState == WebSocket.OPEN) {
 				try {
 					client.send(JSON.stringify({
 						channel: channel,
@@ -325,6 +325,7 @@ function tileWriteEdits(cacheTile, editObj) {
 	var preserve_links = data.preserve_links;
 	var can_color_text = data.can_color_text;
 	var no_log_edits = data.no_log_edits;
+	// TODO: move is_owner stuff up a level to write_data.js
 	var is_owner = data.is_owner || (user.superuser && world.name == main_world_name);
 	var is_member = data.is_member || (user.superuser && world.name == main_world_name);
 

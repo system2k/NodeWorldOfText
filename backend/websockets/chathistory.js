@@ -8,16 +8,14 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var san_nbr = vars.san_nbr;
 	var tile_coord = vars.tile_coord;
 	var modules = vars.modules;
-	var ws_broadcast = vars.ws_broadcast; // site-wide broadcast
-	var getWorldData = vars.getWorldData;
 	var chat_mgr = vars.chat_mgr;
 
 	var retrieveChatHistory = chat_mgr.retrieveChatHistory;
 
 	//var props = JSON.parse(world.properties);
 	var chat_perm = world.feature.chat; //props.chat_permission;
-	var is_member = user.stats.member;
-	var is_owner = user.stats.owner;
+	var is_member = !!world.members.map[user.id]; //user.stats.member;
+	var is_owner = user.id == world.id; //user.stats.owner;
 
 	var can_chat = false;
 	if(!chat_perm) can_chat = true;

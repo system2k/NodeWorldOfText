@@ -12,8 +12,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var tileX = san_nbr(data.tileX);
 	var tileY = san_nbr(data.tileY);
 
-	var properties = JSON.parse(world.properties);
-	var no_log_edits = !!properties.no_log_edits;
+	var no_log_edits = world.opts.noLogEdits;
 
 	var call_id = tile_database.newCallId();
 	tile_database.reserveCallId(call_id);

@@ -5,8 +5,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var db = vars.db;
 	var plural = vars.plural;
-	var worldViews = vars.worldViews;
 	var fetchWorldMembershipsByUserId = vars.fetchWorldMembershipsByUserId;
+	var fetchOwnedWorldsByUserId = vars.fetchOwnedWorldsByUserId;
 
 	if(!user.authenticated) {
 		return serve(null, null, {
@@ -17,32 +17,26 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var world_list = [];
 	var html_memberships = [];
 
-	// TODO: just fix
-	var owned = await db.all("SELECT * FROM world WHERE owner_id=? LIMIT 10000", user.id);
-	for(var i = 0; i < owned.length; i++) {
-		var world = owned[i];
-		var member_total = await db.get("select world_id, count(world_id) as count from whitelist where world_id=?", world.id);
-		member_total = member_total.count;
-		
-		var world_url = world.name;
+	var ownedList = await fetchOwnedWorldsByUserId(user.id);
+	for(var i = 0; i < ownedList.length; i++) {
+		var owned = ownedList[i];
+		var member_total = Object.keys(owned.members.map).length;
+		var world_url = owned.name;
 		if(world_url == "") {
 			world_url = "/" + world_url;
 		}
-		var properties = JSON.parse(world.properties)
-		var views = properties.views;
-		if(!views) views = 0;
-		if(worldViews[world.id]) views += worldViews[world.id];
+		var views = owned.views;
 		world_list.push({
-			public_writable: world.writability == 0,
-			public_readable: world.readability == 0,
+			public_writable: owned.writability == 0,
+			public_readable: owned.readability == 0,
 			whitelist_set_count: member_total,
-			conf_url: "/accounts/configure/" + world.name + "/",
-			get_absolute_url: "/" + world.name,
+			conf_url: "/accounts/configure/" + owned.name + "/",
+			get_absolute_url: "/" + owned.name,
 			url: world_url,
 			member_plural: plural(member_total),
-			views_plural: plural(properties.views),
+			views_plural: plural(views),
 			views,
-			name: world.name
+			name: owned.name
 		});
 	}
 
@@ -50,7 +44,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		return v1.name.localeCompare(v2.name, "en", { sensitivity: "base" })
 	});
 
-	// TODO: test this
 	var memberships = await fetchWorldMembershipsByUserId(user.id);
 	for(var i = 0; i < memberships.length; i++) {
 		var wid = memberships[i];
@@ -103,9 +96,8 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var db = vars.db;
 	var dispage = vars.dispage;
-	var world_get_or_create = vars.world_get_or_create;
-	var validate_claim_worldname = vars.validate_claim_worldname;
-	var modifyWorldProp = vars.modifyWorldProp;
+	var claimWorldByName = vars.claimWorldByName;
+	var revokeMembershipByWorldName = vars.revokeMembershipByWorldName;
 
 	if(!user.authenticated) {
 		return serve(null, 403);
@@ -118,45 +110,19 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				message: "Guests cannot claim worlds"
 			}, req, serve, vars, evars);
 		} else {
-			var worldname = post_data.worldname + "";
-
-			// TODO: still a race condition here
-			var validate = await validate_claim_worldname(worldname, vars, evars);
-			if(validate.error) { // an error occurred while claiming
-				return await dispage("accounts/profile", {
-					message: validate.message
-				}, req, serve, vars, evars);
+			var worldname = post_data.worldname;
+			if(typeof worldname != "string") {
+				message = "No world name provided";
+			} else {
+				var status = await claimWorldByName(worldname, user);
+				message = status.message;
 			}
-			console.log(validate)
-			var world = validate.world;
-			world.ownerId = user.id;
-			modifyWorldProp(world, "ownerId");
-
-			//await db.run("UPDATE world SET owner_id=? WHERE id=?", [user.id, validate.world_id]);
-
-
-
-			message = validate.message;
 		}
 	} else if(post_data.form == "leave") { // user is leaving the world (terminating own membership)
 		for(var key in post_data) {
 			if(key.startsWith("leave_")) {
 				var worldName = key.substr("leave_".length);
-				var world = await world_get_or_create(worldName);
-				if(world) {
-					var userId = user.id;
-					if(world.members.map[userId]) {
-						delete world.members.map[userId];
-					}
-					if(world.members.updates[userId]) {
-						var type = world.members.updates[userId];
-						if(type == "ADD") {
-							delete world.members.updates[userId];
-						}
-					} else {
-						world.members.updates[userId] = "REMOVE";
-					}
-				}
+				await revokeMembershipByWorldName(worldName, user.id);
 				break;
 			}
 		}

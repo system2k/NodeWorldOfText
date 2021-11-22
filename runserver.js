@@ -193,6 +193,29 @@ function ipv6_txt_to_int() {
 	}
 }
 
+function ipv4_to_range(ip) {
+	ip = ip.trim();
+	ip = ip.split("/");
+	var addr = ip[0];
+	var sub = parseInt(ip[1]);
+	if(isNaN(sub)) sub = 32;
+	var num = ipv4_to_int(addr);
+	var ip_start = unsigned_u32_and(num, subnetMask_ipv4(sub));
+	var ip_end = unsigned_u32_or(num, subnetOr_ipv4(sub));
+	return [ip_start, ip_end];
+}
+function ipv6_to_range(ip) {
+	ip = ip.split("/");
+	var addr = ip[0];
+	var sub = parseInt(ip[1]);
+	if(isNaN(sub)) sub = 128;
+	addr = normalize_ipv6(addr);
+	var num = ipv6_to_int(addr);
+	var ip_start = num & subnetMask_ipv6(sub);
+	var ip_end = num | subnetOr_ipv6(sub);
+	return [ip_start, ip_end];
+}
+
 var u32Byte = new Uint32Array(1);
 function unsigned_u32_and(x, y) {
 	u32Byte[0] = x;
@@ -1509,6 +1532,7 @@ function wait_response_data(req, dispatch, binary_post_data, raise_limit) {
 	});
 }
 
+// TODO: fix
 var restrictions = {};
 function setRestrictions(obj) {
 	restrictions = obj;
@@ -1711,6 +1735,7 @@ function plural(int, plEnding) {
 }
 
 // TODO: refactor
+// TODO: not necessary
 // this prevents a user from claiming /w/<world>
 function is_unclaimable_worldname(world) {
 	if(!world) return false;
@@ -1854,12 +1879,15 @@ function makeWorldObject() {
 			map: {}, // hash-map of member user-ids
 			updates: {} // membership updates in database
 		},
-		modifications: {} // TODO
+		modifications: {}, // TODO
+		handles: 0 // Safe to GC if 'handles' is 0, increments if sockets have a handle on the object (TODO)
 	};
 	return world;
 }
 
 function modifyWorldProp(wobj, path) {
+	// TODO: detect if removed from cache
+	// Don't GC if other worlds still have cache in memory
 	wobj.modifications[path] = true;
 }
 
@@ -1925,6 +1953,11 @@ var worldFetchQueueIndex = {};
 async function getWorld(name, canCreate) {
 	if(typeof name != "string") name = "";
 	var worldHash = name.toUpperCase();
+	// TODO
+	if(worldRenameMap[worldHash]) {
+		name = worldRenameMap[worldHash];
+		worldHash = name.toUpperCase();
+	}
 	if(worldFetchQueueIndex[worldHash]) {
 		var qobj = worldFetchQueueIndex[worldHash];
 		return new Promise(function(res) {
@@ -2027,58 +2060,102 @@ async function fetchWorldMembershipsByUserId(userId) {
 	}
 	for(var i in worldCache) {
 		var wobj = worldCache[i];
-		if(wobj.exists && wobj.members.map[userId]) {
+		if(wobj && wobj.members.map[userId]) {
 			memberWorldIds[wobj.id] = 1;
 		}
 	}
 	return Object.keys(memberWorldIds);
 }
 
-// TODO: remove force_create. this is used when creating subworlds
-async function world_get_or_create(name, do_not_create, force_create) {
-	name += "";
-	if(typeof name != "string") name = "";
-	if(name.length > 10000) {
-		do_not_create = true;
+async function fetchOwnedWorldsByUserId(userId) {
+	var owned = await db.all("SELECT name FROM world WHERE owner_id=? LIMIT 10000", userId);
+	var ownedWorldObjs = {};
+	for(var i = 0; i < owned.length; i++) {
+		var worldname = owned[i].name;
+		var world = await getOrCreateWorld(worldname);
+		if(!world) continue;
+		ownedWorldObjs[world.id] = world;
 	}
-	// TODO: fix race condition
-	var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
-	if(!world) { // world doesn't exist, create it
-		if(((name.match(/^([\w\.\-]*)$/g) || is_unclaimable_worldname(name)) && !do_not_create) || force_create) {
-			var date = Date.now();
-			
-			var feature_go_to_coord = 1;
-			var feature_membertiles_addremove = false;
-			var feature_paste = 1;
-			var feature_coord_link = 1;
-			var feature_url_link = 0;
-			var custom_bg = "";
-			var custom_cursor = "";
-			var custom_guest_cursor = "";
-			var custom_color = "";
-			var custom_tile_owner = "";
-			var custom_tile_member = "";
-			var writability = 0;
-			var readability = 0;
-			var properties = JSON.stringify({});
-
-			var rw = await db.run("INSERT INTO world VALUES(null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-				name, date,
-				feature_go_to_coord, feature_membertiles_addremove, feature_paste, feature_coord_link, feature_url_link,
-				custom_bg, custom_cursor, custom_guest_cursor, custom_color, custom_tile_owner, custom_tile_member,
-				writability, readability, properties
-			]);
-			world = await db.get("SELECT * FROM world WHERE id=?", rw.lastID);
-		} else { // special world names that must not be created
-			return false;
+	for(var i in worldCache) {
+		var wobj = worldCache[i];
+		if(wobj.exists && wobj.ownerId == userId) {
+			ownedWorldObjs[wobj.id] = wobj;
 		}
 	}
-	return world;
+	return Object.values(ownedWorldObjs);
 }
 
-// TODO: proper caching
-async function user_is_member(world_id, user_id) {
-	return await db.get("SELECT * FROM whitelist WHERE world_id=? AND user_id=?", [world_id, user_id]);
+async function revokeMembershipByWorldName(worldName, userId) {
+	var world = await getOrCreateWorld(worldName);
+	if(!world) return;
+	// remove member
+	if(world.members.map[userId]) {
+		delete world.members.map[userId];
+	}
+	if(world.members.updates[userId]) {
+		var type = world.members.updates[userId];
+		if(type == "ADD") {
+			delete world.members.updates[userId];
+		}
+	} else {
+		world.members.updates[userId] = "REMOVE";
+	}
+}
+
+async function promoteMembershipByWorldName(worldName, userId) {
+	var world = await getOrCreateWorld(worldName);
+	if(!world) return;
+	// add member
+	world.members.map[userId] = true;
+	if(world.members.updates[userId]) {
+		var type = world.members.updates[userId];
+		if(type == "REMOVE") {
+			delete world.members.updates[userId];
+		}
+	} else {
+		world.members.updates[userId] = "ADD";
+	}
+}
+
+async function claimWorldByName(worldName, user) {
+	var validation = await validateWorldClaim(worldName, user);
+	if(validation.error) { // an error occurred while claiming
+		return {
+			success: false,
+			message: validation.message
+		};
+	}
+	var world = validation.world;
+	world.ownerId = user.id;
+	modifyWorldProp(world, "ownerId");
+	return {
+		success: true,
+		world: world,
+		message: validation.message
+	};
+}
+
+var worldRenameMap = {};
+
+// TODO: allow renaming for unclaimed worlds
+async function renameWorld(world, newName) {
+	// validate newName
+	var target = await getWorld(newName);
+
+	// validate first, then check if someone else is currently renaming the world
+	if(!target) {
+		if(worldCache[newName.toUpperCase()]) throw "(TODO) Race condition?"
+		delete worldCache[world.name.toUpperCase()];
+		//worldRenameMap[world.name.toUpperCase()] = newName;
+		world.name = newName;
+		worldCache[newName.toUpperCase()] = world;
+		await db.run("UPDATE world SET name=? WHERE id=?", [newName, world.id]);
+		// rename main world
+	} else if(target.ownerId == null) {
+		// swap names
+	} else {
+		// cannot rename
+	}
 }
 
 async function can_view_world(world, user) {
@@ -2093,14 +2170,17 @@ async function can_view_world(world, user) {
 		return false;
 	}
 
-	var is_member = await user_is_member(world.id, user.id);
+	var userId = user.id;
+	var memberList = world.members.map;
+	
+	var is_member = Boolean(memberList[userId]);
 
 	// member and owner only
 	if(world.readability == 1 && !is_member && !is_owner) {
 		return false;
 	}
 
-	permissions.member = !!is_member || is_owner;
+	permissions.member = is_member || is_owner;
 	permissions.owner = is_owner;
 	
 	return permissions;
@@ -2293,7 +2373,10 @@ async function process_request(req, res) {
 	var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
 	var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
 	var remIp = req.socket.remoteAddress;
-	var ipAddress = evaluateIpAddress(remIp, realIp, cfIp)[0];
+	var evalIp = evaluateIpAddress(remIp, realIp, cfIp);
+	var ipAddress = evalIp[0];
+	var ipAddressFam = evalIp[1];
+	var ipAddressVal = evalIp[2];
 
 	var dispatch = createDispatcher(res, {
 		encoding: acceptEncoding,
@@ -2432,8 +2515,7 @@ function announce(text) {
 	})();
 }
 
-//validateWorldClaim
-async function validate_claim_worldname(worldname, user) {
+async function validateWorldClaim(worldname, user) {
 	var worldnamePath = sanitizeWorldname(worldname);
 	if(worldname.length > 10000) {
 		return {
@@ -2515,126 +2597,6 @@ async function validate_claim_worldname(worldname, user) {
 	};
 }
 
-// TODO: Nuke this function
-async function validate_claim_worldname2(worldname, vars, evars, rename_casing, world_id) {
-	var user = evars.user;
-
-	var db = vars.db;
-	var world_get_or_create = vars.world_get_or_create;
-
-	// ignore first /
-	if(worldname[0] == "/") worldname = worldname.substr(1);
-	if(worldname == "" && !user.superuser) {
-		return {
-			error: true,
-			message: "Worldname cannot be blank"
-		};
-	}
-	if(worldname.length > 10000) {
-		return {
-			error: true,
-			message: "An error occurred while claiming this world"
-		};
-	}
-	worldname = worldname.split("/");
-	for(var i in worldname) {
-		// make sure there is no blank segment
-		if(worldname[i] == "" && !user.superuser) {
-			return {
-				error: true,
-				message: "Segments cannot be blank (make sure name does not end in /)"
-			};
-		}
-		// make sure segment is valid
-		var claimMainPage = (worldname[i] == "" && worldname.length == 1 && user.superuser); // if superusers claim the front page
-		if(!(worldname[i].match(/^([\w\.\-]*)$/g) && (worldname[i].length > 0 || claimMainPage))) {
-			return {
-				error: true,
-				message: "Invalid world name. Contains invalid characters. Must contain either letters, numbers, or _. It can be separated by /"
-			};
-		}
-	}
-
-	var valid_world_name = worldname.join("/");
-
-	if(worldname.length == 1) { // regular world names
-		worldname = worldname[0];
-		var world = await world_get_or_create(worldname, rename_casing);
-		if(world.owner_id == null || (rename_casing && world.id == world_id)) {
-			if(rename_casing) {
-				if(world.id == world_id || !world) {
-					return {
-						rename: true,
-						new_name: valid_world_name
-					};
-				} else {
-					return {
-						error: true,
-						message: "World already exists, cannot rename to it"
-					};
-				}
-			}
-			return {
-				world_id: world.id,
-				message: "Successfully claimed the world"
-			};
-		} else {
-			return {
-				error: true,
-				message: "World already has an owner"
-			};
-		}
-	} else { // world with /'s
-		// make sure first segment is a world owned by the user
-		var base_worldname = worldname[0];
-		if(base_worldname == "w" || base_worldname == "W") {
-			return {
-				error: true,
-				message: "You do not own the base world in the path"
-			};
-		}
-		var base_world = await world_get_or_create(base_worldname, true);
-		// world does not exist nor is owned by the user
-		if(!base_world || (base_world && base_world.owner_id != user.id)) {
-			return {
-				error: true,
-				message: "You do not own the base world in the path"
-			};
-		}
-		worldname = worldname.join("/");
-		// create world, except if user is trying to rename
-		var claimedSubworld = await world_get_or_create(worldname, rename_casing, !rename_casing);
-		// only renaming the casing
-		if(rename_casing && claimedSubworld) {
-			if(claimedSubworld.id == world_id) {
-				return {
-					rename: true,
-					new_name: valid_world_name
-				};
-			}
-		}
-		// does not exist
-		if(!claimedSubworld) {
-			return {
-				rename: true,
-				new_name: valid_world_name
-			};
-		}
-		// already owned (Unless owner renames it)
-		if(claimedSubworld.owner_id != null && !(rename_casing && claimedSubworld.id == world_id)) {
-			return {
-				error: true,
-				message: "You already own this subdirectory world"
-			};
-		}
-		// subworld is created, now claim it
-		return {
-			world_id: claimedSubworld.id,
-			message: "Successfully claimed the subdirectory world"
-		};
-	}
-}
-
 async function init_image_database() {
 	if(!await db_img.get("SELECT name FROM sqlite_master WHERE type='table' AND name='images'")) {
 		await db_img.run("CREATE TABLE 'images' (id INTEGER NOT NULL PRIMARY KEY, name TEXT, date_created INTEGER, mime TEXT, data BLOB)");
@@ -2642,21 +2604,19 @@ async function init_image_database() {
 }
 
 var worldData = {};
-function getWorldData(world) {
-	var ref = world.toLowerCase();
+function getWorldData(worldId) {
+	if(worldData[worldId]) return worldData[worldId];
 
-	if(worldData[ref]) return worldData[ref];
-
-	worldData[ref] = {
+	worldData[worldId] = {
 		id_overflow_int: 10000,
 		display_user_count: 0,
 		user_count: 0
 	};
 
-	return worldData[ref];
+	return worldData[worldId];
 }
-function generateClientId(world, world_id) {
-	var worldObj = getWorldData(world);
+function generateClientId(world_id) {
+	var worldObj = getWorldData(world_id);
 
 	var rand_ids = client_ips[world_id];
 	if(!rand_ids) rand_ids = {};
@@ -2677,12 +2637,11 @@ function generateClientId(world, world_id) {
 	return worldObj.id_overflow_int++;
 }
 
-function getUserCountFromWorld(world) {
+function getUserCountFromWorld(worldId) {
 	var counter = 0;
 	wss.clients.forEach(function(ws) {
 		if(!ws.sdata.userClient) return;
-		var user_world = ws.sdata.world_name;
-		if(NCaseCompare(user_world, world)) {
+		if(ws.sdata.world.id == worldId) { // TODO: check if 'world' is valid
 			counter++;
 		}
 	});
@@ -2691,10 +2650,10 @@ function getUserCountFromWorld(world) {
 
 function topActiveWorlds(number) {
 	var clientNumbers = [];
-	for(var i in worldData) {
-		var cnt = getUserCountFromWorld(i);
+	for(var id in worldData) {
+		var cnt = getUserCountFromWorld(id);
 		if(cnt == 0) continue;
-		clientNumbers.push([cnt, i]);
+		clientNumbers.push([cnt, id]);
 	}
 	clientNumbers.sort(function(int1, int2) {
 		return int2[0] - int1[0];
@@ -2702,10 +2661,11 @@ function topActiveWorlds(number) {
 	return clientNumbers.slice(0, number);
 }
 
+// TODO: fix when renaming
 function broadcastUserCount() {
 	if(!global_data.ws_broadcast) return;
-	for(var user_world in worldData) {
-		var worldObj = getWorldData(user_world);
+	for(var id in worldData) {
+		var worldObj = worldData[id];
 		var current_count = worldObj.display_user_count;
 		var new_count = worldObj.user_count;
 		if(current_count != new_count) {
@@ -2714,7 +2674,7 @@ function broadcastUserCount() {
 				source: "signal",
 				kind: "user_count",
 				count: new_count
-			}, user_world, {
+			}, parseInt(id), {
 				isChat: true,
 				clientId: 0,
 				chat_perm: "inherit"
@@ -2873,14 +2833,15 @@ async function initialize_server_components() {
 	wss = new WebSocket.Server({ server });
 	global_data.wss = wss;
 
-	var ws_broadcast = function(data, world, opts) {
+	var ws_broadcast = function(data, world_id, opts) {
 		if(!opts) opts = {};
 		data = JSON.stringify(data);
 		wss.clients.forEach(function each(client) {
 			if(!client.sdata.userClient) return;
 			if(client.readyState != WebSocket.OPEN) return;
 			try {
-				if(world == void 0 || NCaseCompare(client.sdata.world_name, world)) {
+				// world_id is optional, and leaving it out will broadcast to everyone
+				if(world_id == void 0 || client.sdata.world.id == world_id) {
 					if(opts.isChat) {
 						// inherit: check cached value; this is a miscellaneous signal that depends on the chat permission (e.g. user count)
 						if(opts.chat_perm == "inherit") opts.chat_perm = client.sdata.chat_permission;
@@ -2959,15 +2920,18 @@ function broadcastMonitorEvent(data) {
 function evaluateIpAddress(remIp, realIp, cfIp) {
 	var ipAddress = remIp;
 	var ipAddressFam = 4;
+	var ipAddressVal = 1;
 	if(!ipAddress) { // ipv4
 		ipAddress = "0.0.0.0";
 	} else {
 		if(ipAddress.indexOf(".") > -1) { // ipv4
 			ipAddress = ipAddress.split(":").slice(-1);
 			ipAddress = ipAddress[0];
+			ipAddressVal = ipv4_to_int(ipAddress);
 		} else { // ipv6
 			ipAddressFam = 6;
 			ipAddress = normalize_ipv6(ipAddress);
+			ipAddressVal = ipv6_to_int(ipAddress);
 		}
 	}
 
@@ -2980,7 +2944,8 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 			ipAddress = normalize_ipv6(ipAddress);
 		}
 		if(ipAddressFam == 4) {
-			if(is_cf_ipv4_int(ipv4_to_int(ipAddress))) {
+			ipAddressVal = ipv4_to_int(ipAddress);
+			if(is_cf_ipv4_int(ipAddressVal)) {
 				ipAddress = cfIp;
 				if(!ipAddress) {
 					ipAddress = "0.0.0.0";
@@ -2993,7 +2958,8 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 				}
 			}
 		} else if(ipAddressFam == 6) {
-			if(is_cf_ipv6_int(ipv6_to_int(ipAddress))) {
+			ipAddressVal = ipv6_to_int(ipAddress);
+			if(is_cf_ipv6_int(ipAddressVal)) {
 				ipAddress = cfIp;
 				if(!ipAddress) {
 					ipAddress = "0.0.0.0";
@@ -3007,7 +2973,7 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 			}
 		}
 	}
-	return [ipAddress, ipAddressFam];
+	return [ipAddress, ipAddressFam, ipAddressVal];
 }
 
 // {ip: count}
@@ -3119,6 +3085,7 @@ async function manageWebsocketConnection(ws, req) {
 	var evalIp = evaluateIpAddress(remIp, realIp, cfIp);
 	ws.sdata.ipAddress = evalIp[0];
 	ws.sdata.ipAddressFam = evalIp[1];
+	ws.sdata.ipAddressVal = evalIp[2];
 
 	// must be at the top before any async calls (errors would occur before this event declaration)
 	ws.on("error", function(err) {
@@ -3196,7 +3163,11 @@ async function manageWebsocketConnection(ws, req) {
 		pre_queue.push(msg);
 	}
 	ws.on("message", pre_message);
-	var status, clientId = void 0, worldObj, world_name;
+
+	var world = null;
+	var clientId = void 0;
+	var worldObj = null;
+
 	ws.on("close", function() {
 		remove_ip_address_connection(ws.sdata.ipAddress);
 		ws.sdata.terminated = true;
@@ -3209,12 +3180,13 @@ async function manageWebsocketConnection(ws, req) {
 		if(worldObj && !ws.sdata.hide_user_count) {
 			worldObj.user_count--;
 		}
-		if(ws.sdata.hasBroadcastedCursorPosition && !ws.sdata.cursorPositionHidden && world_name != void 0 && ws.sdata.channel) {
+		if(world && ws.sdata.hasBroadcastedCursorPosition && !ws.sdata.cursorPositionHidden && ws.sdata.channel) {
+			// TODO: fix (regarding world_name)
 			global_data.ws_broadcast({
 				kind: "cursor",
 				hidden: true,
 				channel: ws.sdata.channel
-			}, world_name);
+			}, world.id);
 			if(ws.sdata.world) {
 				var channel = ws.sdata.channel;
 				var world = ws.sdata.world;
@@ -3229,13 +3201,16 @@ async function manageWebsocketConnection(ws, req) {
 		}
 	});
 	if(ws.sdata.terminated) return; // in the event of an immediate close
+
+	var world_name = "";
 	if(location.match(/(\/ws\/$)/)) {
 		world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
 	} else {
 		return error_ws("INVALID_ADDR", "Invalid address");
 	}
 	
-	ws.sdata.world_name = world_name;
+	// TODO: remove
+	//ws.sdata.world_name = world_name;
 
 	var cookies = parseCookie(req.headers.cookie);
 	var user = await get_user_info(cookies, true);
@@ -3264,7 +3239,7 @@ async function manageWebsocketConnection(ws, req) {
 		timemachine.active = true;
 	}
 
-	var world = await getOrCreateWorld(world_name);
+	world = await getOrCreateWorld(world_name);
 	if(ws.sdata.terminated) return;
 	if(!world) {
 		return error_ws("NO_EXIST", "World does not exist");
@@ -3287,31 +3262,30 @@ async function manageWebsocketConnection(ws, req) {
 		if(timemachine.time > 1000000) timemachine.time = 1000000;
 	}
 
-	// TODO: refactor this. nuke this.
+	// TODO: remove this
 	status = { permission, world, timemachine };
 
-	ws.sdata.world_id = status.world.id;
+	//ws.sdata.world_id = world.id;
 	ws.sdata.userClient = true; // client connection is now initialized
 	
-	evars.world = status.world;
-	evars.timemachine = status.timemachine;
+	evars.world = world;
+	evars.timemachine = timemachine;
 
-	ws.sdata.world = status.world;
+	ws.sdata.world = world;
 	ws.sdata.user = user;
 
-	//var properties = JSON.parse(status.world.properties);
 	var chat_permission = world.feature.chat;
 	if(!chat_permission) chat_permission = 0;
-	ws.sdata.chat_permission = chat_permission;
+	ws.sdata.chat_permission = chat_permission; // TODO: remove
 
 	var show_cursor = world.feature.showCursor;
 	if(show_cursor == void 0) show_cursor = -1;
-	ws.sdata.show_cursor = show_cursor;
+	ws.sdata.show_cursor = show_cursor; // TODO: ensure updatable, or remove completely
 
-	var can_chat = chat_permission == 0 || (chat_permission == 1 && status.permission.member) || (chat_permission == 2 && status.permission.owner);
-	ws.sdata.can_chat = can_chat;
+	var can_chat = chat_permission == 0 || (chat_permission == 1 && permission.member) || (chat_permission == 2 && permission.owner);
+	ws.sdata.can_chat = can_chat; // TODO: ensure it's updated from config changes
 
-	worldObj = getWorldData(world_name);
+	worldObj = getWorldData(world.id);
 	if(!ws.sdata.terminated && !ws.sdata.hide_user_count) {
 		worldObj.user_count++;
 	}
@@ -3321,23 +3295,21 @@ async function manageWebsocketConnection(ws, req) {
 		initial_user_count = worldObj.user_count;
 	}
 
-	user.stats = status.permission;
+	ws.sdata.is_member = permission.member;
+	ws.sdata.is_owner = permission.owner;
 
-	ws.sdata.is_member = user.stats.member;
-	ws.sdata.is_owner = user.stats.owner;
+	clientId = generateClientId(world.id);
 
-	clientId = generateClientId(world_name, status.world.id);
-
-	if(!client_ips[status.world.id]) {
-		client_ips[status.world.id] = {};
+	if(!client_ips[world.id]) {
+		client_ips[world.id] = {};
 	}
-	client_ips[status.world.id][clientId] = [ws.sdata.ipAddress, -1, false];
+	client_ips[world.id][clientId] = [ws.sdata.ipAddress, -1, false];
 
 	ws.sdata.clientId = clientId;
 	ws.sdata.chat_blocks = [];
 
 	if(monitorEventSockets.length) {
-		broadcastMonitorEvent(ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + evars.world.name + "', " + evars.world.id + "]");
+		broadcastMonitorEvent(ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + world.name + "', " + world.id + "]");
 	}
 
 	var sentClientId = clientId;
@@ -3349,8 +3321,8 @@ async function manageWebsocketConnection(ws, req) {
 		initial_user_count
 	}));
 
-	if(client_cursor_pos[status.world.id]) {
-		var world_cursors = client_cursor_pos[status.world.id];
+	if(client_cursor_pos[world.id]) {
+		var world_cursors = client_cursor_pos[world.id];
 		for(var csr_channel in world_cursors) {
 			var csr = world_cursors[csr_channel];
 			if(csr.hidden) continue;
@@ -3426,7 +3398,7 @@ async function manageWebsocketConnection(ws, req) {
 				if(data.kind && data.kind != kind) {
 					data.source = kind;
 				}
-				global_data.ws_broadcast(data, world_name, opts);
+				global_data.ws_broadcast(data, world.id, opts);
 			}
 			var res;
 			var resError = false;
@@ -3505,12 +3477,10 @@ var global_data = {
 	plural,
 	announce: MODIFY_ANNOUNCEMENT,
 	uptime,
-	validate_claim_worldname,
 	encodeCharProt,
 	decodeCharProt,
 	advancedSplit,
 	change_char_in_array,
-	getWorldData,
 	html_tag_esc,
 	wss, // this is undefined by default, but will get a value once wss is initialized
 	topActiveWorlds,
@@ -3525,7 +3495,6 @@ var global_data = {
 	WebSocket,
 	fixColors,
 	sanitize_color,
-	worldViews: {},
 	ranks_cache,
 	static_data,
 	staticRaw_append,
@@ -3548,7 +3517,14 @@ var global_data = {
 	getRestrictions,
 	modifyWorldProp,
 	sanitizeWorldname,
-	fetchWorldMembershipsByUserId
+	fetchWorldMembershipsByUserId,
+	claimWorldByName,
+	revokeMembershipByWorldName,
+	fetchOwnedWorldsByUserId,
+	promoteMembershipByWorldName,
+	renameWorld,
+	ipv4_to_range,
+	ipv6_to_range
 };
 
 async function sysLoad() {

@@ -53,7 +53,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	world_name = world.name;
 
-	var members = Object.keys(world.members.map); //await db.all("SELECT * FROM whitelist WHERE world_id=?", world.id)
+	var members = Object.keys(world.members.map);
 	var member_list = []; // processed list of members
 	for(var i = 0; i < members.length; i++) {
 		var username;
@@ -73,9 +73,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			member_name: username
 		});
 	}
-
-	// TODO
-	//var properties = JSON.parse(world.properties);
 
 	// if empty, make sure server knows it's empty
 	// ([] is considered to not be empty through boolean conversion)
@@ -186,7 +183,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var url = vars.url;
 	var world_get_or_create = vars.world_get_or_create;
 	var ws_broadcast = vars.ws_broadcast;
-	var validate_claim_worldname = vars.validate_claim_worldname;
 	var advancedSplit = vars.advancedSplit;
 	var decodeCharProt = vars.decodeCharProt;
 	var encodeCharProt = vars.encodeCharProt;
@@ -198,6 +194,9 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var san_nbr = vars.san_nbr;
 	var san_dp = vars.san_dp;
 	var modifyWorldProp = vars.modifyWorldProp;
+	var promoteMembershipByWorldName = vars.promoteMembershipByWorldName;
+	var revokeMembershipByWorldName = vars.revokeMembershipByWorldName;
+	var renameWorld = vars.renameWorld;
 
 	var clearChatlog = chat_mgr.clearChatlog;
 
@@ -218,7 +217,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		return serve("Access denied", 403);
 	}
 
-	//var properties = JSON.parse(world.properties);
 	var new_world_name = null;
 
 	if(post_data.form == "add_member") {
@@ -249,8 +247,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				message: "User is already the owner of \"" + world_name + "\""
 			}, req, serve, vars, evars);
 		}
-		/*var whitelist = await db.get("SELECT * FROM whitelist WHERE user_id=? AND world_id=?",
-			[user_id, world.id]);*/
 
 		var isWhitelisted = world.members.map[user_id];
 		if(isWhitelisted) {
@@ -259,16 +255,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			}, req, serve, vars, evars);
 		}
 
-		world.members.map[user_id] = true;
-		if(world.members.updates[user_id]) {
-			var type = world.members.updates[user_id];
-			if(type == "REMOVE") {
-				delete world.members.updates[user_id];
-			}
-		} else {
-			world.members.updates[user_id] = "ADD";
-		}
-		//await db.run("INSERT into whitelist VALUES(null, ?, ?, ?)", [user_id, world.id, date]);
+		await promoteMembershipByWorldName(world.name, user_id);
 
 		return await dispage("accounts/configure", {
 			message: adduser.username + " is now a member of the \"" + world_name + "\" world"
@@ -333,22 +320,11 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			var id_to_remove = await db.get("SELECT id FROM auth_user WHERE username=? COLLATE NOCASE", username_to_remove);
 			if(id_to_remove) {
 				id_to_remove = id_to_remove.id;
-
-				if(world.members.map[id_to_remove]) {
-					delete world.members.map[id_to_remove];
-				}
-				if(world.members.updates[id_to_remove]) {
-					var type = world.members.updates[id_to_remove];
-					if(type == "ADD") {
-						delete world.members.updates[id_to_remove];
-					}
-				} else {
-					world.members.updates[id_to_remove] = "REMOVE";
-				}
-				//console.log(world)
-				//await db.run("DELETE FROM whitelist WHERE user_id=? AND world_id=?", [id_to_remove, world.id]);
+				await revokeMembershipByWorldName(world.name, id_to_remove);
 			}
 		}
+		// TODO
+		// TODO: is_member and is_owner stuff, especially stats.member
 		/*if(id_to_remove) {
 			wss.clients.forEach(function(e) {
 				if(!e.sdata.userClient) return;
@@ -488,7 +464,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				member_text: member_text_color || "#000",
 				owner_text: owner_text_color || "#000"
 			}
-		}, world.name);
+		}, world.id);
 	} else if(post_data.form == "misc") {
 		if(user.superuser) {
 			if(!post_data.world_background) {
@@ -598,10 +574,14 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		modifyWorldProp(world, "opts/halfChars");
 
 
-/*
+		// TODO
 		var new_name = post_data.new_world_name;
 		if(typeof new_name == "string" && new_name && new_name != world.name) { // changing world name
-			var validate = await validate_claim_worldname(new_name, vars, evars, true, world.id);
+			console.log("NAMECHANGE", world.name, new_name)
+			await renameWorld(world, new_name);
+			new_world_name = new_name;
+
+			/*var validate = await validate_claim_worldname(new_name, vars, evars, true, world.id);
 			if(validate.error) { // error with renaming
 				return await dispage("accounts/configure", {
 					misc_message: validate.message
@@ -610,8 +590,8 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			if(validate.rename) {
 				await db.run("UPDATE world SET name=? WHERE id=?", [validate.new_name, world.id]);
 				new_world_name = validate.new_name;
-			}
-		}*/
+			}*/
+		}
 
 
 		/*var newProps = JSON.stringify(properties);
@@ -629,18 +609,15 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		if("unclaim" in post_data) {
 			world.ownerId = null;
 			modifyWorldProp(world, "ownerId");
-			/*await db.run("UPDATE world SET owner_id=null WHERE id=?", world.id);
-			if(id_to_remove) {
-				wss.clients.forEach(function(e) {
-					if(!e.sdata.userClient) return;
-					if(e.sdata.user.id == user.id) {
-						e.sdata.is_owner = false;
-						e.sdata.is_member = false;
-						e.sdata.user.stats.owner = false;
-						e.sdata.user.stats.member = false;
-					}
-				});
-			}*/
+			wss.clients.forEach(function(e) {
+				if(!e.sdata.userClient) return;
+				/*if(e.sdata.user.id == user.id) {
+					e.sdata.is_owner = false;
+					e.sdata.is_member = false;
+					e.sdata.user.stats.owner = false;
+					e.sdata.user.stats.member = false;
+				}*/
+			});
 			return serve(null, null, {
 				redirect: "/accounts/profile/"
 			});

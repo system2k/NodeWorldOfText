@@ -34,7 +34,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	}
 
 	// not a superuser nor owner
-	var is_owner = world.owner_id == user.id
+	var is_owner = world.ownerId == user.id
 	if(!(user.superuser || is_owner)) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}

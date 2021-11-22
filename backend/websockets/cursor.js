@@ -13,8 +13,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	ws.sdata.hasBroadcastedCursorPosition = true;
 
-	var is_member = user.stats.member;
-	var is_owner = user.stats.owner;
+	var is_member = !!world.members.map[user.id]; //user.stats.member;
+	var is_owner = world.owner_id == user.id; //user.stats.owner;
 
 	var show_cursor = ws.sdata.show_cursor;
 	if(show_cursor == void 0) show_cursor = -1;
@@ -50,7 +50,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 		ws.sdata.cursorPositionHidden = false;
 		wss.clients.forEach(function(client) {
 			if(!client.sdata.userClient) return;
-			if(client.sdata.world_id == worldId && client.readyState == WebSocket.OPEN) {
+			if(client.sdata.world.id == worldId && client.readyState == WebSocket.OPEN) {
 				var cli_channel = client.sdata.channel;
 				var cli_tileX = 0;
 				var cli_tileY = 0;

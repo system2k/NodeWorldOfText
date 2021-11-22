@@ -52,7 +52,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 	wss.clients.forEach(function(client) {
 		if(!client.sdata.userClient) return;
 		try {
-			if(client.readyState == 1 && NCaseCompare(client.sdata.world_name, world.name)) {
+			if(client.readyState == 1 && client.sdata.world.id == world.id) {
 				if(!client.sdata.handleCmdSockets) return;
 				client.send(data);
 			}

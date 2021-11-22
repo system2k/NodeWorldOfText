@@ -19,8 +19,8 @@ module.exports.POST = async function(req, serve, vars, evars, params) {
 	var action = "protect";
 	if(params.unprotect) action = "unprotect";
 
-	evars.world = world;
-	evars.user.stats = can_read;
+	evars.world = world; // TODO
+	//evars.user.stats = can_read;
 
 	var do_protect = await modules.protect_areas({
 		action,

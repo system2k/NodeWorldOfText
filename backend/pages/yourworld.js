@@ -1,42 +1,9 @@
-var intv;
-var handle_error;
-var db;
-var worldViews;
 module.exports.startup_internal = function(vars) {
-	intv = vars.intv;
-	handle_error = vars.handle_error;
-	db = vars.db;
-	worldViews = vars.worldViews;
-
-	// TODO
-	//worldViewCommit();
+	return;
 }
 
 module.exports.server_exit = async function() {
-	//await worldViewCommit(true);
-}
-
-// TODO: get rid
-async function worldViewCommit(no_interval) {
-	try {
-		for(var i in worldViews) {
-			var world_id = parseInt(i);
-	
-			var world = await db.get("SELECT properties FROM world WHERE id=?", world_id);
-			
-			var props = JSON.parse(world.properties);
-
-			if(!props.views) props.views = 0;
-			props.views += worldViews[i];
-
-			await db.run("UPDATE world SET properties=? WHERE id=?", [JSON.stringify(props), world_id]);
-
-			delete worldViews[i];
-		}
-	} catch(e) {
-		handle_error(e);
-	}
-	if(!no_interval) intv.worldViewCommitTimeout = setTimeout(worldViewCommit, 1000 * 5);
+	return;
 }
 
 module.exports.GET = async function(req, serve, vars, evars, params) {
@@ -104,8 +71,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		});
 	} else { // the HTML page
 		if(!query_data.hide) {
-			/*if(!worldViews[world.id]) worldViews[world.id] = 0;
-			worldViews[world.id]++;*/
 			world.views++;
 			modifyWorldProp(world, "views");
 		}
@@ -240,7 +205,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	}
 
 	evars.world = world;
-	evars.user.stats = read_permission;
+	//evars.user.stats = read_permission; // TODO
 
 	var edits_parsed;
 	try {

@@ -5,7 +5,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var db = vars.db;
 	var plural = vars.plural;
-	var worldViews = vars.worldViews;
+	//var worldViews = vars.worldViews;
 
 	if(!user.authenticated) {
 		return serve(null, null, {
