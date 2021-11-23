@@ -6,7 +6,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	if(!user.authenticated) {
 		return serve(null, null, {
 			redirect: "/accounts/login/?next=/accounts/password_change/"
-		})
+		});
 	}
 
 	var data = {
@@ -60,5 +60,5 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	serve(null, null, {
 		redirect: "/accounts/password_change/done/"
-	})
+	});
 }

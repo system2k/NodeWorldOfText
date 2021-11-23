@@ -13,7 +13,7 @@ module.exports.POST = async function(req, serve, vars, evars, params) {
 
 	var can_read = await can_view_world(world, user);
 	if(!can_read) {
-		return serve(null, 403)
+		return serve(null, 403);
 	}
 
 	var action = "protect";

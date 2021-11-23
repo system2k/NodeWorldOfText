@@ -1059,7 +1059,7 @@ function keydown_tileProtectAuto(e) {
 		}
 	}
 }
-document.body.addEventListener("keydown", keydown_tileProtectAuto)
+document.body.addEventListener("keydown", keydown_tileProtectAuto);
 
 // Fast linking
 function mousemove_linkAuto() {
@@ -1374,7 +1374,7 @@ function event_keydown_copy_color(e) {
 	var tileY = pos[1];
 	var charX = pos[2];
 	var charY = pos[3];
-	var color = getCharColor(tileX, tileY, charX, charY)
+	var color = getCharColor(tileX, tileY, charX, charY);
 	w.changeColor(color);
 }
 document.addEventListener("keydown", event_keydown_copy_color);
@@ -1666,7 +1666,7 @@ function stopTileUI() {
 
 function doLink() {
 	if(!lastLinkHover) return;
-	stopLinkUI()
+	stopLinkUI();
 	var tileX = lastLinkHover[0];
 	var tileY = lastLinkHover[1];
 	var charX = lastLinkHover[2];
@@ -5228,7 +5228,7 @@ Object.assign(w, {
 	},
 	changeSocket: function(addr) {
 		ws_path = addr;
-		socket.close()
+		socket.close();
 		createSocket();
 		clearTiles(true);
 		clearInterval(fetchInterval);

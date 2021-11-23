@@ -14,6 +14,21 @@ function trimHTML(html) {
 	return newHtml.join("\r\n");
 }
 
+function checkDuplicateCookie(cookieStr, key) {
+	if(typeof cookieStr != "string") return false;
+	cookieStr = cookieStr.split(";");
+	key = key.toLowerCase();
+	var cnt = 0;
+	for(var i = 0; i < cookieStr.length; i++) {
+		var cook = cookieStr[i].split("=");
+		var keyData = cook[0].trim().toLowerCase();
+		if(keyData != key) continue;
+		cnt++;
+		if(cnt > 1) return true;
+	}
+	return false;
+}
+
 var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 function create_date(time) {
 	var str = "(UTC) ";
@@ -444,7 +459,7 @@ function process_error_arg(e) {
 }
 
 function tile_coord(coord) {
-	coord = coord.split(",")
+	coord = coord.split(",");
 	return [parseInt(coord[0]), parseInt(coord[1])];
 }
 
@@ -508,14 +523,14 @@ function uptime(custom_ms_ago) {
 // recursive directory dumper
 function dump_dir(addr, MP, dsu, po, opt, lc) { // object, file path, web path, path only, options, lower case
 	if(!opt) opt = {};
-	var con = fs.readdirSync(MP)
+	var con = fs.readdirSync(MP);
 	for(var i in con) {
 		var currentPath = MP + con[i];
 		if(!fs.lstatSync(currentPath).isDirectory()) {
 			var pname = dsu + con[i];
 			if(lc) pname = pname.toLowerCase();
 			if(!po) {
-				addr[pname] = fs.readFileSync(currentPath)
+				addr[pname] = fs.readFileSync(currentPath);
 			} else {
 				addr[pname] = currentPath;
 			}
@@ -524,7 +539,7 @@ function dump_dir(addr, MP, dsu, po, opt, lc) { // object, file path, web path, 
 			if(con[i] == opt.omit_folder) {
 				return;
 			}
-			dump_dir(addr, MP + con[i] + "/", dsu + con[i] + "/", po)
+			dump_dir(addr, MP + con[i] + "/", dsu + con[i] + "/", po);
 		}
 	}
 }
@@ -633,10 +648,10 @@ function TerminalMessage(cWidth, cHeight) {
 		}
 
 		// 4 corners
-		this.setChar(chrInf.tlPipe, x1, y1, fore, back)
-		this.setChar(chrInf.brPipe, x2, y2, fore, back)
-		this.setChar(chrInf.trPipe, x2, y1, fore, back)
-		this.setChar(chrInf.blPipe, x1, y2, fore, back)
+		this.setChar(chrInf.tlPipe, x1, y1, fore, back);
+		this.setChar(chrInf.brPipe, x2, y2, fore, back);
+		this.setChar(chrInf.trPipe, x2, y1, fore, back);
+		this.setChar(chrInf.blPipe, x1, y2, fore, back);
 
 		// 2 horizontal lines
 		for(var x = 0; x < x2 - x1 - 1; x++) {
@@ -1047,5 +1062,6 @@ module.exports = {
 	normalizeCacheTile,
 	parseTextcode,
 	checkURLParam,
-	trimSlash
+	trimSlash,
+	checkDuplicateCookie
 };

@@ -105,7 +105,7 @@ function keyup_admclr(e) {
 	w.setTileRender(currentPosition[0], currentPosition[1]);
 	admclr.lastPos = null;
 }
-document.body.addEventListener("keyup", keyup_admclr)
+document.body.addEventListener("keyup", keyup_admclr);
 
 function enableServerPasting() {
 	clearInterval(char_input_check);

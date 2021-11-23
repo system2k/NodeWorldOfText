@@ -1,4 +1,28 @@
+const { r } = require("../../../lib/swig/dateformatter");
+
 var restrictions_string = "";
+
+function procRegionString(region) {
+	if(!region) return null;
+	region = region.split(",");
+	if(region.length != 4) return null;
+	var x1 = parseInt(region[0]);
+	var y1 = parseInt(region[1]);
+	var x2 = parseInt(region[2]);
+	var y2 = parseInt(region[3]);
+	if(isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) return null;
+	if(x2 < x1) {
+		var tmp = x1;
+		x1 = x2;
+		x2 = tmp;
+	}
+	if(y2 < y1) {
+		var tmp = y1;
+		y1 = y2;
+		y2 = tmp;
+	}
+	return [x1, y1, x2, y2];
+}
 
 module.exports.GET = async function(req, serve, vars, evars) {
 	var HTML = evars.HTML;
@@ -60,14 +84,16 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		if(itemtype == "charrate") {
 			var rate = props.rate;
 			var world = props.world;
+			var region = props.region;
 			if(!("world" in props)) {
 				world = null;
 			}
+			region = procRegionString(region);
 			rate = parseInt(rate);
 			if(isNaN(rate)) continue;
 			if(rate < 0) rate = 0;
 			if(rate > 1000000) rate = 1000000;
-			restrictions.push([ipRange, ipFam, "charrate", rate, world]);
+			restrictions.push([ipRange, ipFam, "charrate", rate, world, region]);
 		}
 		if(itemtype == "color") {
 			var region = props.region;
@@ -75,34 +101,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			if(!("world" in props)) {
 				world = null;
 			}
-			if(region) {
-				region = region.split(",");
-				if(region.length == 4) {
-					var x1 = parseInt(region[0]);
-					var y1 = parseInt(region[1]);
-					var x2 = parseInt(region[2]);
-					var y2 = parseInt(region[3]);
-					if(!(isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2))) {
-						if(x2 < x1) {
-							var tmp = x1;
-							x1 = x2;
-							x2 = tmp;
-						}
-						if(y2 < y1) {
-							var tmp = y1;
-							y1 = y2;
-							y2 = tmp;
-						}
-						region = [x1, y1, x2, y2];
-					} else {
-						region = null;
-					}
-				} else {
-					region = null;
-				}
-			} else {
-				region = null;
-			}
+			region = procRegionString(region);
 			restrictions.push([ipRange, ipFam, "color", region, world]);
 		}
 	}
@@ -152,19 +151,23 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		if(type == "charrate") {
 			var rate = restr[3];
 			var world = restr[4];
+			var region = restr[5];
 			var rstrLine = ["ip=" + ip, "type=charrate", "rate=" + rate];
 			if(world != null) {
 				rstrLine.push("world=" + world);
+			}
+			if(region != null) {
+				rstrLine.push("region=" + region.join(","));
 			}
 			rstr += rstrLine.join(";") + "\n";
 		} else if(type == "color") {
 			var region = restr[3];
 			var world = restr[4];
 			var rstrLine = ["ip=" + ip, "type=color"];
-			if(world) {
+			if(world != null) {
 				rstrLine.push("world=" + world);
 			}
-			if(region) {
+			if(region != null) {
 				rstrLine.push("region=" + region.join(","));
 			}
 			rstr += rstrLine.join(";") + "\n";

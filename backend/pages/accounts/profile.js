@@ -41,7 +41,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	}
 
 	world_list.sort(function(v1, v2) {
-		return v1.name.localeCompare(v2.name, "en", { sensitivity: "base" })
+		return v1.name.localeCompare(v2.name, "en", { sensitivity: "base" });
 	});
 
 	var memberships = await fetchWorldMembershipsByUserId(user.id);
@@ -81,7 +81,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var data = {
 		message: message,
-		csrftoken: cookies.csrftoken,
+		csrftoken: cookies.csrftoken, // TODO: fix entire CSRFTOKEN system
 		worlds_owned: world_list,
 		memberships: html_memberships,
 		email_verified: user.is_active

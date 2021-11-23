@@ -34,13 +34,13 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		world_name = int[0];
 	}
 
-	var world = await world_get_or_create(world_name)
+	var world = await world_get_or_create(world_name);
 	if(!world) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
 
 	if(world.ownerId != user.id && !user.superuser) {
-		return serve("Access denied", 403)
+		return serve("Access denied", 403);
 	}
 
 	return await dispage("yourworld", {

@@ -1,19 +1,3 @@
-// TODO: move to utils & refactor
-function checkDuplicateCookie(cookieStr, key) {
-	if(typeof cookieStr != "string") return false;
-	cookieStr = cookieStr.split(";");
-	key = key.toLowerCase();
-	var cnt = 0;
-	for(var i = 0; i < cookieStr.length; i++) {
-		var cook = cookieStr[i].split("=");
-		var keyData = cook[0].trim().toLowerCase();
-		if(keyData != key) continue;
-		cnt++;
-		if(cnt > 1) return true;
-	}
-	return false;
-}
-
 module.exports.GET = async function(req, serve, vars, evars) {
 	var query_data = evars.query_data;
 
@@ -21,6 +5,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var http_time = vars.http_time;
 	var accountSystem = vars.accountSystem;
 	var ms = vars.ms;
+	var checkDuplicateCookie = vars.checkDuplicateCookie;
 
 	if(accountSystem == "local") return -1;
 

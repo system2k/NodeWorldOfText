@@ -1,19 +1,3 @@
-// TODO: move to utils
-function checkDuplicateCookie(cookieStr, key) {
-	if(typeof cookieStr != "string") return false;
-	cookieStr = cookieStr.split(";");
-	key = key.toLowerCase();
-	var cnt = 0;
-	for(var i = 0; i < cookieStr.length; i++) {
-		var cook = cookieStr[i].split("=");
-		var keyData = cook[0].trim().toLowerCase();
-		if(keyData != key) continue;
-		cnt++;
-		if(cnt > 1) return true;
-	}
-	return false;
-}
-
 module.exports.GET = async function(req, serve, vars, evars) {
 	var cookies = evars.cookies;
 	var query_data = evars.query_data;
@@ -22,6 +6,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var http_time = vars.http_time;
 	var accountSystem = vars.accountSystem;
 	var uvias = vars.uvias;
+	var checkDuplicateCookie = vars.checkDuplicateCookie;
 	
 	var logoutReturn = query_data.return;
 	if(accountSystem == "uvias") {
@@ -61,7 +46,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	}
 
 	if(cookies.sessionid) {
-		await db.run("DELETE FROM auth_session WHERE session_key=?", cookies.sessionid)
+		await db.run("DELETE FROM auth_session WHERE session_key=?", cookies.sessionid);
 	}
 
 	serve(null, null, {

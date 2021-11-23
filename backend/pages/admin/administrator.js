@@ -65,7 +65,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			});
 		}
 	} else if(accountSystem == "local") {
-		user_ranks = await db.all("SELECT * FROM auth_user WHERE level > 0 ORDER BY level DESC")
+		user_ranks = await db.all("SELECT * FROM auth_user WHERE level > 0 ORDER BY level DESC");
 	}
 
 	var data = {

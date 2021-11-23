@@ -52,7 +52,7 @@ function prepareRateLimiter(limObj, ipAddress) {
 	return obj;
 }
 
-function checkCharrateRestr(list, ipVal, ipFam, world) {
+function checkCharrateRestr(list, ipVal, ipFam, world, tileX, tileY) {
 	if(!list) return null;
 	for(var i = 0; i < list.length; i++) {
 		var item = list[i];
@@ -66,8 +66,11 @@ function checkCharrateRestr(list, ipVal, ipFam, world) {
 		if(type == "charrate") {
 			var rRate = item[3];
 			var rRorld = item[4];
+			var rRegion = item[5];
 			if(rRorld == null || rRorld.toUpperCase() == world.toUpperCase()) {
-				return rRate;
+				if(rRegion == null || rRegion[0] <= tileX && tileX <= rRegion[2] && rRegion[1] <= tileY && tileY <= rRegion[3]) {
+					return rRate;
+				}
 			}
 		}
 	}
@@ -142,11 +145,6 @@ module.exports = async function(data, vars, evars) {
 		editLimit = superuserEditReqLimit;
 	}
 
-	var rrate = checkCharrateRestr(restr, ipAddressVal, ipAddressFam, world.name);
-	if(rrate != null) {
-		charRatePerSecond = rrate;
-	}
-
 	var world_id = world.id;
 
 	var no_log_edits = world.opts.noLogEdits;
@@ -177,6 +175,12 @@ module.exports = async function(data, vars, evars) {
 		if(!segment || !Array.isArray(segment)) continue;
 		var tileY = san_nbr(segment[0]);
 		var tileX = san_nbr(segment[1]);
+
+		var rrate = checkCharrateRestr(restr, ipAddressVal, ipAddressFam, world.name, tileX, tileY);
+		if(rrate != null) {
+			charRatePerSecond = rrate;
+		}
+
 		var tileStr = tileY + "," + tileX;
 		var char = segment[5];
 		if(typeof char != "string") continue;

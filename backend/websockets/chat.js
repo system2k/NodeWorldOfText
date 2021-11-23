@@ -250,7 +250,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 					${worldList}
 				</div>
 			`;
-			serverChatResponse("Currently loaded worlds (top " + topCount + "): " + listWrapper, data.location)
+			serverChatResponse("Currently loaded worlds (top " + topCount + "): " + listWrapper, data.location);
 			return;
 		},
 		help: function() {
@@ -290,7 +290,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 			wss.clients.forEach(function(ws) {
 				if(clientFound) return;
 				if(!ws.sdata.userClient) return;
-				if(ws.sdata.clientId == id && ws.sdata.world.id == world.id && ws.sdata.can_chat) { // TODO
+				if(ws.sdata.clientId == id && ws.sdata.world.id == world.id && ws.sdata.can_chat) { // TODO (can_chat)
 					clientFound = true;
 					var privateMessage = {
 						nickname: nick,

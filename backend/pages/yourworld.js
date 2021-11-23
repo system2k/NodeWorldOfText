@@ -84,7 +84,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			if(pathname.charAt(pathname.length - 1) == "/") pathname = pathname.slice(0, -1);
 		}
 		var chat_permission = world.feature.chat;
-		if(!chat_permission) chat_permission = 0;
 		var show_cursor = world.feature.showCursor;
 		if(show_cursor == void 0) show_cursor = -1;
 		var color_text = world.feature.colorText;
@@ -110,7 +109,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 				feature_go_to_coord: world.feature.goToCoord,
 				name: world.name,
 				feature_paste: world.feature.paste,
-				namespace: world.name.split("/")[0], // TODO: remove?
+				namespace: world.name.split("/")[0],
 				readability: world.readability,
 				feature_coord_link: world.feature.coordLink,
 				pathname,

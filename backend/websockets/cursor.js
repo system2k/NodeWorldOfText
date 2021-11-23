@@ -16,7 +16,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var is_member = !!world.members.map[user.id]; //user.stats.member;
 	var is_owner = world.owner_id == user.id; //user.stats.owner;
 
-	var show_cursor = ws.sdata.show_cursor;
+	var show_cursor = world.feature.showCursor;
 	if(show_cursor == void 0) show_cursor = -1;
 
 	if(show_cursor == -1) return;

@@ -25,7 +25,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var page_chat_prev = [];
 
 	if(can_chat) {
-		page_chat_prev = await retrieveChatHistory(world.id)
+		page_chat_prev = await retrieveChatHistory(world.id);
 	}
 	
 	send({

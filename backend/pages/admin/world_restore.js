@@ -84,7 +84,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", r_world);
 
 	if(!world) {
-		return serve("NO_WORLD")
+		return serve("NO_WORLD");
 	}
 
 	await db.run("DELETE FROM tile WHERE world_id=?", world.id);

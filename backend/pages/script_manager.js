@@ -16,8 +16,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		scripts.push({
 			name: data.name,
 			enabled: data.enabled
-		})
-	})
+		});
+	});
 
 	var data = {
 		message: params.message,
@@ -41,7 +41,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var name = post_data.scriptname;
 
 	var exists = await db.get("SELECT * FROM scripts WHERE owner_id=? AND name=?",
-		[user.id, name])
+		[user.id, name]);
 
 	if(exists) {
 		return await dispage("script_manager", {
@@ -50,7 +50,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	}
 
 	await db.run("INSERT INTO scripts VALUES(null, ?, ?, '', ?, 0)",
-		[user.id, name, Date.now()])
+		[user.id, name, Date.now()]);
 
 	await dispage("script_manager", {
 		message: "Script created successfully"

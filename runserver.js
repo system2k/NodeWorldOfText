@@ -66,6 +66,7 @@ var dump_dir             = utils.dump_dir;
 var arrayIsEntirely      = utils.arrayIsEntirely;
 var normalizeCacheTile   = utils.normalizeCacheTile;
 var parseTextcode        = utils.parseTextcode;
+var checkDuplicateCookie = utils.checkDuplicateCookie;
 
 var gzipEnabled = true;
 
@@ -975,7 +976,7 @@ async function send_email(destination, subject, text) {
 				resolve(info);
 			}
 		});
-	})
+	});
 }
 
 async function fetchCloudflareIPs(ip_type) {
@@ -1947,17 +1948,21 @@ function loadWorldIntoObject(world, wobj) {
 }
 
 // TODO: what if world gets renamed?
+// TODO: saving to database
 var worldCache = {}; // TODO
 var worldFetchQueueIndex = {};
 // either returns world-object or null
 async function getWorld(name, canCreate) {
 	if(typeof name != "string") name = "";
 	var worldHash = name.toUpperCase();
-	// TODO
+	// yield to world-rename operations
 	if(worldRenameMap[worldHash]) {
-		name = worldRenameMap[worldHash];
-		worldHash = name.toUpperCase();
+		var qobj = worldRenameMap[worldHash];
+		return new Promise(function(res) {
+			qobj.promises.push(res);
+		});
 	}
+	// yield to operations that are already fetching the world
 	if(worldFetchQueueIndex[worldHash]) {
 		var qobj = worldFetchQueueIndex[worldHash];
 		return new Promise(function(res) {
@@ -1974,6 +1979,7 @@ async function getWorld(name, canCreate) {
 				return null;
 			}
 		} else {
+			cacheObject.handles++;
 			return cacheObject;
 		}
 	}
@@ -2007,6 +2013,7 @@ async function getWorld(name, canCreate) {
 
 		for(var i = 0; i < resQueue.length; i++) {
 			var queueObj = resQueue[i];
+			wobj.handles++;
 			queueObj.promiseResolve(wobj);
 		}
 		delete worldFetchQueueIndex[worldHash];
@@ -2023,6 +2030,7 @@ async function getWorld(name, canCreate) {
 		wobj = makeWorldObject();
 		loadWorldIntoObject(worldRow, wobj);
 		wobj.exists = true;
+		wobj.handles++;
 		worldCache[worldHash] = wobj;
 		var resQueue = worldFetchQueueIndex[worldHash].promises;
 		for(var i = 0; i < resQueue.length; i++) {
@@ -2033,8 +2041,14 @@ async function getWorld(name, canCreate) {
 	}
 	return prom;
 }
+
 // TODO
-//(async function(){console.log(await getWorld("282", true))})()
+function releaseWorld(obj) {
+	obj.handles--;
+	if(obj.handles < 0) {
+		// possibly do a stack trace here
+	}
+}
 
 async function getOrCreateWorld(name, mustCreate) {
 	if(typeof name != "string") name = "";
@@ -2135,23 +2149,43 @@ async function claimWorldByName(worldName, user) {
 	};
 }
 
-var worldRenameMap = {};
+var worldRenameMap = {}; // TODO
 
 // TODO: allow renaming for unclaimed worlds
-async function renameWorld(world, newName) {
+async function renameWorld(world, newName, userId) {
 	// validate newName
 	var target = await getWorld(newName);
 
 	// validate first, then check if someone else is currently renaming the world
 	if(!target) {
-		if(worldCache[newName.toUpperCase()]) throw "(TODO) Race condition?"
-		delete worldCache[world.name.toUpperCase()];
-		//worldRenameMap[world.name.toUpperCase()] = newName;
+		var srcHash = world.name.toUpperCase();
+		var destHash = newName.toUpperCase();
+
+		if(worldRenameMap[srcHash] || worldRenameMap[destHash]) {
+			throw "too slow!"; // TODO
+		}
+		// Lock both worldnames until DB operation finishes
+		var srcProm = [];
+		var destProm = [];
+		worldRenameMap[srcHash] = {
+			promises: srcProm
+		};
+		worldRenameMap[destHash] = {
+			promises: destProm
+		};
+		delete worldCache[srcHash];
 		world.name = newName;
-		worldCache[newName.toUpperCase()] = world;
+		worldCache[destHash] = world;
 		await db.run("UPDATE world SET name=? WHERE id=?", [newName, world.id]);
-		// rename main world
-	} else if(target.ownerId == null) {
+		delete worldRenameMap[srcHash];
+		delete worldRenameMap[destHash];
+		for(var i = 0; i < srcProm.length; i++) {
+			srcProm[i]();
+		}
+		for(var i = 0; i < destProm.length; i++) {
+			destProm[i]();
+		}
+	} else if(userId && target.ownerId == userId) {
 		// swap names
 	} else {
 		// cannot rename
@@ -2843,12 +2877,14 @@ async function initialize_server_components() {
 				// world_id is optional, and leaving it out will broadcast to everyone
 				if(world_id == void 0 || client.sdata.world.id == world_id) {
 					if(opts.isChat) {
+						var isOwner = client.sdata.world.ownerId == client.sdata.user.id;
+						var isMember = !!client.sdata.world.members.map[client.sdata.user.id];
 						// inherit: check cached value; this is a miscellaneous signal that depends on the chat permission (e.g. user count)
-						if(opts.chat_perm == "inherit") opts.chat_perm = client.sdata.chat_permission;
+						if(opts.chat_perm == "inherit") opts.chat_perm = client.sdata.world.feature.chat; // TODO: fix chat_perm
 						// 1: members only
-						if(opts.chat_perm == 1) if(!(client.sdata.is_member || client.sdata.is_owner)) return;
+						if(opts.chat_perm == 1) if(!(isMember || isOwner)) return;
 						// 2: owner only
-						if(opts.chat_perm == 2) if(!client.sdata.is_owner) return;
+						if(opts.chat_perm == 2) if(!isOwner) return;
 						// -1: unavailable to all
 						if(opts.chat_perm == -1) return;
 						// check if user has blocked this client
@@ -3233,7 +3269,7 @@ async function manageWebsocketConnection(ws, req) {
 	};
 	// TODO: ensure /w/ works properly
 
-	var tm_check = world_name.split("/")
+	var tm_check = world_name.split("/");
 	if(tm_check[0] == "accounts" && tm_check[1] == "timemachine" && tm_check[3]) {
 		world_name = tm_check[2];
 		timemachine.active = true;
@@ -3275,13 +3311,8 @@ async function manageWebsocketConnection(ws, req) {
 	ws.sdata.user = user;
 
 	var chat_permission = world.feature.chat;
-	if(!chat_permission) chat_permission = 0;
-	ws.sdata.chat_permission = chat_permission; // TODO: remove
 
-	var show_cursor = world.feature.showCursor;
-	if(show_cursor == void 0) show_cursor = -1;
-	ws.sdata.show_cursor = show_cursor; // TODO: ensure updatable, or remove completely
-
+	// TODO: fix .can_chat completely
 	var can_chat = chat_permission == 0 || (chat_permission == 1 && permission.member) || (chat_permission == 2 && permission.owner);
 	ws.sdata.can_chat = can_chat; // TODO: ensure it's updated from config changes
 
@@ -3294,9 +3325,6 @@ async function manageWebsocketConnection(ws, req) {
 	if(can_chat) {
 		initial_user_count = worldObj.user_count;
 	}
-
-	ws.sdata.is_member = permission.member;
-	ws.sdata.is_owner = permission.owner;
 
 	clientId = generateClientId(world.id);
 
@@ -3463,7 +3491,6 @@ var global_data = {
 	split_limit,
 	website: settings.website,
 	send_email,
-	crypto,
 	filename_sanitize,
 	checkURLParam,
 	create_date,
@@ -3524,7 +3551,8 @@ var global_data = {
 	promoteMembershipByWorldName,
 	renameWorld,
 	ipv4_to_range,
-	ipv6_to_range
+	ipv6_to_range,
+	checkDuplicateCookie
 };
 
 async function sysLoad() {
@@ -3539,7 +3567,7 @@ async function sintLoad(obj) {
 	// if page modules contain a startup function, run it
 	for(var i in obj) {
 		var mod = obj[i];
-		var isPage = mod.GET || mod.POST;
+		var isPage = mod.GET || mod.POST; // XXX
 		if(isPage) {
 			if(mod.startup_internal) {
 				await mod.startup_internal(global_data);

@@ -5,10 +5,8 @@ module.exports = async function(data, vars, evars) {
 	var channel = evars.channel;
 	var world = evars.world;
 
-	var db = vars.db;
 	var san_nbr = vars.san_nbr;
 	var san_dp = vars.san_dp;
-	var decodeCharProt = vars.decodeCharProt;
 	var tile_database = vars.tile_database;
 
 	var is_owner = user.id == world.ownerId || (user.superuser && world.name == "");

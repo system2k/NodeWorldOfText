@@ -44,5 +44,5 @@ module.exports.GET = async function(req, serve, vars, evars) {
 
 	serve(JSON.stringify(style), null, {
 		mime: "application/json"
-	})
+	});
 }

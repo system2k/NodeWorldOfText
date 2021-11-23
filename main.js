@@ -48,7 +48,7 @@ function runServer() {
 		if(maintenance) {
 			maintenanceMode();
 		}
-	})
+	});
 
 	owot.on("message", function(msg) {
 		if(msg == "EXIT") {
@@ -66,7 +66,7 @@ function runServer() {
 				if(e.length && e[0] == "0x03") {
 					process.exit();
 				}
-			})
+			});
 		}
 	});
 }

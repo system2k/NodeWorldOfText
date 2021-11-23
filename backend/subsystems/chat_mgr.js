@@ -28,9 +28,9 @@ async function init_chat_history() {
 	}
 	if(!await db_ch.get("SELECT value FROM ch_info WHERE name='initialized'")) {
 		await db_ch.run("INSERT INTO ch_info VALUES('initialized', 'true')");
-		await db_ch.run("CREATE TABLE channels (id integer NOT NULL PRIMARY KEY, name integer, properties text, description text, date_created integer, world_id integer)")
-		await db_ch.run("CREATE TABLE entries (id integer NOT NULL PRIMARY KEY, date integer, channel integer, data text)")
-		await db_ch.run("CREATE TABLE default_channels (channel_id integer, world_id integer)")
+		await db_ch.run("CREATE TABLE channels (id integer NOT NULL PRIMARY KEY, name integer, properties text, description text, date_created integer, world_id integer)");
+		await db_ch.run("CREATE TABLE entries (id integer NOT NULL PRIMARY KEY, date integer, channel integer, data text)");
+		await db_ch.run("CREATE TABLE default_channels (channel_id integer, world_id integer)");
 		await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
 			["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0]);
 	}

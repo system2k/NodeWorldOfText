@@ -36,19 +36,19 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	if(!user.authenticated) {
 		return serve(null, null, {
 			redirect: "/accounts/login/?next=" + url.parse(req.url).pathname
-		})
+		});
 	}
 
 	// gets world name from /accounts/configure/{world...}/
 	var world_name = checkURLParam("/accounts/configure/*world", path).world;
 
-	var world = await world_get_or_create(world_name)
+	var world = await world_get_or_create(world_name);
 	if(!world) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
 
 	if(world.ownerId != user.id && !user.superuser) {
-		return serve("Access denied", 403)
+		return serve("Access denied", 403);
 	}
 
 	world_name = world.name;
@@ -177,15 +177,11 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var user = evars.user;
 
 	var db = vars.db;
-	var db_edits = vars.db_edits;
 	var checkURLParam = vars.checkURLParam;
 	var dispage = vars.dispage;
 	var url = vars.url;
 	var world_get_or_create = vars.world_get_or_create;
 	var ws_broadcast = vars.ws_broadcast;
-	var advancedSplit = vars.advancedSplit;
-	var decodeCharProt = vars.decodeCharProt;
-	var encodeCharProt = vars.encodeCharProt;
 	var chat_mgr = vars.chat_mgr;
 	var tile_database = vars.tile_database;
 	var uvias = vars.uvias;
@@ -222,7 +218,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	if(post_data.form == "add_member") {
 		// TODO
 		var username = post_data.add_member;
-		var date = Date.now();
+		var date = Date.now(); // TODO: member-add dates
 
 		var adduser;
 		var user_id;
@@ -266,24 +262,22 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		wss.clients.forEach(function(e) {
 			if(!e.sdata.userClient) return;
 			if(e.sdata.world.id == world.id) {
-				if(readability == 1 && !e.sdata.is_member && !e.sdata.is_owner) {
+				var isOwner = world.ownerId == user.id;
+				var isMember = !!world.members.map[user.id];
+				if(readability == 1 && !isMember && !isOwner) {
 					e.close();
 					return;
 				}
-				if(readability == 2 && !e.sdata.is_owner) {
+				if(readability == 2 && !isOwner) {
 					e.close();
 					return;
 				}
-				//e.sdata.world.writability = writability;
-				//e.sdata.world.readability = readability;
 			}
 		});
 		world.readability = readability;
 		world.writability = writability;
 		modifyWorldProp(world, "readability");
 		modifyWorldProp(world, "writability");
-		/*await db.run("UPDATE world SET (readability,writability)=(?,?) WHERE id=?",
-			[readability, writability, world.id]);*/
 	} else if(post_data.form == "remove_member") {
 		// TODO
 		var to_remove = "";
@@ -369,28 +363,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		modifyWorldProp(world, "feature/showCursor");
 		modifyWorldProp(world, "feature/colorText");
 		modifyWorldProp(world, "feature/memberTilesAddRemove");
-
-		/*properties.chat_permission = chat;
-		properties.color_text = color_text;
-		properties.show_cursor = show_cursor;*/
-
-		// update properties in cached world objects for all clients
-		//var newProps = JSON.stringify(properties);
-		/*wss.clients.forEach(function(e) {
-			if(!e.sdata.userClient) return;
-			if(e.sdata.world_id == world.id) {
-				e.sdata.world.properties = newProps;
-				e.sdata.world.feature_go_to_coord = go_to_coord;
-				e.sdata.world.feature_membertiles_addremove = membertiles_addremove;
-				e.sdata.world.feature_paste = paste;
-				e.sdata.world.feature_coord_link = coord_link;
-				e.sdata.world.feature_url_link = url_link;
-				e.sdata.chat_permission = chat;
-				e.sdata.show_cursor = show_cursor;
-			}
-		});*/
-		/*await db.run("UPDATE world SET (feature_go_to_coord,feature_membertiles_addremove,feature_paste,feature_coord_link,feature_url_link,properties)=(?,?,?,?,?,?) WHERE id=?",
-			[go_to_coord, membertiles_addremove, paste, coord_link, url_link, newProps, world.id]);*/
 	} else if(post_data.form == "style") {
 		var color = validateCSS(post_data.color);
 		var cursor_color = validateCSS(post_data.cursor_color);
@@ -425,31 +397,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		modifyWorldProp(world, "theme/memberText");
 		modifyWorldProp(world, "theme/ownerText");
 
-		/*if(menu_color) {
-			properties.custom_menu_color = menu_color;
-		} else {
-			delete properties.custom_menu_color;
-		}
-
-		if(public_text_color) {
-			properties.custom_public_text_color = public_text_color;
-		} else {
-			delete properties.custom_public_text_color;
-		}
-		if(member_text_color) {
-			properties.custom_member_text_color = member_text_color;
-		} else {
-			delete properties.custom_member_text_color;
-		}
-		if(owner_text_color) {
-			properties.custom_owner_text_color = owner_text_color;
-		} else {
-			delete properties.custom_owner_text_color;
-		}*/
-
-		/*await db.run("UPDATE world SET (custom_bg,custom_cursor,custom_guest_cursor,custom_color,custom_tile_owner,custom_tile_member,properties)=(?,?,?,?,?,?,?) WHERE id=?",
-			[bg, cursor_color, cursor_guest_color, color, owner_color, member_color, JSON.stringify(properties), world.id]);*/
-		
 		ws_broadcast({
 			kind: "colors",
 			colors: {
@@ -573,12 +520,11 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		modifyWorldProp(world, "opts/squareChars");
 		modifyWorldProp(world, "opts/halfChars");
 
-
 		// TODO
 		var new_name = post_data.new_world_name;
 		if(typeof new_name == "string" && new_name && new_name != world.name) { // changing world name
-			console.log("NAMECHANGE", world.name, new_name)
-			await renameWorld(world, new_name);
+			console.log("NAMECHANGE", world.name, new_name, user.id)
+			await renameWorld(world, new_name, user.id);
 			new_world_name = new_name;
 
 			/*var validate = await validate_claim_worldname(new_name, vars, evars, true, world.id);
@@ -592,19 +538,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				new_world_name = validate.new_name;
 			}*/
 		}
-
-
-		/*var newProps = JSON.stringify(properties);
-		wss.clients.forEach(function(e) {
-			if(!e.sdata.userClient) return;
-			if(e.sdata.world_id == world.id) {
-				e.sdata.world.properties = newProps;
-			}
-		});
-		if(properties_updated) {
-			await db.run("UPDATE world SET properties=? WHERE id=?",
-				[newProps, world.id]);
-		}*/
 	} else if(post_data.form == "action") {
 		if("unclaim" in post_data) {
 			world.ownerId = null;
