@@ -157,7 +157,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		half_chars,
 		mixed_chars,
 
-		// TODO: check string?
 		background_path: world.background.url,
 		background_x: world.background.x,
 		background_y: world.background.y,
@@ -216,7 +215,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var new_world_name = null;
 
 	if(post_data.form == "add_member") {
-		// TODO
 		var username = post_data.add_member;
 		var date = Date.now(); // TODO: member-add dates
 
@@ -279,7 +277,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		modifyWorldProp(world, "readability");
 		modifyWorldProp(world, "writability");
 	} else if(post_data.form == "remove_member") {
-		// TODO
 		var to_remove = "";
 		for(var key in post_data) {
 			if(key.startsWith("remove_")) to_remove = key;
@@ -287,7 +284,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		var id_to_remove = void 0;
 		var validId = true;
 		var username_to_remove = to_remove.substr("remove_".length);
-		if(accountSystem == "uvias") { // TODO
+		if(accountSystem == "uvias") {
 			if(username_to_remove.startsWith("deleted~")) {
 				id_to_remove = username_to_remove.substr("deleted~".length);
 				if(id_to_remove.length < 1 || id_to_remove.length > 16) validId = false;
@@ -317,19 +314,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				await revokeMembershipByWorldName(world.name, id_to_remove);
 			}
 		}
-		// TODO
-		// TODO: is_member and is_owner stuff, especially stats.member
-		/*if(id_to_remove) {
-			wss.clients.forEach(function(e) {
-				if(!e.sdata.userClient) return;
-				if(e.sdata.user.id == id_to_remove) {
-					if(!e.sdata.is_owner) {
-						e.sdata.is_member = false;
-						e.sdata.user.stats.member = false;
-					}
-				}
-			});
-		}*/
 	} else if(post_data.form == "features") {
 		var go_to_coord = validatePerms(post_data.go_to_coord, 2);
 		var coord_link = validatePerms(post_data.coord_link, 2);
@@ -488,13 +472,20 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		}
 		modifyWorldProp(world, "opts/noLogEdits");
 
+		// TODO
+		if("ratelim_enabled" in post_data) {
+			var val = post_data.ratelim_value;
+		} else {
+
+		}
+
 		if(post_data.meta_desc) {
 			var mdesc = post_data.meta_desc;
 			if(typeof mdesc != "string") mdesc = "";
 			mdesc = mdesc.trim();
 			mdesc = mdesc.slice(0, 600);
 			mdesc = mdesc.replace(/\r|\n/g, " ");
-			world.opts.desc = mdesc; // TODO: check
+			world.opts.desc = mdesc;
 		} else {
 			world.opts.desc = "";
 		}
@@ -542,15 +533,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		if("unclaim" in post_data) {
 			world.ownerId = null;
 			modifyWorldProp(world, "ownerId");
-			wss.clients.forEach(function(e) {
-				if(!e.sdata.userClient) return;
-				/*if(e.sdata.user.id == user.id) {
-					e.sdata.is_owner = false;
-					e.sdata.is_member = false;
-					e.sdata.user.stats.owner = false;
-					e.sdata.user.stats.member = false;
-				}*/
-			});
 			return serve(null, null, {
 				redirect: "/accounts/profile/"
 			});

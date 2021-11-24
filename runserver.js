@@ -749,7 +749,6 @@ var pages = {
 		user_list: require("./backend/pages/admin/user_list.js"),
 		users_by_id: require("./backend/pages/admin/users_by_id.js"),
 		users_by_username: require("./backend/pages/admin/users_by_username.js"),
-		world_restore: require("./backend/pages/admin/world_restore.js"),
 		restrictions: require("./backend/pages/admin/restrictions.js")
 	},
 	other: {
@@ -1413,7 +1412,6 @@ var url_regexp = [ // regexp , function/redirect to , options
 	[/^administrator\/user\/(.*)\/$/g, pages.admin.user],
 	[/^administrator\/users\/by_username\/(.*)[\/]?$/g, pages.admin.users_by_username],
 	[/^administrator\/users\/by_id\/(.*)[\/]?$/g, pages.admin.users_by_id],
-	[/^administrator\/world_restore[\/]?$/g, pages.admin.world_restore],
 	[/^administrator\/backgrounds[\/]?$/g, pages.admin.backgrounds, { binary_post_data: true }],
 	[/^administrator\/files[\/]?$/g, pages.admin.files, { binary_post_data: true }],
 	[/^administrator\/manage_ranks[\/]?$/g, pages.admin.manage_ranks],

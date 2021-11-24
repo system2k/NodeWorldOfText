@@ -416,6 +416,20 @@
 							</div>
 						</div>
 					</div>
+					<div style="background-color: #EEEEEE;">
+						<div>
+							<b>Rate Limits</b>
+							<br>
+							<div>
+								Enabled
+								<input name="ratelim_enabled" type="checkbox"{%if is_ratelim_enabled%} checked{%endif%}>
+							</div>
+							<div>
+								Characters per second
+								<input name="ratelim_value" type="input" value={{ratelim_char}}>
+							</div>
+						</div>
+					</div>
 					<br>
 				</div>
 				<input type="hidden" name="form" value="misc">
