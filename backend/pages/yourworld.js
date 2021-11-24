@@ -20,6 +20,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var announcement = vars.announcement();
 	var san_nbr = vars.san_nbr;
 	var accountSystem = vars.accountSystem;
+	var releaseWorld = vars.releaseWorld;
 
 	var modifyWorldProp = vars.modifyWorldProp;
 
@@ -30,13 +31,11 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var world = await world_get_or_create(world_name);
 	if(!world) return await dispage("404", null, req, serve, vars, evars);
-
-	// TODO
-	//var world_properties = JSON.parse(world.properties);
+	releaseWorld(world);
 
 	var read_permission = await can_view_world(world, user, db);
 	if(!read_permission) {
-		return dispatch(null, null, {
+		return serve(null, null, {
 			redirect: "/accounts/private/"
 		});
 	}
@@ -74,7 +73,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			world.views++;
 			modifyWorldProp(world, "views");
 		}
-
 		var pathname = world.name;
 		if(pathname != "") {
 			pathname = "/" + pathname;
@@ -83,11 +81,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			pathname = "/" + path;
 			if(pathname.charAt(pathname.length - 1) == "/") pathname = pathname.slice(0, -1);
 		}
-		var chat_permission = world.feature.chat;
-		var show_cursor = world.feature.showCursor;
-		if(show_cursor == void 0) show_cursor = -1;
-		var color_text = world.feature.colorText;
-		if(!color_text) color_text = 0;
 		var username = user.username;
 		if(accountSystem == "uvias") {
 			username = user.display_username;
@@ -113,9 +106,9 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 				readability: world.readability,
 				feature_coord_link: world.feature.coordLink,
 				pathname,
-				chat_permission,
-				color_text,
-				show_cursor
+				chat_permission: world.feature.chat,
+				color_text: world.feature.colorText,
+				show_cursor: world.feature.showCursor
 			}
 		};
 		if(CONST.tileRows != 8) {
@@ -125,7 +118,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			state.worldModel.tileCols = CONST.tileCols;
 		}
 		if(world.opts.nsfw) {
-			state.worldModel.nsfw = world_properties.page_is_nsfw;
+			state.worldModel.nsfw = true;
 		}
 		if(world.opts.squareChars) {
 			state.worldModel.square_chars = true;
@@ -173,7 +166,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		}
 		var data = {
 			state: JSON.stringify(state),
-			world, // TODO: useless?
 			page_title,
 			nsfw: world.opts.nsfw,
 			meta_desc
@@ -193,9 +185,11 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var modules = vars.modules;
 	var world_get_or_create = vars.world_get_or_create;
 	var can_view_world = vars.can_view_world;
+	var releaseWorld = vars.releaseWorld;
 
 	var world = await world_get_or_create(path);
 	if(!world) return serve(null, 404);
+	releaseWorld(world);
 
 	var read_permission = await can_view_world(world, user, db);
 	if(!read_permission) {

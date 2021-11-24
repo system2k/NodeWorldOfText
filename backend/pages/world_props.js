@@ -1,9 +1,7 @@
 module.exports.GET = async function(req, serve, vars, evars) {
 	var query_data = evars.query_data;
 	var user = evars.user;
-	// TODO: fix this
 
-	var db = vars.db;
 	var world_get_or_create = vars.world_get_or_create;
 	var can_view_world = vars.can_view_world;
 	
@@ -17,27 +15,64 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		return serve(null, 403);
 	}
 
-	var properties = JSON.parse(world.properties);
-
 	var pathname = world.name;
 	if(pathname != "") {
 		pathname = "/" + pathname;
 	}
 
-	// TODO: display all properties as given in yourworld.js
 	var props = {
-		feature_membertiles_addremove: !!world.feature_membertiles_addremove,
-		writability: world.writability,
-		feature_url_link: world.feature_url_link,
-		feature_go_to_coord: world.feature_go_to_coord,
 		name: world.name,
-		feature_paste: world.feature_paste,
-		namespace: world.name.split("/")[0],
+		feature: {
+			goToCoord: world.feature.goToCoord,
+			memberTilesAddRemove: world.feature.memberTilesAddRemove,
+			paste: world.feature.paste,
+			coordLink: world.feature.coordLink,
+			urlLink: world.feature.urlLink,
+			chat: world.feature.chat,
+			showCursor: world.feature.showCursor,
+			colorText: world.feature.colorText
+		},
+		theme: {
+			bg: world.theme.bg,
+			cursor: world.theme.cursor,
+			guestCursor: world.theme.guestCursor,
+			color: world.theme.color,
+			tileOwner: world.theme.tileOwner,
+			tileMember: world.theme.tileMember,
+			menu: world.theme.menu,
+			publicText: world.theme.publicText,
+			memberText: world.theme.memberText,
+			ownerText: world.theme.ownerText
+		},
+		opts: {
+			nsfw: world.opts.nsfw,
+			squareChars: world.opts.squareChars,
+			noLogEdits: world.opts.noLogEdits,
+			halfChars: world.opts.halfChars,
+			desc: world.opts.desc
+		},
+		background: {
+			url: world.background.url,
+			x: world.background.x,
+			y: world.background.y,
+			w: world.background.w,
+			h: world.background.h,
+			rmod: world.background.rmod,
+			alpha: world.background.alpha
+		},
+		writability: world.writability,
 		readability: world.readability,
-		feature_coord_link: world.feature_coord_link,
-		pathname,
-		chat_permission: properties.chat_permission ? properties.chat_permission : 0,
-		color_text: properties.color_text ? properties.color_text : 0
+		layout: {
+			tileRows: 8,
+			tileCols: 16
+		}
+	};
+
+	if(CONST.tileRows != 8) {
+		props.layout.tileRows = CONST.tileRows;
+	}
+	if(CONST.tileCols != 16) {
+		props.layout.tileCols = CONST.tileCols;
 	}
 
 	serve(JSON.stringify(props), null, {

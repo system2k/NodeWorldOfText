@@ -1735,21 +1735,6 @@ function plural(int, plEnding) {
 	return p;
 }
 
-// TODO: refactor
-// TODO: not necessary
-// this prevents a user from claiming /w/<world>
-function is_unclaimable_worldname(world) {
-	if(!world) return false;
-	world = world.split("/");
-	if(world.length < 2) return false;
-	if(!(world[0] == "w" || world[0] == "W")) return false;
-	for(var i = 0; i < world.length; i++) {
-		var seg = world[i];
-		if(!seg.match(/^([\w\.\-]*)$/g) || !seg) return false;
-	}
-	return true;
-}
-
 var world_default_props = {
 	views: 0,
 	chat_permission: 0,
@@ -1880,8 +1865,9 @@ function makeWorldObject() {
 			map: {}, // hash-map of member user-ids
 			updates: {} // membership updates in database
 		},
-		modifications: {}, // TODO
-		handles: 0 // Safe to GC if 'handles' is 0, increments if sockets have a handle on the object (TODO)
+		modifications: {},
+		lastAccessed: 0,
+		handles: 0 // Safe to GC if 'handles' is 0, increments if sockets have a handle on the object
 	};
 	return world;
 }
@@ -1897,6 +1883,13 @@ function getAndProcWorldProp(wprops, propName) {
 		return wprops[propName];
 	}
 	return world_default_props[propName];
+}
+
+function normWorldProp(val, propName) {
+	if(world_default_props[propName] == val) {
+		return void 0;
+	}
+	return val;
 }
 
 function loadWorldIntoObject(world, wobj) {
@@ -1980,6 +1973,7 @@ async function getWorld(name, canCreate) {
 			}
 		} else {
 			cacheObject.handles++;
+			cacheObject.lastAccessed = Date.now();
 			return cacheObject;
 		}
 	}
@@ -1988,9 +1982,7 @@ async function getWorld(name, canCreate) {
 	};
 	worldFetchQueueIndex[worldHash] = qobj;
 	var prom = new Promise(function(res) {
-		qobj.promises.push({
-			promiseResolve: res
-		});
+		qobj.promises.push(res);
 	});
 	var world = await fetchWorld(name); // TODO: Validate
 	if(world) {
@@ -2010,11 +2002,12 @@ async function getWorld(name, canCreate) {
 			map[key] = true;
 		}
 		wobj.members.map = map;
+		wobj.lastAccessed = Date.now();
 
 		for(var i = 0; i < resQueue.length; i++) {
-			var queueObj = resQueue[i];
+			var queueRes = resQueue[i];
 			wobj.handles++;
-			queueObj.promiseResolve(wobj);
+			queueRes(wobj);
 		}
 		delete worldFetchQueueIndex[worldHash];
 	} else {
@@ -2030,16 +2023,196 @@ async function getWorld(name, canCreate) {
 		wobj = makeWorldObject();
 		loadWorldIntoObject(worldRow, wobj);
 		wobj.exists = true;
-		wobj.handles++;
+		wobj.lastAccessed = Date.now();
 		worldCache[worldHash] = wobj;
 		var resQueue = worldFetchQueueIndex[worldHash].promises;
 		for(var i = 0; i < resQueue.length; i++) {
-			var queueObj = resQueue[i];
-			queueObj.promiseResolve(wobj);
+			var queueRes = resQueue[i];
+			wobj.handles++;
+			queueRes(wobj);
 		}
 		delete worldFetchQueueIndex[worldHash];
 	}
 	return prom;
+}
+
+async function commitWorld(world) {
+	var upd = world.modifications;
+
+	var worldId = world.id;
+
+	var propVals = [
+		"feature/chat",
+		"feature/showCursor",
+		"feature/colorText",
+		"theme/menu",
+		"theme/publicText",
+		"theme/memberText",
+		"theme/ownerText",
+		"opts/nsfw",
+		"opts/squareChars",
+		"opts/noLogEdits",
+		"opts/halfChars",
+		"opts/desc",
+		"background/url",
+		"background/x",
+		"background/y",
+		"background/w",
+		"background/h",
+		"background/rmod",
+		"background/alpha",
+		"views"
+	];
+
+	var properties = {
+		chat_permission: world.feature.chat,
+		show_cursor: world.feature.showCursor,
+		color_text: world.feature.colorText,
+		custom_menu_color: world.theme.menu,
+		custom_public_text_color: world.theme.publicText,
+		custom_member_text_color: world.theme.memberText,
+		custom_owner_text_color: world.theme.ownerText,
+		page_is_nsfw: world.opts.nsfw,
+		square_chars: world.opts.squareChars,
+		no_log_edits: world.opts.noLogEdits,
+		half_chars: world.opts.halfChars,
+		meta_desc: world.opts.desc,
+		background: world.background.url,
+		background_x: world.background.x,
+		background_y: world.background.y,
+		background_w: world.background.w,
+		background_h: world.background.h,
+		background_rmod: world.background.rmod,
+		background_alpha: world.background.alpha,
+		views: world.views
+	};
+	for(var prop in properties) {
+		properties[prop] = normWorldProp(properties[prop], prop);
+	}
+
+	var colVals = [
+		"ownerId",
+		"writability",
+		"readability",
+		"feature/goToCoord",
+		"feature/memberTilesAddRemove",
+		"feature/paste",
+		"feature/coordLink",
+		"feature/urlLink",
+		"theme/bg",
+		"theme/cursor",
+		"theme/guestCursor",
+		"theme/color",
+		"theme/tileOwner",
+		"theme/tileMember"
+	];
+
+	var cols = {
+		owner_id: world.ownerId,
+		writability: world.writability,
+		readability: world.readability,
+		feature_go_to_coord: world.feature.goToCoord,
+		feature_membertiles_addremove: world.feature.memberTilesAddRemove,
+		feature_paste: world.feature.paste,
+		feature_coord_link: world.feature.coordLink,
+		feature_url_link: world.feature.urlLink,
+		custom_bg: world.theme.bg,
+		custom_cursor: world.theme.cursor,
+		custom_guest_cursor: world.theme.guestCursor,
+		custom_color: world.theme.color,
+		custom_tile_owner: world.theme.tileOwner,
+		custom_tile_member: world.theme.tileMember
+	};
+
+	var propUpd = false;
+	var colUpd = false;
+
+	for(var p = 0; p < propVals.length; p++) {
+		var key = propVals[p];
+		if(upd[key]) {
+			propUpd = true;
+			break;
+		}
+	}
+
+	for(var p = 0; p < colVals.length; p++) {
+		var key = colVals[p];
+		if(upd[key]) {
+			colUpd = true;
+			break;
+		}
+	}
+
+	if(propUpd) {
+		var propStr = JSON.stringify(properties);
+		await db.run("UPDATE world SET properties=? WHERE id=?", [propStr, worldId]);
+	}
+	if(colUpd) {
+		await db.run(`
+			UPDATE world SET (
+				owner_id, feature_go_to_coord, feature_membertiles_addremove,
+				feature_paste, feature_coord_link, feature_url_link, custom_bg,
+				custom_cursor, custom_guest_cursor, custom_color, custom_tile_owner,
+				custom_tile_member, writability, readability
+			) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) WHERE id=?
+		`, [
+			cols.owner_id, cols.feature_go_to_coord, cols.feature_membertiles_addremove,
+			cols.feature_paste, cols.feature_coord_link, cols.feature_url_link, cols.custom_bg,
+			cols.custom_cursor, cols.custom_guest_cursor, cols.custom_color, cols.custom_tile_owner,
+			cols.custom_tile_member, cols.writability, cols.readability,
+			worldId
+		]);
+	}
+
+	var dbQueries =[];
+	// perform membership updates
+	var memUpd = world.members.updates;
+	for(var uid in memUpd) {
+		var type = memUpd[uid];
+		delete memUpd[uid];
+		if(type == "REMOVE") {
+			dbQueries.push(["DELETE FROM whitelist WHERE user_id=? AND world_id=?", [uid, worldId]]);
+		} else if(type == "ADD") {
+			dbQueries.push(["INSERT INTO whitelist VALUES(null, ?, ?, ?)", [uid, worldId, Date.now()]]);
+		}
+	}
+	for(var i = 0; i < dbQueries.length; i++) {
+		var query = dbQueries[i];
+		var sql = query[0];
+		var arg = query[1];
+		await db.run(sql, arg);
+	}
+}
+
+async function commitAllWorlds() {
+	var updateResp = [];
+	for(var worldName in worldCache) {
+		var world = worldCache[worldName];
+		if(!world.exists) continue;
+		var updProm = commitWorld(world);
+		updateResp.push(updProm);
+	}
+	await Promise.all(updateResp);
+}
+
+function invalidateWorldCache() {
+	for(var worldName in worldCache) {
+		var world = worldCache[worldName];
+		if(!world.exists) {
+			delete worldCache[worldName];
+			continue;
+		}
+		if(world.handles != 0) {
+			continue;
+		}
+		var modLen = Object.keys(world.modifications);
+		if(modLen > 0) continue;
+		if(!world.lastAccessed) continue;
+		var accDiff = Date.now() - world.lastAccessed;
+		if(accDiff >= 1000 * 60 * 5) {
+			delete worldCache[worldName];
+		}
+	}
 }
 
 // TODO
@@ -2049,6 +2222,11 @@ function releaseWorld(obj) {
 		// possibly do a stack trace here
 	}
 }
+function isSpecialNamespace(world) {
+	world = sanitizeWorldname(world);
+	if(!world) return false;
+	return world[0].toLowerCase() == "w";
+}
 
 async function getOrCreateWorld(name, mustCreate) {
 	if(typeof name != "string") name = "";
@@ -2056,7 +2234,7 @@ async function getOrCreateWorld(name, mustCreate) {
 	if(!name.match(/^([\w\.\-]*)$/g)) {
 		canCreate = false;
 	}
-	if(is_unclaimable_worldname(name)) { // TODO: shouldn't this be false? maybe not, check
+	if(isSpecialNamespace(name)) {
 		canCreate = true;
 	}
 	if(name.length > 10000) {
@@ -2088,6 +2266,7 @@ async function fetchOwnedWorldsByUserId(userId) {
 		var worldname = owned[i].name;
 		var world = await getOrCreateWorld(worldname);
 		if(!world) continue;
+		releaseWorld(world);
 		ownedWorldObjs[world.id] = world;
 	}
 	for(var i in worldCache) {
@@ -2114,6 +2293,7 @@ async function revokeMembershipByWorldName(worldName, userId) {
 	} else {
 		world.members.updates[userId] = "REMOVE";
 	}
+	releaseWorld(world);
 }
 
 async function promoteMembershipByWorldName(worldName, userId) {
@@ -2129,6 +2309,7 @@ async function promoteMembershipByWorldName(worldName, userId) {
 	} else {
 		world.members.updates[userId] = "ADD";
 	}
+	releaseWorld(world);
 }
 
 async function claimWorldByName(worldName, user) {
@@ -2708,7 +2889,7 @@ function broadcastUserCount() {
 				source: "signal",
 				kind: "user_count",
 				count: new_count
-			}, parseInt(id), {
+			}, id, {
 				isChat: true,
 				clientId: 0,
 				chat_perm: "inherit"
@@ -3025,20 +3206,13 @@ var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	cmd_opt:		[10, 1000, 0],
 	cmd:			[256, 1000, 0],
 	debug:			[10, 1000, 0],
-	fetch:			[256, 1000, 0],
+	fetch:			[256, 1000, 0], // TODO: fetch rate limits
 	link:			[400, 1000, 0],
 	protect:		[400, 1000, 0],
 	write:			[256, 1000, 0], // rate-limiting handled separately
 	paste:			[10, 500, 0],
 	cursor:			[70, 1000, 0]
 };
-
-/*
-	Rate limits:
-	20480 chars per second
-	800 tile changes per second
-	
-*/
 
 function can_process_req_kind(lims, kind) {
 	if(!ws_limits[kind]) return true;
@@ -3204,6 +3378,7 @@ async function manageWebsocketConnection(ws, req) {
 	var clientId = void 0;
 	var worldObj = null;
 
+	// TODO: fix
 	ws.on("close", function() {
 		remove_ip_address_connection(ws.sdata.ipAddress);
 		ws.sdata.terminated = true;
@@ -3225,8 +3400,8 @@ async function manageWebsocketConnection(ws, req) {
 			}, world.id);
 			if(ws.sdata.world) {
 				var channel = ws.sdata.channel;
-				var world = ws.sdata.world;
-				var worldId = world.id;
+				var cliWorld = ws.sdata.world;
+				var worldId = wocliWorldrld.id;
 				if(client_cursor_pos[worldId]) {
 					delete client_cursor_pos[worldId][channel];
 					if(Object.keys(client_cursor_pos[worldId]).length == 0) {
@@ -3234,6 +3409,9 @@ async function manageWebsocketConnection(ws, req) {
 					}
 				}
 			}
+		}
+		if(world) { // TODO
+			releaseWorld(world);
 		}
 	});
 	if(ws.sdata.terminated) return; // in the event of an immediate close
@@ -3311,10 +3489,7 @@ async function manageWebsocketConnection(ws, req) {
 	ws.sdata.user = user;
 
 	var chat_permission = world.feature.chat;
-
-	// TODO: fix .can_chat completely
 	var can_chat = chat_permission == 0 || (chat_permission == 1 && permission.member) || (chat_permission == 2 && permission.owner);
-	ws.sdata.can_chat = can_chat; // TODO: ensure it's updated from config changes
 
 	worldObj = getWorldData(world.id);
 	if(!ws.sdata.terminated && !ws.sdata.hide_user_count) {
@@ -3552,7 +3727,8 @@ var global_data = {
 	renameWorld,
 	ipv4_to_range,
 	ipv6_to_range,
-	checkDuplicateCookie
+	checkDuplicateCookie,
+	releaseWorld
 };
 
 async function sysLoad() {

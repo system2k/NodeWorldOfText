@@ -1,21 +1,14 @@
 module.exports = async function(ws, data, send, vars, evars) {
-	var broadcast = evars.broadcast; // broadcast to current world
-	var clientId = evars.clientId;
 	var user = evars.user;
 	var world = evars.world;
 
-	var db = vars.db;
-	var san_nbr = vars.san_nbr;
-	var tile_coord = vars.tile_coord;
-	var modules = vars.modules;
 	var chat_mgr = vars.chat_mgr;
 
 	var retrieveChatHistory = chat_mgr.retrieveChatHistory;
 
-	//var props = JSON.parse(world.properties);
-	var chat_perm = world.feature.chat; //props.chat_permission;
-	var is_member = !!world.members.map[user.id]; //user.stats.member;
-	var is_owner = user.id == world.id; //user.stats.owner;
+	var chat_perm = world.feature.chat;
+	var is_member = !!world.members.map[user.id];
+	var is_owner = user.id == world.id;
 
 	var can_chat = false;
 	if(!chat_perm) can_chat = true;

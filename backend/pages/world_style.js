@@ -5,18 +5,18 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var db = vars.db;
 	var world_get_or_create = vars.world_get_or_create;
 	var can_view_world = vars.can_view_world;
+	var releaseWorld = vars.releaseWorld;
 	
 	if(typeof query_data.world != "string") return serve(null, 400);
 	var world = await world_get_or_create(query_data.world);
 	if(!world) {
 		return serve(null, 404);
 	}
+	releaseWorld(world);
 	var perm = await can_view_world(world, user);
 	if(!perm) {
 		return serve(null, 403);
 	}
-
-	//var properties = JSON.parse(world.properties);
 
 	var backgroundColor = world.theme.color || "#000";
 	var ownerTileColor = world.theme.tileOwner || "#ddd";

@@ -22,8 +22,7 @@ module.exports.POST = async function(req, serve, vars, evars, params) {
 		type = "coord";
 	}
 
-	evars.world = world; // TODO
-	//evars.user.stats = can_read;
+	evars.world = world;
 
 	var do_link = await modules.write_links({
 		type: type,
