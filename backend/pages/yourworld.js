@@ -25,9 +25,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var modifyWorldProp = vars.modifyWorldProp;
 
 	var world_name = path;
-	if(params.timemachine) {
-		world_name = params.world;
-	}
 
 	var world = await world_get_or_create(world_name);
 	if(!world) return await dispage("404", null, req, serve, vars, evars);
@@ -41,7 +38,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	}
 
 	if(query_data.fetch == 1) { // fetch request
-		evars.timemachine = { active: params.timemachine };
 		evars.world = world;
 		var tiles = await modules.fetch_tiles({
 			fetchRectangles: [{
@@ -76,10 +72,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		var pathname = world.name;
 		if(pathname != "") {
 			pathname = "/" + pathname;
-		}
-		if(params.timemachine) {
-			pathname = "/" + path;
-			if(pathname.charAt(pathname.length - 1) == "/") pathname = pathname.slice(0, -1);
 		}
 		var username = user.username;
 		if(accountSystem == "uvias") {
@@ -128,10 +120,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		}
 		if(announcement) {
 			state.announce = announcement;
-		}
-		if(params.timemachine) {
-			state.worldModel.writability = 0;
-			state.worldModel.timemachine = true;
 		}
 		if(world.background.url) {
 			state.background = {

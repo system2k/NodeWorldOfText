@@ -734,7 +734,6 @@ var pages = {
 		register_complete: require("./backend/pages/accounts/register_complete.js"),
 		sso: require("./backend/pages/accounts/sso.js"),
 		tabular: require("./backend/pages/accounts/tabular.js"),
-		timemachine: require("./backend/pages/accounts/timemachine.js"),
 		verify: require("./backend/pages/accounts/verify.js"),
 		verify_email: require("./backend/pages/accounts/verify_email.js")
 	},
@@ -1392,7 +1391,6 @@ var url_regexp = [ // regexp , function/redirect to , options
 	[/^accounts\/configure\/$/g, pages.accounts.configure], // for front page configuring
 	[/^accounts\/configure\/(.*)\/$/g, pages.accounts.configure],
 	[/^accounts\/member_autocomplete[\/]?$/g, pages.accounts.member_autocomplete],
-	[/^accounts\/timemachine\/(.*)\/$/g, pages.accounts.timemachine],
 	[/^accounts\/register\/complete[\/]?$/g, pages.accounts.register_complete],
 	[/^accounts\/verify\/(.*)\/$/g, pages.accounts.verify],
 	[/^accounts\/download\/$/g, pages.accounts.download], // for front page downloading
@@ -3441,27 +3439,10 @@ async function manageWebsocketConnection(ws, req) {
 		ws.sdata.hide_user_count = true;
 	}
 
-	var timemachine = {
-		active: false,
-		time: 0
-	};
-	// TODO: ensure /w/ works properly
-
-	var tm_check = world_name.split("/");
-	if(tm_check[0] == "accounts" && tm_check[1] == "timemachine" && tm_check[3]) {
-		world_name = tm_check[2];
-		timemachine.active = true;
-	}
-
 	world = await getOrCreateWorld(world_name);
 	if(ws.sdata.terminated) return;
 	if(!world) {
 		return error_ws("NO_EXIST", "World does not exist");
-	}
-
-	// TODO: replace all instances of owner_id with ownerId
-	if(timemachine.active && world.ownerId != user.id && !user.superuser) {
-		return error_ws("NO_PERM", "No permission to view time machine");
 	}
 
 	var permission = await can_view_world(world, user);
@@ -3470,20 +3451,13 @@ async function manageWebsocketConnection(ws, req) {
 		return error_ws("NO_PERM", "No permission");
 	}
 
-	if(timemachine.active) {
-		timemachine.time = san_nbr(tm_check[3]);
-		if(timemachine.time < 0) timemachine.time = 0;
-		if(timemachine.time > 1000000) timemachine.time = 1000000;
-	}
-
 	// TODO: remove this
-	status = { permission, world, timemachine };
+	status = { permission, world };
 
 	//ws.sdata.world_id = world.id;
 	ws.sdata.userClient = true; // client connection is now initialized
 	
 	evars.world = world;
-	evars.timemachine = timemachine;
 
 	ws.sdata.world = world;
 	ws.sdata.user = user;
