@@ -3674,7 +3674,6 @@ function encodeCharProt(array, encoding) {
 	return str;
 }
 
-// TODO
 function fillBlockChar(charCode, textRender, x, y) {
 	if((charCode & 0x1FB00) != 0x1FB00 && (charCode & 0x2500) != 0x2500) return false; // symbols for legacy computing
 	var transform = [0, 1]; // (left, right, up, down = 0, 1, 2, 3), percentage

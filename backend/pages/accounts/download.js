@@ -25,12 +25,12 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var filename_sanitize = vars.filename_sanitize;
-	var world_get_or_create = vars.world_get_or_create;
+	var getOrCreateWorld = vars.getOrCreateWorld;
 	var releaseWorld = vars.releaseWorld;
 
 	var world_name = checkURLParam("/accounts/download/*world", path).world;
 
-	var world = await world_get_or_create(world_name);
+	var world = await getOrCreateWorld(world_name);
 	if(!world) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}

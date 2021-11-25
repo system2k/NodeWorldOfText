@@ -4,12 +4,12 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var setCallback = evars.setCallback;
 
 	var db = vars.db;
-	var world_get_or_create = vars.world_get_or_create;
+	var getOrCreateWorld = vars.getOrCreateWorld;
 	var can_view_world = vars.can_view_world;
 	var releaseWorld = vars.releaseWorld;
 	
 	if(typeof query_data.world != "string") return serve(null, 400);
-	var world = await world_get_or_create(query_data.world);
+	var world = await getOrCreateWorld(query_data.world);
 	if(!world) {
 		return serve(null, 404);
 	}

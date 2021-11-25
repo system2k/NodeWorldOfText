@@ -15,7 +15,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var dispage = vars.dispage;
 	var db = vars.db;
-	var world_get_or_create = vars.world_get_or_create;
+	var getOrCreateWorld = vars.getOrCreateWorld;
 	var can_view_world = vars.can_view_world;
 	var modules = vars.modules;
 	var announcement = vars.announcement();
@@ -26,7 +26,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var world_name = path;
 
-	var world = await world_get_or_create(world_name);
+	var world = await getOrCreateWorld(world_name);
 	if(!world) return await dispage("404", null, req, serve, vars, evars);
 	
 	setCallback(function() {
@@ -143,7 +143,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			if(world.background.rmod) {
 				state.background.rmod = world.background.rmod;
 			}
-			if(world.background.alpha) { // TODO: ensure it works properly
+			if(world.background.alpha) {
 				state.background.alpha = world.background.alpha;
 			}
 		}
@@ -174,12 +174,12 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var db = vars.db;
 	var modules = vars.modules;
-	var world_get_or_create = vars.world_get_or_create;
+	var getOrCreateWorld = vars.getOrCreateWorld;
 	var can_view_world = vars.can_view_world;
 	var releaseWorld = vars.releaseWorld;
 	var setCallback = vars.setCallback;
 
-	var world = await world_get_or_create(path);
+	var world = await getOrCreateWorld(path);
 	if(!world) return serve(null, 404);
 	
 	setCallback(function() {
@@ -193,7 +193,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	}
 
 	evars.world = world;
-	//evars.user.stats = read_permission; // TODO
 
 	var edits_parsed;
 	try {

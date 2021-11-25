@@ -1529,7 +1529,6 @@ function wait_response_data(req, dispatch, binary_post_data, raise_limit) {
 	});
 }
 
-// TODO: fix
 var restrictions = {};
 function setRestrictions(obj) {
 	restrictions = obj;
@@ -1807,7 +1806,6 @@ async function fetchWorldMembersById(worldId) {
 	return members;
 }
 
-// TODO: ensure world object does NOT expire while a request is processing a world
 function makeWorldObject() {
 	// return world object with all values "zeroed"
 	var world = {
@@ -1936,9 +1934,9 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.views = getAndProcWorldProp(wprops, "views");
 }
 
-// TODO: what if two getWorld()s are called on nonexistant world, each with diff canCreate values
 var worldCache = {};
 var worldFetchQueueIndex = {};
+var worldRenameMap = {};
 // either returns world-object or null
 async function getWorld(name, canCreate) {
 	if(typeof name != "string") name = "";
@@ -1979,13 +1977,7 @@ async function getWorld(name, canCreate) {
 		promises: [] // to be resolved after loading
 	};
 	worldFetchQueueIndex[worldHash] = qobj;
-	var prom = new Promise(function(res) {
-		qobj.promises.push({
-			promise: res,
-			creatable: canCreate
-		});
-	});
-	var world = await fetchWorld(name); // TODO: Validate
+	var world = await fetchWorld(name);
 	if(world) {
 		var wobj = makeWorldObject();
 
@@ -2011,6 +2003,8 @@ async function getWorld(name, canCreate) {
 			queueRes.promise(wobj);
 		}
 		delete worldFetchQueueIndex[worldHash];
+		wobj.handles++;
+		return wobj;
 	} else {
 		var wobj = null;
 		if(!canCreate) {
@@ -2019,16 +2013,27 @@ async function getWorld(name, canCreate) {
 			worldCache[worldHash] = wobj;
 			var resQueue = worldFetchQueueIndex[worldHash].promises;
 			delete worldFetchQueueIndex[worldHash];
+			var hasConvertedToCreatable = false;
 			for(var i = 0; i < resQueue.length; i++) {
 				var queueRes = resQueue[i];
 				if(queueRes.creatable) {
-					// TODO: test further with un-creatable worlds (e.g. subworlds)
+					hasConvertedToCreatable = true;
+					break;
+				}
+			}
+			for(var i = 0; i < resQueue.length; i++) {
+				var queueRes = resQueue[i];
+				if(hasConvertedToCreatable) {
 					queueRes.promise(await getWorld(name, true));
 				} else {
 					queueRes.promise(null);
 				}
 			}
-			return null;
+			if(hasConvertedToCreatable) {
+				return await getWorld(name, true);
+			} else {
+				return null;
+			}
 		}
 		var worldRow = await insertWorld(name);
 		wobj = makeWorldObject();
@@ -2043,8 +2048,9 @@ async function getWorld(name, canCreate) {
 			queueRes.promise(wobj);
 		}
 		delete worldFetchQueueIndex[worldHash];
+		wobj.handles++;
+		return wobj;
 	}
-	return prom;
 }
 
 async function commitWorld(world) {
@@ -2142,7 +2148,7 @@ async function commitWorld(world) {
 		var key = propVals[p];
 		if(upd[key]) {
 			propUpd = true;
-			break;
+			delete upd[key];
 		}
 	}
 
@@ -2150,7 +2156,7 @@ async function commitWorld(world) {
 		var key = colVals[p];
 		if(upd[key]) {
 			colUpd = true;
-			break;
+			delete upd[key];
 		}
 	}
 
@@ -2292,8 +2298,8 @@ async function fetchOwnedWorldsByUserId(userId) {
 		var worldname = owned[i].name;
 		var world = await getOrCreateWorld(worldname);
 		if(!world) continue;
-		releaseWorld(world);
 		ownedWorldObjs[world.id] = world;
+		releaseWorld(world);
 	}
 	for(var i in worldCache) {
 		var wobj = worldCache[i];
@@ -2356,46 +2362,88 @@ async function claimWorldByName(worldName, user) {
 	};
 }
 
-var worldRenameMap = {}; // TODO
+async function renameWorld(world, newName, user) {
+	var target = await getWorld(newName, false);
 
-// TODO: allow renaming for unclaimed worlds
-async function renameWorld(world, newName, userId) {
-	// validate newName
-	var target = await getWorld(newName);
-
-	// validate first, then check if someone else is currently renaming the world
-	if(!target) {
-		var srcHash = world.name.toUpperCase();
-		var destHash = newName.toUpperCase();
-
-		if(worldRenameMap[srcHash] || worldRenameMap[destHash]) {
-			throw "too slow!"; // TODO
+	var renameCheck = await validateWorldClaim(newName, user, true);
+	if(renameCheck.error) {
+		releaseWorld(target);
+		return {
+			error: true,
+			message: renameCheck.message
 		}
-		// Lock both worldnames until DB operation finishes
-		var srcProm = [];
-		var destProm = [];
-		worldRenameMap[srcHash] = {
-			promises: srcProm
+	}
+
+	// if the destination worldname already exists, then swap names
+	if(target && target.ownerId != null && target.ownerId != user.id) {
+		releaseWorld(target);
+		return {
+			error: true,
+			message: "World already has an owner"
 		};
-		worldRenameMap[destHash] = {
-			promises: destProm
+	}
+
+	var srcHash = world.name.toUpperCase();
+	var destHash = newName.toUpperCase();
+
+	if(worldRenameMap[srcHash] || worldRenameMap[destHash]) {
+		releaseWorld(target);
+		return {
+			error: true,
+			message: "World has already been renamed"
 		};
-		delete worldCache[srcHash];
-		world.name = newName;
-		worldCache[destHash] = world;
+	}
+	// Lock both worldnames until DB operation finishes
+	var srcProm = [];
+	var destProm = [];
+	worldRenameMap[srcHash] = {
+		promises: srcProm
+	};
+	worldRenameMap[destHash] = {
+		promises: destProm
+	};
+	if(target) {
+		delete worldCache[destHash];
+	}
+	var oldWorldName = world.name;
+	delete worldCache[srcHash];
+	world.name = newName;
+	worldCache[destHash] = world;
+	var targetTempName = null;
+	var internalError = false;
+	try {
+		if(target) {
+			worldCache[srcHash] = target;
+			target.name = oldWorldName;
+			targetTempName = oldWorldName + "-" + crypto.randomBytes(10).toString("hex");
+			await db.run("UPDATE world SET name=? WHERE id=?", [targetTempName, target.id]);
+		}
 		await db.run("UPDATE world SET name=? WHERE id=?", [newName, world.id]);
-		delete worldRenameMap[srcHash];
-		delete worldRenameMap[destHash];
-		for(var i = 0; i < srcProm.length; i++) {
-			srcProm[i]();
+		if(target) {
+			await db.run("UPDATE world SET name=? WHERE id=?", [oldWorldName, target.id]);
 		}
-		for(var i = 0; i < destProm.length; i++) {
-			destProm[i]();
+	} catch(e) {
+		internalError = true;
+	}
+	delete worldRenameMap[srcHash];
+	delete worldRenameMap[destHash];
+	for(var i = 0; i < srcProm.length; i++) {
+		srcProm[i]();
+	}
+	for(var i = 0; i < destProm.length; i++) {
+		destProm[i]();
+	}
+	if(internalError) {
+		releaseWorld(target);
+		return {
+			error: true,
+			message: "Internal server error"
 		}
-	} else if(userId && target.ownerId == userId) {
-		// swap names
-	} else {
-		// cannot rename
+	}
+	releaseWorld(target);
+	return {
+		success: true,
+		message: "Successfully renamed the world"
 	}
 }
 
@@ -2776,7 +2824,7 @@ function announce(text) {
 	})();
 }
 
-async function validateWorldClaim(worldname, user) {
+async function validateWorldClaim(worldname, user, isRenaming) {
 	var worldnamePath = sanitizeWorldname(worldname);
 	if(worldname.length > 10000) {
 		return {
@@ -2790,6 +2838,7 @@ async function validateWorldClaim(worldname, user) {
 			message: "Invalid worldname - it must contain the following characters: a-z A-Z 0-9 . _ -"
 		};
 	}
+	// check if not main page ("")
 	if(!(worldnamePath.length == 1 && worldnamePath[0] == "")) {
 		for(var i = 0; i < worldnamePath.length; i++) {
 			if(worldnamePath[i] == "") {
@@ -2808,8 +2857,14 @@ async function validateWorldClaim(worldname, user) {
 				message: "Cannot claim world"
 			};
 		}
+		if(isRenaming) {
+			return {
+				error: false
+			};
+		}
 		var world = await getOrCreateWorld(newname);
 		if(world) {
+			releaseWorld(world);
 			if(world.ownerId == null) {
 				return {
 					world: world,
@@ -2832,6 +2887,7 @@ async function validateWorldClaim(worldname, user) {
 		var baseWorld = await getOrCreateWorld(baseName);
 		// world does not exist nor is owned by the user
 		if(!baseWorld || (baseWorld && baseWorld.ownerId != user.id)) {
+			releaseWorld(baseWorld);
 			return {
 				error: true,
 				message: "You do not own the base world in the path"
@@ -2839,6 +2895,13 @@ async function validateWorldClaim(worldname, user) {
 		}
 		var fullWorldname = worldnamePath.join("/");
 		var subWorld = await getOrCreateWorld(fullWorldname, true);
+		releaseWorld(baseWorld);
+		releaseWorld(subWorld);
+		if(isRenaming) {
+			return {
+				error: false
+			};
+		}
 		// already owned
 		if(subWorld.ownerId != null) {
 			return {
@@ -2922,7 +2985,6 @@ function topActiveWorlds(number) {
 	return clientNumbers.slice(0, number);
 }
 
-// TODO: fix when renaming
 function broadcastUserCount() {
 	if(!global_data.ws_broadcast) return;
 	for(var id in worldData) {
@@ -3681,7 +3743,7 @@ var global_data = {
 	checkURLParam,
 	create_date,
 	get_user_info,
-	world_get_or_create: getOrCreateWorld,
+	getOrCreateWorld,
 	can_view_world,
 	san_nbr,
 	san_dp,

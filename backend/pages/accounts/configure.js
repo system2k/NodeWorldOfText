@@ -30,7 +30,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var dispage = vars.dispage;
-	var world_get_or_create = vars.world_get_or_create;
+	var getOrCreateWorld = vars.getOrCreateWorld;
 	var uvias = vars.uvias;
 	var accountSystem = vars.accountSystem;
 	var releaseWorld = vars.releaseWorld;
@@ -44,7 +44,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	// gets world name from /accounts/configure/{world...}/
 	var world_name = checkURLParam("/accounts/configure/*world", path).world;
 
-	var world = await world_get_or_create(world_name);
+	var world = await getOrCreateWorld(world_name);
 	if(!world) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
@@ -86,7 +86,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var owner_name = "";
 
-	// TODO: pull correct info from cache
 	if(world.ownerId && user.superuser) {
 		if(accountSystem == "uvias") {
 			var debug1 = world.ownerId;
@@ -186,7 +185,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var checkURLParam = vars.checkURLParam;
 	var dispage = vars.dispage;
 	var url = vars.url;
-	var world_get_or_create = vars.world_get_or_create;
+	var getOrCreateWorld = vars.getOrCreateWorld;
 	var ws_broadcast = vars.ws_broadcast;
 	var chat_mgr = vars.chat_mgr;
 	var tile_database = vars.tile_database;
@@ -209,7 +208,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var world_name = checkURLParam("/accounts/configure/*world", path).world;
 
-	var world = await world_get_or_create(world_name);
+	var world = await getOrCreateWorld(world_name);
 	if(!world) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
@@ -266,7 +265,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		return await dispage("accounts/configure", {
 			message: adduser.username + " is now a member of the \"" + world_name + "\" world"
 		}, req, serve, vars, evars);
-	} else if(post_data.form == "access_perm") { // access_perm
+	} else if(post_data.form == "access_perm") {
 		var readability = validatePerms(post_data.readability, 2);
 		var writability = validatePerms(post_data.writability, 2);
 		wss.clients.forEach(function(e) {
@@ -503,7 +502,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		}
 		modifyWorldProp(world, "opts/desc");
 
-
 		if(post_data.charsize == "default") {
 			world.opts.squareChars = false;
 			world.opts.halfChars = false;
@@ -523,23 +521,17 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		modifyWorldProp(world, "opts/squareChars");
 		modifyWorldProp(world, "opts/halfChars");
 
-		// TODO
+		// the world name is being changed
 		var new_name = post_data.new_world_name;
-		if(typeof new_name == "string" && new_name && new_name != world.name) { // changing world name
-			console.log("NAMECHANGE", world.name, new_name, user.id)
-			await renameWorld(world, new_name, user.id);
-			new_world_name = new_name;
-
-			/*var validate = await validate_claim_worldname(new_name, vars, evars, true, world.id);
-			if(validate.error) { // error with renaming
+		if(typeof new_name == "string" && new_name && new_name != world.name) {
+			var stat = await renameWorld(world, new_name, user);
+			if(stat.error) {
 				return await dispage("accounts/configure", {
-					misc_message: validate.message
+					misc_message: stat.message
 				}, req, serve, vars, evars);
+			} else if(stat.success) {
+				new_world_name = new_name;
 			}
-			if(validate.rename) {
-				await db.run("UPDATE world SET name=? WHERE id=?", [validate.new_name, world.id]);
-				new_world_name = validate.new_name;
-			}*/
 		}
 	} else if(post_data.form == "action") {
 		if("unclaim" in post_data) {

@@ -3,12 +3,12 @@ module.exports.POST = async function(req, serve, vars, evars, params) {
 	var user = evars.user;
 	var setCallback = evars.setCallback;
 
-	var world_get_or_create = vars.world_get_or_create;
+	var getOrCreateWorld = vars.getOrCreateWorld;
 	var can_view_world = vars.can_view_world;
 	var modules = vars.modules;
 	var releaseWorld = vars.releaseWorld;
 
-	var world = await world_get_or_create(post_data.world);
+	var world = await getOrCreateWorld(post_data.world);
 	if(!world) {
 		return serve(null, 404);
 	}
