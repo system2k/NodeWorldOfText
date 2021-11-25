@@ -11,6 +11,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var path = evars.path;
 	var user = evars.user;
 	var HTML = evars.HTML;
+	var setCallback = evars.setCallback;
 
 	var dispage = vars.dispage;
 	var db = vars.db;
@@ -21,14 +22,16 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var san_nbr = vars.san_nbr;
 	var accountSystem = vars.accountSystem;
 	var releaseWorld = vars.releaseWorld;
-
 	var modifyWorldProp = vars.modifyWorldProp;
 
 	var world_name = path;
 
 	var world = await world_get_or_create(world_name);
 	if(!world) return await dispage("404", null, req, serve, vars, evars);
-	releaseWorld(world);
+	
+	setCallback(function() {
+		releaseWorld(world);
+	});
 
 	var read_permission = await can_view_world(world, user, db);
 	if(!read_permission) {
@@ -174,10 +177,14 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var world_get_or_create = vars.world_get_or_create;
 	var can_view_world = vars.can_view_world;
 	var releaseWorld = vars.releaseWorld;
+	var setCallback = vars.setCallback;
 
 	var world = await world_get_or_create(path);
 	if(!world) return serve(null, 404);
-	releaseWorld(world);
+	
+	setCallback(function() {
+		releaseWorld(world);
+	});
 
 	var read_permission = await can_view_world(world, user, db);
 	if(!read_permission) {

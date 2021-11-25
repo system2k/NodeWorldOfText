@@ -151,7 +151,7 @@ module.exports = async function(data, vars, evars) {
 	var color_text = world.feature.colorText;
 
 	var is_owner = user.id == world.ownerId;
-	var is_member = !!world.members.map[user.id]; // TODO: test
+	var is_member = !!world.members.map[user.id];
 
 	is_owner = is_owner || (user.superuser && world.name == "");
 

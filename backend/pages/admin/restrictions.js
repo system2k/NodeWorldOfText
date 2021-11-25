@@ -1,5 +1,3 @@
-const { r } = require("../../../lib/swig/dateformatter");
-
 var restrictions_string = "";
 
 function procRegionString(region) {

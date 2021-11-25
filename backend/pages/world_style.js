@@ -1,6 +1,7 @@
 module.exports.GET = async function(req, serve, vars, evars) {
 	var query_data = evars.query_data;
 	var user = evars.user;
+	var setCallback = evars.setCallback;
 
 	var db = vars.db;
 	var world_get_or_create = vars.world_get_or_create;
@@ -12,7 +13,11 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	if(!world) {
 		return serve(null, 404);
 	}
-	releaseWorld(world);
+	
+	setCallback(function() {
+		releaseWorld(world);
+	});
+
 	var perm = await can_view_world(world, user);
 	if(!perm) {
 		return serve(null, 403);

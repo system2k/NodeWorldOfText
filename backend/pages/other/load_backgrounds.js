@@ -1,4 +1,4 @@
-var cache = {};
+var cache = {}; // TODO: cache is unused?
 
 module.exports.startup_internal = async function(vars) {
 	var db_img = vars.db_img;

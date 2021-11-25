@@ -24,6 +24,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var path = evars.path;
 	var HTML = evars.HTML;
 	var user = evars.user;
+	var setCallback = evars.setCallback;
 
 	var url = vars.url;
 	var checkURLParam = vars.checkURLParam;
@@ -32,6 +33,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var world_get_or_create = vars.world_get_or_create;
 	var uvias = vars.uvias;
 	var accountSystem = vars.accountSystem;
+	var releaseWorld = vars.releaseWorld;
 
 	if(!user.authenticated) {
 		return serve(null, null, {
@@ -46,6 +48,10 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	if(!world) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
+
+	setCallback(function() {
+		releaseWorld(world);
+	});
 
 	if(world.ownerId != user.id && !user.superuser) {
 		return serve("Access denied", 403);
@@ -174,6 +180,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var post_data = evars.post_data;
 	var path = evars.path;
 	var user = evars.user;
+	var setCallback = evars.setCallback;
 
 	var db = vars.db;
 	var checkURLParam = vars.checkURLParam;
@@ -192,6 +199,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var promoteMembershipByWorldName = vars.promoteMembershipByWorldName;
 	var revokeMembershipByWorldName = vars.revokeMembershipByWorldName;
 	var renameWorld = vars.renameWorld;
+	var releaseWorld = vars.releaseWorld;
 
 	var clearChatlog = chat_mgr.clearChatlog;
 
@@ -205,6 +213,10 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	if(!world) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
+
+	setCallback(function() {
+		releaseWorld(world);
+	});
 
 	world_name = world.name;
 

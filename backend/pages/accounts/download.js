@@ -10,7 +10,7 @@ module.exports.startup_internal = function(vars) {
 				delete time_limits[i];
 			}
 		}
-	}, 1000 * 8) // check every 8 seconds if the time is up
+	}, 1000 * 8); // check every 8 seconds if the time is up
 }
 
 var wait_ms = 1000 * 60 * 2;
@@ -19,12 +19,14 @@ var time_limits = {};
 module.exports.GET = async function(req, serve, vars, evars) {
 	var path = evars.path;
 	var user = evars.user;
+	var setCallback = evars.setCallback;
 
 	var dispage = vars.dispage;
 	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var filename_sanitize = vars.filename_sanitize;
 	var world_get_or_create = vars.world_get_or_create;
+	var releaseWorld = vars.releaseWorld;
 
 	var world_name = checkURLParam("/accounts/download/*world", path).world;
 
@@ -33,8 +35,12 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
 
+	setCallback(function() {
+		releaseWorld(world);
+	});
+
 	// not a superuser nor owner
-	var is_owner = world.ownerId == user.id
+	var is_owner = world.ownerId == user.id;
 	if(!(user.superuser || is_owner)) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}

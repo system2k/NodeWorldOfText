@@ -56,16 +56,22 @@
 			var mgr_maintenance = document.getElementById("mgr_maintenance");
 			if(mgr_restart) {
 				mgr_restart.onclick = function() {
+					var conf = confirm("Are you sure you want to do this? (Restart)");
+					if(!conf) return;
 					manageServerCommand("restart");
 				}
 			}
 			if(mgr_close) {
 				mgr_close.onclick = function() {
+					var conf = confirm("Are you sure you want to do this? (Close)");
+					if(!conf) return;
 					manageServerCommand("close");
 				}
 			}
 			if(mgr_maintenance) {
 				mgr_maintenance.onclick = function() {
+					var conf = confirm("Are you sure you want to do this? (Maintenance)");
+					if(!conf) return;
 					manageServerCommand("maintenance");
 				}
 			}

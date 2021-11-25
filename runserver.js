@@ -1936,9 +1936,8 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.views = getAndProcWorldProp(wprops, "views");
 }
 
-// TODO: what if world gets renamed?
-// TODO: saving to database
-var worldCache = {}; // TODO
+// TODO: what if two getWorld()s are called on nonexistant world, each with diff canCreate values
+var worldCache = {};
 var worldFetchQueueIndex = {};
 // either returns world-object or null
 async function getWorld(name, canCreate) {
@@ -1955,7 +1954,10 @@ async function getWorld(name, canCreate) {
 	if(worldFetchQueueIndex[worldHash]) {
 		var qobj = worldFetchQueueIndex[worldHash];
 		return new Promise(function(res) {
-			qobj.promises.push(res);
+			qobj.promises.push({
+				promise: res,
+				creatable: canCreate
+			});
 		});
 	}
 	var cacheObject = worldCache[worldHash];
@@ -1978,7 +1980,10 @@ async function getWorld(name, canCreate) {
 	};
 	worldFetchQueueIndex[worldHash] = qobj;
 	var prom = new Promise(function(res) {
-		qobj.promises.push(res);
+		qobj.promises.push({
+			promise: res,
+			creatable: canCreate
+		});
 	});
 	var world = await fetchWorld(name); // TODO: Validate
 	if(world) {
@@ -2003,7 +2008,7 @@ async function getWorld(name, canCreate) {
 		for(var i = 0; i < resQueue.length; i++) {
 			var queueRes = resQueue[i];
 			wobj.handles++;
-			queueRes(wobj);
+			queueRes.promise(wobj);
 		}
 		delete worldFetchQueueIndex[worldHash];
 	} else {
@@ -2012,7 +2017,17 @@ async function getWorld(name, canCreate) {
 			wobj = makeWorldObject();
 			wobj.exists = false;
 			worldCache[worldHash] = wobj;
+			var resQueue = worldFetchQueueIndex[worldHash].promises;
 			delete worldFetchQueueIndex[worldHash];
+			for(var i = 0; i < resQueue.length; i++) {
+				var queueRes = resQueue[i];
+				if(queueRes.creatable) {
+					// TODO: test further with un-creatable worlds (e.g. subworlds)
+					queueRes.promise(await getWorld(name, true));
+				} else {
+					queueRes.promise(null);
+				}
+			}
 			return null;
 		}
 		var worldRow = await insertWorld(name);
@@ -2025,7 +2040,7 @@ async function getWorld(name, canCreate) {
 		for(var i = 0; i < resQueue.length; i++) {
 			var queueRes = resQueue[i];
 			wobj.handles++;
-			queueRes(wobj);
+			queueRes.promise(wobj);
 		}
 		delete worldFetchQueueIndex[worldHash];
 	}
@@ -2160,7 +2175,7 @@ async function commitWorld(world) {
 		]);
 	}
 
-	var dbQueries =[];
+	var dbQueries = [];
 	// perform membership updates
 	var memUpd = world.members.updates;
 	for(var uid in memUpd) {
@@ -2188,7 +2203,11 @@ async function commitAllWorlds() {
 		var updProm = commitWorld(world);
 		updateResp.push(updProm);
 	}
-	await Promise.all(updateResp);
+	try {
+		await Promise.all(updateResp);
+	} catch(e) {
+		handle_error(e, true);
+	}
 }
 
 function invalidateWorldCache() {
@@ -2201,8 +2220,10 @@ function invalidateWorldCache() {
 		if(world.handles != 0) {
 			continue;
 		}
-		var modLen = Object.keys(world.modifications);
+		var modLen = Object.keys(world.modifications).length;
 		if(modLen > 0) continue;
+		var memModLen = Object.keys(world.members.updates).length;
+		if(memModLen > 0) continue;
 		if(!world.lastAccessed) continue;
 		var accDiff = Date.now() - world.lastAccessed;
 		if(accDiff >= 1000 * 60 * 5) {
@@ -2211,11 +2232,20 @@ function invalidateWorldCache() {
 	}
 }
 
-// TODO
+function setupWorldCacheTimers() {
+	intv.worldCacheInvalidation = setInterval(function() {
+		invalidateWorldCache();
+	}, 1000 * 60);
+	intv.worldCacheCommitter = setInterval(function() {
+		commitAllWorlds();
+	}, 1000 * 5);
+}
+
 function releaseWorld(obj) {
+	if(!obj) return;
 	obj.handles--;
 	if(obj.handles < 0) {
-		// possibly do a stack trace here
+		console.log("World handle corruption", obj);
 	}
 }
 function isSpecialNamespace(world) {
@@ -2419,11 +2449,28 @@ var server,
 	HTTPSocketID;
 function setupHTTPServer() {
 	server = https_reference.createServer(options, function(req, res) {
-		process_request(req, res).catch(function(e) {
+		var compCallbacks = [];
+		var cbExecuted = false;
+		process_request(req, res, compCallbacks).then(function() {
+			cbExecuted = true;
+			for(var i = 0; i < compCallbacks.length; i++) {
+				var cb = compCallbacks[i];
+				cb();
+			}
+		}).catch(function(e) {
 			res.statusCode = 500;
 			var err500Temp = "";
 			try {
 				err500Temp = template_data["500.html"]();
+				if(cbExecuted) {
+					console.log("An error has occurred while executing request callbacks");
+				} else {
+					for(var i = 0; i < compCallbacks.length; i++) {
+						var cb = compCallbacks[i];
+						cb();
+					}
+				}
+				
 			} catch(e) {
 				err500Temp = "HTTP 500: An internal server error has occurred";
 				handle_error(e);
@@ -2564,7 +2611,7 @@ function createDispatcher(res, opts) {
 
 var valid_subdomains = ["test"];
 
-async function process_request(req, res) {
+async function process_request(req, res, compCallbacks) {
 	if(!serverLoaded) await waitForServerLoad();
 	if(isStopping) return;
 
@@ -2669,7 +2716,10 @@ async function process_request(req, res) {
 					referer: req.headers.referer,
 					broadcast: global_data.ws_broadcast,
 					HTML,
-					ipAddress
+					ipAddress,
+					setCallback: function(cb) {
+						compCallbacks.push(cb);
+					}
 				};
 				if(pageRes[method] && valid_method(method)) {
 					// Return the page
@@ -3024,6 +3074,7 @@ async function initialize_server_components() {
 	}, 2000);
 
 	setupClearClosedClientsInterval();
+	setupWorldCacheTimers();
 
 	if(accountSystem == "local") {
 		await clear_expired_sessions();
@@ -3293,7 +3344,7 @@ async function manageWebsocketConnection(ws, req) {
 	ws.sdata.ipAddressFam = evalIp[1];
 	ws.sdata.ipAddressVal = evalIp[2];
 
-	// must be at the top before any async calls (errors would occur before this event declaration)
+	// must be at the top before any async calls (errors may otherwise occur before the event declaration)
 	ws.on("error", function(err) {
 		handle_error(JSON.stringify(process_error_arg(err)));
 	});
@@ -3374,40 +3425,35 @@ async function manageWebsocketConnection(ws, req) {
 	var clientId = void 0;
 	var worldObj = null;
 
-	// TODO: fix
 	ws.on("close", function() {
+		if(world) {
+			releaseWorld(world);
+		}
 		remove_ip_address_connection(ws.sdata.ipAddress);
 		ws.sdata.terminated = true;
-		if(status && clientId != void 0) {
-			if(client_ips[status.world.id] && client_ips[status.world.id][clientId]) {
-				client_ips[status.world.id][clientId][2] = true;
-				client_ips[status.world.id][clientId][1] = Date.now();
+		if(world && clientId != void 0) {
+			if(client_ips[world.id] && client_ips[world.id][clientId]) {
+				client_ips[world.id][clientId][2] = true;
+				client_ips[world.id][clientId][1] = Date.now();
 			}
 		}
 		if(worldObj && !ws.sdata.hide_user_count) {
 			worldObj.user_count--;
 		}
 		if(world && ws.sdata.hasBroadcastedCursorPosition && !ws.sdata.cursorPositionHidden && ws.sdata.channel) {
-			// TODO: fix (regarding world_name)
 			global_data.ws_broadcast({
 				kind: "cursor",
 				hidden: true,
 				channel: ws.sdata.channel
 			}, world.id);
-			if(ws.sdata.world) {
-				var channel = ws.sdata.channel;
-				var cliWorld = ws.sdata.world;
-				var worldId = wocliWorldrld.id;
-				if(client_cursor_pos[worldId]) {
-					delete client_cursor_pos[worldId][channel];
-					if(Object.keys(client_cursor_pos[worldId]).length == 0) {
-						delete client_cursor_pos[worldId];
-					}
+			var channel = ws.sdata.channel;
+			var worldId = world.id;
+			if(client_cursor_pos[worldId]) {
+				delete client_cursor_pos[worldId][channel];
+				if(Object.keys(client_cursor_pos[worldId]).length == 0) {
+					delete client_cursor_pos[worldId];
 				}
 			}
-		}
-		if(world) { // TODO
-			releaseWorld(world);
 		}
 	});
 	if(ws.sdata.terminated) return; // in the event of an immediate close
@@ -3418,9 +3464,6 @@ async function manageWebsocketConnection(ws, req) {
 	} else {
 		return error_ws("INVALID_ADDR", "Invalid address");
 	}
-	
-	// TODO: remove
-	//ws.sdata.world_name = world_name;
 
 	var cookies = parseCookie(req.headers.cookie);
 	var user = await get_user_info(cookies, true);
@@ -3449,10 +3492,6 @@ async function manageWebsocketConnection(ws, req) {
 		return error_ws("NO_PERM", "No permission");
 	}
 
-	// TODO: remove this
-	status = { permission, world };
-
-	//ws.sdata.world_id = world.id;
 	ws.sdata.userClient = true; // client connection is now initialized
 	
 	evars.world = world;
@@ -3774,6 +3813,8 @@ function stopServer(restart, maintenance) {
 					await sys.server_exit();
 				}
 			}
+
+			await commitAllWorlds();
 
 			server.close();
 			wss.close();

@@ -78,7 +78,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		client_num,
 		bypass_key: get_bypass_key(),
 		custom_ranks
-	}
+	};
 
 	serve(HTML("administrator.html", data));
 }
@@ -146,7 +146,8 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	if("force_unclaim" in post_data) {
 		var unclaim = post_data.force_unclaim;
 		if(typeof unclaim == "string" && unclaim != "") {
-			// TODO: Upgrade
+			// forcibly unclaim a world as a result of a bug.
+			// skip the world-cache layer - any bug could happen.
 			await db.run("UPDATE world SET owner_id=null WHERE name=? COLLATE NOCASE", unclaim);
 		}
 		return await dispage("admin/administrator", null, req, serve, vars, evars);
