@@ -6,8 +6,6 @@ var intv;
 var wss;
 var WebSocket;
 var san_nbr;
-var fixColors;
-var get_bypass_key;
 var encodeCharProt;
 var advancedSplit;
 var change_char_in_array;
@@ -17,7 +15,6 @@ var broadcastMonitorEvent;
 
 var server_exiting = false;
 var editlog_cell_props = false;
-var main_world_name = "";
 
 module.exports.main = function(vars) {
 	db = vars.db;
@@ -28,8 +25,6 @@ module.exports.main = function(vars) {
 	wss = vars.wss;
 	WebSocket = vars.WebSocket;
 	san_nbr = vars.san_nbr;
-	fixColors = vars.fixColors;
-	get_bypass_key = vars.get_bypass_key;
 	encodeCharProt = vars.encodeCharProt;
 	advancedSplit = vars.advancedSplit;
 	change_char_in_array = vars.change_char_in_array;
@@ -325,9 +320,9 @@ function tileWriteEdits(cacheTile, editObj) {
 	var preserve_links = data.preserve_links;
 	var can_color_text = data.can_color_text;
 	var no_log_edits = data.no_log_edits;
-	// TODO: move is_owner stuff up a level to write_data.js
-	var is_owner = data.is_owner || (user.superuser && world.name == main_world_name);
-	var is_member = data.is_member || (user.superuser && world.name == main_world_name);
+
+	var is_owner = data.is_owner;
+	var is_member = data.is_member;
 
 	var index = charY * CONST.tileCols + charX;
 	var char_writability = cacheTile.prop_char[index];
@@ -416,8 +411,8 @@ function tileWriteLinks(cacheTile, editObj) {
 	var charY = data.charY;
 	var user = data.user;
 	var world = data.world;
-	var is_member = data.is_member || (user.superuser && world.name == main_world_name);
-	var is_owner = data.is_owner || (user.superuser && world.name == main_world_name);
+	var is_member = data.is_member;
+	var is_owner = data.is_owner;
 	var type = data.type;
 	var url = data.url;
 	var link_tileX = data.link_tileX;
@@ -487,8 +482,11 @@ function tileWriteProtections(cacheTile, editObj) {
 	var protect_type = data.protect_type;
 
 	var feature_perm = world.feature.memberTilesAddRemove;
-	var is_owner = data.is_owner || (user.superuser && world.name == main_world_name);
-	var is_member = (data.is_member && feature_perm) || is_owner || (user.superuser && world.name == main_world_name);
+	var is_owner = data.is_owner;
+	var is_member = data.is_member;
+
+	var can_owner = is_owner;
+	var can_member = (is_member && feature_perm) || is_owner;
 
 	var tile_writability = cacheTile.writability;
 	if(tile_writability == null) tile_writability = world.writability;
@@ -499,23 +497,23 @@ function tileWriteProtections(cacheTile, editObj) {
 		var idx = charY * CONST.tileCols + charX;
 		var char_writability = cacheTile.prop_char[idx];
 		if(char_writability == null) char_writability = tile_writability;
-		var area_perm = is_owner || (is_member && char_writability < 2);
-		if(protect_type == 2 && area_perm && is_owner) {
+		var area_perm = can_owner || (can_member && char_writability < 2);
+		if(protect_type == 2 && area_perm && can_owner) {
 			cacheTile.prop_char[idx] = 2;
 			cacheTile.props_updated = true;
 			has_modified = true;
 		}
-		if(protect_type == 1 && area_perm && is_member) {
+		if(protect_type == 1 && area_perm && can_member) {
 			cacheTile.prop_char[idx] = 1;
 			cacheTile.props_updated = true;
 			has_modified = true;
 		}
-		if(protect_type == 0 && area_perm && is_member) {
+		if(protect_type == 0 && area_perm && can_member) {
 			cacheTile.prop_char[idx] = 0;
 			cacheTile.props_updated = true;
 			has_modified = true;
 		}
-		if(protect_type == null && area_perm && is_member) {
+		if(protect_type == null && area_perm && can_member) {
 			if(cacheTile.writability != null) {
 				for(var n = 0; n < cacheTile.prop_char.length; n++) {
 					if(cacheTile.prop_char[n] == null) {
@@ -544,9 +542,9 @@ function tileWriteProtections(cacheTile, editObj) {
 		for(var i = 0; i < CONST.tileArea; i++) {
 			var char_writability = cacheTile.prop_char[i];
 			if(char_writability == null) char_writability = tile_writability;
-			var area_perm = is_owner || (is_member && char_writability < 2);
+			var area_perm = can_owner || (can_member && char_writability < 2);
 			if(protect_type == 2) {
-				if(area_perm && is_owner) {
+				if(area_perm && can_owner) {
 					cacheTile.prop_char[i] = 2;
 					cacheTile.props_updated = true;
 					has_modified = true;
@@ -555,7 +553,7 @@ function tileWriteProtections(cacheTile, editObj) {
 				}
 			}
 			if(protect_type == 1) {
-				if(area_perm && is_member) {
+				if(area_perm && can_member) {
 					cacheTile.prop_char[i] = 1;
 					cacheTile.props_updated = true;
 					has_modified = true;
@@ -564,7 +562,7 @@ function tileWriteProtections(cacheTile, editObj) {
 				}
 			}
 			if(protect_type == 0) {
-				if(area_perm && is_member) {
+				if(area_perm && can_member) {
 					cacheTile.prop_char[i] = 0;
 					cacheTile.props_updated = true;
 					has_modified = true;
@@ -573,7 +571,7 @@ function tileWriteProtections(cacheTile, editObj) {
 				}
 			}
 			if(protect_type == null) {
-				if(area_perm && is_member) {
+				if(area_perm && can_member) {
 					cacheTile.prop_char[i] = null;
 					has_modified = true;
 					cacheTile.props_updated = true;
@@ -613,12 +611,6 @@ function tileWriteClear(cacheTile, editObj) {
 	var data = editObj[1];
 	var sharedObj = editObj[2];
 	var callID = editObj[3];
-
-	var tileX = data.tileX;
-	var tileY = data.tileY;
-	var user = data.user;
-	var world = data.world;
-	var date = data.date;
 
 	for(var x = 0; x < CONST.tileArea; x++) {
 		cacheTile.content[x] = " ";

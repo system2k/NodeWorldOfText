@@ -27,8 +27,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var call_id = tile_database.newCallId();
 	tile_database.reserveCallId(call_id);
 
-	var is_owner = user.id == world.ownerId || (user.superuser && world.name == "");
-	var is_member = !!world.members.map[user.id] || is_owner || (user.superuser && world.name == "");
+	var is_owner = user.id == world.ownerId;
+	is_owner = is_owner || (user.superuser && world.name == "");
+	var is_member = !!world.members.map[user.id] || is_owner;
 
 	tile_database.write(call_id, tile_database.types.paste, {
 		world, user,

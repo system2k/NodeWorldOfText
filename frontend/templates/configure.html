@@ -13,6 +13,9 @@
 		clear_public.onclick = function() { actionMethod = "clear_public" };
 		clear_all.onclick = function() { actionMethod = "clear_all" };
 		clear_chat_hist.onclick = function() { actionMethod = "clear_chat_hist" };
+
+		updateRatelimBox();
+		ratelim_enabled.onclick = updateRatelimBox;
 	}
 	function action_confirm() {
 		var msg = "";
@@ -39,6 +42,17 @@
 		} else {
 			advElm.style.display = "none";
 			advancedMiscVisible = false;
+		}
+	}
+
+	function updateRatelimBox() {
+		var ratelim_enabled = document.getElementById("ratelim_enabled");
+		var ratelim_value = document.getElementById("ratelim_value");
+		var checked = ratelim_enabled.checked;
+		if(checked) {
+			ratelim_value.disabled = false;
+		} else {
+			ratelim_value.disabled = true;
 		}
 	}
 </script>
@@ -422,11 +436,11 @@
 							<br>
 							<div>
 								Enabled
-								<input name="ratelim_enabled" type="checkbox"{%if is_ratelim_enabled%} checked{%endif%}>
+								<input id="ratelim_enabled" name="ratelim_enabled" type="checkbox"{%if is_ratelim_enabled%} checked{%endif%}>
 							</div>
 							<div>
-								Characters per second
-								<input name="ratelim_value" type="input" value={{ratelim_char}}>
+								Characters per second:
+								<input id="ratelim_value" name="ratelim_value" type="input" value={{ratelim_char}}>
 							</div>
 						</div>
 					</div>

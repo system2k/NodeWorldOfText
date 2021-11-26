@@ -1,3 +1,5 @@
+var crypto = require("crypto");
+
 var intv;
 var handle_error;
 var db;
@@ -15,6 +17,10 @@ module.exports.main = async function(vars) {
 	}, 1000 * 5); // 5 seconds
 }
 
+var worldCache = {};
+var worldFetchQueueIndex = {};
+var worldRenameMap = {};
+
 var world_default_props = {
 	views: 0,
 	chat_permission: 0,
@@ -28,6 +34,7 @@ var world_default_props = {
 	square_chars: false,
 	no_log_edits: false,
 	half_chars: false,
+    char_rate: "",
 	background: "",
 	background_x: 0,
 	background_y: 0,
@@ -127,6 +134,7 @@ function makeWorldObject() {
 			squareChars: false,
 			noLogEdits: false,
 			halfChars: false,
+            charRate: "",
 			desc: ""
 		},
 		background: {
@@ -152,7 +160,6 @@ function makeWorldObject() {
 }
 
 function modifyWorldProp(wobj, path) {
-	// TODO: detect if removed from cache
 	// Don't GC if other worlds still have cache in memory
 	wobj.modifications[path] = true;
 }
@@ -206,6 +213,7 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.opts.squareChars = getAndProcWorldProp(wprops, "square_chars");
 	wobj.opts.noLogEdits = getAndProcWorldProp(wprops, "no_log_edits");
 	wobj.opts.halfChars = getAndProcWorldProp(wprops, "half_chars");
+    wobj.opts.charRate = getAndProcWorldProp(wprops, "char_rate");
 	wobj.opts.desc = getAndProcWorldProp(wprops, "meta_desc");
 
 	wobj.background.url = getAndProcWorldProp(wprops, "background");
@@ -219,9 +227,6 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.views = getAndProcWorldProp(wprops, "views");
 }
 
-var worldCache = {};
-var worldFetchQueueIndex = {};
-var worldRenameMap = {};
 // either returns world-object or null
 async function getWorld(name, canCreate) {
 	if(typeof name != "string") name = "";
@@ -355,6 +360,7 @@ async function commitWorld(world) {
 		"opts/squareChars",
 		"opts/noLogEdits",
 		"opts/halfChars",
+        "opts/charRate",
 		"opts/desc",
 		"background/url",
 		"background/x",
@@ -378,6 +384,7 @@ async function commitWorld(world) {
 		square_chars: world.opts.squareChars,
 		no_log_edits: world.opts.noLogEdits,
 		half_chars: world.opts.halfChars,
+        char_rate: world.opts.charRate,
 		meta_desc: world.opts.desc,
 		background: world.background.url,
 		background_x: world.background.x,
@@ -414,7 +421,7 @@ async function commitWorld(world) {
 		writability: world.writability,
 		readability: world.readability,
 		feature_go_to_coord: world.feature.goToCoord,
-		feature_membertiles_addremove: world.feature.memberTilesAddRemove,
+		feature_membertiles_addremove: Number(world.feature.memberTilesAddRemove),
 		feature_paste: world.feature.paste,
 		feature_coord_link: world.feature.coordLink,
 		feature_url_link: world.feature.urlLink,
@@ -579,9 +586,10 @@ async function fetchOwnedWorldsByUserId(userId) {
 	}
 	for(var i in worldCache) {
 		var wobj = worldCache[i];
-		if(wobj.exists && wobj.ownerId == userId) {
-			ownedWorldObjs[wobj.id] = wobj;
-		}
+        if(!wobj.exists) continue;
+        if(wobj.ownerId == userId) {
+            ownedWorldObjs[wobj.id] = wobj;
+        }
 	}
 	return Object.values(ownedWorldObjs);
 }
@@ -691,6 +699,7 @@ async function renameWorld(world, newName, user) {
 		if(target) {
 			worldCache[srcHash] = target;
 			target.name = oldWorldName;
+            // TODO: swapping must be done in a better way
 			targetTempName = oldWorldName + "-" + crypto.randomBytes(10).toString("hex");
 			await db.run("UPDATE world SET name=? WHERE id=?", [targetTempName, target.id]);
 		}
@@ -699,6 +708,7 @@ async function renameWorld(world, newName, user) {
 			await db.run("UPDATE world SET name=? WHERE id=?", [oldWorldName, target.id]);
 		}
 	} catch(e) {
+        handle_error(e);
 		internalError = true;
 	}
 	delete worldRenameMap[srcHash];

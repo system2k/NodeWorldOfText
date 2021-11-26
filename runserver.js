@@ -1612,6 +1612,7 @@ function parseToken(token) {
 	};
 }
 
+// TODO: cache user data
 async function get_user_info(cookies, is_websocket, dispatch) {
 	/*
 		User Levels:
@@ -1636,6 +1637,7 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 		email: "",
 		uv_rank: 0
 	};
+	// TODO: add user cache system for local accounts some time
 	if(accountSystem == "local" && cookies.sessionid) {
 		// user data from session
 		var s_data = await db.get("SELECT * FROM auth_session WHERE session_key=?", cookies.sessionid);
@@ -1657,6 +1659,7 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 				} else {
 					user.scripts = [];
 				}
+				user.scripts = [];
 			}
 			user.session_key = s_data.session_key;
 		}
@@ -1715,11 +1718,14 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 						user.staff = level == 1 || level == 2 || level == 3;
 					}
 
+					// TODO: might want to add a public script repository for OWOT and remove/change this
 					if(user.staff && !is_websocket) {
 						user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id);
 					} else {
 						user.scripts = [];
 					}
+					user.scripts = [];
+
 					user.csrftoken = new_token(32);
 					user.session_key = cookies.token;
 				}
@@ -2034,6 +2040,8 @@ async function process_request(req, res, compCallbacks) {
 					broadcast: global_data.ws_broadcast,
 					HTML,
 					ipAddress,
+					ipAddressFam,
+					ipAddressVal,
 					setCallback: function(cb) {
 						compCallbacks.push(cb);
 					}

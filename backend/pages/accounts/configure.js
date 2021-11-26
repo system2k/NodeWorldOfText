@@ -113,6 +113,13 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var member_text_color = world.theme.memberText || "default";
 	var owner_text_color = world.theme.ownerText || "default";
 
+	var is_ratelim_enabled = false;
+	var ratelim_char = 0;
+	if(world.opts.charRate) {
+		is_ratelim_enabled = true;
+		ratelim_char = world.opts.charRate.split("/")[0];
+	}
+
 	var square_chars = world.opts.squareChars;
 	var half_chars = world.opts.halfChars;
 	var mixed_chars = false;
@@ -161,6 +168,9 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		no_log_edits: world.opts.noLogEdits,
 		half_chars,
 		mixed_chars,
+
+		is_ratelim_enabled,
+		ratelim_char,
 
 		background_path: world.background.url,
 		background_x: world.background.x,
@@ -241,6 +251,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			return await dispage("accounts/configure", { message: "User not found" }, req, serve, vars, evars);
 		}
 
+		// TODO: check if ids work for uvias system
 		if(accountSystem == "uvias") {
 			user_id = "x" + adduser.uid;
 		} else if(accountSystem == "local") {
@@ -349,7 +360,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		world.feature.chat = chat;
 		world.feature.showCursor = show_cursor;
 		world.feature.colorText = color_text;
-		world.feature.memberTilesAddRemove = membertiles_addremove;
+		world.feature.memberTilesAddRemove = Boolean(membertiles_addremove);
 		modifyWorldProp(world, "feature/goToCoord");
 		modifyWorldProp(world, "feature/coordLink");
 		modifyWorldProp(world, "feature/urlLink");
@@ -468,27 +479,31 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			modifyWorldProp(world, "background/alpha");
 		}
 
-
-		if("nsfw_page" in post_data) {
+		if(post_data.nsfw_page == "on") {
 			world.opts.nsfw = true;
 		} else {
 			world.opts.nsfw = false;
 		}
 		modifyWorldProp(world, "opts/nsfw");
 
-		if("no_log_edits" in post_data) {
+		if(post_data.no_log_edits == "on") {
 			world.opts.noLogEdits = true;
 		} else {
 			world.opts.noLogEdits = false;
 		}
 		modifyWorldProp(world, "opts/noLogEdits");
 
-		// TODO
-		if("ratelim_enabled" in post_data) {
+		if(post_data.ratelim_enabled == "on") {
 			var val = post_data.ratelim_value;
+			if(!val) val = 20480;
+			val = san_nbr(val);
+			if(val < 1) val = 1;
+			if(val > 20480) val = 20480;
+			world.opts.charRate = val + "/" + 1000;
 		} else {
-
+			world.opts.charRate = "";
 		}
+		modifyWorldProp(world, "opts/charRate");
 
 		if(post_data.meta_desc) {
 			var mdesc = post_data.meta_desc;
@@ -541,7 +556,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				redirect: "/accounts/profile/"
 			});
 		} else if("clear_public" in post_data) {
-			var tileCount = await db.get("SELECT count(id) AS cnt FROM tile WHERE world_id=?", world.id);
+			var tileCount = await db.get("SELECT COUNT(id) AS cnt FROM tile WHERE world_id=?", world.id);
 			if(!tileCount) return;
 			tileCount = tileCount.cnt;
 			// tile limit of 30000

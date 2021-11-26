@@ -151,12 +151,11 @@ module.exports = async function(data, vars, evars) {
 	var color_text = world.feature.colorText;
 
 	var is_owner = user.id == world.ownerId;
-	var is_member = !!world.members.map[user.id];
-
 	is_owner = is_owner || (user.superuser && world.name == "");
+	var is_member = !!world.members.map[user.id] || is_owner;
 
 	var can_color_text = true;
-	if(color_text == 1 && !is_member && !is_owner) can_color_text = false;
+	if(color_text == 1 && !is_member) can_color_text = false;
 	if(color_text == 2 && !is_owner) can_color_text = false;
 
 	var edits = data.edits;
@@ -165,6 +164,16 @@ module.exports = async function(data, vars, evars) {
 	
 	var tileLimiter = prepareRateLimiter(tileRateLimits, ipAddress);
 	var editLimiter = prepareRateLimiter(editRateLimits, ipAddress);
+
+	var customLimit = world.opts.charRate;
+	var customLimiter = null;
+	if(customLimit && !is_member) {
+		customLimit = customLimit.split("/");
+		if(customLimit.length == 2) {
+			customLimit = parseInt(customLimit[0]);
+			customLimiter = prepareRateLimiter(editRateLimits, ipAddress + "-custom-" + world_id);
+		}
+	}
 
 	var totalEdits = 0;
 	var tiles = {};
@@ -186,6 +195,11 @@ module.exports = async function(data, vars, evars) {
 		if(typeof char != "string") continue;
 		if(!checkCharRateLimit(editLimiter, charRatePerSecond, 1)) {
 			break;
+		}
+		if(customLimiter) {
+			if(!checkCharRateLimit(customLimiter, customLimit, 1)) {
+				break;
+			}
 		}
 		if(!tiles[tileStr]) {
 			if(!checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world_id)) {
