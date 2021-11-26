@@ -1,20 +1,15 @@
-var intv;
+var download_busy = {};
+
 module.exports.startup_internal = function(vars) {
 	intv = vars.intv;
 
-	// wait at least 5 minutes and then allow user to download again
-	intv.accountTimeCheck = setInterval(function() {
-		var date = Date.now();
-		for(var i in time_limits) {
-			if(time_limits[i] + wait_ms >= date) {
-				delete time_limits[i];
-			}
+	// periodically clear the list in case of a bug
+	intv.downloadBusyCheck = setInterval(function() {
+		for(var i in download_busy) {
+			delete download_busy[i];
 		}
-	}, 1000 * 8); // check every 8 seconds if the time is up
+	}, 1000 * 60 * 5);
 }
-
-var wait_ms = 1000 * 60 * 2;
-var time_limits = {};
 
 module.exports.GET = async function(req, serve, vars, evars) {
 	var path = evars.path;
@@ -37,6 +32,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 
 	setCallback(function() {
 		releaseWorld(world);
+		delete download_busy[user.id];
 	});
 
 	// not a superuser nor owner
@@ -46,10 +42,10 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	}
 
 	if(is_owner && !user.superuser) {
-		if(time_limits[user.id]) {
-			return serve("Wait about 2 minutes before downloading again.");
+		if(download_busy[user.id]) {
+			return serve("You are already downloading a world. Please wait.");
 		} else {
-			time_limits[user.id] = Date.now();
+			download_busy[user.id] = true;
 		}
 	}
 

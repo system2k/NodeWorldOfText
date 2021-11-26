@@ -5,7 +5,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 
 	var db = vars.db;
 	var getOrCreateWorld = vars.getOrCreateWorld;
-	var can_view_world = vars.can_view_world;
+	var canViewWorld = vars.canViewWorld;
 	var releaseWorld = vars.releaseWorld;
 	
 	if(typeof query_data.world != "string") return serve(null, 400);
@@ -18,7 +18,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		releaseWorld(world);
 	});
 
-	var perm = await can_view_world(world, user);
+	var perm = await canViewWorld(world, user);
 	if(!perm) {
 		return serve(null, 403);
 	}

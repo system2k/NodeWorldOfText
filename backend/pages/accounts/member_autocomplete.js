@@ -8,10 +8,13 @@ function escape_control(str) {
 
 module.exports.GET = async function(req, serve, vars, evars) {
 	var query_data = evars.query_data;
+	var user = evars.user;
 
 	var db = vars.db;
 	var uvias = vars.uvias;
 	var accountSystem = vars.accountSystem;
+
+	if(!user.authenticated) return serve(null, 403);
 
 	var input = query_data.q;
 

@@ -1,0 +1,862 @@
+var intv;
+var handle_error;
+var db;
+module.exports.main = async function(vars) {
+    intv = vars.intv;
+    handle_error = vars.handle_error;
+    db = vars.db;
+
+    intv.worldCacheInvalidation = setInterval(function() {
+		invalidateWorldCache();
+	}, 1000 * 60); // 1 minute
+
+	intv.worldCacheCommitter = setInterval(function() {
+		commitAllWorlds();
+	}, 1000 * 5); // 5 seconds
+}
+
+var world_default_props = {
+	views: 0,
+	chat_permission: 0,
+	show_cursor: -1,
+	color_text: 0,
+	custom_menu_color: "",
+	custom_public_text_color: "",
+	custom_member_text_color: "",
+	custom_owner_text_color: "",
+	page_is_nsfw: false,
+	square_chars: false,
+	no_log_edits: false,
+	half_chars: false,
+	background: "",
+	background_x: 0,
+	background_y: 0,
+	background_w: 0,
+	background_h: 0,
+	background_rmod: 0,
+	background_alpha: 1,
+	meta_desc: ""
+};
+
+function validateWorldname(name) {
+	return /^([\w\.\-]*)$/g.test(name);
+}
+
+function sanitizeWorldname(name) {
+	if(typeof name != "string") return null;
+	if(name.charAt(0) == "/") name = name.slice(1);
+	if(name.charAt(name.length - 1) == "/") name = name.slice(0, -1);
+	name = name.split("/");
+	for(var i = 0; i < name.length; i++) {
+		var segment = name[i];
+		if(!validateWorldname(segment)) return null;
+	}
+	return name;
+}
+
+async function insertWorld(name) {
+	var date = Date.now();
+			
+	var feature_go_to_coord = 1;
+	var feature_membertiles_addremove = false;
+	var feature_paste = 1;
+	var feature_coord_link = 1;
+	var feature_url_link = 0;
+	var custom_bg = "";
+	var custom_cursor = "";
+	var custom_guest_cursor = "";
+	var custom_color = "";
+	var custom_tile_owner = "";
+	var custom_tile_member = "";
+	var writability = 0;
+	var readability = 0;
+	var properties = JSON.stringify({});
+
+	var rw = await db.run("INSERT INTO world VALUES(null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+		name, date,
+		feature_go_to_coord, feature_membertiles_addremove, feature_paste, feature_coord_link, feature_url_link,
+		custom_bg, custom_cursor, custom_guest_cursor, custom_color, custom_tile_owner, custom_tile_member,
+		writability, readability, properties
+	]);
+	var worldId = await db.get("SELECT * FROM world WHERE id=?", rw.lastID);
+	return worldId;
+}
+
+async function fetchWorld(name) {
+	var world = await db.get("SELECT * FROM world WHERE name=? COLLATE NOCASE", name);
+	return world;
+}
+async function fetchWorldMembersById(worldId) {
+	var members = await db.all("SELECT * FROM whitelist WHERE world_id=?", worldId);
+	return members;
+}
+
+function makeWorldObject() {
+	// return world object with all values "zeroed"
+	var world = {
+		exists: false,
+		id: null, // integer
+		name: "", // raw db name
+		ownerId: null, // integer (classic account system); string (uvias account system)
+		creationDate: 0,
+		views: 0,
+		feature: {
+			goToCoord: 0,
+			memberTilesAddRemove: false,
+			paste: 0,
+			coordLink: 0,
+			urlLink: 0,
+			chat: 0,
+			showCursor: 0,
+			colorText: 0
+		},
+		theme: {
+			bg: "",
+			cursor: "",
+			guestCursor: "",
+			color: "",
+			tileOwner: "",
+			tileMember: "",
+			menu: "",
+			publicText: "",
+			memberText: "",
+			ownerText: ""
+		},
+		opts: {
+			nsfw: false,
+			squareChars: false,
+			noLogEdits: false,
+			halfChars: false,
+			desc: ""
+		},
+		background: {
+			url: "",
+			x: 0,
+			y: 0,
+			w: 0,
+			h: 0,
+			rmod: 0,
+			alpha: 0
+		},
+		writability: 0,
+		readability: 0,
+		members: {
+			map: {}, // hash-map of member user-ids
+			updates: {} // membership updates in database
+		},
+		modifications: {},
+		lastAccessed: 0,
+		handles: 0 // Safe to GC if 'handles' is 0, increments if sockets have a handle on the object
+	};
+	return world;
+}
+
+function modifyWorldProp(wobj, path) {
+	// TODO: detect if removed from cache
+	// Don't GC if other worlds still have cache in memory
+	wobj.modifications[path] = true;
+}
+
+function getAndProcWorldProp(wprops, propName) {
+	if(propName in wprops) {
+		return wprops[propName];
+	}
+	return world_default_props[propName];
+}
+
+function normWorldProp(val, propName) {
+	if(world_default_props[propName] == val) {
+		return void 0;
+	}
+	return val;
+}
+
+function loadWorldIntoObject(world, wobj) {
+	wobj.id = world.id;
+	wobj.name = world.name;
+	wobj.ownerId = world.owner_id;
+	wobj.creationDate = world.created_at;
+	
+	wobj.writability = world.writability;
+	wobj.readability = world.readability;
+
+	var wprops = JSON.parse(world.properties);
+
+	wobj.feature.goToCoord = world.feature_go_to_coord;
+	wobj.feature.memberTilesAddRemove = Boolean(world.feature_membertiles_addremove);
+	wobj.feature.paste = world.feature_paste;
+	wobj.feature.coordLink = world.feature_coord_link;
+	wobj.feature.urlLink = world.feature_url_link;
+	wobj.feature.chat = getAndProcWorldProp(wprops, "chat_permission");
+	wobj.feature.showCursor = getAndProcWorldProp(wprops, "show_cursor");
+	wobj.feature.colorText = getAndProcWorldProp(wprops, "color_text");
+
+	wobj.theme.bg = world.custom_bg;
+	wobj.theme.cursor = world.custom_cursor;
+	wobj.theme.guestCursor = world.custom_guest_cursor;
+	wobj.theme.color = world.custom_color;
+	wobj.theme.tileOwner = world.custom_tile_owner;
+	wobj.theme.tileMember = world.custom_tile_member;
+	wobj.theme.menu = getAndProcWorldProp(wprops, "custom_menu_color");
+	wobj.theme.publicText = getAndProcWorldProp(wprops, "custom_public_text_color");
+	wobj.theme.memberText = getAndProcWorldProp(wprops, "custom_member_text_color");
+	wobj.theme.ownerText = getAndProcWorldProp(wprops, "custom_owner_text_color");
+
+	wobj.opts.nsfw = getAndProcWorldProp(wprops, "page_is_nsfw");
+	wobj.opts.squareChars = getAndProcWorldProp(wprops, "square_chars");
+	wobj.opts.noLogEdits = getAndProcWorldProp(wprops, "no_log_edits");
+	wobj.opts.halfChars = getAndProcWorldProp(wprops, "half_chars");
+	wobj.opts.desc = getAndProcWorldProp(wprops, "meta_desc");
+
+	wobj.background.url = getAndProcWorldProp(wprops, "background");
+	wobj.background.x = getAndProcWorldProp(wprops, "background_x");
+	wobj.background.y = getAndProcWorldProp(wprops, "background_y");
+	wobj.background.w = getAndProcWorldProp(wprops, "background_w");
+	wobj.background.h = getAndProcWorldProp(wprops, "background_h");
+	wobj.background.rmod = getAndProcWorldProp(wprops, "background_rmod");
+	wobj.background.alpha = getAndProcWorldProp(wprops, "background_alpha");
+
+	wobj.views = getAndProcWorldProp(wprops, "views");
+}
+
+var worldCache = {};
+var worldFetchQueueIndex = {};
+var worldRenameMap = {};
+// either returns world-object or null
+async function getWorld(name, canCreate) {
+	if(typeof name != "string") name = "";
+	var worldHash = name.toUpperCase();
+	// yield to world-rename operations
+	if(worldRenameMap[worldHash]) {
+		var qobj = worldRenameMap[worldHash];
+		return new Promise(function(res) {
+			qobj.promises.push(res);
+		});
+	}
+	// yield to operations that are already fetching the world
+	if(worldFetchQueueIndex[worldHash]) {
+		var qobj = worldFetchQueueIndex[worldHash];
+		return new Promise(function(res) {
+			qobj.promises.push({
+				promise: res,
+				creatable: canCreate
+			});
+		});
+	}
+	var cacheObject = worldCache[worldHash];
+	// retrieve from cache; if a world can be created but it's marked as nonexistant in cache, then create it
+	if(cacheObject) {
+		if(!cacheObject.exists) {
+			if(canCreate) {
+				delete worldCache[worldHash];
+			} else {
+				return null;
+			}
+		} else {
+			cacheObject.handles++;
+			cacheObject.lastAccessed = Date.now();
+			return cacheObject;
+		}
+	}
+	var qobj = {
+		promises: [] // to be resolved after loading
+	};
+	worldFetchQueueIndex[worldHash] = qobj;
+	var world = await fetchWorld(name);
+	if(world) {
+		var wobj = makeWorldObject();
+
+		loadWorldIntoObject(world, wobj);
+		wobj.exists = true;
+
+		worldCache[worldHash] = wobj;
+		var resQueue = worldFetchQueueIndex[worldHash].promises;
+
+		// load all member ids
+		var members = await fetchWorldMembersById(world.id);
+		var map = {};
+		for(var i = 0; i < members.length; i++) {
+			var key = members[i].user_id;
+			map[key] = true;
+		}
+		wobj.members.map = map;
+		wobj.lastAccessed = Date.now();
+
+		for(var i = 0; i < resQueue.length; i++) {
+			var queueRes = resQueue[i];
+			wobj.handles++;
+			queueRes.promise(wobj);
+		}
+		delete worldFetchQueueIndex[worldHash];
+		wobj.handles++;
+		return wobj;
+	} else {
+		var wobj = null;
+		if(!canCreate) {
+			wobj = makeWorldObject();
+			wobj.exists = false;
+			worldCache[worldHash] = wobj;
+			var resQueue = worldFetchQueueIndex[worldHash].promises;
+			delete worldFetchQueueIndex[worldHash];
+			var hasConvertedToCreatable = false;
+			for(var i = 0; i < resQueue.length; i++) {
+				var queueRes = resQueue[i];
+				if(queueRes.creatable) {
+					hasConvertedToCreatable = true;
+					break;
+				}
+			}
+			for(var i = 0; i < resQueue.length; i++) {
+				var queueRes = resQueue[i];
+				if(hasConvertedToCreatable) {
+					queueRes.promise(await getWorld(name, true));
+				} else {
+					queueRes.promise(null);
+				}
+			}
+			if(hasConvertedToCreatable) {
+				return await getWorld(name, true);
+			} else {
+				return null;
+			}
+		}
+		var worldRow = await insertWorld(name);
+		wobj = makeWorldObject();
+		loadWorldIntoObject(worldRow, wobj);
+		wobj.exists = true;
+		wobj.lastAccessed = Date.now();
+		worldCache[worldHash] = wobj;
+		var resQueue = worldFetchQueueIndex[worldHash].promises;
+		for(var i = 0; i < resQueue.length; i++) {
+			var queueRes = resQueue[i];
+			wobj.handles++;
+			queueRes.promise(wobj);
+		}
+		delete worldFetchQueueIndex[worldHash];
+		wobj.handles++;
+		return wobj;
+	}
+}
+
+async function commitWorld(world) {
+	var upd = world.modifications;
+
+	var worldId = world.id;
+
+	var propVals = [
+		"feature/chat",
+		"feature/showCursor",
+		"feature/colorText",
+		"theme/menu",
+		"theme/publicText",
+		"theme/memberText",
+		"theme/ownerText",
+		"opts/nsfw",
+		"opts/squareChars",
+		"opts/noLogEdits",
+		"opts/halfChars",
+		"opts/desc",
+		"background/url",
+		"background/x",
+		"background/y",
+		"background/w",
+		"background/h",
+		"background/rmod",
+		"background/alpha",
+		"views"
+	];
+
+	var properties = {
+		chat_permission: world.feature.chat,
+		show_cursor: world.feature.showCursor,
+		color_text: world.feature.colorText,
+		custom_menu_color: world.theme.menu,
+		custom_public_text_color: world.theme.publicText,
+		custom_member_text_color: world.theme.memberText,
+		custom_owner_text_color: world.theme.ownerText,
+		page_is_nsfw: world.opts.nsfw,
+		square_chars: world.opts.squareChars,
+		no_log_edits: world.opts.noLogEdits,
+		half_chars: world.opts.halfChars,
+		meta_desc: world.opts.desc,
+		background: world.background.url,
+		background_x: world.background.x,
+		background_y: world.background.y,
+		background_w: world.background.w,
+		background_h: world.background.h,
+		background_rmod: world.background.rmod,
+		background_alpha: world.background.alpha,
+		views: world.views
+	};
+	for(var prop in properties) {
+		properties[prop] = normWorldProp(properties[prop], prop);
+	}
+
+	var colVals = [
+		"ownerId",
+		"writability",
+		"readability",
+		"feature/goToCoord",
+		"feature/memberTilesAddRemove",
+		"feature/paste",
+		"feature/coordLink",
+		"feature/urlLink",
+		"theme/bg",
+		"theme/cursor",
+		"theme/guestCursor",
+		"theme/color",
+		"theme/tileOwner",
+		"theme/tileMember"
+	];
+
+	var cols = {
+		owner_id: world.ownerId,
+		writability: world.writability,
+		readability: world.readability,
+		feature_go_to_coord: world.feature.goToCoord,
+		feature_membertiles_addremove: world.feature.memberTilesAddRemove,
+		feature_paste: world.feature.paste,
+		feature_coord_link: world.feature.coordLink,
+		feature_url_link: world.feature.urlLink,
+		custom_bg: world.theme.bg,
+		custom_cursor: world.theme.cursor,
+		custom_guest_cursor: world.theme.guestCursor,
+		custom_color: world.theme.color,
+		custom_tile_owner: world.theme.tileOwner,
+		custom_tile_member: world.theme.tileMember
+	};
+
+	var propUpd = false;
+	var colUpd = false;
+
+	for(var p = 0; p < propVals.length; p++) {
+		var key = propVals[p];
+		if(upd[key]) {
+			propUpd = true;
+			delete upd[key];
+		}
+	}
+
+	for(var p = 0; p < colVals.length; p++) {
+		var key = colVals[p];
+		if(upd[key]) {
+			colUpd = true;
+			delete upd[key];
+		}
+	}
+
+	if(propUpd) {
+		var propStr = JSON.stringify(properties);
+		await db.run("UPDATE world SET properties=? WHERE id=?", [propStr, worldId]);
+	}
+	if(colUpd) {
+		await db.run(`
+			UPDATE world SET (
+				owner_id, feature_go_to_coord, feature_membertiles_addremove,
+				feature_paste, feature_coord_link, feature_url_link, custom_bg,
+				custom_cursor, custom_guest_cursor, custom_color, custom_tile_owner,
+				custom_tile_member, writability, readability
+			) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) WHERE id=?
+		`, [
+			cols.owner_id, cols.feature_go_to_coord, cols.feature_membertiles_addremove,
+			cols.feature_paste, cols.feature_coord_link, cols.feature_url_link, cols.custom_bg,
+			cols.custom_cursor, cols.custom_guest_cursor, cols.custom_color, cols.custom_tile_owner,
+			cols.custom_tile_member, cols.writability, cols.readability,
+			worldId
+		]);
+	}
+
+	var dbQueries = [];
+	// perform membership updates
+	var memUpd = world.members.updates;
+	for(var uid in memUpd) {
+		var type = memUpd[uid];
+		delete memUpd[uid];
+		if(type == "REMOVE") {
+			dbQueries.push(["DELETE FROM whitelist WHERE user_id=? AND world_id=?", [uid, worldId]]);
+		} else if(type == "ADD") {
+			dbQueries.push(["INSERT INTO whitelist VALUES(null, ?, ?, ?)", [uid, worldId, Date.now()]]);
+		}
+	}
+	for(var i = 0; i < dbQueries.length; i++) {
+		var query = dbQueries[i];
+		var sql = query[0];
+		var arg = query[1];
+		await db.run(sql, arg);
+	}
+}
+
+async function commitAllWorlds() {
+	var updateResp = [];
+	for(var worldName in worldCache) {
+		var world = worldCache[worldName];
+		if(!world.exists) continue;
+		var updProm = commitWorld(world);
+		updateResp.push(updProm);
+	}
+	try {
+		await Promise.all(updateResp);
+	} catch(e) {
+		handle_error(e, true);
+	}
+}
+
+function invalidateWorldCache() {
+	for(var worldName in worldCache) {
+		var world = worldCache[worldName];
+		if(!world.exists) {
+			delete worldCache[worldName];
+			continue;
+		}
+		if(world.handles != 0) {
+			continue;
+		}
+		var modLen = Object.keys(world.modifications).length;
+		if(modLen > 0) continue;
+		var memModLen = Object.keys(world.members.updates).length;
+		if(memModLen > 0) continue;
+		if(!world.lastAccessed) continue;
+		var accDiff = Date.now() - world.lastAccessed;
+		if(accDiff >= 1000 * 60 * 5) {
+			delete worldCache[worldName];
+		}
+	}
+}
+
+function releaseWorld(obj) {
+	if(!obj) return;
+	obj.handles--;
+	if(obj.handles < 0) {
+		console.log("World handle corruption", obj);
+	}
+}
+function isSpecialNamespace(world) {
+	world = sanitizeWorldname(world);
+	if(!world) return false;
+	return world[0].toLowerCase() == "w";
+}
+
+async function getOrCreateWorld(name, mustCreate) {
+	if(typeof name != "string") name = "";
+	var canCreate = true;
+	if(!name.match(/^([\w\.\-]*)$/g)) {
+		canCreate = false;
+	}
+	if(isSpecialNamespace(name)) {
+		canCreate = true;
+	}
+	if(name.length > 10000) {
+		canCreate = false;
+	}
+	return await getWorld(name, canCreate || mustCreate);
+}
+
+async function fetchWorldMembershipsByUserId(userId) {
+	// pull membership information from the database and the cache
+	var whitelists = await db.all("SELECT * FROM whitelist WHERE user_id=?", userId);
+	var memberWorldIds = {};
+	for(var i = 0; i < whitelists.length; i++) {
+		memberWorldIds[whitelists[i].world_id] = 1;
+	}
+	for(var i in worldCache) {
+		var wobj = worldCache[i];
+		if(wobj && wobj.members.map[userId]) {
+			memberWorldIds[wobj.id] = 1;
+		}
+	}
+	return Object.keys(memberWorldIds);
+}
+
+async function fetchOwnedWorldsByUserId(userId) {
+	var owned = await db.all("SELECT name FROM world WHERE owner_id=? LIMIT 10000", userId);
+	var ownedWorldObjs = {};
+	for(var i = 0; i < owned.length; i++) {
+		var worldname = owned[i].name;
+		var world = await getOrCreateWorld(worldname);
+		if(!world) continue;
+		ownedWorldObjs[world.id] = world;
+		releaseWorld(world);
+	}
+	for(var i in worldCache) {
+		var wobj = worldCache[i];
+		if(wobj.exists && wobj.ownerId == userId) {
+			ownedWorldObjs[wobj.id] = wobj;
+		}
+	}
+	return Object.values(ownedWorldObjs);
+}
+
+async function revokeMembershipByWorldName(worldName, userId) {
+	var world = await getOrCreateWorld(worldName);
+	if(!world) return;
+	// remove member
+	if(world.members.map[userId]) {
+		delete world.members.map[userId];
+	}
+	if(world.members.updates[userId]) {
+		var type = world.members.updates[userId];
+		if(type == "ADD") {
+			delete world.members.updates[userId];
+		}
+	} else {
+		world.members.updates[userId] = "REMOVE";
+	}
+	releaseWorld(world);
+}
+
+async function promoteMembershipByWorldName(worldName, userId) {
+	var world = await getOrCreateWorld(worldName);
+	if(!world) return;
+	// add member
+	world.members.map[userId] = true;
+	if(world.members.updates[userId]) {
+		var type = world.members.updates[userId];
+		if(type == "REMOVE") {
+			delete world.members.updates[userId];
+		}
+	} else {
+		world.members.updates[userId] = "ADD";
+	}
+	releaseWorld(world);
+}
+
+async function claimWorldByName(worldName, user) {
+	var validation = await validateWorldClaim(worldName, user);
+	if(validation.error) { // an error occurred while claiming
+		return {
+			success: false,
+			message: validation.message
+		};
+	}
+	var world = validation.world;
+	world.ownerId = user.id;
+	modifyWorldProp(world, "ownerId");
+	return {
+		success: true,
+		world: world,
+		message: validation.message
+	};
+}
+
+async function renameWorld(world, newName, user) {
+	var target = await getWorld(newName, false);
+
+	var renameCheck = await validateWorldClaim(newName, user, true);
+	if(renameCheck.error) {
+		releaseWorld(target);
+		return {
+			error: true,
+			message: renameCheck.message
+		}
+	}
+
+	// if the destination worldname already exists, then swap names
+	if(target && target.ownerId != null && target.ownerId != user.id) {
+		releaseWorld(target);
+		return {
+			error: true,
+			message: "World already has an owner"
+		};
+	}
+
+	var srcHash = world.name.toUpperCase();
+	var destHash = newName.toUpperCase();
+
+	if(worldRenameMap[srcHash] || worldRenameMap[destHash]) {
+		releaseWorld(target);
+		return {
+			error: true,
+			message: "World has already been renamed"
+		};
+	}
+	// Lock both worldnames until DB operation finishes
+	var srcProm = [];
+	var destProm = [];
+	worldRenameMap[srcHash] = {
+		promises: srcProm
+	};
+	worldRenameMap[destHash] = {
+		promises: destProm
+	};
+	if(target) {
+		delete worldCache[destHash];
+	}
+	var oldWorldName = world.name;
+	delete worldCache[srcHash];
+	world.name = newName;
+	worldCache[destHash] = world;
+	var targetTempName = null;
+	var internalError = false;
+	try {
+		if(target) {
+			worldCache[srcHash] = target;
+			target.name = oldWorldName;
+			targetTempName = oldWorldName + "-" + crypto.randomBytes(10).toString("hex");
+			await db.run("UPDATE world SET name=? WHERE id=?", [targetTempName, target.id]);
+		}
+		await db.run("UPDATE world SET name=? WHERE id=?", [newName, world.id]);
+		if(target) {
+			await db.run("UPDATE world SET name=? WHERE id=?", [oldWorldName, target.id]);
+		}
+	} catch(e) {
+		internalError = true;
+	}
+	delete worldRenameMap[srcHash];
+	delete worldRenameMap[destHash];
+	for(var i = 0; i < srcProm.length; i++) {
+		srcProm[i]();
+	}
+	for(var i = 0; i < destProm.length; i++) {
+		destProm[i]();
+	}
+	if(internalError) {
+		releaseWorld(target);
+		return {
+			error: true,
+			message: "Internal server error"
+		}
+	}
+	releaseWorld(target);
+	return {
+		success: true,
+		message: "Successfully renamed the world"
+	}
+}
+
+async function canViewWorld(world, user) {
+	var permissions = {
+		member: false,
+		owner: false
+	};
+
+	var is_owner = world.ownerId == user.id;
+
+	if(world.readability == 2 && !is_owner) { // owner only
+		return false;
+	}
+
+	var userId = user.id;
+	var memberList = world.members.map;
+	
+	var is_member = Boolean(memberList[userId]);
+
+	// member and owner only
+	if(world.readability == 1 && !is_member && !is_owner) {
+		return false;
+	}
+
+	permissions.member = is_member || is_owner;
+	permissions.owner = is_owner;
+	
+	return permissions;
+}
+
+async function validateWorldClaim(worldname, user, isRenaming) {
+	var worldnamePath = sanitizeWorldname(worldname);
+	if(worldname.length > 10000) {
+		return {
+			error: true,
+			message: "Worldname is too long"
+		};
+	}
+	if(!worldnamePath) {
+		return {
+			error: true,
+			message: "Invalid worldname - it must contain the following characters: a-z A-Z 0-9 . _ -"
+		};
+	}
+	// check if not main page ("")
+	if(!(worldnamePath.length == 1 && worldnamePath[0] == "")) {
+		for(var i = 0; i < worldnamePath.length; i++) {
+			if(worldnamePath[i] == "") {
+				return {
+					error: true,
+					message: "Worldname contains empty segments (make sure the name does not begin or end with /)"
+				};
+			}
+		}
+	}
+	if(worldnamePath.length == 1) {
+		var newname = worldnamePath[0];
+		if(newname == "" && !user.superuser) {
+			return {
+				error: true,
+				message: "Cannot claim world"
+			};
+		}
+		if(isRenaming) {
+			return {
+				error: false
+			};
+		}
+		var world = await getOrCreateWorld(newname);
+		if(world) {
+			releaseWorld(world);
+			if(world.ownerId == null) {
+				return {
+					world: world,
+					message: "Successfully claimed the world"
+				};
+			} else {
+				return {
+					error: true,
+					message: "World already has an owner"
+				};
+			}
+		} else {
+			return {
+				error: true,
+				message: "Unable to create the world"
+			};
+		}
+	} else if(worldnamePath.length > 1) {
+		var baseName = worldnamePath[0];
+		var baseWorld = await getOrCreateWorld(baseName);
+		// world does not exist nor is owned by the user
+		if(!baseWorld || (baseWorld && baseWorld.ownerId != user.id)) {
+			releaseWorld(baseWorld);
+			return {
+				error: true,
+				message: "You do not own the base world in the path"
+			};
+		}
+		var fullWorldname = worldnamePath.join("/");
+		var subWorld = await getOrCreateWorld(fullWorldname, true);
+		releaseWorld(baseWorld);
+		releaseWorld(subWorld);
+		if(isRenaming) {
+			return {
+				error: false
+			};
+		}
+		// already owned
+		if(subWorld.ownerId != null) {
+			return {
+				error: true,
+				message: "You already own this subdirectory world"
+			};
+		}
+		// subworld is created, now claim it
+		return {
+			world: subWorld,
+			message: "Successfully claimed the subdirectory world"
+		};
+	}
+	return {
+		error: true,
+		message: "Unexpected error"
+	};
+}
+
+module.exports.sanitizeWorldname = sanitizeWorldname;
+module.exports.modifyWorldProp = modifyWorldProp;
+module.exports.commitAllWorlds = commitAllWorlds;
+module.exports.releaseWorld = releaseWorld;
+module.exports.getOrCreateWorld = getOrCreateWorld;
+module.exports.fetchWorldMembershipsByUserId = fetchWorldMembershipsByUserId;
+module.exports.fetchOwnedWorldsByUserId = fetchOwnedWorldsByUserId;
+module.exports.revokeMembershipByWorldName = revokeMembershipByWorldName;
+module.exports.promoteMembershipByWorldName = promoteMembershipByWorldName;
+module.exports.claimWorldByName = claimWorldByName;
+module.exports.renameWorld = renameWorld;
+module.exports.canViewWorld = canViewWorld;
