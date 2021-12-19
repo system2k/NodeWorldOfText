@@ -41,18 +41,18 @@ function pushNumber(ar, number) {
 
 function stringToUTF8(str) {
 	var array = [];
-	for (var i = 0; i < str.length; ++i) {
+	for(var i = 0; i < str.length; i++) {
 		var u = str.charCodeAt(i);
-		if (u >= 55296 && u <= 57343) u = 65536 + ((u & 1023) << 10) | str.charCodeAt(++i) & 1023;
-		if (u <= 127) {
+		if(u >= 55296 && u <= 57343) u = 65536 + ((u & 1023) << 10) | str.charCodeAt(i++) & 1023;
+		if(u <= 127) {
 			array.push(u);
-		} else if (u <= 2047) {
+		} else if(u <= 2047) {
 			array.push(192 | u >> 6, 128 | u & 63);
-		} else if (u <= 65535) {
+		} else if(u <= 65535) {
 			array.push(224 | u >> 12, 128 | u >> 6 & 63, 128 | u & 63);
-		} else if (u <= 2097151) {
+		} else if(u <= 2097151) {
 			array.push(240 | u >> 18, 128 | u >> 12 & 63, 128 | u >> 6 & 63, 128 | u & 63);
-		} else if (u <= 67108863) {
+		} else if(u <= 67108863) {
 			array.push(248 | u >> 24, 128 | u >> 18 & 63, 128 | u >> 12 & 63, 128 | u >> 6 & 63, 128 | u & 63);
 		} else {
 			array.push(252 | u >> 30, 128 | u >> 24 & 63, 128 | u >> 18 & 63, 128 | u >> 12 & 63, 128 | u >> 6 & 63, 128 | u & 63);

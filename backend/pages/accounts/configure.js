@@ -114,10 +114,15 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var owner_text_color = world.theme.ownerText || "default";
 
 	var is_ratelim_enabled = false;
-	var ratelim_char = 0;
+	var ratelim_char = 10240;
 	if(world.opts.charRate) {
 		is_ratelim_enabled = true;
 		ratelim_char = world.opts.charRate.split("/")[0];
+	}
+
+	var is_memkey_enabled = false;
+	if(world.opts.memKey) {
+		is_memkey_enabled = true;
 	}
 
 	var square_chars = world.opts.squareChars;
@@ -171,6 +176,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 		is_ratelim_enabled,
 		ratelim_char,
+		is_memkey_enabled,
+		memkey_value: world.opts.memKey,
 
 		background_path: world.background.url,
 		background_x: world.background.x,
@@ -237,7 +244,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	if(post_data.form == "add_member") {
 		var username = post_data.add_member;
-		var date = Date.now(); // TODO: member-add dates
 
 		var adduser;
 		var user_id;
@@ -251,7 +257,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			return await dispage("accounts/configure", { message: "User not found" }, req, serve, vars, evars);
 		}
 
-		// TODO: check if ids work for uvias system
 		if(accountSystem == "uvias") {
 			user_id = "x" + adduser.uid;
 		} else if(accountSystem == "local") {
@@ -282,8 +287,9 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		wss.clients.forEach(function(e) {
 			if(!e.sdata.userClient) return;
 			if(e.sdata.world.id == world.id) {
-				var isOwner = world.ownerId == user.id;
-				var isMember = !!world.members.map[user.id];
+				var memkeyAccess = world.opts.memKey && world.opts.memKey == e.sdata.keyQuery;
+				var isOwner = world.ownerId == e.sdata.user.id;
+				var isMember = !!world.members.map[e.sdata.user.id] || memkeyAccess;
 				if(readability == 1 && !isMember && !isOwner) {
 					e.close();
 					return;
@@ -419,6 +425,8 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			}
 		}, world.id);
 	} else if(post_data.form == "misc") {
+		var msgResponseMisc = [];
+		var memkeyUpdated = false;
 		if(user.superuser) {
 			if(!post_data.world_background) {
 				world.background.url = "";
@@ -495,15 +503,37 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 		if(post_data.ratelim_enabled == "on") {
 			var val = post_data.ratelim_value;
-			if(!val) val = 20480;
+			if(!val) val = 4096;
 			val = san_nbr(val);
-			if(val < 1) val = 1;
+			if(val < 0) val = 0;
 			if(val > 20480) val = 20480;
 			world.opts.charRate = val + "/" + 1000;
 		} else {
 			world.opts.charRate = "";
 		}
 		modifyWorldProp(world, "opts/charRate");
+
+		if(post_data.memkey_enabled == "on") {
+			var key = post_data.memkey_value;
+			if(!key || typeof key != "string") {
+				msgResponseMisc.push("Member key removed");
+				world.opts.memKey = "";
+				modifyWorldProp(world, "opts/memKey");
+				memkeyUpdated = true;
+			} else {
+				if(key.length > 64) {
+					msgResponseMisc.push("Member key is too long (max 64 chars)");
+				} else {
+					world.opts.memKey = key;
+					modifyWorldProp(world, "opts/memKey");
+					memkeyUpdated = true;
+				}
+			}
+		} else {
+			world.opts.memKey = "";
+			modifyWorldProp(world, "opts/memKey");
+			memkeyUpdated = true;
+		}
 
 		if(post_data.meta_desc) {
 			var mdesc = post_data.meta_desc;
@@ -536,6 +566,26 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		modifyWorldProp(world, "opts/squareChars");
 		modifyWorldProp(world, "opts/halfChars");
 
+		if(memkeyUpdated) {
+			wss.clients.forEach(function(e) {
+				if(!e.sdata.userClient) return;
+				if(e.sdata.world.id == world.id) {
+					var readability = world.readability;
+					var memkeyAccess = world.opts.memKey && world.opts.memKey == e.sdata.keyQuery;
+					var isOwner = world.ownerId == e.sdata.user.id;
+					var isMember = !!world.members.map[e.sdata.user.id] || memkeyAccess;
+					if(readability == 1 && !isMember && !isOwner) {
+						e.close();
+						return;
+					}
+					if(readability == 2 && !isOwner) {
+						e.close();
+						return;
+					}
+				}
+			});
+		}
+
 		// the world name is being changed
 		var new_name = post_data.new_world_name;
 		if(typeof new_name == "string" && new_name && new_name != world.name) {
@@ -547,6 +597,11 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			} else if(stat.success) {
 				new_world_name = new_name;
 			}
+		}
+		if(msgResponseMisc.length) {
+			return await dispage("accounts/configure", {
+				misc_message: msgResponseMisc.join("<br>")
+			}, req, serve, vars, evars);
 		}
 	} else if(post_data.form == "action") {
 		if("unclaim" in post_data) {

@@ -4,11 +4,11 @@ var intv;
 var handle_error;
 var db;
 module.exports.main = async function(vars) {
-    intv = vars.intv;
-    handle_error = vars.handle_error;
-    db = vars.db;
+	intv = vars.intv;
+	handle_error = vars.handle_error;
+	db = vars.db;
 
-    intv.worldCacheInvalidation = setInterval(function() {
+	intv.worldCacheInvalidation = setInterval(function() {
 		invalidateWorldCache();
 	}, 1000 * 60); // 1 minute
 
@@ -34,7 +34,8 @@ var world_default_props = {
 	square_chars: false,
 	no_log_edits: false,
 	half_chars: false,
-    char_rate: "",
+	char_rate: "",
+	mem_key: "",
 	background: "",
 	background_x: 0,
 	background_y: 0,
@@ -98,6 +99,15 @@ async function fetchWorldMembersById(worldId) {
 	return members;
 }
 
+function getWorldNameFromCacheById(id) {
+	for(var i in worldCache) {
+		if(worldCache[i].id == id) {
+			return worldCache[i].name;
+		}
+	}
+	return "UNKNOWN~" + id;
+}
+
 function makeWorldObject() {
 	// return world object with all values "zeroed"
 	var world = {
@@ -134,7 +144,8 @@ function makeWorldObject() {
 			squareChars: false,
 			noLogEdits: false,
 			halfChars: false,
-            charRate: "",
+			charRate: "",
+			memKey: "",
 			desc: ""
 		},
 		background: {
@@ -213,7 +224,8 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.opts.squareChars = getAndProcWorldProp(wprops, "square_chars");
 	wobj.opts.noLogEdits = getAndProcWorldProp(wprops, "no_log_edits");
 	wobj.opts.halfChars = getAndProcWorldProp(wprops, "half_chars");
-    wobj.opts.charRate = getAndProcWorldProp(wprops, "char_rate");
+	wobj.opts.charRate = getAndProcWorldProp(wprops, "char_rate");
+	wobj.opts.memKey = getAndProcWorldProp(wprops, "mem_key");
 	wobj.opts.desc = getAndProcWorldProp(wprops, "meta_desc");
 
 	wobj.background.url = getAndProcWorldProp(wprops, "background");
@@ -304,6 +316,8 @@ async function getWorld(name, canCreate) {
 			var resQueue = worldFetchQueueIndex[worldHash].promises;
 			delete worldFetchQueueIndex[worldHash];
 			var hasConvertedToCreatable = false;
+			// If the world does not exist with canCreate set to false, but a function has tried to fetch it with
+			// canCreate set to true, then re-fetch the world for all calls with canCreate set to true.
 			for(var i = 0; i < resQueue.length; i++) {
 				var queueRes = resQueue[i];
 				if(queueRes.creatable) {
@@ -360,7 +374,7 @@ async function commitWorld(world) {
 		"opts/squareChars",
 		"opts/noLogEdits",
 		"opts/halfChars",
-        "opts/charRate",
+		"opts/charRate",
 		"opts/desc",
 		"background/url",
 		"background/x",
@@ -384,7 +398,8 @@ async function commitWorld(world) {
 		square_chars: world.opts.squareChars,
 		no_log_edits: world.opts.noLogEdits,
 		half_chars: world.opts.halfChars,
-        char_rate: world.opts.charRate,
+		char_rate: world.opts.charRate,
+		mem_key: world.opts.memKey,
 		meta_desc: world.opts.desc,
 		background: world.background.url,
 		background_x: world.background.x,
@@ -477,12 +492,12 @@ async function commitWorld(world) {
 	// perform membership updates
 	var memUpd = world.members.updates;
 	for(var uid in memUpd) {
-		var type = memUpd[uid];
+		var upd = memUpd[uid];
 		delete memUpd[uid];
-		if(type == "REMOVE") {
+		if(upd.type == "REMOVE") {
 			dbQueries.push(["DELETE FROM whitelist WHERE user_id=? AND world_id=?", [uid, worldId]]);
-		} else if(type == "ADD") {
-			dbQueries.push(["INSERT INTO whitelist VALUES(null, ?, ?, ?)", [uid, worldId, Date.now()]]);
+		} else if(upd.type == "ADD") {
+			dbQueries.push(["INSERT INTO whitelist VALUES(null, ?, ?, ?)", [uid, worldId, upd.date]]);
 		}
 	}
 	for(var i = 0; i < dbQueries.length; i++) {
@@ -586,10 +601,10 @@ async function fetchOwnedWorldsByUserId(userId) {
 	}
 	for(var i in worldCache) {
 		var wobj = worldCache[i];
-        if(!wobj.exists) continue;
-        if(wobj.ownerId == userId) {
-            ownedWorldObjs[wobj.id] = wobj;
-        }
+		if(!wobj.exists) continue;
+		if(wobj.ownerId == userId) {
+			ownedWorldObjs[wobj.id] = wobj;
+		}
 	}
 	return Object.values(ownedWorldObjs);
 }
@@ -602,12 +617,14 @@ async function revokeMembershipByWorldName(worldName, userId) {
 		delete world.members.map[userId];
 	}
 	if(world.members.updates[userId]) {
-		var type = world.members.updates[userId];
-		if(type == "ADD") {
+		var upd = world.members.updates[userId];
+		if(upd.type == "ADD") {
 			delete world.members.updates[userId];
 		}
 	} else {
-		world.members.updates[userId] = "REMOVE";
+		world.members.updates[userId] = {
+			type: "REMOVE"
+		};
 	}
 	releaseWorld(world);
 }
@@ -618,12 +635,15 @@ async function promoteMembershipByWorldName(worldName, userId) {
 	// add member
 	world.members.map[userId] = true;
 	if(world.members.updates[userId]) {
-		var type = world.members.updates[userId];
-		if(type == "REMOVE") {
+		var upd = world.members.updates[userId];
+		if(upd.type == "REMOVE") {
 			delete world.members.updates[userId];
 		}
 	} else {
-		world.members.updates[userId] = "ADD";
+		world.members.updates[userId] = {
+			type: "ADD",
+			date: Date.now()
+		};
 	}
 	releaseWorld(world);
 }
@@ -674,7 +694,7 @@ async function renameWorld(world, newName, user) {
 		releaseWorld(target);
 		return {
 			error: true,
-			message: "World has already been renamed"
+			message: "World is currently busy"
 		};
 	}
 	// Lock both worldnames until DB operation finishes
@@ -699,7 +719,7 @@ async function renameWorld(world, newName, user) {
 		if(target) {
 			worldCache[srcHash] = target;
 			target.name = oldWorldName;
-            // TODO: swapping must be done in a better way
+			// TODO: swapping must be done in a better way
 			targetTempName = oldWorldName + "-" + crypto.randomBytes(10).toString("hex");
 			await db.run("UPDATE world SET name=? WHERE id=?", [targetTempName, target.id]);
 		}
@@ -708,7 +728,7 @@ async function renameWorld(world, newName, user) {
 			await db.run("UPDATE world SET name=? WHERE id=?", [oldWorldName, target.id]);
 		}
 	} catch(e) {
-        handle_error(e);
+		handle_error(e, true);
 		internalError = true;
 	}
 	delete worldRenameMap[srcHash];
@@ -733,7 +753,7 @@ async function renameWorld(world, newName, user) {
 	}
 }
 
-async function canViewWorld(world, user) {
+async function canViewWorld(world, user, opts) {
 	var permissions = {
 		member: false,
 		owner: false
@@ -749,6 +769,11 @@ async function canViewWorld(world, user) {
 	var memberList = world.members.map;
 	
 	var is_member = Boolean(memberList[userId]);
+	if(opts) {
+		if(opts.memkeyAccess) {
+			is_member = true;
+		}
+	}
 
 	// member and owner only
 	if(world.readability == 1 && !is_member && !is_owner) {
@@ -870,3 +895,13 @@ module.exports.promoteMembershipByWorldName = promoteMembershipByWorldName;
 module.exports.claimWorldByName = claimWorldByName;
 module.exports.renameWorld = renameWorld;
 module.exports.canViewWorld = canViewWorld;
+module.exports.getWorldNameFromCacheById = getWorldNameFromCacheById;
+module.exports.getWorld = getWorld;
+
+// subsystems.world_mgr.debug.worldCache
+// used to debug a problem with the cache
+module.exports.debug = {
+	worldCache,
+	worldFetchQueueIndex,
+	worldRenameMap
+};

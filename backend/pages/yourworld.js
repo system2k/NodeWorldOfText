@@ -33,7 +33,9 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		releaseWorld(world);
 	});
 
-	var read_permission = await canViewWorld(world, user, db);
+	var memkeyAccess = (query_data.key && query_data.key == world.opts.memKey);
+
+	var read_permission = await canViewWorld(world, user, { memkeyAccess });
 	if(!read_permission) {
 		return serve(null, null, {
 			redirect: "/accounts/private/"
@@ -171,13 +173,13 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var post_data = evars.post_data;
 	var path = evars.path;
 	var user = evars.user;
+	var setCallback = evars.setCallback;
 
 	var db = vars.db;
 	var modules = vars.modules;
 	var getOrCreateWorld = vars.getOrCreateWorld;
 	var canViewWorld = vars.canViewWorld;
 	var releaseWorld = vars.releaseWorld;
-	var setCallback = vars.setCallback;
 
 	var world = await getOrCreateWorld(path);
 	if(!world) return serve(null, 404);
@@ -186,7 +188,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		releaseWorld(world);
 	});
 
-	var read_permission = await canViewWorld(world, user, db);
+	var read_permission = await canViewWorld(world, user);
 	if(!read_permission) {
 		// no permission to view world?
 		return serve(null, 403);

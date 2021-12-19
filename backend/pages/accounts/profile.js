@@ -36,7 +36,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			member_plural: plural(member_total),
 			views_plural: plural(views),
 			views,
-			name: owned.name
+			name: owned.name,
+			mem_key: owned.opts.memKey
 		});
 	}
 

@@ -16,6 +16,8 @@
 
 		updateRatelimBox();
 		ratelim_enabled.onclick = updateRatelimBox;
+		updateMemkeyBox();
+		memkey_enabled.onclick = updateMemkeyBox;
 	}
 	function action_confirm() {
 		var msg = "";
@@ -53,6 +55,17 @@
 			ratelim_value.disabled = false;
 		} else {
 			ratelim_value.disabled = true;
+		}
+	}
+
+	function updateMemkeyBox() {
+		var memkey_enabled = document.getElementById("memkey_enabled");
+		var memkey_value = document.getElementById("memkey_value");
+		var checked = memkey_enabled.checked;
+		if(checked) {
+			memkey_value.disabled = false;
+		} else {
+			memkey_value.disabled = true;
 		}
 	}
 </script>
@@ -109,6 +122,9 @@
 				<input type="hidden" name="form" value="access_perm">
 				<input type="submit" value="Submit">
 			</form>
+			{% if is_memkey_enabled %}
+			<a style="color: red; font-weight: bold;" href="/{{world}}?key={{memkey_value}}">This world has a membership key enabled</a>
+			{% endif %}
 		</div>
 	</div>
 
@@ -196,7 +212,7 @@
 							</select>
 						</td>
 						<td class="feature_description">
-							Allows users to chat using the chatbox. This is not affected by read permissions or write permissions.
+							Allows users to chat using the chatbox.
 						</td>
 					</tr>
 					<tr>
@@ -441,6 +457,20 @@
 							<div>
 								Characters per second:
 								<input id="ratelim_value" name="ratelim_value" type="input" value={{ratelim_char}}>
+							</div>
+						</div>
+					</div>
+					<div style="background-color: #EEEEEE;">
+						<div>
+							<b>Membership Key</b>
+							<br>
+							<div>
+								Enabled
+								<input id="memkey_enabled" name="memkey_enabled" type="checkbox"{%if is_memkey_enabled%} checked{%endif%}>
+							</div>
+							<div>
+								Key:
+								<input id="memkey_value" name="memkey_value" type="input" maxlength="64" value={{memkey_value}}>
 							</div>
 						</div>
 					</div>

@@ -66,9 +66,6 @@ var Permissions = {
 		if(perm == PERM.PUBLIC) { // anyone
 			return true;
 		}
-		if(!user.authenticated) {
-			return false;
-		}
 		if(user.is_owner) {
 			return true;
 		}

@@ -18,7 +18,9 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		releaseWorld(world);
 	});
 
-	var perm = await canViewWorld(world, user);
+	var memkeyAccess = (query_data.key && query_data.key == world.opts.memKey);
+
+	var perm = await canViewWorld(world, user, { memkeyAccess });
 	if(!perm) {
 		return serve(null, 403);
 	}

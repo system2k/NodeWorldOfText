@@ -3,10 +3,6 @@ var emptyWriteResponse = { accepted: [], rejected: {} };
 var editRateLimits = {};
 var tileRateLimits = {};
 
-/*
-	Limit of 20480 edits per second, and 800 unique tiles per second
-*/
-
 var editReqLimit = 512;
 var superuserEditReqLimit = 1280;
 
@@ -127,8 +123,8 @@ module.exports = async function(data, vars, evars) {
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 	var getRestrictions = vars.getRestrictions;
 
-	var charRatePerSecond = 20480;
-	var tileRatePerSecond = 800;
+	var defaultCharRatePerSecond = 10240;
+	var tileRatePerSecond = 256;
 
 	var restr = getRestrictions();
 
@@ -137,8 +133,9 @@ module.exports = async function(data, vars, evars) {
 		bypass_key = NaN;
 	}
 
-	var public_only = data.public_only;
-	var preserve_links = data.preserve_links;
+	var public_only = !!data.public_only;
+	var no_update = !!data.no_update;
+	var preserve_links = !!data.preserve_links;
 
 	var editLimit = editReqLimit;
 	if(user.superuser) {
@@ -150,9 +147,11 @@ module.exports = async function(data, vars, evars) {
 	var no_log_edits = world.opts.noLogEdits;
 	var color_text = world.feature.colorText;
 
+	var memkeyAccess = world.opts.memKey && world.opts.memKey == evars.keyQuery;
+
 	var is_owner = user.id == world.ownerId;
 	is_owner = is_owner || (user.superuser && world.name == "");
-	var is_member = !!world.members.map[user.id] || is_owner;
+	var is_member = !!world.members.map[user.id] || is_owner || memkeyAccess;
 
 	var can_color_text = true;
 	if(color_text == 1 && !is_member) can_color_text = false;
@@ -184,6 +183,7 @@ module.exports = async function(data, vars, evars) {
 		if(!segment || !Array.isArray(segment)) continue;
 		var tileY = san_nbr(segment[0]);
 		var tileX = san_nbr(segment[1]);
+		var charRatePerSecond = defaultCharRatePerSecond;
 
 		var rrate = checkCharrateRestr(restr, ipAddressVal, ipAddressFam, world.name, tileX, tileY);
 		if(rrate != null) {
@@ -194,16 +194,16 @@ module.exports = async function(data, vars, evars) {
 		var char = segment[5];
 		if(typeof char != "string") continue;
 		if(!checkCharRateLimit(editLimiter, charRatePerSecond, 1)) {
-			break;
+			continue;
 		}
 		if(customLimiter) {
 			if(!checkCharRateLimit(customLimiter, customLimit, 1)) {
-				break;
+				continue;
 			}
 		}
 		if(!tiles[tileStr]) {
 			if(!checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world_id)) {
-				break;
+				continue;
 			}
 			tiles[tileStr] = [];
 			tileCount++;
@@ -330,7 +330,7 @@ module.exports = async function(data, vars, evars) {
 		user, world, is_owner, is_member,
 		can_color_text, public_only, no_log_edits, preserve_links,
 		channel,
-		no_update: false
+		no_update
 	});
 
 	var resp = await tile_database.editResponse(call_id);

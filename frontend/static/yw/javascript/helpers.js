@@ -483,7 +483,7 @@ function ReconnectingWebSocket(url) {
 	this.onclose = null;
 	this.onmessage = null;
 	this.onerror = null;
-	this.reconnectTimeout = 100;
+	this.reconnectTimeout = 1000;
 	var closed = false;
 	var self = this;
 	function connect() {

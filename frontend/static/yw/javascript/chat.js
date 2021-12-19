@@ -13,6 +13,7 @@ var chatWriteTmpBuffer   = "";
 var defaultChatColor     = window.localStorage ? parseInt(localStorage.getItem("chatcolor")) : null; // 24-bit Uint
 var chatPageUnreadBar    = null;
 var chatGlobalUnreadBar  = null;
+var chatGreentext        = true;
 
 if(isNaN(defaultChatColor)) {
 	defaultChatColor = null;
@@ -408,6 +409,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 	if(date) dateStr = convertToDate(date);
 	var field = evaluateChatfield(chatfield);
 	var pm = dataObj.privateMessage;
+	var isGreen = false;
 
 	if(chatLimitCombChars) {
 		message = w.split(message);
@@ -415,6 +417,11 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 			message[i] = message[i].slice(0, 5);
 		}
 		message = message.join("");
+	}
+
+	if(chatGreentext && message[0] == ">") {
+		message = message.substr(1);
+		isGreen = true;
 	}
 
 	if(!op) {
@@ -508,6 +515,10 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 		} else if(pm == "from_me") {
 			pmDom.innerText = "Me -> ";
 		}
+	}
+
+	if(isGreen) {
+		message = "<span style=\"color: #789922\">&gt;" + message + "</span>";
 	}
 
 	var msgDom = document.createElement("span");

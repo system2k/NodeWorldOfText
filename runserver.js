@@ -816,6 +816,7 @@ var promoteMembershipByWorldName = subsystems.world_mgr.promoteMembershipByWorld
 var claimWorldByName = subsystems.world_mgr.claimWorldByName;
 var renameWorld = subsystems.world_mgr.renameWorld;
 var canViewWorld = subsystems.world_mgr.canViewWorld;
+var getWorldNameFromCacheById = subsystems.world_mgr.getWorldNameFromCacheById;
 
 function asyncDbSystem(database) {
 	const db = {
@@ -2157,7 +2158,7 @@ function topActiveWorlds(number) {
 	for(var id in worldData) {
 		var cnt = getUserCountFromWorld(id);
 		if(cnt == 0) continue;
-		clientNumbers.push([cnt, id]);
+		clientNumbers.push([cnt, getWorldNameFromCacheById(id)]);
 	}
 	clientNumbers.sort(function(int1, int2) {
 		return int2[0] - int1[0];
@@ -2714,7 +2715,8 @@ async function manageWebsocketConnection(ws, req) {
 
 	var vars = global_data;
 	var evars = {
-		user, channel
+		user, channel,
+		keyQuery: search.key
 	};
 
 	if(search.hide == "1") {
@@ -2727,13 +2729,16 @@ async function manageWebsocketConnection(ws, req) {
 		return error_ws("NO_EXIST", "World does not exist");
 	}
 
-	var permission = await canViewWorld(world, user);
+	var memkeyAccess = search.key && search.key == world.opts.memKey;
+
+	var permission = await canViewWorld(world, user, { memkeyAccess });
 	if(ws.sdata.terminated) return;
 	if(!permission) {
 		return error_ws("NO_PERM", "No permission");
 	}
 
 	ws.sdata.userClient = true; // client connection is now initialized
+	ws.sdata.keyQuery = search.key;
 	
 	evars.world = world;
 
@@ -2797,7 +2802,7 @@ async function manageWebsocketConnection(ws, req) {
 			}));
 		}
 	}
-
+	// Log all ws and http requests (incl. duration) to analyze attacks
 	ws.off("message", pre_message);
 	ws.on("message", handle_message);
 	async function handle_message(msg) {
@@ -2805,7 +2810,7 @@ async function manageWebsocketConnection(ws, req) {
 		if(!(typeof msg == "string" || typeof msg == "object")) {
 			return;
 		}
-		if(msg.constructor == Buffer) {
+		if(msg.constructor == Buffer) { // TODO
 			/*msg = bin_packet.decode(msg);
 			if(!msg) return; // malformed packet*/
 			return;

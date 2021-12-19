@@ -6,8 +6,10 @@ module.exports = async function(data, vars, evars) {
 	var san_nbr = vars.san_nbr;
 	var tile_database = vars.tile_database;
 
+	var memkeyAccess = world.opts.memKey && world.opts.memKey == evars.keyQuery;
+
 	var is_owner = user.id == world.ownerId || (user.superuser && world.name == "");
-	var is_member = !!world.members.map[user.id] || (user.superuser && world.name == "");
+	var is_member = !!world.members.map[user.id] || memkeyAccess || (user.superuser && world.name == "");
 
 	var action = data.action;
 	var tileX = san_nbr(data.tileX);

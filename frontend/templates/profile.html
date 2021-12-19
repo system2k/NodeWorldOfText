@@ -50,6 +50,9 @@
 						{% endif %}
 						{{ world.whitelist_set_count }} member{{ world.member_plural }}.
 						{{ world.views }} view{{ world.views_plural }}.
+						{% if world.mem_key %}
+						<span style="color: red; font-weight: bold;">(Key)</span>
+						{% endif %}
 						<a href="{{ world.conf_url }}">options</a>
 					</li>
 					{% endfor %}

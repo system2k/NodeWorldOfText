@@ -27,7 +27,7 @@ function sanitizeColor(col) {
 }
 
 var chat_ip_limits = {};
-var blocked_ips = {};
+var blocked_ips_by_world_id = {}; // id 0 = global
 
 module.exports = async function(ws, data, send, vars, evars) {
 	var broadcast = evars.broadcast; // broadcast to current world
@@ -54,8 +54,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var ipHeaderAddr = ws.sdata.ipAddress;
 
 	var chat_perm = world.feature.chat;
-	var is_member = !!world.members.map[user.id];
 	var is_owner = world.owner_id == user.id;
+	var is_member = !!world.members.map[user.id] || is_owner;
 
 	// sends `[ Server ]: <message>` in chat.
 	function serverChatResponse(message, location) {
@@ -90,14 +90,14 @@ module.exports = async function(ws, data, send, vars, evars) {
 		return;
 	}
 
-	var isMuted = blocked_ips[ipHeaderAddr];
+	var isMuted = false;/*blocked_ips[ipHeaderAddr];
 	if(isMuted) {
 		var expTime = blocked_ips[ipHeaderAddr];
 		if(!expTime || typeof expTime != "number" || Date.now() >= expTime) {
 			isMuted = false;
 			delete blocked_ips[ipHeaderAddr];
 		}
-	}
+	}*/
 
 	var nick = "";
 	if(data.nickname) {
@@ -146,7 +146,6 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 		// staff
 		[1, "channel", null, "get info about a chat channel"],
-		[1, "mute", ["id", "time (seconds)"], "mute a user for all clients", "1220 100"],
 		[1, "clearmutes", null, "unmute all clients"],
 
 		// general
@@ -157,6 +156,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 		[0, "warpserver", ["server"], "use a different server", "wss://www.yourworldoftext.com/~help/ws/"], // client-side
 		[0, "gridsize", ["WxH"], "change the size of cells", "10x20"], // client-side
 		[0, "block", ["id"], "mute a user", "1220"],
+		[0, "mute", ["id", "seconds"], "mute a user for everyone", "1220 9999"], // TODO
 		[0, "color", ["color code"], "change your text color", "#FF00FF"], // client-side
 		[0, "chatcolor", ["color code"], "change your chat color", "#FF00FF"], // client-side
 		[0, "night", null, "enable night mode", null], // client-side
@@ -366,7 +366,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 			infoLog += "<b>Default channel id:</b> " + html_tag_esc(def) + "<br>";
 			return serverChatResponse(infoLog, location);
 		},
+		// TODO: fix
 		mute: function(id, time) {
+			if(!is_owner && !user.staff) return;
 			id = san_nbr(id);
 			time = san_nbr(time); // in seconds
 			var clientFound = false;
@@ -375,7 +377,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 				if(clientFound) return;
 				if(!ws.sdata.userClient) return;
 				var searchParam = ws.sdata.clientId == id && ws.sdata.world.id == world.id;
-				if(location == "global") {
+				if(location == "global" && user.staff) {
 					searchParam = ws.sdata.clientId == id;
 				}
 				if(searchParam) {
@@ -457,7 +459,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 				com.channel();
 				return;
 			case "mute":
-				if(staff) com.mute(args[1], args[2]);
+				com.mute(args[1], args[2]);
 				return;
 			case "clearmutes":
 				if(staff) com.clearmutes();
@@ -532,8 +534,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	if(isMuted) return;
 	var websocketChatData = Object.assign({
-		kind: "chat",
-		channel
+		kind: "chat"
 	}, chatData);
 
 	var chatOpts = {

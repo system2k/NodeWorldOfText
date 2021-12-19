@@ -80,6 +80,8 @@ var backgroundPatternSize  = [0, 0];
 var guestCursorsByTile     = {};
 var guestCursors           = {};
 var clientGuestCursorPos   = { tileX: 0, tileY: 0, charX: 0, charY: 0, hidden: false, updated: false };
+var disconnectTimeout      = null;
+var canAccessWorld         = true;
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -1596,16 +1598,21 @@ function getWorldProps(world, type, cb) {
 	if(!type) type = "style";
 	var propUrl;
 	if(type == "style") {
-		propUrl = "/world_style/?world=";
+		propUrl = "/world_style/";
 	} else if(type == "props") {
-		propUrl = "/world_props/?world=";
+		propUrl = "/world_props/";
 	} else {
 		console.error("Invalid type: " + type);
 		return cb(null, true);
 	}
+	if(window.location.search) {
+		propUrl += window.location.search + "&world=" + world;
+	} else {
+		propUrl += "?world=" + world;
+	}
 	ajaxRequest({
 		type: "GET",
-		url: propUrl + world,
+		url: propUrl,
 		done: function(data) {
 			try {
 				data = JSON.parse(data);
@@ -3273,6 +3280,11 @@ function createSocket() {
 		if(w.receivingBroadcasts) {
 			w.broadcastReceive(true);
 		}
+		if(disconnectTimeout != null) {
+			clearTimeout(disconnectTimeout);
+			disconnectTimeout = null;
+			w.doAnnounce("");
+		}
 	}
 
 	socket.onclose = function() {
@@ -3283,6 +3295,10 @@ function createSocket() {
 				cb(null, true);
 			}
 		}
+		disconnectTimeout = setTimeout(function() {
+			w.doAnnounce("Connection lost. Please wait until the client reconnects.");
+			canAccessWorld = false;
+		}, 1000 * 5);
 	}
 
 	socket.onerror = function(err) {
@@ -5541,6 +5557,10 @@ var ws_functions = {
 		w.clientId = data.id;
 		w.userCount = data.initial_user_count;
 		updateUserCount();
+		if(!canAccessWorld) { // client now has read access to this world
+			canAccessWorld = true;
+			w.doAnnounce("");
+		}
 	},
 	announcement: function(data) {
 		w.emit("announcement", data);
@@ -5666,6 +5686,10 @@ var ws_functions = {
 			case "NO_EXIST": // world does not exist
 			case "NO_PERM": // no permission to access world
 				console.log("Received error from the server with code [" + code + "]: " + message);
+				if(code == "NO_PERM") {
+					w.doAnnounce("Access to this world is denied. Please make sure you are logged in.");
+					canAccessWorld = false;
+				}
 				break;
 			case "PARAM": // invalid parameters in message
 				break;

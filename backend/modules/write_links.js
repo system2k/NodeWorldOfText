@@ -9,9 +9,11 @@ module.exports = async function(data, vars, evars) {
 	var san_dp = vars.san_dp;
 	var tile_database = vars.tile_database;
 
+	var memkeyAccess = world.opts.memKey && world.opts.memKey == evars.keyQuery;
+
 	var is_owner = user.id == world.ownerId;
 	is_owner = is_owner || (user.superuser && world.name == "");
-	var is_member = !!world.members.map[user.id] || is_owner;
+	var is_member = !!world.members.map[user.id] || is_owner || memkeyAccess;
 
 	var type = data.type;
 
