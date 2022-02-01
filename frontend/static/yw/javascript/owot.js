@@ -150,7 +150,8 @@ var keyConfig = {
 	cursorDown: "DOWN+*",
 	cursorLeft: "LEFT+*",
 	cursorRight: "RIGHT+*",
-	copyRegion: ["ALT+G", "CTRL+A"]
+	copyRegion: ["ALT+G", "CTRL+A"],
+	centerTeleport: "HOME"
 };
 
 window.addEventListener("load", function() {
@@ -1212,6 +1213,9 @@ function onKeyUp(e) {
 	}
 	if(checkKeyPress(e, keyConfig.cursorRight)) { // arrow right
 		autoArrowKeyMoveStop("right");
+	}
+	if(checkKeyPress(e, keyConfig.centerTeleport)) { // home
+		w.doGoToCoord(0, 0);
 	}
 }
 document.body.addEventListener("keyup", onKeyUp);
