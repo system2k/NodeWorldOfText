@@ -133,6 +133,7 @@ var unobstructCursor       = false; // render cursor on top of characters that m
 var shiftOptimization      = false;
 var transparentBackground  = true;
 var writeFlushRate         = 1000;
+var bufferLargeChars       = false;
 
 var keyConfig = {
 	reset: "ESC",
@@ -2454,6 +2455,7 @@ var char_input_check = setInterval(function() {
 		charX: cursorCoords[2],
 		charY: cursorCoords[3]
 	}, YourWorld.Color);
+	elm.textInput.value = "";
 	var item;
 	var charCount = 0;
 	var pasteFunc = function() {
@@ -2861,6 +2863,18 @@ linkElm.onclick = function(e) {
 	} else if(prot == "comu") {
 		w.broadcastCommand(url, true);
 		return false;
+	}
+	// todo
+	var lTileX = currentSelectedLinkCoords[0];
+	var lTileY = currentSelectedLinkCoords[1];
+	var lCharX = currentSelectedLinkCoords[2];
+	var lCharY = currentSelectedLinkCoords[3];
+	var linkProt = getCharProtection(lTileX, lTileY, lCharX, lCharY);
+	if(state.worldModel.name == "" && linkProt == 0) {
+		var acpt = confirm("Are you sure you want to visit this link?\n" + url);
+		if(!acpt) {
+			return false;
+		}
 	}
 	if(linkEvent && linkEvent[0]) {
 		return linkEvent[0];
@@ -3760,12 +3774,12 @@ function fillBlockChar(charCode, textRender, x, y) {
 	return true;
 }
 
-function renderChar(textRender, x, y, str, content, colors, writability, props) {
+function renderChar(textRender, x, y, str, content, colors, writability, props, offsetX, offsetY) {
 	// adjust baseline
 	var textYOffset = cellH - (5 * zoom);
 
-	var fontX = x * cellW;
-	var fontY = y * cellH;
+	var fontX = x * cellW + offsetX;
+	var fontY = y * cellH + offsetY;
 
 	// fill background if defined
 	if(coloredChars[str] && coloredChars[str][y] && coloredChars[str][y][x]) {
@@ -3775,7 +3789,7 @@ function renderChar(textRender, x, y, str, content, colors, writability, props) 
 	}
 
 	var char = content[y * tileC + x];
-	var color = colors[y * tileC + x];
+	var color = colors ? colors[y * tileC + x] : 0;
 	// initialize link color to default text color in case there's no link to color
 	var linkColor = styles.text;
 	if(textColorOverride) {
@@ -3839,9 +3853,7 @@ function renderChar(textRender, x, y, str, content, colors, writability, props) 
 	}
 }
 
-function drawGrid(renderCtx, gridColor) {
-	var offsetX = 0;
-	var offsetY = 0;
+function drawGrid(renderCtx, gridColor, offsetX, offsetY) {
 	if(subgridEnabled) {
 		renderCtx.strokeStyle = "#B9B9B9";
 		var dashSize = Math.ceil(zoom);
@@ -3948,7 +3960,7 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 	return backColor;
 }
 
-function renderTileBackgroundImage(renderCtx, tileX, tileY) {
+function renderTileBackgroundImage(renderCtx, tileX, tileY, ctxOffX, ctxOffY) {
 	var startX = tileX * tileW;
 	var startY = tileY * tileH;
 	var backRatioW = tileWidth / dTileW;
@@ -3983,7 +3995,7 @@ function renderTileBackgroundImage(renderCtx, tileX, tileY) {
 		backgroundPattern.setTransform(new DOMMatrix([backRatioW, 0, 0, backRatioH, -startX, -startY]));
 		renderCtx.fillStyle = backgroundPattern;
 		renderCtx.globalAlpha = alpha;
-		renderCtx.fillRect(0, 0, tileWidth, tileHeight);
+		renderCtx.fillRect(ctxOffX, ctxOffY, tileWidth, tileHeight);
 		renderCtx.globalAlpha = 1;
 		return true;
 	} else if(repeat == 1 || repeat == 2) {
@@ -3993,7 +4005,7 @@ function renderTileBackgroundImage(renderCtx, tileX, tileY) {
 			startY += Math.floor(imgHeight / 2) * backRatioH;
 		}
 		renderCtx.globalAlpha = alpha;
-		renderCtx.drawImage(backgroundImage, -startX, -startY, imgWidth * backRatioW, imgHeight * backRatioH);
+		renderCtx.drawImage(backgroundImage, -startX + ctxOffX, -startY + ctxOffY, imgWidth * backRatioW, imgHeight * backRatioH);
 		renderCtx.globalAlpha = 1;
 		return true;
 	}
@@ -4008,9 +4020,44 @@ function clearTile(tileX, tileY) {
 	owotCtx.clearRect(offsetX, offsetY, tileWidth, tileHeight);
 }
 
+function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY) {
+	var str = tileY + "," + tileX;
+	var tile = Tile.get(tileX, tileY);
+	if(!tile) return;
+	var content = tile.content;
+	var colors = tile.properties.color;
+	var props = tile.properties.cell_props || {};
+	var writability = tile.writability;
+	if(priorityOverwriteChar && tile.properties.char) {
+		for(var lev = 0; lev < 3; lev++) {
+			for(var c = 0; c < tileArea; c++) {
+				var code = tile.properties.char[c]; // writability
+				if(code == null) code = tile.properties.writability;
+				if(code == null) code = state.worldModel.writability;
+				if(code != lev) continue;
+				var cX = c % tileC;
+				var cY = Math.floor(c / tileC);
+				textRenderCtx.clearRect(cX * cellW, cY * cellH, cellW, cellH);
+				renderChar(textRenderCtx, cX, cY, str, content, colors, code, props, offsetX, offsetY);
+			}
+		}
+	} else {
+		for(var y = 0; y < tileR; y++) {
+			for(var x = 0; x < tileC; x++) {
+				var protValue = writability;
+				if(tile.properties.char) {
+					protValue = tile.properties.char[y * tileC + x];
+				}
+				if(protValue == null) protValue = tile.properties.writability;
+				if(protValue == null) protValue = state.worldModel.writability;
+				renderChar(textRenderCtx, x, y, str, content, colors, protValue, props, offsetX, offsetY);
+			}
+		}
+	}
+}
+
 function renderTile(tileX, tileY, redraw) {
 	if(!Tile.loaded(tileX, tileY)) return;
-	var str = tileY + "," + tileX;
 	var tileScreenPos = getTileScreenPosition(tileX, tileY);
 	var offsetX = Math.floor(tileScreenPos[0]);
 	var offsetY = Math.floor(tileScreenPos[1]);
@@ -4021,7 +4068,6 @@ function renderTile(tileX, tileY, redraw) {
 	}
 	if(!Tile.visible(tileX, tileY)) return;
 
-	var writability = tile.properties.writability;
 	var cursorVisibility = cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY;
 
 	var gridColor = "#000000";
@@ -4088,7 +4134,7 @@ function renderTile(tileX, tileY, redraw) {
 	}
 
 	if(backgroundEnabled) {
-		renderTileBackgroundImage(textRenderCtx, tileX, tileY);
+		renderTileBackgroundImage(textRenderCtx, tileX, tileY, 0, 0);
 	}
 
 	// temp compat
@@ -4096,43 +4142,18 @@ function renderTile(tileX, tileY, redraw) {
 		tile.content = w.split(tile.content);
 	}
 
-	var content = tile.content;
-	var colors = tile.properties.color;
-	// color data doesn't exist, use empty array as placeholder
-	if(!colors) colors = new Array(tileArea).fill(0);
-
-	var props = tile.properties.cell_props;
-	if(!props) props = {};
-
-	if(priorityOverwriteChar && tile.properties.char) {
-		for(var lev = 0; lev < 3; lev++) {
-			for(var c = 0; c < tileArea; c++) {
-				var code = tile.properties.char[c]; // writability
-				if(code == null) code = tile.properties.writability;
-				if(code == null) code = state.worldModel.writability;
-				if(code != lev) continue;
-				var cX = c % tileC;
-				var cY = Math.floor(c / tileC);
-				textRenderCtx.clearRect(cX * cellW, cY * cellH, cellW, cellH);
-				renderChar(textRenderCtx, cX, cY, str, content, colors, code, props);
-			}
-		}
+	if(!bufferLargeChars) {
+		renderContent(textRenderCtx, tileX, tileY, 0, 0);
 	} else {
-		for(var y = 0; y < tileR; y++) {
-			for(var x = 0; x < tileC; x++) {
-				var protValue = writability;
-				if(tile.properties.char) {
-					protValue = tile.properties.char[y * tileC + x];
-				}
-				if(protValue == null) protValue = tile.properties.writability;
-				if(protValue == null) protValue = state.worldModel.writability;
-				renderChar(textRenderCtx, x, y, str, content, colors, protValue, props);
+		for(var x = -1; x <= 1; x++) {
+			for(var y = -1; y <= 1; y++) {
+				renderContent(textRenderCtx, tileX + x, tileY + y, tileW * x, tileH * y);
 			}
 		}
 	}
 
 	if(gridEnabled) {
-		drawGrid(textRenderCtx, gridColor);
+		drawGrid(textRenderCtx, gridColor, 0, 0);
 	}
 
 	// add image to tile pool
@@ -4302,21 +4323,21 @@ function buildMenu() {
 	if(Permissions.can_color_text(state.userModel, state.worldModel)) {
 		menu.addOption("Change color", w.color);
 	}
-	if (Permissions.can_go_to_coord(state.userModel, state.worldModel)) {
+	if(Permissions.can_go_to_coord(state.userModel, state.worldModel)) {
 		menu.addOption("Go to coordinates", w.goToCoord);
 	}
-	if (Permissions.can_coordlink(state.userModel, state.worldModel)) {
+	if(Permissions.can_coordlink(state.userModel, state.worldModel)) {
 		menu.addOption("Create link to coordinates", w.coordLink);
 	}
-	if (Permissions.can_urllink(state.userModel, state.worldModel)) {
+	if(Permissions.can_urllink(state.userModel, state.worldModel)) {
 		menu.addOption("Create link to URL", w.urlLink);
 	}
-	if (Permissions.can_admin(state.userModel, state.worldModel)) {
+	if(Permissions.can_admin(state.userModel, state.worldModel)) {
 		menu.addOption("Make an area owner-only", function() {
 			return w.doProtect("owner-only");
 		});
 	}
-	if (Permissions.can_protect_tiles(state.userModel, state.worldModel)) {
+	if(Permissions.can_protect_tiles(state.userModel, state.worldModel)) {
 		menu.addOption("Make an area member-only", function() {
 			return w.doProtect("member-only");
 		});
@@ -5288,7 +5309,7 @@ Object.assign(w, {
 	}
 });
 
-if (state.announce) {
+if(state.announce) {
 	w._ui.announce_text.innerHTML = w._state.announce;
 	w._ui.announce.style.display = "";
 }
@@ -5354,7 +5375,7 @@ var tellEdit = [];
 // tileX, tileY, charX, charY, editID
 function searchTellEdit(tileX, tileY, charX, charY) {
 	for(var i = 0; i < tellEdit.length; i++) {
-		if (tellEdit[i][0] == tileX &&
+		if(tellEdit[i][0] == tileX &&
 			tellEdit[i][1] == tileY &&
 			tellEdit[i][2] == charX &&
 			tellEdit[i][3] == charY) {

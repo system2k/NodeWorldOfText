@@ -143,13 +143,4 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		}
 		return;
 	}
-	if("force_unclaim" in post_data) {
-		var unclaim = post_data.force_unclaim;
-		if(typeof unclaim == "string" && unclaim != "") {
-			// forcibly unclaim a world as a result of a bug.
-			// skip the world-cache layer - any bug could happen.
-			await db.run("UPDATE world SET owner_id=null WHERE name=? COLLATE NOCASE", unclaim);
-		}
-		return await dispage("admin/administrator", null, req, serve, vars, evars);
-	}
 }

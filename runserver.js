@@ -2202,7 +2202,7 @@ async function clear_expired_sessions(no_timeout) {
 
 var client_cursor_pos = {};
 var client_ips = {};
-var closed_client_limit = 1000 * 60 * 60; // 1 hour
+var closed_client_limit = 1000 * 60 * 20; // 20 min
 function setupClearClosedClientsInterval() {
 	intv.clear_closed_clients = setInterval(function() {
 		var curTime = Date.now();
@@ -2219,7 +2219,7 @@ function setupClearClosedClientsInterval() {
 				delete client_ips[w];
 			}
 		}
-	}, 1000 * 60 * 10); // 10 minutes
+	}, 1000 * 60 * 2); // 2 minutes
 }
 
 // ping clients every 30 seconds
@@ -2763,7 +2763,8 @@ async function manageWebsocketConnection(ws, req) {
 	if(!client_ips[world.id]) {
 		client_ips[world.id] = {};
 	}
-	client_ips[world.id][clientId] = [ws.sdata.ipAddress, -1, false];
+	client_ips[world.id][clientId] = [ws.sdata.ipAddress, -1, false, -1];
+	// [Ip, Disconnect time, Is disconnected, Last chat time (on global)]
 
 	ws.sdata.clientId = clientId;
 	ws.sdata.chat_blocks = [];

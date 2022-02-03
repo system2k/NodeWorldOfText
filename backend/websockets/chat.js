@@ -48,14 +48,22 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var ranks_cache = vars.ranks_cache;
 	var accountSystem = vars.accountSystem;
 	var create_date = vars.create_date;
+	var client_ips = vars.client_ips;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
 
 	var ipHeaderAddr = ws.sdata.ipAddress;
 
 	var chat_perm = world.feature.chat;
-	var is_owner = world.owner_id == user.id;
+	var is_owner = world.ownerId == user.id;
 	var is_member = !!world.members.map[user.id] || is_owner;
+
+	var clientIpObj = null;
+	if(client_ips[world.id]) {
+		if(client_ips[world.id][clientId]) {
+			clientIpObj = client_ips[world.id][clientId];
+		}
+	}
 
 	// sends `[ Server ]: <message>` in chat.
 	function serverChatResponse(message, location) {
@@ -90,14 +98,24 @@ module.exports = async function(ws, data, send, vars, evars) {
 		return;
 	}
 
-	var isMuted = false;/*blocked_ips[ipHeaderAddr];
+	var isMuted = false;
+	var worldChatMutes = blocked_ips_by_world_id[world.id];
+	if(location == "global") {
+		worldChatMutes = blocked_ips_by_world_id[0];
+	}
+	if(worldChatMutes) {
+		if(worldChatMutes[ipHeaderAddr]) {
+			isMuted = true;
+		}
+	}
+
 	if(isMuted) {
-		var expTime = blocked_ips[ipHeaderAddr];
+		var expTime = worldChatMutes[ipHeaderAddr];
 		if(!expTime || typeof expTime != "number" || Date.now() >= expTime) {
 			isMuted = false;
-			delete blocked_ips[ipHeaderAddr];
+			delete worldChatMutes[ipHeaderAddr];
 		}
-	}*/
+	}
 
 	var nick = "";
 	if(data.nickname) {
@@ -122,6 +140,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 	if(!data.color) data.color = "#000000";
 	data.color = data.color.slice(0, 20);
 	data.color = data.color.trim();
+	if(!user.authenticated) {
+		data.color = "#000000";
+	}
 
 	if(!user.staff) {
 		msg = msg.slice(0, 400);
@@ -139,14 +160,13 @@ module.exports = async function(ws, data, send, vars, evars) {
 	// [rank, name, args, description, example]
 	var command_list = [
 		// operator
-		[3, "uptime", null, "get uptime of server", null],
+		//...
 
 		// superuser
 		[2, "worlds", null, "list all worlds", null],
 
 		// staff
 		[1, "channel", null, "get info about a chat channel"],
-		[1, "clearmutes", null, "unmute all clients"],
 
 		// general
 		[0, "help", null, "list all commands", null],
@@ -156,7 +176,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 		[0, "warpserver", ["server"], "use a different server", "wss://www.yourworldoftext.com/~help/ws/"], // client-side
 		[0, "gridsize", ["WxH"], "change the size of cells", "10x20"], // client-side
 		[0, "block", ["id"], "mute a user", "1220"],
-		[0, "mute", ["id", "seconds"], "mute a user for everyone", "1220 9999"], // TODO
+		[0, "mute", ["id", "seconds"], "mute a user for everyone", "1220 9999"], // check for permission
+		[0, "clearmutes", null, "unmute all clients"], // check for permission
 		[0, "color", ["color code"], "change your text color", "#FF00FF"], // client-side
 		[0, "chatcolor", ["color code"], "change your chat color", "#FF00FF"], // client-side
 		[0, "night", null, "enable night mode", null], // client-side
@@ -188,12 +209,19 @@ module.exports = async function(ws, data, send, vars, evars) {
 		var html = "";
 		html += "Command list:<br>";
 		html += "<div style=\"background-color: #DADADA; font-family: monospace; font-size: 13px;\">";
+		var cmdIdx = 0;
 		for(var i = 0; i < list.length; i++) {
 			var row = list[i];
 			var command = row[1];
 			var args = row[2];
 			var desc = row[3];
 			var example = row[4];
+
+			if(command == "mute" || command == "clearmutes") {
+				if(!user.staff && !is_owner) {
+					continue;
+				}
+			}
 
 			// display arguments for this command
 			var arg_desc = "";
@@ -219,11 +247,12 @@ module.exports = async function(ws, data, send, vars, evars) {
 			var help_row = html_tag_esc("-> /") + command + " " + arg_desc + " :: " + html_tag_esc(desc);
 
 			// alternating stripes
-			if(i % 2 == 1) {
+			if(cmdIdx % 2 == 1) {
 				help_row = "<div style=\"background-color: #C3C3C3\">" + help_row + "</div>";
 			}
 
 			html += help_row;
+			cmdIdx++;
 		}
 
 		html += "</div>";
@@ -274,6 +303,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 			serverChatResponse("Server uptime: " + uptime(), location);
 		},
 		tell: function(id, message) {
+			// TODO: respond to /block
 			if(isMuted) return;
 			id += "";
 			message += "";
@@ -366,39 +396,74 @@ module.exports = async function(ws, data, send, vars, evars) {
 			infoLog += "<b>Default channel id:</b> " + html_tag_esc(def) + "<br>";
 			return serverChatResponse(infoLog, location);
 		},
-		// TODO: fix
 		mute: function(id, time) {
 			if(!is_owner && !user.staff) return;
 			id = san_nbr(id);
 			time = san_nbr(time); // in seconds
-			var clientFound = false;
-			var muteDate = 0;
-			wss.clients.forEach(function(ws) {
-				if(clientFound) return;
-				if(!ws.sdata.userClient) return;
-				var searchParam = ws.sdata.clientId == id && ws.sdata.world.id == world.id;
-				if(location == "global" && user.staff) {
-					searchParam = ws.sdata.clientId == id;
+
+			var muted_ip = null;
+
+			if(location == "global" && user.staff) {
+				// since this is global, there is the potential for duplicate IDs.
+				// pick the one that has chatted the most recently.
+				var gclients = [];
+				for(var cw in client_ips) {
+					for(var cwid in client_ips[cw]) {
+						var gCli = client_ips[cw][cwid];
+						gclients.push(gCli);
+					}
 				}
-				if(searchParam) {
-					clientFound = true;
-					var cliIp = ws.sdata.ipAddress;
-					if(!cliIp) return;
-					muteDate = Date.now() + (time * 1000);
-					blocked_ips[cliIp] = muteDate;
+				var latestGCli = null;
+				var latestGCliTime = -1;
+				for(var i = 0; i < gclients.length; i++) {
+					if(gclients[i][3] != -1 && gclients[i][3] >= latestGCliTime) {
+						latestGCli = gclients[i];
+					}
 				}
-			});
-			if(clientFound) {
+				muted_ip = latestGCli[0];
+			} else {
+				if(client_ips[world.id]) {
+					if(client_ips[world.id][id]) {
+						muted_ip = client_ips[world.id][id][0];
+					}
+				}
+			}
+
+			if(muted_ip) {
+				var muteDate = Date.now() + (time * 1000);
+				var mute_wid = null;
+				if(location == "global") {
+					mute_wid = 0;
+				} else if(location == "page") {
+					mute_wid = world.id;
+				}
+				if(mute_wid == null) {
+					return serverChatResponse("Client not found", location);
+				}
+				if(!blocked_ips_by_world_id[mute_wid]) blocked_ips_by_world_id[mute_wid] = {};
+				blocked_ips_by_world_id[mute_wid][muted_ip] = muteDate;
 				return serverChatResponse("Muted client until " + html_tag_esc(create_date(muteDate)), location);
 			} else {
-				return serverChatResponse("Client not found", location);
+				if(!user.staff) {
+					return serverChatResponse("You do not have permission to mute on global", location);
+				} else {
+					return serverChatResponse("Client not found", location);
+				}
 			}
 		},
 		clearmutes: function() {
+			if(!is_owner && !user.staff) return;
 			var cnt = 0;
-			for(var i in blocked_ips) {
-				delete blocked_ips[i];
-				cnt++;
+			if(location == "global" && user.staff) {
+				if(blocked_ips_by_world_id["0"]) {
+					cnt = Object.keys(blocked_ips_by_world_id["0"]).length;
+					delete blocked_ips_by_world_id["0"];
+				}
+			} else {
+				if(blocked_ips_by_world_id[world.id]) {
+					cnt = Object.keys(blocked_ips_by_world_id[world.id]).length;
+					delete blocked_ips_by_world_id[world.id];
+				}
 			}
 			return serverChatResponse("Unmuted " + cnt + " user(s)", location);
 		},
@@ -447,7 +512,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 				com.help();
 				return;
 			case "uptime":
-				if(operator) com.uptime();
+				com.uptime();
 				return;
 			case "block":
 				com.block(args[1]);
@@ -462,7 +527,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 				com.mute(args[1], args[2]);
 				return;
 			case "clearmutes":
-				if(staff) com.clearmutes();
+				com.clearmutes();
 				return;
 			case "whoami":
 				com.whoami();
@@ -545,9 +610,12 @@ module.exports = async function(ws, data, send, vars, evars) {
 	};
 
 	if(!isCommand) {
+		if(clientIpObj && location == "global") {
+			clientIpObj[3] = Date.now();
+		}
 		if(location == "page") {
 			broadcast(websocketChatData, chatOpts);
-		} else if(location == "global") {
+		} else if(location == "global") { // todo: dont sent glob messages if chat disabled
 			ws_broadcast(websocketChatData, void 0, chatOpts);
 		}
 	}

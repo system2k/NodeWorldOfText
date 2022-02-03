@@ -13,7 +13,7 @@ var chatWriteTmpBuffer   = "";
 var defaultChatColor     = window.localStorage ? parseInt(localStorage.getItem("chatcolor")) : null; // 24-bit Uint
 var chatPageUnreadBar    = null;
 var chatGlobalUnreadBar  = null;
-var chatGreentext        = true;
+var chatGreentext        = false;
 
 if(isNaN(defaultChatColor)) {
 	defaultChatColor = null;

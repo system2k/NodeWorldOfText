@@ -114,7 +114,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var owner_text_color = world.theme.ownerText || "default";
 
 	var is_ratelim_enabled = false;
-	var ratelim_char = 10240;
+	var ratelim_char = 20480;
 	if(world.opts.charRate) {
 		is_ratelim_enabled = true;
 		ratelim_char = world.opts.charRate.split("/")[0];

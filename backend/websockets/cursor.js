@@ -13,8 +13,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	ws.sdata.hasBroadcastedCursorPosition = true;
 
-	var is_member = !!world.members.map[user.id]; //user.stats.member;
-	var is_owner = world.owner_id == user.id; //user.stats.owner;
+	var is_member = !!world.members.map[user.id];
+	var is_owner = world.ownerId == user.id;
 
 	var show_cursor = world.feature.showCursor;
 	if(show_cursor == void 0) show_cursor = -1;

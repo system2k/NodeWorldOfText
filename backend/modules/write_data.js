@@ -114,7 +114,7 @@ module.exports = async function(data, vars, evars) {
 		ipAddressVal = evars.ipAddressVal;
 		ipAddressFam = evars.ipAddressFam;
 	}
-	
+	// todo: connection lost thing does not disappear sometimes
 	var san_nbr = vars.san_nbr;
 	var advancedSplit = vars.advancedSplit;
 	var get_bypass_key = vars.get_bypass_key;
@@ -123,7 +123,7 @@ module.exports = async function(data, vars, evars) {
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 	var getRestrictions = vars.getRestrictions;
 
-	var defaultCharRatePerSecond = 10240;
+	var defaultCharRatePerSecond = 20480;
 	var tileRatePerSecond = 256;
 
 	var restr = getRestrictions();
