@@ -462,6 +462,30 @@ if(!Math.log2) {
 	}
 }
 
+function getBasicHostname(host) {
+	var host = host.toLowerCase().split(".");
+	if(host[0] == "www") host.shift();
+	return host.join(".");
+}
+
+function isSafeHostname(host) {
+	return safeLinkHosts.includes(host);
+}
+
+var safeLinkHosts = [
+	getBasicHostname(window.location.host),
+	"yourworldoftext.com",
+	"ourworldofpixels.com",
+	"ourworldoftext.com",
+	"spooks.me",
+	"youtube.com",
+	"discord.com",
+	"discord.gg",
+	"discordapp.com",
+	"reddit.com",
+	"old.reddit.com"
+];
+
 // compatibility (deprecated)
 var blankColor = new Array(128).fill(0);
 

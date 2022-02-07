@@ -97,6 +97,10 @@ function checkColorRestr(list, ipVal, ipFam, world, tileX, tileY) {
 	return false;
 }
 
+function isMainPage(name) {
+	return name == "" || name.toLowerCase() == "main";
+}
+
 module.exports = async function(data, vars, evars) {
 	var user = evars.user;
 	var channel = evars.channel;
@@ -150,7 +154,7 @@ module.exports = async function(data, vars, evars) {
 	var memkeyAccess = world.opts.memKey && world.opts.memKey == evars.keyQuery;
 
 	var is_owner = user.id == world.ownerId;
-	is_owner = is_owner || (user.superuser && world.name == "");
+	is_owner = is_owner || (user.superuser && isMainPage(world.name));
 	var is_member = !!world.members.map[user.id] || is_owner || memkeyAccess;
 
 	var can_color_text = true;

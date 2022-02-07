@@ -6,6 +6,10 @@ module.exports.server_exit = async function() {
 	return;
 }
 
+function isMainPage(name) {
+	return name == "" || name.toLowerCase() == "main";
+}
+
 module.exports.GET = async function(req, serve, vars, evars, params) {
 	var query_data = evars.query_data;
 	var path = evars.path;
@@ -87,8 +91,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 				username: username,
 				is_superuser: user.superuser, // Admin of OWOT?
 				authenticated: user.authenticated,
-				is_member: read_permission.member || (user.superuser && world.name == ""), // Member of world?
-				is_owner: read_permission.owner || (user.superuser && world.name == ""), // Owner of world?
+				is_member: read_permission.member || (user.superuser && isMainPage(world.name)), // Member of world?
+				is_owner: read_permission.owner || (user.superuser && isMainPage(world.name)), // Owner of world?
 				is_staff: user.staff, // Staff of OWOT?
 				is_operator: user.operator // Operator of OWOT?
 			},
@@ -99,7 +103,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 				feature_go_to_coord: world.feature.goToCoord,
 				name: world.name,
 				feature_paste: world.feature.paste,
-				namespace: world.name.split("/")[0],
 				readability: world.readability,
 				feature_coord_link: world.feature.coordLink,
 				pathname,
@@ -150,7 +153,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			}
 		}
 		var page_title = "Our World of Text";
-		if(world.name) {
+		if(!isMainPage(world.name)) {
 			page_title = "/" + world.name;
 		}
 		var meta_desc = world.opts.desc;

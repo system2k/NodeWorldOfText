@@ -24,6 +24,7 @@ const querystring = require("querystring");
 const sql         = require("sqlite3");
 const swig        = require("./lib/swig/swig.js");
 const url         = require("url");
+const util        = require("util");
 const WebSocket   = require("ws");
 const zip         = require("adm-zip");
 const zlib        = require("zlib");
@@ -105,6 +106,19 @@ function initializeDirectoryStruct() {
 	}
 }
 initializeDirectoryStruct();
+
+function loadShellFile() {
+	var file = null;
+	try {
+		file = fs.readFileSync(DATA_PATH + "shell.js");
+	} catch(e) {
+		file = null;
+	}
+	if(file) {
+		file = file.toString("utf8");
+	}
+	return file;
+}
 
 function normalize_ipv6(ip) {
 	ip = ip.replace(/^:|:$/g, "");
@@ -280,8 +294,6 @@ var testUviasIds = false;
 var acmeEnabled = false;
 var acmePass = null;
 
-var intv = {};
-
 function processArgs() {
 	var args = process.argv;
 	args.forEach(function(a) {
@@ -314,6 +326,36 @@ processArgs();
 // console function
 function run(path) {
 	eval(fs.readFileSync(path).toString("utf8"));
+}
+
+async function runShellScript() {
+	var shellFile = loadShellFile();
+	if(shellFile == null) {
+		return "ERR: File does not exist";
+	}
+	var getFunc = null;
+	var shellCont = {};
+	try {
+		getFunc = eval("(function(shell) {\n" + shellFile + "\n})(shellCont);");
+	} catch(e) {
+		return "ERR: Load: \n" + util.inspect(e);
+	}
+	var mainFunc = shellCont.main;
+	if(!mainFunc) {
+		return "ERR: main function not found";
+	}
+	var resp = "<No response>";
+	try {
+		resp = await mainFunc();
+	} catch(e) {
+		return "ERR: Run: \n" + util.inspect(e);
+	}
+	if(typeof resp != "string" && typeof resp != "number" && typeof resp != "bigint") {
+		resp = util.inspect(resp);
+	} else {
+		resp += "";
+	}
+	return resp;
 }
 
 const settings = require(SETTINGS_PATH);
@@ -749,7 +791,8 @@ var pages = {
 		user_list: require("./backend/pages/admin/user_list.js"),
 		users_by_id: require("./backend/pages/admin/users_by_id.js"),
 		users_by_username: require("./backend/pages/admin/users_by_username.js"),
-		restrictions: require("./backend/pages/admin/restrictions.js")
+		restrictions: require("./backend/pages/admin/restrictions.js"),
+		shell: require("./backend/pages/admin/shell.js")
 	},
 	other: {
 		ipaddress: require("./backend/pages/other/ipaddress.js"),
@@ -1434,6 +1477,7 @@ var url_regexp = [ // regexp , function/redirect to , options
 	[/^administrator\/user_list[\/]?$/g, pages.admin.user_list],
 	[/^administrator\/file_list[\/]?$/g, pages.admin.file_list],
 	[/^administrator\/monitor[\/]?$/g, pages.admin.monitor],
+	[/^administrator\/shell[\/]?$/g, pages.admin.shell],
 	[/^administrator\/restrictions[\/]?$/g, pages.admin.restrictions, { binary_post_data: true }],
 
 	[/^script_manager\/$/g, pages.script_manager],
@@ -2574,7 +2618,8 @@ async function manageWebsocketConnection(ws, req) {
 		monitorSocket: false,
 		terminated: false,
 		hasBroadcastedCursorPosition: false,
-		cursorPositionHidden: false
+		cursorPositionHidden: false,
+		messageBackpressure: 0
 	};
 	
 	// process ip address headers from cloudflare/nginx
@@ -2986,7 +3031,10 @@ var global_data = {
 	ipv4_to_range,
 	ipv6_to_range,
 	checkDuplicateCookie,
-	releaseWorld
+	releaseWorld,
+	loadShellFile,
+	process_error_arg,
+	runShellScript
 };
 
 async function sysLoad() {

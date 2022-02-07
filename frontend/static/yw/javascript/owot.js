@@ -2837,6 +2837,7 @@ function runJSLink(data) {
 var linkParams = {
 	protocol: "",
 	url: "",
+	host: "",
 	coord: false
 };
 linkDiv.style.width = (cellW / zoomRatio) + "px";
@@ -2864,13 +2865,14 @@ linkElm.onclick = function(e) {
 		w.broadcastCommand(url, true);
 		return false;
 	}
-	// todo
 	var lTileX = currentSelectedLinkCoords[0];
 	var lTileY = currentSelectedLinkCoords[1];
 	var lCharX = currentSelectedLinkCoords[2];
 	var lCharY = currentSelectedLinkCoords[3];
 	var linkProt = getCharProtection(lTileX, lTileY, lCharX, lCharY);
-	if(state.worldModel.name == "" && linkProt == 0) {
+	var isMain = state.worldModel.name == "" || state.worldModel.name.toLowerCase() == "main";
+	var isCenter = (-20 <= lTileX && 20 >= lTileX) && (-20 <= lTileY && 20 >= lTileY);
+	if(isMain && isCenter && linkProt == 0 && !isSafeHostname(linkParams.host)) {
 		var acpt = confirm("Are you sure you want to visit this link?\n" + url);
 		if(!acpt) {
 			return false;
@@ -2939,6 +2941,7 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 			linkElm.href = URL_Link;
 			linkElm.rel = "noopener noreferrer";
 			var linkProtocol = linkElm.protocol;
+			linkParams.host = "";
 			if(linkProtocol == "javascript:") {
 				linkElm.target = "";
 				linkParams.protocol = "javascript";
@@ -2960,6 +2963,7 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 				linkParams.protocol = "";
 				linkElm.rel = "noopener noreferrer";
 				linkParams.url = URL_Link;
+				linkParams.host = getBasicHostname(linkElm.host);
 			}
 			if(!linkElm.title) linkElm.title = "Link to URL " + linkElm.href;
 		} else if(link.type == "coord") {

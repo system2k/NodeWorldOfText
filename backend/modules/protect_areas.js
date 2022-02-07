@@ -1,3 +1,7 @@
+function isMainPage(name) {
+	return name == "" || name.toLowerCase() == "main";
+}
+
 module.exports = async function(data, vars, evars) {
 	var user = evars.user;
 	var channel = evars.channel;
@@ -8,8 +12,8 @@ module.exports = async function(data, vars, evars) {
 
 	var memkeyAccess = world.opts.memKey && world.opts.memKey == evars.keyQuery;
 
-	var is_owner = user.id == world.ownerId || (user.superuser && world.name == "");
-	var is_member = !!world.members.map[user.id] || memkeyAccess || (user.superuser && world.name == "");
+	var is_owner = user.id == world.ownerId || (user.superuser && isMainPage(world.name));
+	var is_member = !!world.members.map[user.id] || memkeyAccess || (user.superuser && isMainPage(world.name));
 
 	var action = data.action;
 	var tileX = san_nbr(data.tileX);

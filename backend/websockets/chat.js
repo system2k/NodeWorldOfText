@@ -160,7 +160,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 	// [rank, name, args, description, example]
 	var command_list = [
 		// operator
-		//...
+		[3, "uptime", null, "get uptime of server", null],
 
 		// superuser
 		[2, "worlds", null, "list all worlds", null],

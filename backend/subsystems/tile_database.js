@@ -16,6 +16,7 @@ var broadcastMonitorEvent;
 var server_exiting = false;
 var editlog_cell_props = false;
 var send_microedits = false;
+var monitor_net_traffic_per = 0;
 
 module.exports.main = function(vars) {
 	db = vars.db;
@@ -55,6 +56,25 @@ module.exports.main = function(vars) {
 			handle_error(e);
 		}
 	}, 1000 * 60 * 3);
+
+	intv.traff_mon_net_interval = setInterval(function() {
+		if(monitor_net_traffic_per) {
+			broadcastMonitorEvent("[Network] " + monitor_net_traffic_per + " Websocket bytes sent");
+			var topBP = null;
+			var topBPCount = 0;
+			wss.clients.forEach(function(ws) {
+				if(!ws.sdata.userClient) return;
+				if(ws.sdata.messageBackpressure > topBPCount) {
+					topBPCount = ws.sdata.messageBackpressure;
+					topBP = ws;
+				}
+			});
+			if(topBP && topBPCount > 1) {
+				broadcastMonitorEvent("[Backpressure] Top backpressure: " + topBPCount + " (" + topBP.sdata.ipAddress + ")");
+			}
+		}
+		monitor_net_traffic_per = 0;
+	}, 1000);
 
 	sendTileUpdatesToClients();
 }
@@ -271,10 +291,14 @@ function sendTileUpdatesToClients() {
 			if(!client.sdata.userClient) return;
 			if(client.sdata.world.id == worldID && client.readyState == WebSocket.OPEN) {
 				try {
-					client.send(pktBroadcast);
+					client.send(pktBroadcast, function() {
+						client.sdata.messageBackpressure--;
+					});
+					client.sdata.messageBackpressure++;
 				} catch(e) {
 					handle_error(e);
 				}
+				monitor_net_traffic_per += pktBroadcast.length;
 			}
 		});
 	}
