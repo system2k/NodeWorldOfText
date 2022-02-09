@@ -328,7 +328,7 @@ function run(path) {
 	eval(fs.readFileSync(path).toString("utf8"));
 }
 
-async function runShellScript() {
+async function runShellScript(includeColors) {
 	var shellFile = loadShellFile();
 	if(shellFile == null) {
 		return "ERR: File does not exist";
@@ -338,7 +338,7 @@ async function runShellScript() {
 	try {
 		getFunc = eval("(function(shell) {\n" + shellFile + "\n})(shellCont);");
 	} catch(e) {
-		return "ERR: Load: \n" + util.inspect(e);
+		return "ERR: Load: \n" + util.inspect(e, { colors: includeColors });
 	}
 	var mainFunc = shellCont.main;
 	if(!mainFunc) {
@@ -348,10 +348,10 @@ async function runShellScript() {
 	try {
 		resp = await mainFunc();
 	} catch(e) {
-		return "ERR: Run: \n" + util.inspect(e);
+		return "ERR: Run: \n" + util.inspect(e, { colors: includeColors });
 	}
 	if(typeof resp != "string" && typeof resp != "number" && typeof resp != "bigint") {
-		resp = util.inspect(resp);
+		resp = util.inspect(resp, { colors: includeColors });
 	} else {
 		resp += "";
 	}
@@ -2266,21 +2266,6 @@ function setupClearClosedClientsInterval() {
 	}, 1000 * 60 * 2); // 2 minutes
 }
 
-// ping clients every 30 seconds
-function initPingAuto() {
-	intv.ping_clients = setInterval(function() {
-		if(!wss) return;
-		wss.clients.forEach(function(ws) {
-			if(ws.readyState != WebSocket.OPEN) return;
-			try {
-				ws.ping();
-			} catch(e) {
-				handle_error(e);
-			}
-		});
-	}, 1000 * 30);
-}
-
 async function uviasSendIdentifier() {
 	await uvias.run("SELECT accounts.set_service_info($1::text, $2::text, $3::text, $4::text, $5::text, $6::integer, $7::boolean, $8::boolean, $9::text);",
 		[uvias.id, uvias.name, uvias.domain, uvias.sso, uvias.logout, process.pid, uvias.private, uvias.only_verified, uvias.custom_css_file_path]);
@@ -2430,8 +2415,6 @@ async function initialize_server_components() {
 	// initialize variables in page handlers
 	await sintLoad(pages);
 
-	initPingAuto();
-
 	serverLoaded = true;
 	for(var i = 0; i < serverLoadWaitQueue.length; i++) {
 		serverLoadWaitQueue[i]();
@@ -2455,12 +2438,12 @@ function removeMonitorEvents(ws) {
 		monitorEventSockets.splice(idx, 1);
 	}
 }
-function broadcastMonitorEvent(data) {
+function broadcastMonitorEvent(type, data) {
 	if(!monitorEventSockets.length) return;
 	for(var i = 0; i < monitorEventSockets.length; i++) {
 		var sock = monitorEventSockets[i];
 		try {
-			sock.send(data);
+			sock.send("[" + type + "] " + data);
 		} catch(e) {
 			continue;
 		}
@@ -2540,7 +2523,7 @@ var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	cmd:			[256, 1000, 0],
 	debug:			[10, 1000, 0],
 	fetch:			[256, 1000, 0], // TODO: fetch rate limits
-	link:			[400, 1000, 0],
+	link:			[400, 1000, 0], // TODO: fix link limits
 	protect:		[400, 1000, 0],
 	write:			[256, 1000, 0], // rate-limiting handled separately
 	paste:			[10, 500, 0],
@@ -2697,7 +2680,7 @@ async function manageWebsocketConnection(ws, req) {
 				msCount++;
 			}
 		});
-		broadcastMonitorEvent("[Server] " + msCount + " listening sockets, " + monitorEventSockets.length + " listeners");
+		broadcastMonitorEvent("Server", msCount + " listening sockets, " + monitorEventSockets.length + " listeners");
 		return;
 	}
 	var pre_queue = [];
@@ -2815,7 +2798,7 @@ async function manageWebsocketConnection(ws, req) {
 	ws.sdata.chat_blocks = [];
 
 	if(monitorEventSockets.length) {
-		broadcastMonitorEvent(ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + world.name + "', " + world.id + "]");
+		broadcastMonitorEvent("Connect", ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + world.name + "', " + world.id + "]");
 	}
 
 	var sentClientId = clientId;
@@ -2859,10 +2842,6 @@ async function manageWebsocketConnection(ws, req) {
 		if(msg.constructor == Buffer) { // TODO
 			/*msg = bin_packet.decode(msg);
 			if(!msg) return; // malformed packet*/
-			return;
-		}
-		if(msg.startsWith("1::") && isTestServer) { // debug statement
-			console.log(msg.substr(3));
 			return;
 		}
 		if(msg.startsWith("2::")) { // ping
@@ -3108,8 +3087,6 @@ function stopServer(restart, maintenance) {
 					await sys.server_exit();
 				}
 			}
-
-			await commitAllWorlds();
 
 			server.close();
 			wss.close();

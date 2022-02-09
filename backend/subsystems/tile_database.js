@@ -59,7 +59,7 @@ module.exports.main = function(vars) {
 
 	intv.traff_mon_net_interval = setInterval(function() {
 		if(monitor_net_traffic_per) {
-			broadcastMonitorEvent("[Network] " + monitor_net_traffic_per + " Websocket bytes sent");
+			broadcastMonitorEvent("Network", monitor_net_traffic_per + " Websocket bytes sent");
 			var topBP = null;
 			var topBPCount = 0;
 			wss.clients.forEach(function(ws) {
@@ -70,7 +70,7 @@ module.exports.main = function(vars) {
 				}
 			});
 			if(topBP && topBPCount > 1) {
-				broadcastMonitorEvent("[Backpressure] Top backpressure: " + topBPCount + " (" + topBP.sdata.ipAddress + ")");
+				broadcastMonitorEvent("Backpressure", "Top backpressure: " + topBPCount + " (" + topBP.sdata.ipAddress + ")");
 			}
 		}
 		monitor_net_traffic_per = 0;
@@ -81,6 +81,8 @@ module.exports.main = function(vars) {
 
 module.exports.server_exit = async function() {
 	server_exiting = true;
+	// Cycle the clocks again to ensure they execute one last time
+	// They already should re-cycle anyway on server exit.
 	await Promise.all([
 		databaseClock(),
 		editLogClock()
@@ -428,7 +430,7 @@ function performCacheInvalidation() {
 function handleTooManyCachedTiles() {
 	// free every single tile
 	if(totalTilesCached <= tileCacheLimit) return;
-	broadcastMonitorEvent("[Database] Too many cached tiles detected");
+	broadcastMonitorEvent("Database", "Too many cached tiles detected");
 	for(var worldID in memTileCache) {
 		for(var tileY in memTileCache[worldID]) {
 			for(var tileX in memTileCache[worldID][tileY]) {
@@ -907,11 +909,13 @@ function bulkWriteEdits(edits) {
 
 async function iterateDatabaseChanges() {
 	var writeQueue = [];
+	var modTileCount = 0;
 	for(var worldID in memTileCache) {
 		for(var tileY in memTileCache[worldID]) {
 			for(var tileX in memTileCache[worldID][tileY]) {
 				let tile = memTileCache[worldID][tileY][tileX];
 				if(!tile.props_updated && !tile.content_updated && !tile.writability_updated) continue;
+				modTileCount++;
 				if(tile.tile_exists) {
 					if(tile.props_updated) {
 						tile.props_updated = false;
@@ -963,12 +967,14 @@ async function iterateDatabaseChanges() {
 	if(writeQueue.length) {
 		await bulkWriteEdits(writeQueue);
 	}
+	return modTileCount;
 }
 
 async function commitEditLog() {
 	var eLogLen = editLogQueue.length;
 	var editTransaction = false;
 	var editsByWorld = {};
+	var numRows = 0;
 	if(eLogLen > 1) editTransaction = true;
 	if(editTransaction) await db_edits.run("BEGIN");
 	for(var i = 0; i < eLogLen; i++) {
@@ -986,9 +992,11 @@ async function commitEditLog() {
 		var date = edit[5];
 		if(editsByWorld[worldID] <= 2048) {
 			await db_edits.run("INSERT INTO edit VALUES(?, ?, ?, ?, ?, ?)", [user, worldID, tileY, tileX, date, data]);
+			numRows++;
 		}
 	}
 	if(editTransaction) await db_edits.run("COMMIT");
+	return numRows;
 }
 
 var databaseBusy = false;
@@ -997,8 +1005,8 @@ async function databaseClock(serverExit) {
 	if(databaseBusy) return;
 	databaseBusy = true;
 	try {
-		await iterateDatabaseChanges();
-		broadcastMonitorEvent("[Database] Clock cycle executed");
+		var modCount = await iterateDatabaseChanges();
+		broadcastMonitorEvent("Database", "Clock cycle executed (" + modCount + " tiles)");
 	} catch(e) {
 		handle_error(e, true);
 	}
@@ -1014,8 +1022,8 @@ async function editLogClock(serverExit) {
 	if(editLogBusy) return;
 	editLogBusy = true;
 	try {
-		await commitEditLog();
-		broadcastMonitorEvent("[EditLog] Clock cycle executed");
+		var eCount = await commitEditLog();
+		broadcastMonitorEvent("EditLog", "Clock cycle executed (" + eCount + " rows)");
 	} catch(e) {
 		handle_error(e, true);
 	}

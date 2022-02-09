@@ -3,18 +3,47 @@ var crypto = require("crypto");
 var intv;
 var handle_error;
 var db;
+var broadcastMonitorEvent;
+
+var server_exiting = false;
+
 module.exports.main = async function(vars) {
 	intv = vars.intv;
 	handle_error = vars.handle_error;
 	db = vars.db;
+	broadcastMonitorEvent = vars.broadcastMonitorEvent;
 
 	intv.worldCacheInvalidation = setInterval(function() {
 		invalidateWorldCache();
 	}, 1000 * 60); // 1 minute
 
-	intv.worldCacheCommitter = setInterval(function() {
-		commitAllWorlds();
-	}, 1000 * 5); // 5 seconds
+	worldDatabaseClock();
+}
+
+module.exports.server_exit = async function() {
+	server_exiting = true;
+	
+	await worldDatabaseClock();
+}
+
+var worldDatabaseBusy = false;
+var worldsCommittedInPeriod = 0;
+async function worldDatabaseClock(serverExit) {
+	if(worldDatabaseBusy) return;
+	worldDatabaseBusy = true;
+	try {
+		await commitAllWorlds();
+		broadcastMonitorEvent("Worlds", "Committed world metadata (" + worldsCommittedInPeriod + " worlds)");
+		worldsCommittedInPeriod = 0;
+	} catch(e) {
+		handle_error(e, true);
+	}
+	worldDatabaseBusy = false;
+	if(server_exiting) {
+		if(!serverExit) await worldDatabaseClock(true);
+	} else {
+		intv.world_database_clock = setTimeout(worldDatabaseClock, 1000 * 5);
+	}
 }
 
 var worldCache = {};
@@ -506,6 +535,11 @@ async function commitWorld(world) {
 		var arg = query[1];
 		await db.run(sql, arg);
 	}
+
+	// this world has made at least one DB update during this period
+	if(propUpd || colUpd || dbQueries.length) {
+		worldsCommittedInPeriod++;
+	}
 }
 
 async function commitAllWorlds() {
@@ -666,6 +700,7 @@ async function claimWorldByName(worldName, user) {
 	};
 }
 
+// TODO: what if world hasnt been committed to DB yet?
 async function renameWorld(world, newName, user) {
 	var target = await getWorld(newName, false);
 

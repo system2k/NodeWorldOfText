@@ -37,7 +37,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	if(!user.superuser) return;
 
 	if(post_data.command == "exec") {
-		var result = await runShellScript();
+		var result = await runShellScript(post_data.colors === "true");
 		return serve(result);
 	} else {
 		return serve(null, 400);

@@ -9,6 +9,8 @@ module.exports = async function(data, vars, evars) {
 
 	var san_nbr = vars.san_nbr;
 	var tile_database = vars.tile_database;
+	var monitorEventSockets = vars.monitorEventSockets;
+	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 
 	var memkeyAccess = world.opts.memKey && world.opts.memKey == evars.keyQuery;
 
@@ -22,6 +24,17 @@ module.exports = async function(data, vars, evars) {
 	var charY = san_nbr(data.charY);
 	var precise = data.precise;
 	var type = data.type;
+
+	var ipAddress;
+	if(evars.ws && evars.ws.sdata) {
+		ipAddress = evars.ws.sdata.ipAddress;
+	} else {
+		ipAddress = evars.ipAddress;
+	}
+
+	if(monitorEventSockets.length) {
+		broadcastMonitorEvent("Protect", ipAddress + " set 'protect' on world '" + world.name + "' (" + world.id + "), coords (" + tileX + ", " + tileY + ")");
+	}
 
 	var no_log_edits = world.opts.noLogEdits;
 

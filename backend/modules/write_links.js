@@ -13,6 +13,8 @@ module.exports = async function(data, vars, evars) {
 	var san_nbr = vars.san_nbr;
 	var san_dp = vars.san_dp;
 	var tile_database = vars.tile_database;
+	var monitorEventSockets = vars.monitorEventSockets;
+	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 
 	var memkeyAccess = world.opts.memKey && world.opts.memKey == evars.keyQuery;
 
@@ -30,6 +32,17 @@ module.exports = async function(data, vars, evars) {
 	var url = data.url
 	var link_tileX = san_dp(data.link_tileX);
 	var link_tileY = san_dp(data.link_tileY);
+
+	var ipAddress;
+	if(evars.ws && evars.ws.sdata) {
+		ipAddress = evars.ws.sdata.ipAddress;
+	} else {
+		ipAddress = evars.ipAddress;
+	}
+
+	if(monitorEventSockets.length) {
+		broadcastMonitorEvent("Link", ipAddress + " set 'link' on world '" + world.name + "' (" + world.id + "), coords (" + tileX + ", " + tileY + ")");
+	}
 
 	var no_log_edits = world.opts.noLogEdits;
 

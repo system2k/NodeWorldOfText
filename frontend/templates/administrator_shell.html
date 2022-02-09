@@ -34,8 +34,72 @@
 
 {% block endbody %}
 <script>
+	function pushLine(content, color) {
+		var elm = document.createElement("span");
+		elm.innerText = content;
+		elm.style.color = color;
+		shell_console.appendChild(elm);
+	}
 	function printShell(str) {
-		shell_console.innerText += str + "\n";
+		str = str.replace(/\r\n/g, "\n").split("\n");
+		var colMap = {
+			"30": "rgb(12, 12, 12)",
+			"31": "rgb(197, 15, 31)",
+			"32": "rgb(19, 161, 14)",
+			"33": "rgb(193, 156, 0)",
+			"34": "rgb(0, 55, 218)",
+			"35": "rgb(136, 23, 152)",
+			"36": "rgb(58, 150, 221)",
+			"37": "rgb(204, 204, 204)",
+			"90": "rgb(118, 118, 118)",
+			"91": "rgb(231, 72, 86)",
+			"92": "rgb(22, 198, 12)",
+			"93": "rgb(249, 241, 165)",
+			"94": "rgb(59, 120, 255)",
+			"95": "rgb(180, 0, 158)",
+			"96": "rgb(97, 214, 214)",
+			"97": "rgb(242, 242, 242)"
+		};
+		var currColor = "30";
+		var currColorCode = colMap[currColor];
+		for(var i = 0; i < str.length; i++) {
+			var buf = "";
+			var line = str[i];
+			var escMode = false;
+			var escBuf = "";
+			for(var x = 0; x < line.length; x++) {
+				if(line[x] == "\x1b") {
+					escMode = true;
+					continue;
+				}
+				if(escMode) {
+					if(line[x] == "m") {
+						if(escBuf[0] == "[") {
+							var num = escBuf.substr(1);
+							if(num == "39") num = "30";
+							var code = colMap[num];
+							if(code) {
+								if(buf && code != currColorCode) {
+									pushLine(buf, currColorCode);
+									buf = "";
+								}
+								currColorCode = code;
+							}
+						}
+						escBuf = "";
+						escMode = false;
+					} else {
+						escBuf += line[x];
+					}
+				} else {
+					buf += line[x];
+				}
+			}
+			if(buf) {
+				pushLine(buf, currColorCode);
+			}
+			shell_console.appendChild(document.createElement("br"));
+		}
 	}
 	load_shell_cont.onclick = function() {
 		printShell("Loading script content...");
@@ -63,7 +127,8 @@
 			type: "POST",
 			url: "/administrator/shell/",
 			data: {
-				command: "exec"
+				command: "exec",
+				colors: "true"
 			},
 			done: function(data) {
 				printShell("Result:\n" + data);
@@ -82,7 +147,7 @@
 		shell_console.scrollTop = shell_console.scrollHeight;
 	}
 	console_clr.onclick = function() {
-		shell_console.innerText = "";
+		shell_console.innerHTML = "";
 	}
 </script>
 

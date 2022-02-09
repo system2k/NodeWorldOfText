@@ -37,10 +37,19 @@ module.exports = async function(data, vars, evars) {
 	var memTileCache = vars.memTileCache;
 	var encodeCharProt = vars.encodeCharProt;
 	var normalizeCacheTile = vars.normalizeCacheTile;
+	var monitorEventSockets = vars.monitorEventSockets;
+	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 
 	var tiles = {};
 	var fetchRectLimit = 50;
 	var totalAreaLimit = 5000;
+
+	var ipAddress;
+	if(evars.ws && evars.ws.sdata) {
+		ipAddress = evars.ws.sdata.ipAddress;
+	} else {
+		ipAddress = evars.ipAddress;
+	}
 
 	if(!Array.isArray(data.fetchRectangles)) return "Invalid parameters";
 	var len = data.fetchRectangles.length;
@@ -83,6 +92,11 @@ module.exports = async function(data, vars, evars) {
 
 		if(total_area > totalAreaLimit) {
 			return "Too many tiles";
+		}
+
+		if(monitorEventSockets.length) {
+			var monPos = `minX=${minX}, minY=${minY}, maxX=${maxX}, maxY=${maxY}, area=${area}`;
+			broadcastMonitorEvent("Fetch", ipAddress + " requested tiles on world '" + world.name + "' (" + world.id + "), " + monPos);
 		}
 
 		rect.minY = minY;

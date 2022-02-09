@@ -231,7 +231,7 @@ module.exports = async function(data, vars, evars) {
 			chan = "(Via HTTP)";
 		}
 		var textLog = ip + ", [" + cliId + ", '" + chan + "'] sent 'write' on world ['" + world.name + "', " + world.id + "]. " + tileCount + " modified tiles, " + totalEdits + " edits";
-		broadcastMonitorEvent(textLog);
+		broadcastMonitorEvent("Write", textLog);
 	}
 
 	var call_id = tile_database.newCallId();

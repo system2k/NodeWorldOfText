@@ -260,6 +260,35 @@ module.exports = async function(ws, data, send, vars, evars) {
 		return html;
 	}
 
+	function getClientIPByChatID(id, isGlobal) {
+		if(isGlobal) {
+			// since this is global, there is the potential for duplicate IDs.
+			// pick the one that has chatted the most recently.
+			var latestGCli = null;
+			var latestGCliTime = -1;
+			for(var cw in client_ips) {
+				var worldClients = client_ips[cw];
+				if(worldClients[id]) {
+					var gCli = worldClients[id];
+					if(gCli[3] != -1 && gCli[3] >= latestGCliTime) {
+						latestGCliTime = gCli[3];
+						latestGCli = gCli;
+					}
+				}
+			}
+			if(latestGCli) {
+				return latestGCli[0];
+			}
+		} else {
+			if(client_ips[world.id]) {
+				if(client_ips[world.id][id]) {
+					return client_ips[world.id][id][0];
+				}
+			}
+		}
+		return null;
+	}
+
 	var hasPrivateMsged = false;
 
 	var com = {
@@ -289,7 +318,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 			return serverChatResponse(generate_command_list(), location);
 		},
 		block: function(id) {
-			if(id != "*") {
+			if(id != "*" && id != "tell") {
 				id = san_nbr(id);
 				if(id < 0) return;
 			}
@@ -303,7 +332,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 			serverChatResponse("Server uptime: " + uptime(), location);
 		},
 		tell: function(id, message) {
-			// TODO: respond to /block
+			// TODO: fix regarding Global and This page ; test this
 			if(isMuted) return;
 			id += "";
 			message += "";
@@ -319,57 +348,71 @@ module.exports = async function(ws, data, send, vars, evars) {
 				return serverChatResponse("Invalid ID format", location);
 			}
 			id = san_nbr(id);
-			var clientFound = false;
+
+			var client = null;
+			var latestGlobalClientTime = -1;
 			wss.clients.forEach(function(ws) {
-				if(clientFound) return;
 				if(!ws.sdata.userClient) return;
 				var dstClientId = ws.sdata.clientId;
 				var clientWorld = ws.sdata.world;
-				if(clientWorld.id == world.id && dstClientId == id) {
-					clientFound = true;
-				} else {
-					return;
+				if(location == "page") {
+					if(clientWorld.id == world.id && dstClientId == id) {
+						client = ws;
+					}
+				} else if(location == "global") {
+					var cliObj = client_ips[clientWorld.id][dstClientId];
+					var cliTime = cliObj[3];
+					if(cliTime != -1 && cliTime >= latestGlobalClientTime) {
+						latestGlobalClientTime = cliTime;
+						client = ws;
+					}
 				}
-				var privateMessage = {
-					nickname: nick,
-					realUsername: username_to_display,
-					id: clientId,
-					message: message,
-					registered: user.authenticated,
-					location: location,
-					op: user.operator,
-					admin: user.superuser,
-					staff: user.staff,
-					color: data.color,
-					kind: "chat",
-					privateMessage: "to_me"
-				};
-				if(user.authenticated && user.id in ranks_cache.users) {
-					var rank = ranks_cache[ranks_cache.users[user.id]];
-					privateMessage.rankName = rank.name;
-					privateMessage.rankColor = rank.chat_color;
-				}
-				ws.send(JSON.stringify(privateMessage));
-				send({
-					nickname: "",
-					realUsername: "",
-					id: dstClientId,
-					message: message,
-					registered: false,
-					location: location,
-					op: false,
-					admin: false,
-					staff: false,
-					color: "#000000",
-					kind: "chat",
-					privateMessage: "from_me"
-				});
 			});
-			if(!clientFound) {
+
+			if(!client) {
 				return serverChatResponse("User not found", location);
-			} else {
-				hasPrivateMsged = true;
 			}
+
+			hasPrivateMsged = true;
+
+			var privateMessage = {
+				nickname: nick,
+				realUsername: username_to_display,
+				id: clientId,
+				message: message,
+				registered: user.authenticated,
+				location: location,
+				op: user.operator,
+				admin: user.superuser,
+				staff: user.staff,
+				color: data.color,
+				kind: "chat",
+				privateMessage: "to_me"
+			};
+			if(user.authenticated && user.id in ranks_cache.users) {
+				var rank = ranks_cache[ranks_cache.users[user.id]];
+				privateMessage.rankName = rank.name;
+				privateMessage.rankColor = rank.chat_color;
+			}
+			send({
+				nickname: "",
+				realUsername: "",
+				id: dstClientId,
+				message: message,
+				registered: false,
+				location: location,
+				op: false,
+				admin: false,
+				staff: false,
+				color: "#000000",
+				kind: "chat",
+				privateMessage: "from_me"
+			});
+			// if user has muted TELLs, don't let the /tell-er know
+			if(ws.sdata.chat_blocks && (ws.sdata.chat_blocks.includes(clientId) || // is ID of the /tell sender? (not destination)
+				(ws.sdata.chat_blocks.includes("*") && opts.clientId != 0)) ||
+				(ws.sdata.chat_blocks.includes("tell"))) return;
+			ws.send(JSON.stringify(privateMessage));
 		},
 		channel: async function() {
 			var worldId = world.id;
@@ -401,33 +444,11 @@ module.exports = async function(ws, data, send, vars, evars) {
 			id = san_nbr(id);
 			time = san_nbr(time); // in seconds
 
-			var muted_ip = null;
-
-			if(location == "global" && user.staff) {
-				// since this is global, there is the potential for duplicate IDs.
-				// pick the one that has chatted the most recently.
-				var gclients = [];
-				for(var cw in client_ips) {
-					for(var cwid in client_ips[cw]) {
-						var gCli = client_ips[cw][cwid];
-						gclients.push(gCli);
-					}
-				}
-				var latestGCli = null;
-				var latestGCliTime = -1;
-				for(var i = 0; i < gclients.length; i++) {
-					if(gclients[i][3] != -1 && gclients[i][3] >= latestGCliTime) {
-						latestGCli = gclients[i];
-					}
-				}
-				muted_ip = latestGCli[0];
-			} else {
-				if(client_ips[world.id]) {
-					if(client_ips[world.id][id]) {
-						muted_ip = client_ips[world.id][id][0];
-					}
-				}
+			if(location == "global" && !user.staff) {
+				return serverChatResponse("You do not have permission to mute on global", location);
 			}
+
+			var muted_ip = getClientIPByChatID(id, location == "global");
 
 			if(muted_ip) {
 				var muteDate = Date.now() + (time * 1000);
@@ -438,17 +459,13 @@ module.exports = async function(ws, data, send, vars, evars) {
 					mute_wid = world.id;
 				}
 				if(mute_wid == null) {
-					return serverChatResponse("Client not found", location);
+					return serverChatResponse("Invalid location", location);
 				}
 				if(!blocked_ips_by_world_id[mute_wid]) blocked_ips_by_world_id[mute_wid] = {};
 				blocked_ips_by_world_id[mute_wid][muted_ip] = muteDate;
 				return serverChatResponse("Muted client until " + html_tag_esc(create_date(muteDate)), location);
 			} else {
-				if(!user.staff) {
-					return serverChatResponse("You do not have permission to mute on global", location);
-				} else {
-					return serverChatResponse("Client not found", location);
-				}
+				return serverChatResponse("Client not found", location);
 			}
 		},
 		clearmutes: function() {
