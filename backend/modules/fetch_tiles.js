@@ -26,6 +26,7 @@ function advancedSplitCli(str, noSurrog, noComb) {
 function filterUTF16(str) {
 	return advancedSplitCli(str, true, true).join("");
 }
+// TODO: use proper util string splitter
 
 module.exports = async function(data, vars, evars) {
 	var user = evars.user;

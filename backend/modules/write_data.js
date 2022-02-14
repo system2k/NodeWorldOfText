@@ -118,7 +118,7 @@ module.exports = async function(data, vars, evars) {
 		ipAddressVal = evars.ipAddressVal;
 		ipAddressFam = evars.ipAddressFam;
 	}
-	// todo: connection lost thing does not disappear sometimes
+	
 	var san_nbr = vars.san_nbr;
 	var advancedSplit = vars.advancedSplit;
 	var get_bypass_key = vars.get_bypass_key;

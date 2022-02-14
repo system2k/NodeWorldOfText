@@ -700,7 +700,6 @@ async function claimWorldByName(worldName, user) {
 	};
 }
 
-// TODO: what if world hasnt been committed to DB yet?
 async function renameWorld(world, newName, user) {
 	var target = await getWorld(newName, false);
 

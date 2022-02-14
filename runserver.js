@@ -2190,7 +2190,7 @@ function getUserCountFromWorld(worldId) {
 	var counter = 0;
 	wss.clients.forEach(function(ws) {
 		if(!ws.sdata.userClient) return;
-		if(ws.sdata.world.id == worldId) { // TODO: check if 'world' is valid
+		if(ws.sdata.world.id == worldId) {
 			counter++;
 		}
 	});
@@ -2362,8 +2362,10 @@ async function initialize_server_components() {
 		command_prompt();
 	});
 
-	// TODO: Fix per-message deflate
-	wss = new WebSocket.Server({ server });
+	wss = new WebSocket.Server({
+		server,
+		perMessageDeflate: true
+	});
 	global_data.wss = wss;
 
 	var ws_broadcast = function(data, world_id, opts) {

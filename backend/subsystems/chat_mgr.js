@@ -2,11 +2,13 @@ var db_ch;
 var intv;
 var handle_error;
 var db;
+var broadcastMonitorEvent;
 module.exports.main = async function(vars) {
 	db_ch = vars.db_ch;
 	intv = vars.intv;
 	handle_error = vars.handle_error;
 	db = vars.db;
+	broadcastMonitorEvent = vars.broadcastMonitorEvent;
 
 	await init_chat_history();
 
@@ -18,8 +20,11 @@ module.exports.main = async function(vars) {
 	}, 60000 * 5);
 }
 
+var server_exiting = false;
+
 module.exports.server_exit = async function() {
-	await updateChatLogData(true);
+	server_exiting = true;
+	await chatDatabaseClock(true);
 }
 
 async function init_chat_history() {
@@ -34,7 +39,7 @@ async function init_chat_history() {
 		await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
 			["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0]);
 	}
-	updateChatLogData();
+	chatDatabaseClock();
 }
 
 var chat_cache = {};
@@ -112,8 +117,6 @@ async function retrieveChatHistory(world_id) {
 		for(var a = 0; a < world_chats.length; a++) {
 			var row = JSON.parse(world_chats[a].data);
 			row.date = world_chats[a].date;
-			/* row.aid = world_chats[a].id; */
-			delete row.aid; // remove potentially-saved "aid"
 			chat_cache[world_id].data.push(row);
 		}
 	}
@@ -129,7 +132,6 @@ async function retrieveChatHistory(world_id) {
 	return chat_cache[world_id].data;
 }
 
-var chatAdditionId = -2; // avoid using -1.
 async function add_to_chatlog(chatData, world_id) {
 	var location = "page";
 	if(world_id == 0) {
@@ -138,7 +140,6 @@ async function add_to_chatlog(chatData, world_id) {
 
 	var date = Date.now();
 	chatData.date = date;
-	/* chatData.aid = chatAdditionId--; */
 
 	var history = await retrieveChatHistory(world_id);
 
@@ -211,7 +212,6 @@ async function doUpdateChatLogData() {
 		}
 		var cent = await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
 			[date, def_channel, JSON.stringify(chatData)]);
-		/* chatData.aid = cent.lastID; */
 	}
 
 	for(var i = 0; i < copy_global_chat_additions.length; i++) {
@@ -221,31 +221,34 @@ async function doUpdateChatLogData() {
 		var global_channel = (await db_ch.get("SELECT id FROM channels WHERE name='global'")).id;
 		var cent = await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
 			[date, global_channel, JSON.stringify(data)]);
-		/* data.aid = cent.lastID; */
 	}
 
 	await db_ch.run("COMMIT");
 }
 
-async function updateChatLogData(no_timeout) {
-	if(!(global_chat_additions.length > 0 ||
-		  world_chat_additions.length > 0 ||
-		  Object.keys(chatIsCleared).length > 0)) {
-		if(!no_timeout) intv.updateChatLogData = setTimeout(updateChatLogData, 1000);
-		return;
-	}
-
+var chatDatabaseBusy = false;
+async function chatDatabaseClock(serverExit) {
+	if(chatDatabaseBusy) return;
+	chatDatabaseBusy = true;
 	try {
-		await doUpdateChatLogData();
+		var gc_len = global_chat_additions.length;
+		var wc_len = world_chat_additions.length;
+		var cc_len = Object.keys(chatIsCleared).length;
+		if(gc_len > 0 || wc_len > 0 || cc_len > 0) {
+			await doUpdateChatLogData();
+		}
+		broadcastMonitorEvent("Chat", "Clock cycle executed");
 	} catch(e) {
 		handle_error(e);
 	}
-
-	if(!no_timeout) intv.updateChatLogData = setTimeout(updateChatLogData, 5000);
+	chatDatabaseBusy = false;
+	if(server_exiting) {
+		if(!serverExit) await chatDatabaseClock(true);
+	} else {
+		intv.chat_database_clock = setTimeout(chatDatabaseClock, 1000 * 5);
+	}
 }
 
-module.exports.init_chat_history = init_chat_history;
 module.exports.retrieveChatHistory = retrieveChatHistory;
 module.exports.add_to_chatlog = add_to_chatlog;
 module.exports.clearChatlog = clearChatlog;
-module.exports.updateChatLogData = updateChatLogData;

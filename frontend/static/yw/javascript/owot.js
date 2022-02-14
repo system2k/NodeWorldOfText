@@ -3302,11 +3302,11 @@ function createSocket() {
 		if(w.receivingBroadcasts) {
 			w.broadcastReceive(true);
 		}
-		if(disconnectTimeout != null) {
-			clearTimeout(disconnectTimeout);
-			disconnectTimeout = null;
+		if(!canAccessWorld) {
+			canAccessWorld = true;
 			w.doAnnounce("");
 		}
+		clearTimeout(disconnectTimeout);
 	}
 
 	socket.onclose = function() {
@@ -5586,10 +5586,6 @@ var ws_functions = {
 		w.clientId = data.id;
 		w.userCount = data.initial_user_count;
 		updateUserCount();
-		if(!canAccessWorld) { // client now has read access to this world
-			canAccessWorld = true;
-			w.doAnnounce("");
-		}
 	},
 	announcement: function(data) {
 		w.emit("announcement", data);

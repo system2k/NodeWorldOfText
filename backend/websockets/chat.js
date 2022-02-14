@@ -332,7 +332,6 @@ module.exports = async function(ws, data, send, vars, evars) {
 			serverChatResponse("Server uptime: " + uptime(), location);
 		},
 		tell: function(id, message) {
-			// TODO: fix regarding Global and This page ; test this
 			if(isMuted) return;
 			id += "";
 			message += "";

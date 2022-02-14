@@ -31,7 +31,7 @@
 				background-color: black;
 				width: 700px;
 				height: 500px;
-				border: solid 1px #FFFFFF;
+				border: 1px solid white;
 				color: white;
 				font-family: 'Courier New', monospace;
 				padding: 4px;
@@ -45,9 +45,20 @@
 			}
 			#tileCachePanel {
 				background-color: white;
-				border: solid 1px black;
+				border: 1px solid black;
+				padding: 7px;
+			}
+			#controlPanel {
+				display: inline-block;
+				vertical-align: top;
+				padding: 5px;
+			}
+			#logTypePanel {
+				background-color: white;
+				border: 1px solid black;
 				display: inline-block;
 				padding: 7px;
+				margin-bottom: 5px;
 			}
 		</style>
 	</head>
@@ -64,10 +75,15 @@
 					<td style="vertical-align: top; padding-top: 1px;">
 						<div style="background-color: #e6f0ff; height: 100%; padding: 4px;">
 							<div id="outputPanel"></div>
-							<div id="tileCachePanel">
-								<b>Tile Cache</b><br>
-								<span>Worlds: {{tc_worlds}}</span><br>
-								<span>Total Tiles: {{tc_tiles}}</span>
+							<div id="controlPanel">
+								<div id="logTypePanel">
+									<b>Log Types</b><br>
+								</div>
+								<div id="tileCachePanel">
+									<b>Tile Cache</b><br>
+									<span>Worlds: {{tc_worlds}}</span><br>
+									<span>Total Tiles: {{tc_tiles}}</span>
+								</div>
 							</div>
 						</div>
 					</td>
@@ -75,6 +91,55 @@
 			</tbody>
 		</table>
 		<script>
+			var logTypes = {
+				"Server": true,
+				"Connect": true,
+				"Fetch": true,
+				"Protect": false,
+				"Write": true,
+				"Link": false,
+				"Chat": false,
+				"Network": false,
+				"Backpressure": true,
+				"Database": true,
+				"EditLog": false,
+				"Worlds": false
+			};
+
+			function updateLogTypeStatus(evt) {
+				var target = evt.target;
+				var isChecked = target.checked;
+				var type = target.for;
+				if(type in logTypes) {
+					logTypes[type] = isChecked;
+				}
+			}
+
+			for(var type in logTypes) {
+				var isEnabled = logTypes[type];
+				var line = document.createElement("div");
+				var check = document.createElement("input");
+				check.type = "checkbox";
+				check.checked = isEnabled;
+				check.for = type;
+				check.oninput = updateLogTypeStatus;
+				var label = document.createElement("label");
+				label.innerText = type + " (0)";
+				label.id = "logtype_" + type;
+				line.appendChild(check);
+				line.appendChild(label);
+				logTypePanel.appendChild(line);
+			}
+
+			var logCounts = {};
+
+			function updateLogCount(logType) {
+				var count = logCounts[logType];
+				var elm = document.getElementById("logtype_" + logType);
+				if(!elm) return;
+				elm.innerText = logType + " (" + count + ")";
+			}
+
 			var outputPanel = document.getElementById("outputPanel");
 			function appendLine(string) {
 				var line = document.createElement("span");
@@ -103,7 +168,13 @@
 				}
 				socket.onmessage = function(msg) {
 					var data = msg.data;
-					appendLine(data);
+					var type = data.split("]")[0].substr(1);
+					if(!logCounts[type]) logCounts[type] = 0;
+					logCounts[type]++;
+					updateLogCount(type);
+					if(logTypes[type]) {
+						appendLine(data);
+					}
 				}
 			}
 			makeSocket();
