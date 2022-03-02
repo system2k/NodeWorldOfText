@@ -151,14 +151,47 @@ async function add_to_chatlog(chatData, world_id) {
 	if(location == "page") {
 		world_chat_additions.push([chatData, world_id, date]);
 	} else if(location == "global") {
-		global_chat_additions.push([chatData, date]);
+		global_chat_additions.push([chatData, 0, date]);
 	}
+}
+
+async function remove_from_chatlog(world_id, chat_id, chat_date) {
+	var obj = world_chat_additions;
+	if(world_id == 0) obj = global_chat_additions;
+
+	var history = await retrieveChatHistory(world_id);
+
+	var cache_rem = 0;
+	var add_rem = 0;
+
+	// remove from the cache
+	for(var i = 0; i < history.length; i++) {
+		var msg = history[i];
+		if(msg.id == chat_id && msg.date == chat_date) {
+			history.splice(i, 1);
+			cache_rem++;
+			i--;
+		}
+	}
+
+	// remove from the insertion queue
+	for(var i = 0; i < obj.length; i++) {
+		var add = obj[i];
+		if(add[1] == world_id && add[2] == chat_date) {
+			obj.splice(i, 1);
+			add_rem++;
+			i--;
+		}
+	}
+
+	return Math.max(cache_rem, add_rem);
 }
 
 var chatIsCleared = {};
 
 var global_chat_additions = [];
 var world_chat_additions = [];
+var chat_removals = [];
 
 function clearChatlog(world_id) {
 	// clear from cache if it exists
@@ -188,6 +221,7 @@ async function doUpdateChatLogData() {
 		await db_ch.run("DELETE FROM entries WHERE channel=?", def_channel);
 	}
 
+	// TODO: refactor this and simplify
 	for(var i = 0; i < copy_world_chat_additions.length; i++) {
 		var row = copy_world_chat_additions[i];
 		var chatData = row[0];
@@ -217,7 +251,7 @@ async function doUpdateChatLogData() {
 	for(var i = 0; i < copy_global_chat_additions.length; i++) {
 		var row = copy_global_chat_additions[i];
 		var data = row[0];
-		var date = row[1];
+		var date = row[2];
 		var global_channel = (await db_ch.get("SELECT id FROM channels WHERE name='global'")).id;
 		var cent = await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
 			[date, global_channel, JSON.stringify(data)]);
@@ -251,4 +285,5 @@ async function chatDatabaseClock(serverExit) {
 
 module.exports.retrieveChatHistory = retrieveChatHistory;
 module.exports.add_to_chatlog = add_to_chatlog;
+module.exports.remove_from_chatlog = remove_from_chatlog;
 module.exports.clearChatlog = clearChatlog;

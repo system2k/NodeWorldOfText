@@ -7,7 +7,6 @@ var initGlobalTabOpen    = false;
 var chatWriteHistory     = []; // history of user's chats
 var chatWriteHistoryMax  = 100; // maximum size of chat write history length
 var chatWriteHistoryIdx  = -1; // location in chat write history
-var serverPingTime       = 0;
 var chatLimitCombChars   = true;
 var chatWriteTmpBuffer   = "";
 var defaultChatColor     = window.localStorage ? parseInt(localStorage.getItem("chatcolor")) : null; // 24-bit Uint
@@ -127,8 +126,12 @@ var client_commands = {
 		clientChatResponse(nickChangeMsg);
 	},
 	ping: function() {
-		serverPingTime = getDate();
-		network.ping(true);
+		var pingTime = getDate();
+		network.ping(function() {
+			var pongTime = getDate();
+			var pingMs = pongTime - pingTime;
+			clientChatResponse("Ping: " + pingMs);
+		});
 	},
 	gridsize: function (args) {
 		var size = args[0];

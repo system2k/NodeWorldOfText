@@ -82,6 +82,7 @@ var guestCursors           = {};
 var clientGuestCursorPos   = { tileX: 0, tileY: 0, charX: 0, charY: 0, hidden: false, updated: false };
 var disconnectTimeout      = null;
 var canAccessWorld         = true;
+var menuOptions            = {};
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -4312,73 +4313,74 @@ function buildMenu() {
 	w.menu = menu;
 	var homeLink = document.createElement("a");
 	var homeLinkIcon = document.createElement("img");
-	var subgridEntry;
 	homeLink.href = "/home";
 	homeLink.target = "_blank";
 	homeLink.innerHTML = "More...&nbsp";
 	homeLinkIcon.src = "/static/external_link.png";
 	homeLink.appendChild(homeLinkIcon);
-	menu.addEntry(homeLink);
-	menu.addCheckboxOption("Show coordinates", function() {
+	menuOptions.home = menu.addEntry(homeLink);
+	menuOptions.showCoords = menu.addCheckboxOption("Show coordinates", function() {
 		return elm.coords.style.display = "";
 	}, function() {
 		return elm.coords.style.display = "none";
 	});
-	if(Permissions.can_color_text(state.userModel, state.worldModel)) {
-		menu.addOption("Change color", w.color);
-	}
-	if(Permissions.can_go_to_coord(state.userModel, state.worldModel)) {
-		menu.addOption("Go to coordinates", w.goToCoord);
-	}
-	if(Permissions.can_coordlink(state.userModel, state.worldModel)) {
-		menu.addOption("Create link to coordinates", w.coordLink);
-	}
-	if(Permissions.can_urllink(state.userModel, state.worldModel)) {
-		menu.addOption("Create link to URL", w.urlLink);
-	}
-	if(Permissions.can_admin(state.userModel, state.worldModel)) {
-		menu.addOption("Make an area owner-only", function() {
-			return w.doProtect("owner-only");
-		});
-	}
-	if(Permissions.can_protect_tiles(state.userModel, state.worldModel)) {
-		menu.addOption("Make an area member-only", function() {
-			return w.doProtect("member-only");
-		});
-		menu.addOption("Make an area public", function() {
-			return w.doProtect("public");
-		});
-		menu.addOption("Default area protection", w.doUnprotect);
-	}
-	menu.addCheckboxOption("Toggle grid", function() {
+	// TODO
+	//if(Permissions.can_color_text(state.userModel, state.worldModel)) {
+	menuOptions.changeColor = menu.addOption("Change color", w.color);
+	//}
+	//if(Permissions.can_go_to_coord(state.userModel, state.worldModel)) {
+	menuOptions.goToCoords = menu.addOption("Go to coordinates", w.goToCoord);
+	//}
+	//if(Permissions.can_coordlink(state.userModel, state.worldModel)) {
+	menuOptions.coordLink = menu.addOption("Create link to coordinates", w.coordLink);
+	//}
+	//if(Permissions.can_urllink(state.userModel, state.worldModel)) {
+	menuOptions.urlLink = menu.addOption("Create link to URL", w.urlLink);
+	//}
+	//if(Permissions.can_admin(state.userModel, state.worldModel)) {
+	menuOptions.ownerArea = menu.addOption("Make an area owner-only", function() {
+		return w.doProtect("owner-only");
+	});
+	//}
+	//if(Permissions.can_protect_tiles(state.userModel, state.worldModel)) {
+	menuOptions.memberArea = menu.addOption("Make an area member-only", function() {
+		return w.doProtect("member-only");
+	});
+	menuOptions.publicArea = menu.addOption("Make an area public", function() {
+		return w.doProtect("public");
+	});
+	menuOptions.resetArea = menu.addOption("Default area protection", w.doUnprotect);
+	//}
+
+	menuOptions.grid = menu.addCheckboxOption("Toggle grid", function() {
 		gridEnabled = true;
 		w.render(true);
-		menu.showEntry(subgridEntry);
+		menu.showEntry(menuOptions.subgrid);
 	}, function() {
 		gridEnabled = false;
 		w.render(true);
-		menu.hideEntry(subgridEntry);
+		menu.hideEntry(menuOptions.subgrid);
 	});
-	subgridEntry = menu.addCheckboxOption("Subgrid", function() {
+	menuOptions.subgrid = menu.addCheckboxOption("Subgrid", function() {
 		subgridEnabled = true;
 		w.render(true);
 	}, function() {
 		subgridEnabled = false;
 		w.render(true);
 	});
-	menu.hideEntry(subgridEntry);
-	menu.addCheckboxOption("Links enabled", function() {
+	menu.hideEntry(menuOptions.subgrid);
+	menuOptions.linksEnabled = menu.addCheckboxOption("Links enabled", function() {
 		linksEnabled = true;
 	}, function() {
 		linksEnabled = false;
 	}, true);
-	menu.addCheckboxOption("Colors enabled", function() {
+	menuOptions.colorsEnabled = menu.addCheckboxOption("Colors enabled", function() {
 		w.enableColors();
 	}, function() {
 		w.disableColors();
 	}, true);
 	if(state.background) {
-		menu.addCheckboxOption("Background", function() {
+		menuOptions.backgroundEnabled = menu.addCheckboxOption("Background", function() {
 			backgroundEnabled = true;
 			w.render(true);
 		}, function() {
@@ -4405,6 +4407,24 @@ function buildMenu() {
 	zoomBar.id = "zoombar";
 	var zoombarId = menu.addEntry(zoomBar);
 	menu.zoombarId = zoombarId;
+	menuOptions.zoom = zoombarId;
+}
+
+function updateMenuEntryVisiblity() {
+	var permColorText = Permissions.can_color_text(state.userModel, state.worldModel);
+	var permGoToCoord = Permissions.can_go_to_coord(state.userModel, state.worldModel);
+	var permCoordLink = Permissions.can_coordlink(state.userModel, state.worldModel);
+	var permUrlLink = Permissions.can_urllink(state.userModel, state.worldModel);
+	var permOwnerArea = Permissions.can_admin(state.userModel, state.worldModel);
+	var permMemberArea = Permissions.can_protect_tiles(state.userModel, state.worldModel);
+	w.menu.setEntryVisibility(menuOptions.changeColor, permColorText);
+	w.menu.setEntryVisibility(menuOptions.goToCoords, permGoToCoord);
+	w.menu.setEntryVisibility(menuOptions.coordLink, permCoordLink);
+	w.menu.setEntryVisibility(menuOptions.urlLink, permUrlLink);
+	w.menu.setEntryVisibility(menuOptions.ownerArea, permOwnerArea);
+	w.menu.setEntryVisibility(menuOptions.memberArea, permMemberArea);
+	w.menu.setEntryVisibility(menuOptions.publicArea, permMemberArea);
+	w.menu.setEntryVisibility(menuOptions.resetArea, permMemberArea);
 }
 
 var regionSelections = [];
@@ -4729,7 +4749,7 @@ var networkHTTP = {
 };
 
 var network = {
-	latestID: 0,
+	latestID: 1,
 	callbacks: {},
 	http: networkHTTP,
 	protect: function(position, type) {
@@ -4808,7 +4828,7 @@ var network = {
 			preserve_links: opts.preserve_links
 		};
 		if(callback) {
-			var id = network.latestID;
+			var id = network.latestID++;
 			writeReq.request = id;
 			network.callbacks[id] = callback;
 		}
@@ -4832,7 +4852,7 @@ var network = {
 			concat: opts.concat
 		};
 		if(callback) {
-			var id = network.latestID;
+			var id = network.latestID++;
 			fetchReq.request = id;
 			network.callbacks[id] = callback;
 		}
@@ -4847,10 +4867,16 @@ var network = {
 			color: color
 		}));
 	},
-	ping: function(returnTime) {
-		var str = "2::";
-		if(returnTime) str += "@";
-		w.socket.send(str);
+	ping: function(callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		w.socket.send(JSON.stringify({
+			kind: "ping",
+			id: cb_id // optional: number
+		}));
 	},
 	clear_tile: function(x, y) {
 		w.socket.send(JSON.stringify({
@@ -5352,6 +5378,7 @@ document.onselectstart = function(e) {
 w._state.uiModal = false; // is the UI open? (coord, url, go to coord)
 
 buildMenu();
+updateMenuEntryVisiblity();
 w.regionSelect.onselection(handleRegionSelection);
 w.regionSelect.init();
 
@@ -5593,22 +5620,62 @@ var ws_functions = {
 	},
 	ping: function(data) {
 		w.emit("ping", data);
-		if(data.time) {
-			var clientReceived = getDate();
-			// serverPingTime is from chat.js
-			var pingMs = clientReceived - serverPingTime;
-			addChat(null, 0, "user", "[ Client ]", "Ping: " + pingMs + " MS", "Client", false, false, false, null, clientReceived);
-			return;
+		if(data.id) {
+			if(network.callbacks[data.id]) {
+				var cb = network.callbacks[data.id];
+				delete network.callbacks[data.id];
+				cb();
+			}
 		}
 	},
-	tile_clear: function(data) {
-		var pos = data.tileY + "," + data.tileX;
-		if(tiles[pos]) {
-			var writability = tiles[pos].properties.writability;
-			Tile.set(data.tileX, data.tileY, blankTile());
-			tiles[pos].properties.writability = writability;
-			w.setTileRender(data.tileX, data.tileY);
+	propUpdate: function(data) {
+		w.emit("propUpdate", data.props);
+		var props = data.props;
+		for(var p = 0; p < props.length; p++) {
+			var prop = props[p];
+			var type = prop.type;
+			var value = prop.value;
+			switch(type) {
+				case "isMember":
+					state.userModel.is_member = value;
+					break;
+				case "isOwner":
+					state.userModel.is_owner = value;
+					break;
+				case "goToCoord":
+					state.worldModel.feature_go_to_coord = value;
+					break;
+				case "coordLink":
+					state.worldModel.feature_coord_link = value;
+					break;
+				case "urlLink":
+					state.worldModel.feature_url_link = value;
+					break;
+				case "paste":
+					state.worldModel.feature_paste = value;
+					break;
+				case "chat":
+					state.worldModel.chat_permission = value;
+					elm.chatbar.disabled = !Permissions.can_chat(state.userModel, state.worldModel);
+					break;
+				case "showCursor":
+					state.worldModel.show_cursor = value;
+					break;
+				case "colorText":
+					state.worldModel.color_text = value;
+					break;
+				case "memberTilesAddRemove":
+					state.worldModel.feature_membertiles_addremove = value;
+					break;
+				case "readability":
+					break;
+				case "writability":
+					state.worldModel.writability = value;
+					w.redraw();
+					break;
+			}
 		}
+		updateMenuEntryVisiblity();
 	},
 	chat: function(data) {
 		var type = chatType(data.registered, data.nickname, data.realUsername);

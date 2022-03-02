@@ -94,9 +94,9 @@ function sanitizeWorldname(name) {
 async function insertWorld(name) {
 	var date = Date.now();
 			
-	var feature_go_to_coord = 1;
+	var feature_go_to_coord = 0;
 	var feature_membertiles_addremove = false;
-	var feature_paste = 1;
+	var feature_paste = 0;
 	var feature_coord_link = 1;
 	var feature_url_link = 0;
 	var custom_bg = "";
@@ -199,9 +199,19 @@ function makeWorldObject() {
 	return world;
 }
 
-function modifyWorldProp(wobj, path) {
+// Returns: Bool (has changed?)
+function modifyWorldProp(wobj, path, value) {
+	// Iterate through the world object using the path, and set the value
+	var objPath = path.split("/");
+	var objPos = wobj;
+	for(var i = 0; i < objPath.length - 1; i++) {
+		objPos = objPos[objPath[i]];
+	}
+	var oldVal = objPos[objPath[objPath.length - 1]];
+	objPos[objPath[objPath.length - 1]] = value;
 	// Don't GC if other worlds still have cache in memory
 	wobj.modifications[path] = true;
+	return oldVal != value;
 }
 
 function getAndProcWorldProp(wprops, propName) {
@@ -616,8 +626,11 @@ async function fetchWorldMembershipsByUserId(userId) {
 	}
 	for(var i in worldCache) {
 		var wobj = worldCache[i];
-		if(wobj && wobj.members.map[userId]) {
+		if(!wobj.exists) continue;
+		if(wobj.members.map[userId]) {
 			memberWorldIds[wobj.id] = 1;
+		} else {
+			delete memberWorldIds[wobj.id];
 		}
 	}
 	return Object.keys(memberWorldIds);
@@ -638,6 +651,8 @@ async function fetchOwnedWorldsByUserId(userId) {
 		if(!wobj.exists) continue;
 		if(wobj.ownerId == userId) {
 			ownedWorldObjs[wobj.id] = wobj;
+		} else {
+			delete ownedWorldObjs[wobj.id];
 		}
 	}
 	return Object.values(ownedWorldObjs);
@@ -646,9 +661,11 @@ async function fetchOwnedWorldsByUserId(userId) {
 async function revokeMembershipByWorldName(worldName, userId) {
 	var world = await getOrCreateWorld(worldName);
 	if(!world) return;
+	var hasUpdated = false;
 	// remove member
 	if(world.members.map[userId]) {
 		delete world.members.map[userId];
+		hasUpdated = true;
 	}
 	if(world.members.updates[userId]) {
 		var upd = world.members.updates[userId];
@@ -661,13 +678,18 @@ async function revokeMembershipByWorldName(worldName, userId) {
 		};
 	}
 	releaseWorld(world);
+	return [hasUpdated, world.id]; // TODO: refactor
 }
 
 async function promoteMembershipByWorldName(worldName, userId) {
 	var world = await getOrCreateWorld(worldName);
-	if(!world) return;
+	if(!world) return false;
+	var hasUpdated = false;
 	// add member
-	world.members.map[userId] = true;
+	if(!world.members.map[userId]) {
+		world.members.map[userId] = true;
+		hasUpdated = true;
+	}
 	if(world.members.updates[userId]) {
 		var upd = world.members.updates[userId];
 		if(upd.type == "REMOVE") {
@@ -680,6 +702,7 @@ async function promoteMembershipByWorldName(worldName, userId) {
 		};
 	}
 	releaseWorld(world);
+	return hasUpdated;
 }
 
 async function claimWorldByName(worldName, user) {
@@ -690,9 +713,8 @@ async function claimWorldByName(worldName, user) {
 			message: validation.message
 		};
 	}
-	var world = validation.world;
-	world.ownerId = user.id;
-	modifyWorldProp(world, "ownerId");
+	var world = validation.world; // doesn't need to be released (TODO: is this a good design?)
+	modifyWorldProp(world, "ownerId", user.id);
 	return {
 		success: true,
 		world: world,

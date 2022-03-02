@@ -49,8 +49,10 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var accountSystem = vars.accountSystem;
 	var create_date = vars.create_date;
 	var client_ips = vars.client_ips;
+	var wsSend = vars.wsSend;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
+	var remove_from_chatlog = chat_mgr.remove_from_chatlog;
 
 	var ipHeaderAddr = ws.sdata.ipAddress;
 
@@ -167,6 +169,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 		// staff
 		[1, "channel", null, "get info about a chat channel"],
+		[1, "delete", ["id", "timestamp"], "delete a chat message"],
 
 		// general
 		[0, "help", null, "list all commands", null],
@@ -351,6 +354,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 			var client = null;
 			var latestGlobalClientTime = -1;
 			wss.clients.forEach(function(ws) {
+				if(!ws.sdata) return;
 				if(!ws.sdata.userClient) return;
 				var dstClientId = ws.sdata.clientId;
 				var clientWorld = ws.sdata.world;
@@ -411,9 +415,10 @@ module.exports = async function(ws, data, send, vars, evars) {
 			if(ws.sdata.chat_blocks && (ws.sdata.chat_blocks.includes(clientId) || // is ID of the /tell sender? (not destination)
 				(ws.sdata.chat_blocks.includes("*") && opts.clientId != 0)) ||
 				(ws.sdata.chat_blocks.includes("tell"))) return;
-			ws.send(JSON.stringify(privateMessage));
+			wsSend(ws, JSON.stringify(privateMessage));
 		},
 		channel: async function() {
+			if(!user.staff) return;
 			var worldId = world.id;
 			if(location == "global") worldId = 0;
 			var channels = await db_ch.all("SELECT * FROM channels WHERE world_id=?", worldId);
@@ -501,11 +506,29 @@ module.exports = async function(ws, data, send, vars, evars) {
 			return serverChatResponse(idstr, location);
 		},
 		stats: function() {
-			if(world.name != "") return;
-			var stat = "Stats for main world<br>";
+			if(world.name != "" && world.name != "main" && !is_owner && !user.superuser) return;
+			var stat = "Stats for world<br>";
 			stat += "Creation date: " + html_tag_esc(create_date(world.creationDate)) + "<br>";
 			stat += "View count: " + html_tag_esc(world.views);
 			return serverChatResponse(stat, location);
+		},
+		delete: async function(id, timestamp) {
+			id = san_nbr(id);
+			timestamp = san_nbr(timestamp);
+
+			var wid = world.id;
+			if(location == "global") wid = 0;
+			var res = await remove_from_chatlog(wid, id, timestamp);
+			if(res == 0) {
+				return serverChatResponse("No messages deleted", location);
+			}
+			return serverChatResponse("Deleted " + res + " message(s)", location);
+			// TODO
+			/*{
+				kind: "chat_delete",
+				chat_id: 4281,
+				time: 168462892358
+			}*/
 		}
 	}
 
@@ -550,6 +573,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 				return;
 			case "stats":
 				com.stats();
+				return;
+			case "delete":
+				if(staff) com.delete(args[1], args[2]);
 				return;
 			default:
 				serverChatResponse("Invalid command: " + html_tag_esc(msg));
@@ -620,7 +646,6 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	var chatOpts = {
 		// Global and Page updates should not appear in worlds with chat disabled
-		chat_perm,
 		isChat: true,
 		clientId
 	};
@@ -631,7 +656,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 		}
 		if(location == "page") {
 			broadcast(websocketChatData, chatOpts);
-		} else if(location == "global") { // todo: dont sent glob messages if chat disabled
+		} else if(location == "global") {
 			ws_broadcast(websocketChatData, void 0, chatOpts);
 		}
 	}

@@ -1,3 +1,28 @@
+var wss;
+var wsSend;
+module.exports.startup_internal = function(vars) {
+	wss = vars.wss;
+	wsSend = vars.wsSend;
+}
+
+function sendWorldStatusUpdate(worldId, userId, type, val) {
+	wss.clients.forEach(function(client) {
+		if(!client.sdata) return;
+		if(!client.sdata.userClient) return;
+		if(client.sdata.world.id != worldId) return;
+		if(client.sdata.user.id != userId) return;
+		wsSend(client, JSON.stringify({
+			kind: "propUpdate",
+			props: [
+				{
+					type: type,
+					value: val
+				}
+			]
+		}));
+	});
+}
+
 module.exports.GET = async function(req, serve, vars, evars, params) {
 	var cookies = evars.cookies;
 	var user = evars.user;
@@ -67,7 +92,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		html_memberships.push({
 			get_absolute_url: "/" + wname,
 			url: display_name,
-			wname
+			name: wname
 		});
 	}
 
@@ -99,6 +124,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var dispage = vars.dispage;
 	var claimWorldByName = vars.claimWorldByName;
 	var revokeMembershipByWorldName = vars.revokeMembershipByWorldName;
+	var wss = vars.wss;
 
 	if(!user.authenticated) {
 		return serve(null, 403);
@@ -106,7 +132,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var message = null;
 	if(post_data.form == "claim") {
-		if(user.uv_rank == 3) {
+		if(user.uv_rank == 3) { // TODO: use rank table in uvias db
 			return await dispage("accounts/profile", {
 				message: "Guests cannot claim worlds"
 			}, req, serve, vars, evars);
@@ -117,13 +143,19 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			} else {
 				var status = await claimWorldByName(worldname, user);
 				message = status.message;
+				if(status.success) {
+					sendWorldStatusUpdate(status.world.id, user.id, "isOwner", true);
+				}
 			}
 		}
 	} else if(post_data.form == "leave") { // user is leaving the world (terminating own membership)
 		for(var key in post_data) {
 			if(key.startsWith("leave_")) {
 				var worldName = key.substr("leave_".length);
-				await revokeMembershipByWorldName(worldName, user.id);
+				var revoke = await revokeMembershipByWorldName(worldName, user.id);
+				if(revoke && revoke[0]) {
+					sendWorldStatusUpdate(revoke[1], user.id, "isMember", false);
+				}
 				break;
 			}
 		}

@@ -3,6 +3,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var client_cursor_pos = vars.client_cursor_pos;
 	var wss = vars.wss;
 	var WebSocket = vars.WebSocket;
+	var wsSend = vars.wsSend;
 
 	var broadcast = evars.broadcast; // broadcast to current world
 	var user = evars.user;
@@ -49,6 +50,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 		if(charY >= CONST.tileRows) charY = CONST.tileRows;
 		ws.sdata.cursorPositionHidden = false;
 		wss.clients.forEach(function(client) {
+			if(!client.sdata) return;
 			if(!client.sdata.userClient) return;
 			if(client.sdata.world.id == worldId && client.readyState == WebSocket.OPEN) {
 				var cli_channel = client.sdata.channel;
@@ -61,18 +63,14 @@ module.exports = async function(ws, data, send, vars, evars) {
 				}
 				var dist = (cli_tileX - tileX) ** 2 + (cli_tileY - tileY) ** 2;
 				if(dist > 128 * 128) return; // do not broadcast the cursor further than 128 tiles from this client's cursor
-				try {
-					client.send(JSON.stringify({
-						kind: "cursor",
-						position: {
-							tileX, tileY,
-							charX, charY
-						},
-						channel: channel
-					}));
-				} catch(e) {
-					handle_error(e);
-				}
+				wsSend(client, JSON.stringify({
+					kind: "cursor",
+					position: {
+						tileX, tileY,
+						charX, charY
+					},
+					channel: channel
+				}));
 			}
 		});
 		cli_csr.hidden = false;

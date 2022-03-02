@@ -20,6 +20,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var client_num = 0;
 	wss.clients.forEach(function(client) {
+		if(!client.sdata) return;
 		if(!client.sdata.userClient) return;
 		client_num++;
 	});

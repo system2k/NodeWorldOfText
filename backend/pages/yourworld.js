@@ -1,11 +1,3 @@
-module.exports.startup_internal = function(vars) {
-	return;
-}
-
-module.exports.server_exit = async function() {
-	return;
-}
-
 function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main";
 }
@@ -75,8 +67,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		});
 	} else { // the HTML page
 		if(!query_data.hide) {
-			world.views++;
-			modifyWorldProp(world, "views");
+			modifyWorldProp(world, "views", world.views + 1);
 		}
 		var pathname = world.name;
 		if(pathname != "") {
@@ -86,17 +77,23 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		if(accountSystem == "uvias") {
 			username = user.display_username;
 		}
+		var char_rate = world.opts.charRate;
+		if(char_rate) {
+			char_rate = char_rate.split("/").map(Number);
+		} else {
+			char_rate = [20480, 1000];
+		}
 		var state = {
 			userModel: {
 				username: username,
-				is_superuser: user.superuser, // Admin of OWOT?
+				is_superuser: user.superuser,
 				authenticated: user.authenticated,
-				is_member: read_permission.member || (user.superuser && isMainPage(world.name)), // Member of world?
-				is_owner: read_permission.owner || (user.superuser && isMainPage(world.name)), // Owner of world?
-				is_staff: user.staff, // Staff of OWOT?
-				is_operator: user.operator // Operator of OWOT?
+				is_member: read_permission.member || (user.superuser && isMainPage(world.name)),
+				is_owner: read_permission.owner || (user.superuser && isMainPage(world.name)),
+				is_staff: user.staff,
+				is_operator: user.operator
 			},
-			worldModel: { // mirror to world_props.js
+			worldModel: {
 				feature_membertiles_addremove: world.feature.memberTilesAddRemove,
 				writability: world.writability,
 				feature_url_link: world.feature.urlLink,
@@ -108,7 +105,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 				pathname,
 				chat_permission: world.feature.chat,
 				color_text: world.feature.colorText,
-				show_cursor: world.feature.showCursor
+				show_cursor: world.feature.showCursor,
+				char_rate: char_rate
 			}
 		};
 		if(CONST.tileRows != 8) {

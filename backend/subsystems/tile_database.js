@@ -12,11 +12,11 @@ var change_char_in_array;
 var memTileCache;
 var parseTextcode;
 var broadcastMonitorEvent;
+var wsSend;
 
 var server_exiting = false;
 var editlog_cell_props = false;
 var send_microedits = false;
-var monitor_net_traffic_per = 0;
 
 module.exports.main = function(vars) {
 	db = vars.db;
@@ -33,6 +33,7 @@ module.exports.main = function(vars) {
 	memTileCache = vars.memTileCache;
 	parseTextcode = vars.parseTextcode;
 	broadcastMonitorEvent = vars.broadcastMonitorEvent;
+	wsSend = vars.wsSend;
 
 	databaseClock();
 	editLogClock();
@@ -56,25 +57,6 @@ module.exports.main = function(vars) {
 			handle_error(e);
 		}
 	}, 1000 * 60 * 3);
-
-	intv.traff_mon_net_interval = setInterval(function() {
-		if(monitor_net_traffic_per) {
-			broadcastMonitorEvent("Network", monitor_net_traffic_per + " Websocket bytes sent");
-			var topBP = null;
-			var topBPCount = 0;
-			wss.clients.forEach(function(ws) {
-				if(!ws.sdata.userClient) return;
-				if(ws.sdata.messageBackpressure > topBPCount) {
-					topBPCount = ws.sdata.messageBackpressure;
-					topBP = ws;
-				}
-			});
-			if(topBP && topBPCount > 1) {
-				broadcastMonitorEvent("Backpressure", "Top backpressure: " + topBPCount + " (" + topBP.sdata.ipAddress + ")");
-			}
-		}
-		monitor_net_traffic_per = 0;
-	}, 1000);
 
 	sendTileUpdatesToClients();
 }
@@ -290,17 +272,10 @@ function sendTileUpdatesToClients() {
 		}
 		var pktBroadcast = JSON.stringify(cliUpdPkt);
 		wss.clients.forEach(function(client) {
+			if(!client.sdata) return;
 			if(!client.sdata.userClient) return;
 			if(client.sdata.world.id == worldID && client.readyState == WebSocket.OPEN) {
-				try {
-					client.send(pktBroadcast, function() {
-						client.sdata.messageBackpressure--;
-					});
-					client.sdata.messageBackpressure++;
-				} catch(e) {
-					handle_error(e);
-				}
-				monitor_net_traffic_per += pktBroadcast.length;
+				wsSend(client, pktBroadcast);
 			}
 		});
 	}
@@ -1266,6 +1241,13 @@ async function beginTileIterationsLoop() {
 
 		var writeQueue = [];
 		if(context.type == types.publicclear) {
+			// -9007199254740991    ::   9007199254740991
+
+			// SELECT tileX, tileY, content, properties, writability FROM tile WHERE world_id=? AND tileY >= ? LIMIT 2048
+			// SELECT tileX, tileY, content, properties, writability FROM tile WHERE world_id=? AND tileY = ? AND tileX >= ? LIMIT 2048
+
+
+
 			var data = await db.all("SELECT rowid as rowid, content, tileX, tileY, properties, writability FROM tile WHERE world_id=? LIMIT ?,?",
 				[context.world.id, context.index * chunkSize, chunkSize]);
 			if(!data || data.length == 0) {

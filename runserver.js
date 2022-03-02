@@ -1433,6 +1433,7 @@ var ms = {
 	decade: 315569520000
 };
 
+// TODO: rate limits
 var url_regexp = [ // regexp , function/redirect to , options
 	[/^favicon\.ico[\/]?$/g, "/static/favicon.png", { no_login: true }],
 	[/^robots\.txt[\/]?$/g, "/static/robots.txt", { no_login: true }],
@@ -1556,8 +1557,10 @@ function wait_response_data(req, dispatch, binary_post_data, raise_limit) {
 			try {
 				if(binary_post_data) {
 					queryData = Buffer.concat([queryData, data]);
+					periodHTTPInboundBytes += data.length;
 				} else {
 					queryData += data;
+					periodHTTPInboundBytes += Buffer.byteLength(data);
 				}
 				if (queryData.length > sizeLimit) { // hard limit
 					if(binary_post_data) {
@@ -1657,7 +1660,7 @@ function parseToken(token) {
 	};
 }
 
-// TODO: cache user data
+// TODO: cache user data (only care about uvias)
 async function get_user_info(cookies, is_websocket, dispatch) {
 	/*
 		User Levels:
@@ -1682,7 +1685,6 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 		email: "",
 		uv_rank: 0
 	};
-	// TODO: add user cache system for local accounts some time
 	if(accountSystem == "local" && cookies.sessionid) {
 		// user data from session
 		var s_data = await db.get("SELECT * FROM auth_session WHERE session_key=?", cookies.sessionid);
@@ -1812,6 +1814,11 @@ process.on("unhandledRejection", function(reason) {
 	console.log("Error:", reason);
 });
 
+var periodHTTPOutboundBytes = 0;
+var periodHTTPInboundBytes = 0;
+var periodWSOutboundBytes = 0;
+var periodWSInboundBytes = 0;
+
 var server,
 	HTTPSockets,
 	HTTPSocketID;
@@ -1857,6 +1864,10 @@ function setupHTTPServer() {
 			delete HTTPSockets[sockID];
 		});
 	});
+
+	intv.http_outbound_mon = setInterval(function() { // TODO
+
+	}, 1000);
 }
 setupHTTPServer();
 
@@ -1951,6 +1962,7 @@ function createDispatcher(res, opts) {
 		if(!requestStreaming) {
 			res.write(data);
 			res.end();
+			periodHTTPOutboundBytes += data.length;
 		}
 	}
 	dispatch.isResolved = function() {
@@ -1972,6 +1984,7 @@ function createDispatcher(res, opts) {
 		if(!requestStreaming) return;
 		return new Promise(function(resolve) {
 			res.write(data, resolve);
+			periodHTTPOutboundBytes += data.length;
 		});
 	}
 	return dispatch;
@@ -2189,6 +2202,7 @@ function generateClientId(world_id) {
 function getUserCountFromWorld(worldId) {
 	var counter = 0;
 	wss.clients.forEach(function(ws) {
+		if(!ws.sdata) return;
 		if(!ws.sdata.userClient) return;
 		if(ws.sdata.world.id == worldId) {
 			counter++;
@@ -2224,8 +2238,7 @@ function broadcastUserCount() {
 				count: new_count
 			}, id, {
 				isChat: true,
-				clientId: 0,
-				chat_perm: "inherit"
+				clientId: 0
 			});
 		}
 	}
@@ -2335,6 +2348,25 @@ async function loadAnnouncement() {
 	}
 }
 
+function wsSend(socket, data) {
+	if(socket.readyState !== WebSocket.OPEN) return;
+	var error = false;
+	socket.sdata.messageBackpressure++;
+	try {
+		socket.send(data, function() {
+			if(!error && socket.sdata) {
+				socket.sdata.messageBackpressure--;
+			}
+			error = true;
+		});
+	} catch(e) {
+		if(!error && socket.sdata) {
+			socket.sdata.messageBackpressure--;
+		}
+		error = true;
+	}
+}
+
 var wss;
 async function initialize_server_components() {
 	await loadAnnouncement();
@@ -2344,6 +2376,33 @@ async function initialize_server_components() {
 	intv.userCount = setInterval(function() {
 		broadcastUserCount();
 	}, 2000);
+
+	intv.traff_mon_net_interval = setInterval(function() {
+		if(!monitorEventSockets.length) {
+			periodHTTPOutboundBytes = 0;
+			periodHTTPInboundBytes = 0;
+			periodWSOutboundBytes = 0;
+			periodWSInboundBytes = 0;
+			return;
+		}
+		if(periodHTTPOutboundBytes || periodHTTPInboundBytes) {
+			broadcastMonitorEvent("Network", "HTTP stream: " + periodHTTPOutboundBytes + " (out); " + periodHTTPInboundBytes + " (in)");
+			periodHTTPOutboundBytes = 0;
+			periodHTTPInboundBytes = 0;
+		}
+		if(periodWSOutboundBytes || periodWSInboundBytes) {
+			broadcastMonitorEvent("Network", "WebSocket: " + periodWSOutboundBytes + " (out); " + periodWSInboundBytes + " (in)");
+			periodWSOutboundBytes = 0;
+			periodWSInboundBytes = 0;
+			wss.clients.forEach(function(ws) {
+				if(!ws.sdata) return;
+				if(!ws.sdata.userClient) return;
+				if(ws.sdata.messageBackpressure > 1) {
+					broadcastMonitorEvent("Backpressure", "Warning - backpressure of " + ws.sdata.messageBackpressure + " (" + ws.sdata.ipAddress + ")");
+				}
+			});
+		}
+	}, 1000);
 
 	setupClearClosedClientsInterval();
 
@@ -2372,27 +2431,28 @@ async function initialize_server_components() {
 		if(!opts) opts = {};
 		data = JSON.stringify(data);
 		wss.clients.forEach(function each(client) {
+			if(!client.sdata) return;
 			if(!client.sdata.userClient) return;
 			if(client.readyState != WebSocket.OPEN) return;
 			try {
-				// world_id is optional, and leaving it out will broadcast to everyone
+				// world_id is optional - setting it to undefined will broadcast to all clients
 				if(world_id == void 0 || client.sdata.world.id == world_id) {
 					if(opts.isChat) {
 						var isOwner = client.sdata.world.ownerId == client.sdata.user.id;
 						var isMember = !!client.sdata.world.members.map[client.sdata.user.id];
-						// inherit: check cached value; this is a miscellaneous signal that depends on the chat permission (e.g. user count)
-						if(opts.chat_perm == "inherit") opts.chat_perm = client.sdata.world.feature.chat; // TODO: fix chat_perm
+						var chatPerm = client.sdata.world.feature.chat;
+
 						// 1: members only
-						if(opts.chat_perm == 1) if(!(isMember || isOwner)) return;
+						if(chatPerm == 1) if(!(isMember || isOwner)) return;
 						// 2: owner only
-						if(opts.chat_perm == 2) if(!isOwner) return;
+						if(chatPerm == 2) if(!isOwner) return;
 						// -1: unavailable to all
-						if(opts.chat_perm == -1) return;
+						if(chatPerm == -1) return;
 						// check if user has blocked this client
 						if(client.sdata.chat_blocks && (client.sdata.chat_blocks.indexOf(opts.clientId) > -1 ||
 							((client.sdata.chat_blocks.indexOf("*") > -1) && opts.clientId != 0))) return;
 					}
-					client.send(data);
+					wsSend(client, data);
 				}
 			} catch(e) {
 				handle_error(e);
@@ -2444,11 +2504,8 @@ function broadcastMonitorEvent(type, data) {
 	if(!monitorEventSockets.length) return;
 	for(var i = 0; i < monitorEventSockets.length; i++) {
 		var sock = monitorEventSockets[i];
-		try {
-			sock.send("[" + type + "] " + data);
-		} catch(e) {
-			continue;
-		}
+		var str = "[" + type + "] " + data;
+		wsSend(sock, str);
 	}
 }
 
@@ -2586,6 +2643,7 @@ function remove_ip_address_connection(ip) {
 function invalidateWebsocketSession(session_token) {
 	if(!session_token) return;
 	wss.clients.forEach(function(ws) {
+		if(!ws.sdata) return;
 		if(ws.sdata.monitorSocket) return;
 		if(ws.sdata.terminated) return;
 		if(!ws.sdata.session_key) return; // safety layer: don't process unauthenticated clients
@@ -2606,6 +2664,9 @@ async function manageWebsocketConnection(ws, req) {
 		cursorPositionHidden: false,
 		messageBackpressure: 0
 	};
+
+	var bytesWritten = 0;
+	var bytesRead = 0;
 	
 	// process ip address headers from cloudflare/nginx
 	var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
@@ -2621,13 +2682,18 @@ async function manageWebsocketConnection(ws, req) {
 		handle_error(JSON.stringify(process_error_arg(err)));
 	});
 
+	// TODO: may not fire in all cases
+	function updateNetworkStats() {
+		var b_out = req.socket.bytesWritten;
+		var b_in = req.socket.bytesRead;
+		periodWSOutboundBytes += b_out - bytesWritten;
+		periodWSInboundBytes += b_in - bytesRead;
+		bytesWritten = b_out;
+		bytesRead = b_in;
+	}
 	function send_ws(data) {
-		if(ws.readyState === WebSocket.OPEN) {
-			// most errors tend to be about invalid ws packets
-			try {
-				ws.send(data);
-			} catch(e) {}
-		}
+		wsSend(ws, data);
+		updateNetworkStats();
 	}
 	function error_ws(errorCode, errorMsg) {
 		send_ws(JSON.stringify({
@@ -2678,6 +2744,7 @@ async function manageWebsocketConnection(ws, req) {
 		ws.sdata.monitorSocket = true;
 		var msCount = 0;
 		wss.clients.forEach(function(msock) {
+			if(!msock.sdata) return;
 			if(msock.sdata.monitorSocket) {
 				msCount++;
 			}
@@ -2727,6 +2794,7 @@ async function manageWebsocketConnection(ws, req) {
 				}
 			}
 		}
+		updateNetworkStats();
 	});
 	if(ws.sdata.terminated) return; // in the event of an immediate close
 
@@ -2837,6 +2905,7 @@ async function manageWebsocketConnection(ws, req) {
 	ws.off("message", pre_message);
 	ws.on("message", handle_message);
 	async function handle_message(msg) {
+		updateNetworkStats();
 		if(!can_process_req()) return;
 		if(!(typeof msg == "string" || typeof msg == "object")) {
 			return;
@@ -2846,7 +2915,7 @@ async function manageWebsocketConnection(ws, req) {
 			if(!msg) return; // malformed packet*/
 			return;
 		}
-		if(msg.startsWith("2::")) { // ping
+		if(msg.startsWith("2::")) { // TODO: remove this (obsolete ping)
 			var args = msg.substr(3);
 			var res = {
 				kind: "ping",
@@ -2873,6 +2942,16 @@ async function manageWebsocketConnection(ws, req) {
 		if(typeof msg.request == "number") {
 			requestID = san_nbr(msg.request);
 		}
+		if(kind == "ping") {
+			var res = {
+				kind: "ping",
+				result: "pong"
+			}
+			if(msg.id != void 0) {
+				res.id = san_nbr(msg.id);
+			}
+			return send_ws(JSON.stringify(res)); 
+		}
 		// Begin calling a websocket function for the necessary request
 		if(websockets.hasOwnProperty(kind)) {
 			if(!can_process_req_kind(kindLimits, kind)) return;
@@ -2892,8 +2971,8 @@ async function manageWebsocketConnection(ws, req) {
 			try {
 				res = await websockets[kind](ws, msg, send, vars, objIncludes(evars, {
 					broadcast,
-					clientId: ws.sdata.clientId,
-					ws
+					clientId: ws.sdata.clientId, // TODO: does all this need to be joined in with evars?
+					ws // to be passed on to modules
 				}));
 			} catch(e) {
 				resError = true;
@@ -2926,6 +3005,7 @@ function start_server() {
 }
 
 var global_data = {
+	wsSend,
 	memTileCache,
 	isTestServer,
 	announcement: function() { return announcement_cache },

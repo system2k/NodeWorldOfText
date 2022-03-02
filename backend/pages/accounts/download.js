@@ -1,4 +1,5 @@
 var download_busy = {};
+var intv;
 
 module.exports.startup_internal = function(vars) {
 	intv = vars.intv;
@@ -9,6 +10,40 @@ module.exports.startup_internal = function(vars) {
 			delete download_busy[i];
 		}
 	}, 1000 * 60 * 5);
+}
+
+async function iterateWorld(db, worldId, onTile) {
+	var groupSize = 2048;
+	var posY = -9007199254740991;
+	// relies on the following index schema to work properly: (..., tileY, tileX), in ascending order
+	while(true) {
+		var td = await db.all("SELECT * FROM tile WHERE world_id=? AND tileY >= ? LIMIT ?", [worldId, posY, groupSize]);
+		for(var t = 0; t < td.length; t++) {
+			var resp = await onTile(td[t]);
+			if(resp === false) return;
+		}
+		if(td.length < groupSize) { // no more tiles left in world
+			return;
+		}
+		var lastTile = td[td.length - 1];
+		var ltx = lastTile.tileX;
+		var lty = lastTile.tileY;
+		var posX = ltx + 1;
+		while(true) {
+			var rtd = await db.all("SELECT * FROM tile WHERE world_id=? AND tileY=? and tileX >= ? LIMIT ?", [worldId, lty, posX, groupSize]);
+			for(var t = 0; t < rtd.length; t++) {
+				var resp = await onTile(rtd[t]);
+				if(resp === false) return;
+			}
+			if(rtd.length < groupSize) { // no more tiles left in row
+				break;
+			}
+			var lastRowTile = rtd[rtd.length - 1];
+			var rltx = lastRowTile.tileX;
+			posX = rltx + 1;
+		}
+		posY = lty + 1;
+	}
 }
 
 module.exports.GET = async function(req, serve, vars, evars) {
@@ -49,14 +84,6 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		}
 	}
 
-	var count = (await db.get("SELECT count(*) AS cnt FROM tile WHERE world_id=?", world.id)).cnt;
-
-	if(count > 500000 && !user.superuser) {
-		return serve("World is too large to download");
-	}
-
-	var groupSize = 2048;
-
 	serve.startStream();
 
 	// set up headers
@@ -65,40 +92,24 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		download_file: filename_sanitize("World_" + world_name + ".json")
 	});
 
-	var groups = Math.ceil(count / groupSize);
-	var status = await serve.writeStream("[");
-	if(status) return; // socket aborted
-	var loopEnded = false;
-	for(var i = 0; i < groups; i++) {
-		var data = await db.all("SELECT * FROM tile WHERE world_id=? ORDER BY rowid LIMIT ?,?",
-			[world.id, i * groupSize, groupSize]);
-		if(!data || data.length == 0) {
-			var status = await serve.writeStream("]");
-			if(status) return; // socket aborted
-			loopEnded = true;
-			break;
-		}
-		var tileData = "";
-		if(i != 0) tileData += ",";
-		for(var t = 0; t < data.length; t++) {
-			var tile = data[t];
-			if(t != 0) tileData += ",";
-			tileData += JSON.stringify({
-				content: tile.content,
-				tileX: tile.tileX,
-				tileY: tile.tileY,
-				properties: tile.properties,
-				writability: tile.writability,
-				created_at: tile.created_at
-			});
-		}
-		var status = await serve.writeStream(tileData);
-		if(status) return; // socket aborted
+	var firstTile = true;
+	async function procTile(tile) {
+		var data = JSON.stringify({
+			content: tile.content,
+			tileX: tile.tileX,
+			tileY: tile.tileY,
+			properties: tile.properties,
+			writability: tile.writability,
+			created_at: tile.created_at
+		});
+		if(!firstTile) data = "," + data;
+		firstTile = false;
+		if(await serve.writeStream(data)) return false; // aborted
 	}
-	if(!loopEnded) {
-		var status = await serve.writeStream("]");
-		if(status) return; // socket aborted
-	}
+
+	if(await serve.writeStream("[")) return;
+	await iterateWorld(db, world.id, procTile);
+	if(await serve.writeStream("]")) return;
 
 	serve.endStream();
 }

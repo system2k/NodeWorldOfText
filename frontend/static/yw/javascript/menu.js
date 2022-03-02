@@ -116,6 +116,13 @@ function Menu(titleEl, menuEl) {
 		var elm = entry.element;
 		elm.style.display = "";
 	}
+	this.setEntryVisibility = function(id, visible) {
+		if(visible) {
+			_this.showEntry(id);
+		} else {
+			_this.hideEntry(id);
+		}
+	}
 	this.moveEntryLast = function(id) {
 		var entry = _this.entriesById[id];
 		if(!entry) return;

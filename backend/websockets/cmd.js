@@ -8,6 +8,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var wss = vars.wss;
 	var NCaseCompare = vars.NCaseCompare;
 	var accountSystem = vars.accountSystem;
+	var wsSend = vars.wsSend;
 
 	// rate limit commands
 	var msNow = Date.now();
@@ -50,12 +51,11 @@ module.exports = async function(ws, data, send, vars, evars) {
 	data = JSON.stringify(cdata);
 	
 	wss.clients.forEach(function(client) {
+		if(!client.sdata) return;
 		if(!client.sdata.userClient) return;
-		try {
-			if(client.readyState == 1 && client.sdata.world.id == world.id) {
-				if(!client.sdata.handleCmdSockets) return;
-				client.send(data);
-			}
-		} catch(e) {}
+		if(client.readyState == 1 && client.sdata.world.id == world.id) {
+			if(!client.sdata.handleCmdSockets) return;
+			wsSend(client, data);
+		}
 	});
 }
