@@ -13,36 +13,23 @@ module.exports.startup_internal = function(vars) {
 }
 
 async function iterateWorld(db, worldId, onTile) {
-	var groupSize = 2048;
-	var posY = -9007199254740991;
-	// relies on the following index schema to work properly: (..., tileY, tileX), in ascending order
+	var groupSize = 512;
+	var initPos = await db.get("SELECT tileX, tileY FROM tile WHERE world_id=? LIMIT 1", [worldId]);
+	if(!initPos) return;
+	var posX = initPos.tileX - 1; // start before the first tile
+	var posY = initPos.tileY;
 	while(true) {
-		var td = await db.all("SELECT * FROM tile WHERE world_id=? AND tileY >= ? LIMIT ?", [worldId, posY, groupSize]);
+		var td = await db.all("SELECT * FROM tile WHERE world_id=? AND (tileY, tileX) > (?, ?) LIMIT ?", [worldId, posY, posX, groupSize]);
+		if(!td.length) return;
 		for(var t = 0; t < td.length; t++) {
-			var resp = await onTile(td[t]);
+			var tile = td[t];
+			var resp = await onTile(tile);
 			if(resp === false) return;
 		}
-		if(td.length < groupSize) { // no more tiles left in world
-			return;
-		}
+		if(td.length < groupSize) return; // last batch
 		var lastTile = td[td.length - 1];
-		var ltx = lastTile.tileX;
-		var lty = lastTile.tileY;
-		var posX = ltx + 1;
-		while(true) {
-			var rtd = await db.all("SELECT * FROM tile WHERE world_id=? AND tileY=? and tileX >= ? LIMIT ?", [worldId, lty, posX, groupSize]);
-			for(var t = 0; t < rtd.length; t++) {
-				var resp = await onTile(rtd[t]);
-				if(resp === false) return;
-			}
-			if(rtd.length < groupSize) { // no more tiles left in row
-				break;
-			}
-			var lastRowTile = rtd[rtd.length - 1];
-			var rltx = lastRowTile.tileX;
-			posX = rltx + 1;
-		}
-		posY = lty + 1;
+		posX = lastTile.tileX;
+		posY = lastTile.tileY;
 	}
 }
 

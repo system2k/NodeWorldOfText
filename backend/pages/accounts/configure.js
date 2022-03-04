@@ -656,15 +656,21 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				}, req, serve, vars, evars);
 			} else if(stat.success) {
 				new_world_name = new_name;
-				ws_broadcast({
-					kind: "propUpdate",
-					props: [
-						{
-							type: "name",
-							value: new_world_name
-						}
-					]
-				}, world.id);
+				var idUpdList = stat.list;
+				for(var l = 0; l < idUpdList.length; l++) {
+					var upd = idUpdList[l];
+					var updId = upd[0];
+					var updName = upd[1];
+					ws_broadcast({
+						kind: "propUpdate",
+						props: [
+							{
+								type: "name",
+								value: updName
+							}
+						]
+					}, updId);
+				}
 			}
 		}
 		if(msgResponseMisc.length) {

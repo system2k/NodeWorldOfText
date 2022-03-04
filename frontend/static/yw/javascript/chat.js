@@ -5,6 +5,7 @@ var chatGlobalUnread     = 0;
 var initPageTabOpen      = false;
 var initGlobalTabOpen    = false;
 var chatWriteHistory     = []; // history of user's chats
+var chatRecords          = [];
 var chatWriteHistoryMax  = 100; // maximum size of chat write history length
 var chatWriteHistoryIdx  = -1; // location in chat write history
 var chatLimitCombChars   = true;
@@ -13,6 +14,7 @@ var defaultChatColor     = window.localStorage ? parseInt(localStorage.getItem("
 var chatPageUnreadBar    = null;
 var chatGlobalUnreadBar  = null;
 var chatGreentext        = false;
+var acceptChatDeletions  = true;
 
 if(isNaN(defaultChatColor)) {
 	defaultChatColor = null;
@@ -556,6 +558,21 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 	maxScroll = field.scrollHeight - field.clientHeight;
 	if(doScrollBottom) {
 		field.scrollTop = maxScroll;
+	}
+	chatRecords.push({
+		id, date, field,
+		element: chatGroup
+	});
+}
+
+function removeChatByIdAndDate(id, date) {
+	if(!acceptChatDeletions) return;
+	for(var i = 0; i < chatRecords.length; i++) {
+		var r = chatRecords[i];
+		if(r.id == id && r.date == date) {
+			var elm = r.element;
+			elm.remove();
+		}
 	}
 }
 

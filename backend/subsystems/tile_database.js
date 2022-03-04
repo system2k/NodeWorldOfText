@@ -1213,7 +1213,7 @@ var tileIterationsLoopStarted = false;
 async function beginTileIterationsLoop() {
 	if(tileIterationsLoopStarted) return;
 	tileIterationsLoopStarted = true;
-	var chunkSize = 64;
+	var chunkSize = 512;
 	while(true) {
 		if(server_exiting) break;
 		if(!activeTileIterationsQueue.length) {
@@ -1237,20 +1237,8 @@ async function beginTileIterationsLoop() {
 			} else if(context.type == types.eraseworld) {
 				appendToEditLogQueue(0, 0, context.user.id, "@{\"kind\":\"clear_all\"}", context.world.id, Date.now());
 			}
-		}
-
-		var writeQueue = [];
-		if(context.type == types.publicclear) {
-			// -9007199254740991    ::   9007199254740991
-
-			// SELECT tileX, tileY, content, properties, writability FROM tile WHERE world_id=? AND tileY >= ? LIMIT 2048
-			// SELECT tileX, tileY, content, properties, writability FROM tile WHERE world_id=? AND tileY = ? AND tileX >= ? LIMIT 2048
-
-
-
-			var data = await db.all("SELECT rowid as rowid, content, tileX, tileY, properties, writability FROM tile WHERE world_id=? LIMIT ?,?",
-				[context.world.id, context.index * chunkSize, chunkSize]);
-			if(!data || data.length == 0) {
+			var initPos = await db.get("SELECT tileX, tileY FROM tile WHERE world_id=? LIMIT 1", [context.world.id]);
+			if(!initPos) {
 				activeTileIterationsQueue.splice(tileIterationsIndex, 1);
 				IOProgress(context.call_id);
 				if(tileIterationsIndex >= activeTileIterationsQueue.length) {
@@ -1258,6 +1246,14 @@ async function beginTileIterationsLoop() {
 				}
 				continue;
 			}
+			context.posX = initPos.tileX - 1; // start before first tile
+			context.posY = initPos.tileY;
+		}
+
+		var writeQueue = [];
+		if(context.type == types.publicclear) {
+			var data = await db.all("SELECT rowid AS rowid, content, tileX, tileY, properties, writability FROM tile WHERE world_id=? AND (tileY, tileX) > (?, ?) LIMIT ?",
+				[context.world.id, context.posY, context.posX, chunkSize]);
 			for(var d = 0; d < data.length; d++) {
 				var tile = data[d];
 				var tileObj = normalize_tile(tile);
@@ -1343,10 +1339,7 @@ async function beginTileIterationsLoop() {
 			for(var i in tileIterationTempMem) {
 				delete tileIterationTempMem[i];
 			}
-		} else if(context.type == types.eraseworld) {
-			var data = await db.all("SELECT rowid as rowid, tileX, tileY FROM tile WHERE world_id=? LIMIT ?,?",
-				[context.world.id, context.index * chunkSize, chunkSize]);
-			if(!data || data.length == 0) {
+			if(data.length < chunkSize) { // reached end of world
 				activeTileIterationsQueue.splice(tileIterationsIndex, 1);
 				IOProgress(context.call_id);
 				if(tileIterationsIndex >= activeTileIterationsQueue.length) {
@@ -1354,54 +1347,57 @@ async function beginTileIterationsLoop() {
 				}
 				continue;
 			}
-
-			for(var d = 0; d < data.length; d++) {
-				var tile = data[d];
-				var tileX = tile.tileX;
-				var tileY = tile.tileY;
-				var dimTile = isTileDIM(context.world.id, tileX, tileY);
-				if(dimTile) {
-					for(var i = 0; i < dimTile.content.length; i++) {
-						dimTile.content[i] = "";
-						dimTile.prop_color[i] = 0;
-						dimTile.content_updated = true;
-						dimTile.props_updated = true;
-						for(var p in dimTile.prop_cell_props) {
-							delete dimTile.prop_cell_props[p];
-						}
-					}
-					dimTile.last_accessed = Date.now();
-				} else {
-					if(lookupTileQueue(context.world.id + "," + tileX + "," + tileY)) {
-						continue;
-					}
-					var tileObj = normalize_tile({
-						properties: "{}",
-						content: " ".repeat(CONST.tileArea),
-						writability: null,
-						rowid: tile.rowid
-					});
-					tileIterationTempMem[context.world.id + "," + tileY + "," + tileX] = tileObj;
-					for(var i = 0; i < tileObj.content.length; i++) {
-						tileObj.content[i] = "";
-						tileObj.prop_color[i] = 0;
-						// will be updated in DB right now anyways
-						tileObj.content_updated = false;
-						tileObj.props_updated = false;
-						for(var p in tileObj.prop_cell_props) {
-							delete tileObj.prop_cell_props[p];
-						}
-					}
-					writeQueue.push(["UPDATE tile SET properties=?, content=?, writability=? WHERE rowid=?",
-						["{}", " ".repeat(CONST.tileArea), null, tileObj.tile_id]]);
+			var lastTile = data[data.length - 1];
+			context.posX = lastTile.tileX;
+			context.posY = lastTile.tileY;
+		} else if(context.type == types.eraseworld) {
+			var data = await db.all("SELECT tileX, tileY FROM tile WHERE world_id=? AND (tileY, tileX) > (?, ?) LIMIT ?",
+				[context.world.id, context.posY, context.posX, chunkSize]);
+			var localTiles = {};
+			for(var i = 0; i < data.length; i++) {
+				var coords = data[i];
+				var tileX = coords.tileX;
+				var tileY = coords.tileY;
+				if(lookupTileQueue(context.world.id + "," + tileX + "," + tileY)) {
+					continue;
 				}
+				localTiles[tileY + "," + tileX] = 1;
+				writeQueue.push(["DELETE FROM tile WHERE world_id=? AND tileX=? and tileY=?", [context.world.id, tileX, tileY]]);
+			}
+			// begin to delete tiles from memory
+			for(var i in localTiles) {
+				var pos = i.split(",");
+				var tileX = parseInt(pos[1]);
+				var tileY = parseInt(pos[0]);
+				var ctile = isTileDIM(context.world.id, tileX, tileY);
+				if(!ctile) continue;
+				ctile.tile_exists = false;
+				ctile.tile_id = null;
+				ctile.prop_cell_props = {};
+				for(var x = 0; x < CONST.tileArea; x++) {
+					ctile.content[x] = " ";
+					ctile.prop_char[x] = null;
+					ctile.prop_color[x] = 0;
+					ctile.writability = null;
+				}
+				ctile.content_updated = true;
+				ctile.writability_updated = true;
+				ctile.props_updated = true;
 			}
 			if(writeQueue.length) {
 				await bulkWriteEdits(writeQueue);
 			}
-			for(var i in tileIterationTempMem) {
-				delete tileIterationTempMem[i];
+			if(data.length < chunkSize) {
+				activeTileIterationsQueue.splice(tileIterationsIndex, 1);
+				IOProgress(context.call_id);
+				if(tileIterationsIndex >= activeTileIterationsQueue.length) {
+					tileIterationsIndex = 0;
+				}
+				continue;
 			}
+			var lastTile = data[data.length - 1];
+			context.posX = lastTile.tileX;
+			context.posY = lastTile.tileY;
 		}
 	
 		context.index++;
@@ -1424,6 +1420,8 @@ function appendToTileIterationsQueue(world, callID, type, user) {
 		call_id: callID,
 		type,
 		index: 0,
+		posX: 0,
+		posY: 0,
 		suspended: false,
 		user
 	});

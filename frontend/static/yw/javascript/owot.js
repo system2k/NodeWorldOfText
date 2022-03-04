@@ -5673,6 +5673,19 @@ var ws_functions = {
 					state.worldModel.writability = value;
 					w.redraw();
 					break;
+				case "name":
+					state.worldModel.name = value;
+					if(!value || value.toLowerCase() == "main") {
+						state.worldModel.pathname = "Our World of Text";
+					} else {
+						state.worldModel.pathname = value ? "/" + value : "";
+					}
+					ws_path = createWsPath();
+					document.title = state.worldModel.pathname;
+					if(window.history && window.history.replaceState) {
+						history.replaceState("", document.title, value + window.location.search + window.location.hash);
+					}
+					break;
 			}
 		}
 		updateMenuEntryVisiblity();
@@ -5718,6 +5731,12 @@ var ws_functions = {
 			addChat(chat.location, chat.id, type, chat.nickname,
 				chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color, chat.date, chat);
 		}
+	},
+	chatdelete: function(data) {
+		// subject to change
+		var id = data.id; // client id
+		var time = data.time;
+		removeChatByIdAndDate(id, time);
 	},
 	cmd: function(data) {
 		w.emit("cmd", data);

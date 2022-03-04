@@ -506,7 +506,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 			return serverChatResponse(idstr, location);
 		},
 		stats: function() {
-			if(world.name != "" && world.name != "main" && !is_owner && !user.superuser) return;
+			if(world.name != "" && world.name.toLowerCase() != "main" && !is_owner && !user.superuser) return;
 			var stat = "Stats for world<br>";
 			stat += "Creation date: " + html_tag_esc(create_date(world.creationDate)) + "<br>";
 			stat += "View count: " + html_tag_esc(world.views);
@@ -515,20 +515,18 @@ module.exports = async function(ws, data, send, vars, evars) {
 		delete: async function(id, timestamp) {
 			id = san_nbr(id);
 			timestamp = san_nbr(timestamp);
-
 			var wid = world.id;
 			if(location == "global") wid = 0;
 			var res = await remove_from_chatlog(wid, id, timestamp);
 			if(res == 0) {
 				return serverChatResponse("No messages deleted", location);
 			}
+			broadcast({
+				kind: "chatdelete",
+				id: id,
+				time: timestamp
+			});
 			return serverChatResponse("Deleted " + res + " message(s)", location);
-			// TODO
-			/*{
-				kind: "chat_delete",
-				chat_id: 4281,
-				time: 168462892358
-			}*/
 		}
 	}
 

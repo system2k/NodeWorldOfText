@@ -724,6 +724,7 @@ async function claimWorldByName(worldName, user) {
 
 async function renameWorld(world, newName, user) {
 	var target = await getWorld(newName, false);
+	var nameUpdates = [];
 
 	var renameCheck = await validateWorldClaim(newName, user, true);
 	if(renameCheck.error) {
@@ -768,6 +769,7 @@ async function renameWorld(world, newName, user) {
 	var oldWorldName = world.name;
 	delete worldCache[srcHash];
 	world.name = newName;
+	nameUpdates.push([world.id, newName]);
 	worldCache[destHash] = world;
 	var targetTempName = null;
 	var internalError = false;
@@ -775,6 +777,7 @@ async function renameWorld(world, newName, user) {
 		if(target) {
 			worldCache[srcHash] = target;
 			target.name = oldWorldName;
+			nameUpdates.push([target.id, oldWorldName]);
 			// TODO: swapping must be done in a better way
 			targetTempName = oldWorldName + "-" + crypto.randomBytes(10).toString("hex");
 			await db.run("UPDATE world SET name=? WHERE id=?", [targetTempName, target.id]);
@@ -805,7 +808,8 @@ async function renameWorld(world, newName, user) {
 	releaseWorld(target);
 	return {
 		success: true,
-		message: "Successfully renamed the world"
+		message: "Successfully renamed the world",
+		list: nameUpdates
 	}
 }
 
