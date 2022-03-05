@@ -1639,6 +1639,7 @@ function manage_https() {
 }
 manage_https();
 
+// parse Uvias account token
 function parseToken(token) {
 	if(typeof token != "string") return false;
 	token = token.split("|");
@@ -1713,7 +1714,7 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 	}
 
 	if(accountSystem == "uvias" && cookies.token) {
-		var parsed = parseToken(cookies.token);
+		var parsed = await uvias.get("SELECT * FROM accounts.parse_token($1::text)", [cookies.token]);
 		var success = false;
 		var has_refreshed = false;
 		if(parsed) {

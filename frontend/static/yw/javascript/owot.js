@@ -3859,28 +3859,32 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 }
 
 function drawGrid(renderCtx, gridColor, offsetX, offsetY) {
-	if(subgridEnabled) {
-		renderCtx.strokeStyle = "#B9B9B9";
-		var dashSize = Math.ceil(zoom);
-		if(dashSize < 1) dashSize = 1;
+	if(subgridEnabled && zoom >= 0.3) {
+		var b = 0xB9;
+		if(zoom < 0.5) {
+			b += (0xFF - b) * (0.5 - zoom) * 2;
+		}
+		b = Math.floor(b);
+		renderCtx.strokeStyle = "rgb(" + b + ", " + b + ", " + b + ")";
+		var dashSize = 1
 		renderCtx.setLineDash([dashSize]);
 		renderCtx.lineWidth = dashSize;
 		for(var x = 1; x < tileC; x++) {
 			for(var y = 1; y < tileR; y++) {
 				renderCtx.beginPath();
-				renderCtx.moveTo(0, y * cellH + 0.5);
-				renderCtx.lineTo(tileW, y * cellH + 0.5);
+				renderCtx.moveTo(0, Math.round(y * cellH) + 0.5);
+				renderCtx.lineTo(tileW, Math.round(y * cellH) + 0.5);
 				renderCtx.stroke();
 			}
 			renderCtx.beginPath();
-			renderCtx.moveTo(x * cellW + 0.5, 0);
-			renderCtx.lineTo(x * cellW + 0.5, tileH);
+			renderCtx.moveTo(Math.round(x * cellW) + 0.5, 0);
+			renderCtx.lineTo(Math.round(x * cellW) + 0.5, tileH);
 			renderCtx.stroke();
 		}
 	}
 	renderCtx.fillStyle = gridColor;
-	renderCtx.fillRect(offsetX, offsetY + tileH - zoom, tileW, zoom);
-	renderCtx.fillRect(offsetX + tileW - zoom, offsetY, zoom, tileH);
+	renderCtx.fillRect(Math.floor(offsetX), Math.floor(offsetY), tileWidth, 1);
+	renderCtx.fillRect(Math.floor(offsetX), Math.floor(offsetY), 1, tileHeight);
 }
 
 function drawObstructedCursor(renderCtx, content, curX, curY, offsetX, offsetY) {
@@ -3907,8 +3911,18 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 	}
 	var backColor = renderCtx.fillStyle;
 
+	var clamp, clampW, clampH;
+	if(transparentBackground) {
+		clamp = getTileScreenPosition(tileX + 1, tileY + 1);
+		clampW = Math.floor(clamp[0]) - offsetX;
+		clampH = Math.floor(clamp[1]) - offsetY;
+	} else {
+		clampW = tileWidth;
+		clampH = tileHeight;
+	}
+
 	// fill tile background color
-	renderCtx.fillRect(offsetX, offsetY, tileWidth, tileHeight);
+	renderCtx.fillRect(offsetX, offsetY, clampW, clampH);
 
 	// render char protections
 	if(tile.properties.char && !tile.backgroundColor) {
@@ -3922,8 +3936,8 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 				if(code == 2) renderCtx.fillStyle = styles.owner;
 				if(cellW >= 1 && cellH >= 1) {
 					// clamp to nearest axis
-					var tmpCellW = tileWidth / tileC;
-					var tmpCellH = tileHeight / tileR;
+					var tmpCellW = clampW / tileC;
+					var tmpCellH = clampH / tileR;
 					var sx = Math.floor(cX * tmpCellW);
 					var sy = Math.floor(cY * tmpCellH);
 					var x2 = Math.floor((cX + 1) * tmpCellW);
@@ -4073,6 +4087,10 @@ function renderTile(tileX, tileY, redraw) {
 	}
 	if(!Tile.visible(tileX, tileY)) return;
 
+	var clamp = getTileScreenPosition(tileX + 1, tileY + 1);
+	var clampW = Math.floor(clamp[0]) - offsetX;
+	var clampH = Math.floor(clamp[1]) - offsetY;
+
 	var cursorVisibility = cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY;
 
 	var gridColor = "#000000";
@@ -4111,11 +4129,11 @@ function renderTile(tileX, tileY, redraw) {
 		var pCanv = tilePool.pool.canv;
 		var pX = tilePool.poolX;
 		var pY = tilePool.poolY;
-		owotCtx.drawImage(pCanv, pX, pY, tileWidth, tileHeight, offsetX, offsetY, tileWidth, tileHeight);
+		owotCtx.drawImage(pCanv, pX, pY, clampW, clampH, offsetX, offsetY, clampW, clampH);
 		if(w.events.tilerendered) w.emit("tileRendered", {
 			tileX: tileX, tileY: tileY,
 			startX: offsetX, startY: offsetY,
-			endX: offsetX + tileWidth - 1, endY: offsetY + tileHeight - 1
+			endX: offsetX + clampW - 1, endY: offsetY + clampH - 1
 		});
 		if(unobstructCursor && cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
 			drawObstructedCursor(owotCtx, tile.content, cursorCoords[2], cursorCoords[3], offsetX, offsetY);
@@ -4166,7 +4184,7 @@ function renderTile(tileX, tileY, redraw) {
 	poolCtx.drawImage(textRenderCanvas, poolX, poolY);
 
 	// add image to main canvas
-	owotCtx.drawImage(textRenderCanvas, offsetX, offsetY);
+	owotCtx.drawImage(textRenderCanvas, 0, 0, clampW, clampH, offsetX, offsetY, clampW, clampH);
 
 	if(unobstructCursor && cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
 		drawObstructedCursor(owotCtx, tile.content, cursorCoords[2], cursorCoords[3], offsetX, offsetY);
@@ -5675,15 +5693,15 @@ var ws_functions = {
 					break;
 				case "name":
 					state.worldModel.name = value;
+					state.worldModel.pathname = value ? "/" + value : "";
 					if(!value || value.toLowerCase() == "main") {
-						state.worldModel.pathname = "Our World of Text";
+						document.title = "Our World of Text";
 					} else {
-						state.worldModel.pathname = value ? "/" + value : "";
+						document.title = state.worldModel.pathname;
 					}
 					ws_path = createWsPath();
-					document.title = state.worldModel.pathname;
 					if(window.history && window.history.replaceState) {
-						history.replaceState("", document.title, value + window.location.search + window.location.hash);
+						history.replaceState({}, "", value + window.location.search + window.location.hash);
 					}
 					break;
 			}
