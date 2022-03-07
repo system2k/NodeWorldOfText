@@ -385,6 +385,92 @@ elm.chat_global_tab.addEventListener("click", function() {
 	}
 });
 
+function resizable_chat() {
+	var state = 0;
+	var isDown = false;
+	var downX = 0;
+	var downY = 0;
+	var elmX = 0;
+	var elmY = 0;
+	var chatWidth = 0;
+	var chatHeight = 0;
+	chat_window.addEventListener("mousemove", function(e) {
+		if(isDown) return;
+		var posX = e.pageX - chat_window.offsetLeft;
+		var posY = e.pageY - chat_window.offsetTop;
+		var top = (posY) <= 4;
+		var left = (posX) <= 3;
+		var right = (chat_window.offsetWidth - posX) <= 4;
+		var bottom = (chat_window.offsetHeight - posY) <= 5;
+		var cursor = "";
+		if(left || right) cursor = "ew-resize";
+		if(top || bottom) cursor = "ns-resize";
+		if((top && left) || (right && bottom)) cursor = "nwse-resize";
+		if((bottom && left) || (top && right)) cursor = "nesw-resize";
+		chat_window.style.cursor = cursor;
+		state = bottom << 3 | right << 2 | left << 1 | top;
+	});
+	chat_window.addEventListener("mousedown", function(e) {
+		downX = e.pageX;
+		downY = e.pageY;
+		if(state) {
+			// subtract 2 for the borders
+			chatWidth = chat_window.offsetWidth - 2;
+			chatHeight = chat_window.offsetHeight - 2;
+			elmX = chat_window.offsetLeft;
+			elmY = chat_window.offsetTop;
+			isDown = true;
+			chatResizing = true;
+		}
+	});
+	document.addEventListener("mouseup", function() {
+		isDown = false;
+		chatResizing = false;
+	});
+	document.addEventListener("mousemove", function(e) {
+		if(!isDown) return;
+		var offX = e.pageX - downX;
+		var offY = e.pageY - downY;
+		var resize_bottom = state >> 3 & 1;
+		var resize_right = state >> 2 & 1;
+		var resize_left = state >> 1 & 1;
+		var resize_top = state & 1;
+
+		var width_delta = 0;
+		var height_delta = 0;
+		var abs_top = chat_window.offsetTop;
+		var abs_left = chat_window.offsetLeft;
+		var snap_bottom = chat_window.style.bottom == "0px";
+		var snap_right = chat_window.style.right == "0px";
+
+		if(resize_top) {
+			height_delta = -offY;
+		} else if(resize_bottom) {
+			height_delta = offY;
+		}
+		if(resize_left) {
+			width_delta = -offX;
+		} else if(resize_right) {
+			width_delta = offX;
+		}
+		var res = resizeChat(chatWidth + width_delta, chatHeight + height_delta);
+		if(resize_top && !snap_bottom) {
+			chat_window.style.top = (elmY + (chatHeight - res[1])) + "px";
+		}
+		if(resize_bottom && snap_bottom) {
+			chat_window.style.bottom = "";
+			chat_window.style.top = abs_top + "px";
+		}
+		if(resize_right && snap_right) {
+			chat_window.style.right = "";
+			chat_window.style.left = abs_left + "px";
+		}
+		if(resize_left && !snap_right) {
+			chat_window.style.left = (elmX + (chatWidth - res[0])) + "px";
+		}
+	});
+}
+
 function evaluateChatfield(chatfield) {
 	var field;
 	if(chatfield == "page") {

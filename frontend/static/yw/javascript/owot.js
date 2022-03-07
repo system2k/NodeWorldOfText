@@ -347,92 +347,6 @@ draggable_element(elm.chat_window, null, [
 draggable_element(elm.confirm_js, null, [
 	elm.confirm_js_code
 ]);
-
-function resizable_chat() {
-	var state = 0;
-	var isDown = false;
-	var downX = 0;
-	var downY = 0;
-	var elmX = 0;
-	var elmY = 0;
-	var chatWidth = 0;
-	var chatHeight = 0;
-	chat_window.addEventListener("mousemove", function(e) {
-		if(isDown) return;
-		var posX = e.pageX - chat_window.offsetLeft;
-		var posY = e.pageY - chat_window.offsetTop;
-		var top = (posY) <= 4;
-		var left = (posX) <= 3;
-		var right = (chat_window.offsetWidth - posX) <= 4;
-		var bottom = (chat_window.offsetHeight - posY) <= 5;
-		var cursor = "";
-		if(left || right) cursor = "ew-resize";
-		if(top || bottom) cursor = "ns-resize";
-		if((top && left) || (right && bottom)) cursor = "nwse-resize";
-		if((bottom && left) || (top && right)) cursor = "nesw-resize";
-		chat_window.style.cursor = cursor;
-		state = bottom << 3 | right << 2 | left << 1 | top;
-	});
-	chat_window.addEventListener("mousedown", function(e) {
-		downX = e.pageX;
-		downY = e.pageY;
-		if(state) {
-			// subtract 2 for the borders
-			chatWidth = chat_window.offsetWidth - 2;
-			chatHeight = chat_window.offsetHeight - 2;
-			elmX = chat_window.offsetLeft;
-			elmY = chat_window.offsetTop;
-			isDown = true;
-			chatResizing = true;
-		}
-	});
-	document.addEventListener("mouseup", function() {
-		isDown = false;
-		chatResizing = false;
-	});
-	document.addEventListener("mousemove", function(e) {
-		if(!isDown) return;
-		var offX = e.pageX - downX;
-		var offY = e.pageY - downY;
-		var resize_bottom = state >> 3 & 1;
-		var resize_right = state >> 2 & 1;
-		var resize_left = state >> 1 & 1;
-		var resize_top = state & 1;
-
-		var width_delta = 0;
-		var height_delta = 0;
-		var abs_top = chat_window.offsetTop;
-		var abs_left = chat_window.offsetLeft;
-		var snap_bottom = chat_window.style.bottom == "0px";
-		var snap_right = chat_window.style.right == "0px";
-
-		if(resize_top) {
-			height_delta = -offY;
-		} else if(resize_bottom) {
-			height_delta = offY;
-		}
-		if(resize_left) {
-			width_delta = -offX;
-		} else if(resize_right) {
-			width_delta = offX;
-		}
-		var res = resizeChat(chatWidth + width_delta, chatHeight + height_delta);
-		if(resize_top && !snap_bottom) {
-			chat_window.style.top = (elmY + (chatHeight - res[1])) + "px";
-		}
-		if(resize_bottom && snap_bottom) {
-			chat_window.style.bottom = "";
-			chat_window.style.top = abs_top + "px";
-		}
-		if(resize_right && snap_right) {
-			chat_window.style.right = "";
-			chat_window.style.left = abs_left + "px";
-		}
-		if(resize_left && !snap_right) {
-			chat_window.style.left = (elmX + (chatWidth - res[0])) + "px";
-		}
-	});
-}
 resizable_chat();
 
 function getStoredNickname() {
@@ -1496,7 +1410,7 @@ function checkTextColorOverride() {
 	var public = 4;
 	var member = 2;
 	var owner = 1;
-	// if custom text color is set to a zone, use that color instead of main default
+	// if custom text color is set to a zone, use that color instead of default
 	if(styles.public_text != "#000" && styles.public_text != "#000000") {
 		textColorOverride |= public;
 	} else {
@@ -3806,23 +3720,20 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 	var isLink = false;
 
 	// check if this char is a link
-	if(linksRendered) {
-		if(props[y]) {
-			if(props[y][x]) {
-				var link = props[y][x].link;
-				if(link) {
-					isLink = true;
-					if(link.type == "url") {
-						linkColor = defaultURLLinkColor;
-					} else if(link.type == "coord") {
-						linkColor = defaultCoordLinkColor;
-					}
-				}
+	if(linksRendered && props[y] && props[y][x]) {
+		var link = props[y][x].link;
+		if(link) {
+			isLink = true;
+			if(link.type == "url") {
+				linkColor = defaultURLLinkColor;
+			} else if(link.type == "coord") {
+				linkColor = defaultCoordLinkColor;
 			}
 		}
 	}
 	if(!char) char = " ";
 	var cCode = char.codePointAt(0);
+	var isSpecial = char.codePointAt(1) !== void 0; // contains combining chars (doesn't work with Courier)
 
 	// if text has no color, use default text color. otherwise, colorize it
 	if(color == 0 || !colorsEnabled || (isLink && !colorizeLinks)) {
@@ -3852,9 +3763,9 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 	} else if(ansiBlockFill && fillBlockChar(cCode, textRender, fontX, fontY)) {
 		return;
 	} else { // character rendering
-		if(char.length > 1 ) textRender.font = specialCharFont;
+		if(isSpecial) textRender.font = specialCharFont;
 		textRender.fillText(char, Math.round(fontX + XPadding), Math.round(fontY + textYOffset));
-		if(char.length > 1) textRender.font = font;
+		if(isSpecial) textRender.font = font;
 	}
 }
 
@@ -3872,13 +3783,13 @@ function drawGrid(renderCtx, gridColor, offsetX, offsetY) {
 		for(var x = 1; x < tileC; x++) {
 			for(var y = 1; y < tileR; y++) {
 				renderCtx.beginPath();
-				renderCtx.moveTo(0, Math.round(y * cellH) + 0.5);
-				renderCtx.lineTo(tileW, Math.round(y * cellH) + 0.5);
+				renderCtx.moveTo(0, Math.floor(y * cellH) + 0.5);
+				renderCtx.lineTo(tileW, Math.floor(y * cellH) + 0.5);
 				renderCtx.stroke();
 			}
 			renderCtx.beginPath();
-			renderCtx.moveTo(Math.round(x * cellW) + 0.5, 0);
-			renderCtx.lineTo(Math.round(x * cellW) + 0.5, tileH);
+			renderCtx.moveTo(Math.floor(x * cellW) + 0.5, 0);
+			renderCtx.lineTo(Math.floor(x * cellW) + 0.5, tileH);
 			renderCtx.stroke();
 		}
 	}
@@ -3917,6 +3828,8 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 		clampW = Math.floor(clamp[0]) - offsetX;
 		clampH = Math.floor(clamp[1]) - offsetY;
 	} else {
+		// in opaque mode, the offsets are always (0, 0) within the text-render tile
+		// in transparent mode, backgrounds are placed directly on the main canvas
 		clampW = tileWidth;
 		clampH = tileHeight;
 	}
@@ -4168,6 +4081,7 @@ function renderTile(tileX, tileY, redraw) {
 	if(!bufferLargeChars) {
 		renderContent(textRenderCtx, tileX, tileY, 0, 0);
 	} else {
+		// proof-of-concept
 		for(var x = -1; x <= 1; x++) {
 			for(var y = -1; y <= 1; y++) {
 				renderContent(textRenderCtx, tileX + x, tileY + y, tileW * x, tileH * y);
@@ -4342,25 +4256,13 @@ function buildMenu() {
 	}, function() {
 		return elm.coords.style.display = "none";
 	});
-	// TODO
-	//if(Permissions.can_color_text(state.userModel, state.worldModel)) {
 	menuOptions.changeColor = menu.addOption("Change color", w.color);
-	//}
-	//if(Permissions.can_go_to_coord(state.userModel, state.worldModel)) {
 	menuOptions.goToCoords = menu.addOption("Go to coordinates", w.goToCoord);
-	//}
-	//if(Permissions.can_coordlink(state.userModel, state.worldModel)) {
 	menuOptions.coordLink = menu.addOption("Create link to coordinates", w.coordLink);
-	//}
-	//if(Permissions.can_urllink(state.userModel, state.worldModel)) {
 	menuOptions.urlLink = menu.addOption("Create link to URL", w.urlLink);
-	//}
-	//if(Permissions.can_admin(state.userModel, state.worldModel)) {
 	menuOptions.ownerArea = menu.addOption("Make an area owner-only", function() {
 		return w.doProtect("owner-only");
 	});
-	//}
-	//if(Permissions.can_protect_tiles(state.userModel, state.worldModel)) {
 	menuOptions.memberArea = menu.addOption("Make an area member-only", function() {
 		return w.doProtect("member-only");
 	});
@@ -4368,7 +4270,6 @@ function buildMenu() {
 		return w.doProtect("public");
 	});
 	menuOptions.resetArea = menu.addOption("Default area protection", w.doUnprotect);
-	//}
 
 	menuOptions.grid = menu.addCheckboxOption("Toggle grid", function() {
 		gridEnabled = true;
@@ -5703,6 +5604,9 @@ var ws_functions = {
 					if(window.history && window.history.replaceState) {
 						history.replaceState({}, "", value + window.location.search + window.location.hash);
 					}
+					break;
+				case "charRate":
+					state.worldModel.char_rate = value;
 					break;
 			}
 		}
