@@ -419,6 +419,7 @@ if(!Object.assign) {
 		for(var i in vars) {
 			target[i] = vars[i];
 		}
+		return target;
 	}
 }
 
@@ -435,6 +436,12 @@ if(!Array.prototype.fill) {
 if(!String.prototype.startsWith) {
 	String.prototype.startsWith = function(search, pos) {
 		return this.substr(!pos || pos < 0 ? 0 : +pos, search.length) == search;
+	}
+}
+
+if(!String.prototype.codePointAt) {
+	String.prototype.codePointAt = function() {
+		return this[0].charCodeAt();
 	}
 }
 

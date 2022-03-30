@@ -21,10 +21,9 @@ function processPath(path) {
 
 module.exports.GET = async function(req, serve, vars, evars) {
 	var path = evars.path;
-	var acme_stat = vars.acme_stat;
+	var acme = vars.acme;
 
-	var stat = acme_stat();
-	if(!stat.enabled) return -1;
+	if(!acme.enabled) return -1;
 
 	var procPath = processPath(path);
 
@@ -49,13 +48,12 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var cookies = evars.cookies;
 	var post_data = evars.post_data;
 	var path = evars.path;
-	var acme_stat = vars.acme_stat;
+	var acme = vars.acme;
 
-	var stat = acme_stat();
-	if(!stat.enabled) return;
+	if(!acme.enabled) return;
 
 	var token = cookies.token;
-	if(token !== stat.pass) {
+	if(token !== acme.pass) {
 		return;
 	}
 

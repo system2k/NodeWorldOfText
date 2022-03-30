@@ -274,6 +274,7 @@ function sendTileUpdatesToClients() {
 		wss.clients.forEach(function(client) {
 			if(!client.sdata) return;
 			if(!client.sdata.userClient) return;
+			if(!client.sdata.receiveContentUpdates) return;
 			if(client.sdata.world.id == worldID && client.readyState == WebSocket.OPEN) {
 				wsSend(client, pktBroadcast);
 			}

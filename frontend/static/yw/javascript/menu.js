@@ -127,12 +127,12 @@ function Menu(titleEl, menuEl) {
 		var entry = _this.entriesById[id];
 		if(!entry) return;
 		var elm = entry.element;
-		var entryLi = _this.getEntryContainer();
-		if(!entryLi) {
+		var mainUl = _this.menuEl.getElementsByTagName("ul")[0];
+		if(!mainUl) {
 			throw "Entry container not found";
 		}
 		elm.remove();
-		entryLi.appendChild(elm);
+		mainUl.appendChild(elm);
 	}
 	this.pin = function() {
 		_this.pinned = true;
@@ -203,12 +203,12 @@ function slideMenu(direction, element, speed) {
 	var start = getDate();
 	var end = start + speed;
 	var lapse = end - start;
-	var int = setInterval(function() {
+	var menu_int = setInterval(function() {
 		element.style.display = "block";
 		var duration = getDate() - start;
 		if(duration >= lapse) {
 			menuAnimationActive = false;
-			clearInterval(int);
+			clearInterval(menu_int);
 			if(direction == "down") {
 				element.style.display = "";
 			} else if(direction == "up") {

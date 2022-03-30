@@ -11,7 +11,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var ranks_cache = vars.ranks_cache;
 	var db_misc = vars.db_misc;
 	var uvias = vars.uvias;
-	var accountSystem = vars.accountSystem
+	var accountSystem = vars.accountSystem;
+	var acme = vars.acme;
 
 	// not a superuser...
 	if(!user.superuser) {
@@ -74,11 +75,14 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		announcement: announcement(),
 		announcement_update_msg: params.announcement_update_msg,
 		cons_update_msg: params.cons_update_msg,
+		acme_update_msg: params.acme_update_msg,
 		uptime: uptime(),
 		machine_uptime: uptime(process.hrtime()[0] * 1000),
 		client_num,
 		bypass_key: get_bypass_key(),
-		custom_ranks
+		custom_ranks,
+		acme_enabled: acme.enabled,
+		acme_pass: acme.enabled ? (acme.pass ? acme.pass : "") : ""
 	};
 
 	serve(HTML("administrator.html", data));
@@ -95,11 +99,32 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var db_edits = vars.db_edits;
 	var modify_bypass_key = vars.modify_bypass_key;
 	var stopServer = vars.stopServer;
+	var acme = vars.acme;
 
 	if(!user.superuser) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
 
+	if("set_acme_pass" in post_data) {
+		var new_acme_pass = post_data.set_acme_pass;
+		var acme_update_msg = "";
+		if(post_data.acme_enable) {
+			if(typeof new_acme_pass == "string" && new_acme_pass.length >= 1) {
+				acme.pass = new_acme_pass;
+				acme.enabled = true;
+				acme_update_msg = "Updated ACME password and enabled ACME";
+			} else {
+				acme_update_msg = "Invalid ACME password";
+			}
+		} else if(post_data.acme_disable) {
+			acme.pass = null;
+			acme.enabled = false;
+			acme_update_msg = "ACME disabled";
+		}
+		return await dispage("admin/administrator", {
+			acme_update_msg
+		}, req, serve, vars, evars);
+	}
 	if("set_bypass_key" in post_data) {
 		var new_bypass_key = post_data.set_bypass_key;
 		modify_bypass_key(new_bypass_key);

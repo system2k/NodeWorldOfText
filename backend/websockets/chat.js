@@ -27,6 +27,7 @@ function sanitizeColor(col) {
 }
 
 var chat_ip_limits = {};
+var tell_blocks = {};
 var blocked_ips_by_world_id = {}; // id 0 = global
 
 module.exports = async function(ws, data, send, vars, evars) {
@@ -50,6 +51,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var create_date = vars.create_date;
 	var client_ips = vars.client_ips;
 	var wsSend = vars.wsSend;
+	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
 	var remove_from_chatlog = chat_mgr.remove_from_chatlog;
@@ -101,20 +103,27 @@ module.exports = async function(ws, data, send, vars, evars) {
 	}
 
 	var isMuted = false;
+	var isShadowMuted = false;
+	var muteInfo = null;
 	var worldChatMutes = blocked_ips_by_world_id[world.id];
 	if(location == "global") {
 		worldChatMutes = blocked_ips_by_world_id[0];
 	}
 	if(worldChatMutes) {
-		if(worldChatMutes[ipHeaderAddr]) {
+		muteInfo = worldChatMutes[ipHeaderAddr];
+		if(muteInfo) {
 			isMuted = true;
+			if(muteInfo[1]) {
+				isShadowMuted = true;
+			}
 		}
 	}
 
 	if(isMuted) {
-		var expTime = worldChatMutes[ipHeaderAddr];
+		var expTime = muteInfo[0];
 		if(!expTime || typeof expTime != "number" || Date.now() >= expTime) {
 			isMuted = false;
+			isShadowMuted = false;
 			delete worldChatMutes[ipHeaderAddr];
 		}
 	}
@@ -179,6 +188,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 		[0, "warpserver", ["server"], "use a different server", "wss://www.yourworldoftext.com/~help/ws/"], // client-side
 		[0, "gridsize", ["WxH"], "change the size of cells", "10x20"], // client-side
 		[0, "block", ["id"], "mute a user", "1220"],
+		[0, "unblockall", null, "unblock all users", null],
 		[0, "mute", ["id", "seconds"], "mute a user for everyone", "1220 9999"], // check for permission
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
 		[0, "color", ["color code"], "change your text color", "#FF00FF"], // client-side
@@ -329,13 +339,35 @@ module.exports = async function(ws, data, send, vars, evars) {
 			if(blocks.length >= chatIdBlockLimit) return serverChatResponse("Too many blocked IDs", location);
 			if(blocks.indexOf(id) > -1) return;
 			blocks.push(id);
+
+			var blocked_ip = getClientIPByChatID(id, location == "global");
+			if(blocked_ip) {
+				var blist = tell_blocks[ipHeaderAddr];
+				if(!blist) {
+					blist = {};
+					tell_blocks[ipHeaderAddr] = blist;
+				}
+				if(!blist[blocked_ip]) {
+					blist[blocked_ip] = Date.now();
+				}
+			}
+
 			serverChatResponse("Blocked chats from ID: " + id, location);
+		},
+		unblockall: function() {
+			ws.sdata.chat_blocks.splice(0);
+			var tblocks = tell_blocks[ipHeaderAddr];
+			if(tblocks) {
+				for(var b in tblocks) {
+					delete tblocks[b];
+				}
+			}
+			serverChatResponse("Cleared all blocks", location);
 		},
 		uptime: function() {
 			serverChatResponse("Server uptime: " + uptime(), location);
 		},
 		tell: function(id, message) {
-			if(isMuted) return;
 			id += "";
 			message += "";
 			message = message.trim();
@@ -378,10 +410,11 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 			hasPrivateMsged = true;
 
+			if(isMuted && !isShadowMuted) return;
 			var privateMessage = {
 				nickname: nick,
 				realUsername: username_to_display,
-				id: clientId,
+				id: clientId, // client id of sender
 				message: message,
 				registered: user.authenticated,
 				location: location,
@@ -392,6 +425,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 				kind: "chat",
 				privateMessage: "to_me"
 			};
+			if(isShadowMuted) return;
+
 			if(user.authenticated && user.id in ranks_cache.users) {
 				var rank = ranks_cache[ranks_cache.users[user.id]];
 				privateMessage.rankName = rank.name;
@@ -400,7 +435,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 			send({
 				nickname: "",
 				realUsername: "",
-				id: dstClientId,
+				id: id, // client id of receiver
 				message: message,
 				registered: false,
 				location: location,
@@ -411,11 +446,24 @@ module.exports = async function(ws, data, send, vars, evars) {
 				kind: "chat",
 				privateMessage: "from_me"
 			});
-			// if user has muted TELLs, don't let the /tell-er know
+			// if user has blocked TELLs, don't let the /tell-er know
 			if(ws.sdata.chat_blocks && (ws.sdata.chat_blocks.includes(clientId) || // is ID of the /tell sender? (not destination)
 				(ws.sdata.chat_blocks.includes("*") && opts.clientId != 0)) ||
 				(ws.sdata.chat_blocks.includes("tell"))) return;
-			wsSend(ws, JSON.stringify(privateMessage));
+				
+			// user has blocked the TELLer by IP
+			var tellblock = tell_blocks[ws.sdata.ipAddress];
+			if(tellblock && tellblock[ipHeaderAddr]) {
+				var blk = tellblock[ipHeaderAddr];
+				if(Date.now() - blk > 1000 * 60 * 60) { // delete after 1 hour
+					delete tellblock[ipHeaderAddr];
+				} else {
+					return;
+				}
+			}
+
+			wsSend(client, JSON.stringify(privateMessage));
+			broadcastMonitorEvent("TellSpam", "Tell from " + clientId + " (" + ws.sdata.ipAddress + ") to " + id + ", first 4 chars: [" + message.slice(0, 4) + "]");
 		},
 		channel: async function() {
 			if(!user.staff) return;
@@ -443,10 +491,11 @@ module.exports = async function(ws, data, send, vars, evars) {
 			infoLog += "<b>Default channel id:</b> " + html_tag_esc(def) + "<br>";
 			return serverChatResponse(infoLog, location);
 		},
-		mute: function(id, time) {
+		mute: function(id, time, flag) {
 			if(!is_owner && !user.staff) return;
 			id = san_nbr(id);
 			time = san_nbr(time); // in seconds
+			var isShadow = flag == "shadow";
 
 			if(location == "global" && !user.staff) {
 				return serverChatResponse("You do not have permission to mute on global", location);
@@ -466,7 +515,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 					return serverChatResponse("Invalid location", location);
 				}
 				if(!blocked_ips_by_world_id[mute_wid]) blocked_ips_by_world_id[mute_wid] = {};
-				blocked_ips_by_world_id[mute_wid][muted_ip] = muteDate;
+				blocked_ips_by_world_id[mute_wid][muted_ip] = [muteDate, isShadow];
 				return serverChatResponse("Muted client until " + html_tag_esc(create_date(muteDate)), location);
 			} else {
 				return serverChatResponse("Client not found", location);
@@ -554,6 +603,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 			case "block":
 				com.block(args[1]);
 				return;
+			case "unblockall":
+				com.unblockall();
 			case "tell":
 				com.tell(args[1], args.slice(2).join(" "));
 				return;
@@ -561,7 +612,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 				com.channel();
 				return;
 			case "mute":
-				com.mute(args[1], args[2]);
+				com.mute(args[1], args[2], args[3]);
 				return;
 			case "clearmutes":
 				com.clearmutes();
@@ -637,10 +688,16 @@ module.exports = async function(ws, data, send, vars, evars) {
 		}
 	}
 
-	if(isMuted) return;
+	if(isMuted && !isShadowMuted) return;
 	var websocketChatData = Object.assign({
 		kind: "chat"
 	}, chatData);
+
+	// send chat message to the shadow-muted sender only
+	if(isShadowMuted) {
+		send(websocketChatData);
+		return;
+	}
 
 	var chatOpts = {
 		// Global and Page updates should not appear in worlds with chat disabled

@@ -9,8 +9,9 @@ html, body {
 	overscroll-behavior: contain;
 	touch-action: pan-down;
 }
-#announce_text {
+.announce_text {
 	text-align: center;
+	margin-right: 3px;
 }
 .screen_canvas {
 	overflow: hidden;
@@ -39,10 +40,10 @@ a:visited {
 	width: 100%;
 	position: absolute;
 }
-#announce {
+#announce_container {
 	text-align: center;
 }
-#announce_close {
+.announce_close {
 	font-size: 11px;
 	font-weight: bold;
 	color: #636060;
@@ -50,7 +51,7 @@ a:visited {
 	border-radius: 2px;
 	padding: 0 3px;
 }
-#announce_close:hover {
+.announce_close:hover {
 	background: #928E8E;
 	color: white;
 	cursor: pointer;
@@ -229,6 +230,10 @@ a:visited {
 	align-items: center;
 	justify-content: center;
 	margin-right: 3px;
+}
+.chat_tab_selected {
+	background-color: #8C8C8C;
+	color: white;
 }
 #chat_page_tab {
 	width: 100px;
@@ -421,9 +426,9 @@ a:visited {
 }
 #color_shortcuts {
 	background-color: #C3C3FF;
-	margin-left: -12px;
-	margin-right: -12px;
-	margin-bottom: -12px;
+	margin-left: -13px;
+	margin-right: -13px;
+	margin-bottom: -13px;
 	text-align: right;
 	padding-top: 3px;
 }

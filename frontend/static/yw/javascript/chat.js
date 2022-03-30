@@ -352,10 +352,8 @@ elm.chat_open.addEventListener("click", function() {
 });
 
 elm.chat_page_tab.addEventListener("click", function() {
-	elm.chat_global_tab.style.backgroundColor = "";
-	elm.chat_global_tab.style.color = "";
-	elm.chat_page_tab.style.backgroundColor = "#8c8c8c";
-	elm.chat_page_tab.style.color = "white";
+	elm.chat_page_tab.classList.add("chat_tab_selected");
+	elm.chat_global_tab.classList.remove("chat_tab_selected");
 
 	elm.global_chatfield.style.display = "none";
 	elm.page_chatfield.style.display = "";
@@ -369,10 +367,8 @@ elm.chat_page_tab.addEventListener("click", function() {
 });
 
 elm.chat_global_tab.addEventListener("click", function() {
-	elm.chat_global_tab.style.backgroundColor = "#8c8c8c";
-	elm.chat_global_tab.style.color = "white";
-	elm.chat_page_tab.style.backgroundColor = "";
-	elm.chat_page_tab.style.color = "";
+	elm.chat_global_tab.classList.add("chat_tab_selected");
+	elm.chat_page_tab.classList.remove("chat_tab_selected");
 
 	elm.global_chatfield.style.display = "";
 	elm.page_chatfield.style.display = "none";
@@ -646,7 +642,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 		field.scrollTop = maxScroll;
 	}
 	chatRecords.push({
-		id, date, field,
+		id: id, date: date, field: field,
 		element: chatGroup
 	});
 }

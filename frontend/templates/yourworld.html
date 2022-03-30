@@ -19,10 +19,7 @@
 		</a>
 		<div id="topbar" class="ui">
 			<div id="topbar_inner">
-				<div id="announce" class="ui-vis" style="display: none;">
-					<span id="announce_text"></span>
-					<span id="announce_close" class="announce_close">X</span>
-				</div>
+				<div id="announce_container"></div>
 				<span id="menu" class="ui-vis tab menu" style="display: none;">
 					<img src="/static/pin.png" class="menuPin" style="display: none;">
 					<span class="menuText">Menu</span>
@@ -145,7 +142,7 @@
 		</div>
 		<div id="chat_window" style="width: 400px; height: 300px; bottom: 0px; left: 0px; display: none;">
 			<div id="chat_upper" style="padding: 3px; padding-bottom: 0px;">
-				<div class="chat_tab_button" id="chat_page_tab" style="background-color: #8c8c8c; color: white;">
+				<div class="chat_tab_button chat_tab_selected" id="chat_page_tab">
 					This page&nbsp;<b id="page_unread" class="unread" style="display: none;">(-)</b>
 				</div><div class="chat_tab_button" id="chat_global_tab">
 					Global&nbsp;<b id="global_unread" class="unread" style="display: none;">(-)</b>
@@ -156,7 +153,7 @@
 			<div class="chatfield" id="page_chatfield"></div>
 			<div class="chatfield" id="global_chatfield" style="display: none;"></div>
 			<div id="chat_lower" style="width: 100%; display: flex;">
-				<input style="width: 100%; margin: 3px; margin-right: 0px;" id="chatbar" autocomplete="off">
+				<input style="width: 100%; margin: 3px; margin-right: 0px;" id="chatbar" autocomplete="off" aria-autocomplete="list">
 				<button id="chatsend" style="margin: 3px;">Send</button>
 			</div>
 		</div>

@@ -291,8 +291,11 @@ var isTestServer = false;
 var debugLogging = false;
 var testServerMainDirs = false;
 var testUviasIds = false;
-var acmeEnabled = false;
-var acmePass = null;
+
+var acme = {
+	enabled: false,
+	pass: null
+};
 
 function processArgs() {
 	var args = process.argv;
@@ -831,7 +834,8 @@ var websockets = {
 	link: require("./backend/websockets/link.js"),
 	paste: require("./backend/websockets/paste.js"),
 	protect: require("./backend/websockets/protect.js"),
-	write: require("./backend/websockets/write.js")
+	write: require("./backend/websockets/write.js"),
+	config: require("./backend/websockets/config.js")
 };
 
 var modules = {
@@ -1372,15 +1376,15 @@ function command_prompt() {
 				var goodPass = true;
 				if(!pass || pass.length < 8) goodPass = false;
 				if(goodPass) {
-					acmePass = pass;
-					acmeEnabled = true;
+					acme.pass = pass;
+					acme.enabled = true;
 					console.log("Enabled acme with password: " + acmePass);
 				} else {
 					console.log("Bad acme password");
 				}
 			} else if(action == "off") {
-				acmeEnabled = false;
-				acmePass = null;
+				acme.enabled = false;
+				acme.pass = null;
 				console.log("Disabled acme");
 			} else {
 				console.log("acme command usage:\nacme on <password>: enable acme challenge\nacme off: disable acme challenge");
@@ -1865,10 +1869,6 @@ function setupHTTPServer() {
 			delete HTTPSockets[sockID];
 		});
 	});
-
-	intv.http_outbound_mon = setInterval(function() { // TODO
-
-	}, 1000);
 }
 setupHTTPServer();
 
@@ -2663,7 +2663,8 @@ async function manageWebsocketConnection(ws, req) {
 		terminated: false,
 		hasBroadcastedCursorPosition: false,
 		cursorPositionHidden: false,
-		messageBackpressure: 0
+		messageBackpressure: 0,
+		receiveContentUpdates: true
 	};
 
 	var bytesWritten = 0;
@@ -3077,7 +3078,7 @@ var global_data = {
 	arrayIsEntirely,
 	normalizeCacheTile,
 	parseTextcode,
-	acme_stat: function() { return { enabled: acmeEnabled, pass: acmePass } },
+	acme,
 	uviasSendIdentifier,
 	client_cursor_pos,
 	setRestrictions,
