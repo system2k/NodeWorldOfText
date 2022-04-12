@@ -475,20 +475,20 @@ function tileWriteEdits(cacheTile, editObj) {
 
 	// tile is owner-only, but user is not owner
 	if(char_writability == 2 && !is_owner) {
-		if(rejected) rejected[editID] = "NO_TILE_PERM";
+		if(rejected) rejected[editID] = 1;
 		IOProgress(callID);
 		return;
 	}
 	// tile is member-only, but user is not member (nor owner)
 	if(char_writability == 1 && !is_owner && !is_member) {
-		if(rejected) rejected[editID] = "NO_TILE_PERM";
+		if(rejected) rejected[editID] = 1;
 		IOProgress(callID);
 		return;
 	}
 
 	// this edit request is only allowed to write on public areas
 	if(public_only && char_writability != 0) {
-		if(rejected) rejected[editID] = "NO_TILE_PERM";
+		if(rejected) rejected[editID] = 1;
 		IOProgress(callID);
 		return;
 	}
@@ -1048,7 +1048,7 @@ function processTileIORequest(call_id, type, data) {
 			var tile_edits = data.tile_edits;
 			if(!tile_edits.length) return IOProgress(call_id);
 			var world = data.world;
-			cids[call_id][1] = [[], {}];
+			cids[call_id][1] = [[], data.rejected];
 			cids[call_id][3] = tile_edits.length;
 			var sharedObj = {
 				editLog: [],

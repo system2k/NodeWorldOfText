@@ -469,6 +469,75 @@ if(!Math.log2) {
 	}
 }
 
+function CircularBuffer(maxLen) {
+	this.len = maxLen;
+	this.buffer = [];
+	this.pos = 0;
+	this.elms = 0;
+	return this;
+}
+
+CircularBuffer.prototype.push = function(data) {
+	if(data === undefined) throw "Element cannot be undefined";
+	if(this.pos >= this.buffer.length) {
+		this.buffer.push(data);
+		this.elms++;
+		this.pos++;
+		if(this.pos >= this.len) this.pos = 0;
+		return;
+	}
+	this.buffer[this.pos] = data;
+	this.elms++;
+	if(this.elms > this.len) this.elms = this.len;
+	this.pos++;
+	if(this.pos >= this.len) this.pos = 0;
+}
+
+CircularBuffer.prototype.pop = function() {
+	if(!this.buffer.length) return;
+	if(!this.elms) return;
+	this.pos--;
+	if(this.pos < 0) this.pos = this.len - 1;
+	var res = this.buffer[this.pos];
+	this.elms--;
+	return res;
+}
+
+CircularBuffer.prototype.unpop = function() {
+	if(!this.buffer.length) return;
+	if(this.elms >= this.buffer.length) return;
+	var res = this.buffer[this.pos];
+	if(res === undefined) return;
+	this.pos++;
+	if(this.pos >= this.len) this.pos = 0;
+	this.elms++;
+	return res;
+}
+
+CircularBuffer.prototype.trim = function() {
+	var tmpPos = this.pos;
+	for(var i = this.elms; i < this.buffer.length; i++) {
+		if(tmpPos >= this.buffer.length) tmpPos = 0;
+		if(this.buffer[tmpPos] === undefined) return;
+		this.buffer[tmpPos] = undefined;
+		tmpPos++;
+	}
+}
+
+CircularBuffer.prototype.unwind = function() {
+	var res = [];
+	var tmpPos = this.pos - this.elms;
+	if(tmpPos < 0) tmpPos += this.buffer.length;
+	for(var i = 0; i < this.elms; i++) {
+		if(tmpPos >= this.buffer.length) tmpPos = 0;
+		var elm = this.buffer[tmpPos];
+		if(elm === undefined) break;
+		res.push(elm);
+		tmpPos++;
+	}
+	return res;
+}
+
 function getBasicHostname(host) {
 	var host = host.toLowerCase().split(".");
 	if(host[0] == "www") host.shift();

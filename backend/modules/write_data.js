@@ -1,12 +1,13 @@
 var emptyWriteResponse = { accepted: [], rejected: {} };
 
-var editRateLimits = {};
+var editRateLimits = {}; // TODO: flush
 var tileRateLimits = {};
 
 var editReqLimit = 512;
 var superuserEditReqLimit = 1280;
 
 function checkCharRateLimit(ipObj, cRate, editCount) {
+	if(!cRate) return false;
 	var sec = Math.floor(Date.now() / 1000);
 	var currentSec = ipObj.currentSecond;
 	ipObj.currentSecond = sec;
@@ -22,6 +23,7 @@ function checkCharRateLimit(ipObj, cRate, editCount) {
 }
 
 function checkTileRateLimit(ipObj, tRate, tileX, tileY, worldId) {
+	if(!tRate) return false;
 	var sec = Math.floor(Date.now() / 1000);
 	var currentSec = ipObj.currentSecond;
 	ipObj.currentSecond = sec;
@@ -48,21 +50,27 @@ function prepareRateLimiter(limObj, ipAddress) {
 	return obj;
 }
 
-function checkCharrateRestr(list, ipVal, ipFam, world, tileX, tileY) {
+function checkCharrateRestr(list, ipVal, ipFam, isGrouped, world, tileX, tileY) {
 	if(!list) return null;
 	for(var i = 0; i < list.length; i++) {
 		var item = list[i];
 
-		var range = item[0];
-		var fam = item[1];
-		var type = item[2];
-		if(fam != ipFam) continue;
-		if(!(ipVal >= range[0] && ipVal <= range[1])) continue;
+		var ip = item.ip;
+		var group = item.group;
+		if(ip) {
+			var riRange = ip[0];
+			var riFam = ip[1];
+			if(riFam != ipFam) continue;
+			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
+		} else if(group) {
+			if(!(group == "cg1" && isGrouped)) continue;
+		}
 
+		var type = item.type;
 		if(type == "charrate") {
-			var rRate = item[3];
-			var rRorld = item[4];
-			var rRegion = item[5];
+			var rRate = item.rate;
+			var rRorld = item.world;
+			var rRegion = item.region;
 			if(rRorld == null || rRorld.toUpperCase() == world.toUpperCase()) {
 				if(rRegion == null || rRegion[0] <= tileX && tileX <= rRegion[2] && rRegion[1] <= tileY && tileY <= rRegion[3]) {
 					return rRate;
@@ -73,20 +81,26 @@ function checkCharrateRestr(list, ipVal, ipFam, world, tileX, tileY) {
 	return null;
 }
 
-function checkColorRestr(list, ipVal, ipFam, world, tileX, tileY) {
+function checkColorRestr(list, ipVal, ipFam, isGrouped, world, tileX, tileY) {
 	if(!list) return false;
 	for(var i = 0; i < list.length; i++) {
 		var item = list[i];
 
-		var range = item[0];
-		var fam = item[1];
-		var type = item[2];
-		if(fam != ipFam) continue;
-		if(!(ipVal >= range[0] && ipVal <= range[1])) continue;
+		var ip = item.ip;
+		var group = item.group;
+		if(ip) {
+			var riRange = ip[0];
+			var riFam = ip[1];
+			if(riFam != ipFam) continue;
+			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
+		} else if(group) {
+			if(!(group == "cg1" && isGrouped)) continue;
+		}
 
+		var type = item.type;
 		if(type == "color") {
-			var rRegion = item[3];
-			var rWorld = item[4];
+			var rRegion = item.region;
+			var rWorld = item.world;
 			if(rWorld == null || rWorld.toUpperCase() == world.toUpperCase()) {
 				if(rRegion == null || rRegion[0] <= tileX && tileX <= rRegion[2] && rRegion[1] <= tileY && tileY <= rRegion[3]) {
 					return true;
@@ -126,11 +140,13 @@ module.exports = async function(data, vars, evars) {
 	var fixColors = vars.fixColors;
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 	var getRestrictions = vars.getRestrictions;
+	var checkCoalition = vars.checkCoalition;
 
 	var defaultCharRatePerSecond = 20480;
 	var tileRatePerSecond = 256;
 
 	var restr = getRestrictions();
+	var isGrouped = checkCoalition(ipAddressVal, ipAddressFam);
 
 	var bypass_key = get_bypass_key();
 	if(!bypass_key) {
@@ -164,9 +180,15 @@ module.exports = async function(data, vars, evars) {
 	var edits = data.edits;
 	if(!edits) return emptyWriteResponse;
 	if(!Array.isArray(edits)) return emptyWriteResponse;
+
+	var rejected = {};
+	/*
+	1: NO_TILE_PERM
+	2: RATE_LIMIT
+	*/
 	
-	var tileLimiter = prepareRateLimiter(tileRateLimits, ipAddress);
-	var editLimiter = prepareRateLimiter(editRateLimits, ipAddress);
+	var tileLimiter = prepareRateLimiter(tileRateLimits, isGrouped ? "cg1" : ipAddress);
+	var editLimiter = prepareRateLimiter(editRateLimits, isGrouped ? "cg1" : ipAddress);
 
 	var customLimit = world.opts.charRate;
 	var customLimiter = null;
@@ -174,7 +196,7 @@ module.exports = async function(data, vars, evars) {
 		customLimit = customLimit.split("/");
 		if(customLimit.length == 2) {
 			customLimit = parseInt(customLimit[0]);
-			customLimiter = prepareRateLimiter(editRateLimits, ipAddress + "-custom-" + world_id);
+			customLimiter = prepareRateLimiter(editRateLimits, ipAddress + "-world-" + world_id);
 		}
 	}
 
@@ -189,24 +211,29 @@ module.exports = async function(data, vars, evars) {
 		var tileX = san_nbr(segment[1]);
 		var charRatePerSecond = defaultCharRatePerSecond;
 
-		var rrate = checkCharrateRestr(restr, ipAddressVal, ipAddressFam, world.name, tileX, tileY);
+		var rrate = checkCharrateRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name, tileX, tileY);
 		if(rrate != null) {
 			charRatePerSecond = rrate;
 		}
 
 		var tileStr = tileY + "," + tileX;
 		var char = segment[5];
+		segment[6] = san_nbr(segment[6]); // edit id
+		var editID = segment[6];
 		if(typeof char != "string") continue;
 		if(!checkCharRateLimit(editLimiter, charRatePerSecond, 1)) {
+			rejected[editID] = 2;
 			continue;
 		}
 		if(customLimiter) {
 			if(!checkCharRateLimit(customLimiter, customLimit, 1)) {
+				rejected[editID] = 2;
 				continue;
 			}
 		}
 		if(!tiles[tileStr]) {
 			if(!checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world_id)) {
+				rejected[editID] = 2;
 				continue;
 			}
 			tiles[tileStr] = [];
@@ -248,7 +275,7 @@ module.exports = async function(data, vars, evars) {
 		var pos = i.split(",");
 		var tileX = parseInt(pos[1]);
 		var tileY = parseInt(pos[0]);
-		if(checkColorRestr(restr, ipAddressVal, ipAddressFam, world.name, tileX, tileY)) {
+		if(checkColorRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name, tileX, tileY)) {
 			canColor = false;
 		}
 
@@ -325,7 +352,10 @@ module.exports = async function(data, vars, evars) {
 		}
 	}
 
-	if(!tile_edits.length) return emptyWriteResponse;
+	if(!tile_edits.length) return {
+		accepted: [],
+		rejected
+	};
 
 	// send to tile database manager
 	tile_database.write(call_id, tile_database.types.write, {
@@ -334,10 +364,11 @@ module.exports = async function(data, vars, evars) {
 		user, world, is_owner, is_member,
 		can_color_text, public_only, no_log_edits, preserve_links,
 		channel,
-		no_update
+		no_update,
+		rejected
 	});
 
 	var resp = await tile_database.editResponse(call_id);
 
-	return { accepted: resp[0], rejected: resp[1] };
+	return { accepted: resp[0], rejected };
 }

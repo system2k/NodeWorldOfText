@@ -1,4 +1,16 @@
+var setRestrictions;
+var setCoalition;
+var ipv4_to_range;
+var ipv6_to_range;
+module.exports.startup_internal = function(vars) {
+	setRestrictions = vars.setRestrictions;
+	setCoalition = vars.setCoalition;
+	ipv4_to_range = vars.ipv4_to_range;
+	ipv6_to_range = vars.ipv6_to_range;
+}
+
 var restrictions_string = "";
+var coalition_group = "";
 
 function procRegionString(region) {
 	if(!region) return null;
@@ -22,36 +34,59 @@ function procRegionString(region) {
 	return [x1, y1, x2, y2];
 }
 
-module.exports.GET = async function(req, serve, vars, evars) {
-	var HTML = evars.HTML;
-	var user = evars.user;
-
-	if(!user.superuser) return;
-
-	serve(HTML("administrator_restrictions.html", {
-		rstr: restrictions_string
-	}));
+function procIP(str) {
+	if(str.includes(":")) {
+		return [ipv6_to_range(str), 6];
+	} else if(str.includes(".")) {
+		return [ipv4_to_range(str), 4];
+	}
+	return null;
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var user = evars.user;
+// convert ip integer range to ip string
+function reconIPv4(start, end) {
+	var range = end - start + 1;
+	var sub = 32 - Math.floor(Math.log2(range));
+	var dig1 = (start) & 0xff;
+	var dig2 = (start >> 8) & 0xff;
+	var dig3 = (start >> 16) & 0xff;
+	var dig4 = (start >> 24) & 0xff;
+	var ip = dig4 + "." + dig3 + "." + dig2 + "." + dig1;
+	if(sub != 32) ip += "/" + sub;
+	return ip;
+}
 
-	var setRestrictions = vars.setRestrictions;
-	var ipv4_to_range = vars.ipv4_to_range;
-	var ipv6_to_range = vars.ipv6_to_range;
+function reconIPv6(start, end) {
+	var range = end - start + 1n;
+	var sub = 0;
+	for(var i = 0; i < 128; i++) {
+		if(range < 2n) {
+			break;
+		}
+		range /= 2n;
+		sub++;
+	}
+	sub = 128 - sub;
+	var s1 = ((start >> (16n*7n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s2 = ((start >> (16n*6n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s3 = ((start >> (16n*5n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s4 = ((start >> (16n*4n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s5 = ((start >> (16n*3n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s6 = ((start >> (16n*2n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s7 = ((start >> (16n*1n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s8 = ((start) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var ip = s1 + ":" + s2 + ":" + s3 + ":" + s4 + ":" + s5 + ":" + s6 + ":" + s7 + ":" + s8;
+	if(sub != 128) ip += "/" + sub;
+	return ip;
+}
 
-	if(!user.superuser) return;
-
+function procRest(list) {
 	var restrictions = [];
-
-	var list = post_data.toString("utf8");
-	list = list.replace(/\r\n/g, "\n");
-	list = list.split("\n");
 	for(var i = 0; i < list.length; i++) {
 		var item = list[i].split(";");
 		var itemtype = "";
 		var itemip = "";
+		var itemgroup = "";
 		var props = {};
 		for(var x = 0; x < item.length; x++) {
 			var subitem = item[x].split("=");
@@ -61,24 +96,16 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				itemip = val;
 			} else if(key == "type") {
 				itemtype = val;
+			} else if(key == "group") {
+				itemgroup = val;
 			} else {
 				props[key] = val;
 			}
 		}
-		if(!itemip || (itemtype != "charrate" && itemtype != "color")) continue;
-
-		var ipRange = null;
-		var ipFam = 0;
-		if(itemip.includes(":")) {
-			ipRange = ipv6_to_range(itemip);
-			ipFam = 6;
-		} else if(itemip.includes(".")) {
-			ipRange = ipv4_to_range(itemip);
-			ipFam = 4;
-		} else {
-			continue;
-		}
+		if((!itemip && !itemgroup) || (itemtype != "charrate" && itemtype != "color")) continue;
+		if(itemgroup && itemip) continue; // can't have both
 		
+		var obj = null;
 		if(itemtype == "charrate") {
 			var rate = props.rate;
 			var world = props.world;
@@ -91,16 +118,31 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			if(isNaN(rate)) continue;
 			if(rate < 0) rate = 0;
 			if(rate > 1000000) rate = 1000000;
-			restrictions.push([ipRange, ipFam, "charrate", rate, world, region]);
-		}
-		if(itemtype == "color") {
+			obj = {
+				type: "charrate",
+				rate, world, region
+			};
+		} else if(itemtype == "color") {
 			var region = props.region;
 			var world = props.world;
 			if(!("world" in props)) {
 				world = null;
 			}
 			region = procRegionString(region);
-			restrictions.push([ipRange, ipFam, "color", region, world]);
+			obj = {
+				type: "color",
+				region, world
+			};
+		}
+		if(obj) {
+			if(itemip) {
+				var ipInfo = procIP(itemip);
+				if(!ipInfo) continue;
+				obj.ip = ipInfo;
+			} else if(itemgroup) {
+				obj.group = itemgroup;
+			}
+			restrictions.push(obj);
 		}
 	}
 	
@@ -108,49 +150,30 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	for(var i = 0; i < restrictions.length; i++) {
 		var restr = restrictions[i];
 
-		var ipRange = restr[0];
-		var ipFam = restr[1];
-		var type = restr[2];
+		var type = restr.type;
+		var ip = restr.ip;
+		var group = restr.group;
 
-		// reconstruct string representation of IP address from IP ranges
-		var ip = "";
-		if(ipFam == 4) {
-			var range = ipRange[1] - ipRange[0] + 1;
-			var sub = 32 - Math.floor(Math.log2(range));
-			var dig1 = (ipRange[0]) & 0xff;
-			var dig2 = (ipRange[0] >> 8) & 0xff;
-			var dig3 = (ipRange[0] >> 16) & 0xff;
-			var dig4 = (ipRange[0] >> 24) & 0xff;
-			ip = dig4 + "." + dig3 + "." + dig2 + "." + dig1;
-			if(sub != 32) ip += "/" + sub;
-		} else if(ipFam == 6) {
-			var range = ipRange[1] - ipRange[0] + 1n;
-			var sub = 0;
-			for(var i = 0; i < 128; i++) {
-				if(range < 2n) {
-					break;
-				}
-				range /= 2n;
-				sub++;
+		var identifier = "";
+
+		if(ip) {
+			var ipRange = ip[0];
+			var ipFam = ip[1];
+			if(ipFam == 4) {
+				ip = reconIPv4(ipRange[0], ipRange[1]);
+			} else if(ipFam == 6) {
+				ip = reconIPv6(ipRange[0], ipRange[1]);
 			}
-			sub = 128 - sub;
-			var s1 = ((ipRange[0] >> (16n*7n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-			var s2 = ((ipRange[0] >> (16n*6n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-			var s3 = ((ipRange[0] >> (16n*5n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-			var s4 = ((ipRange[0] >> (16n*4n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-			var s5 = ((ipRange[0] >> (16n*3n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-			var s6 = ((ipRange[0] >> (16n*2n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-			var s7 = ((ipRange[0] >> (16n*1n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-			var s8 = ((ipRange[0]) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-			ip = s1 + ":" + s2 + ":" + s3 + ":" + s4 + ":" + s5 + ":" + s6 + ":" + s7 + ":" + s8;
-			if(sub != 128) ip += "/" + sub;
+			identifier = "ip=" + ip;
+		} else if(group) {
+			identifier = "group=" + group;
 		}
 
 		if(type == "charrate") {
-			var rate = restr[3];
-			var world = restr[4];
-			var region = restr[5];
-			var rstrLine = ["ip=" + ip, "type=charrate", "rate=" + rate];
+			var rate = restr.rate;
+			var world = restr.world;
+			var region = restr.region;
+			var rstrLine = [identifier, "type=charrate", "rate=" + rate];
 			if(world != null) {
 				rstrLine.push("world=" + world);
 			}
@@ -159,9 +182,9 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			}
 			rstr += rstrLine.join(";") + "\n";
 		} else if(type == "color") {
-			var region = restr[3];
-			var world = restr[4];
-			var rstrLine = ["ip=" + ip, "type=color"];
+			var region = restr.region;
+			var world = restr.world;
+			var rstrLine = [identifier, "type=color"];
 			if(world != null) {
 				rstrLine.push("world=" + world);
 			}
@@ -174,6 +197,72 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	restrictions_string = rstr;
 	setRestrictions(restrictions);
+}
+
+function procCoal(list) {
+	var ranges4 = [];
+	var ranges6 = [];
+	for(var i = 0; i < list.length; i++) {
+		var row = list[i];
+		if(!row) continue;
+		row = row.trim();
+		var ipInfo = procIP(row);
+		if(!ipInfo) continue;
+		var ipRange = ipInfo[0];
+		var ipFam = ipInfo[1];
+		if(ipFam == 4) ranges4.push(ipRange);
+		if(ipFam == 6) ranges6.push(ipRange);
+	}
+	ranges4.sort(function(a, b) {
+		return a[0] - b[0];
+	});
+	ranges6.sort(function(a, b) {
+		return a[0] - b[0];
+	});
+	var cstr = "";
+	for(var i = 0; i < ranges4.length; i++) {
+		cstr += reconIPv4(ranges4[i][0], ranges4[i][1]) + "\n";
+	}
+	for(var i = 0; i < ranges6.length; i++) {
+		cstr += reconIPv6(ranges6[i][0], ranges6[i][1]) + "\n";
+	}
+	coalition_group = cstr;
+	setCoalition({
+		v4: ranges4,
+		v6: ranges6
+	});
+}
+
+module.exports.GET = async function(req, serve, vars, evars) {
+	var HTML = evars.HTML;
+	var user = evars.user;
+
+	if(!user.superuser) return;
+
+	serve(HTML("administrator_restrictions.html", {
+		rstr: restrictions_string,
+		coal: coalition_group
+	}));
+}
+
+module.exports.POST = async function(req, serve, vars, evars) {
+	var post_data = evars.post_data;
+	var user = evars.user;
+	var query_data = evars.query_data;
+
+	if(!user.superuser) return;
+
+	var type = query_data.type;
+
+	var list = post_data.toString("utf8");
+	list = list.replace(/\r\n/g, "\n");
+	list = list.split("\n");
+
+	if(type == "1") { // restrictions
+		procRest(list);
+	} else if(type == "2") { // coalesce
+		procCoal(list);
+	}
 
 	serve("SUCCESS");
 }

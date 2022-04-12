@@ -82,8 +82,7 @@ var guestCursors           = {};
 var clientGuestCursorPos   = { tileX: 0, tileY: 0, charX: 0, charY: 0, hidden: false, updated: false };
 var disconnectTimeout      = null;
 var menuOptions            = {};
-var undoRingBuffer         = [];
-var undoBufferPos          = 0;
+var undoBuffer             = new CircularBuffer(2048);
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -154,7 +153,9 @@ var keyConfig = {
 	cursorLeft: "LEFT+*",
 	cursorRight: "RIGHT+*",
 	copyRegion: ["ALT+G", "CTRL+A"],
-	centerTeleport: "HOME"
+	centerTeleport: "HOME",
+	undo: "CTRL+Z",
+	redo: ["CTRL+Y", "CTRL+SHIFT+Z"]
 };
 
 window.addEventListener("load", function() {
@@ -882,7 +883,8 @@ function mousemove_tileProtectAuto() {
 			if(protectPrecision == 0) {
 				if(tempTile) tempTile.backgroundColor = color;
 			} else if(protectPrecision == 1) {
-				colorChar(ctileX, ctileY, ccharX, ccharY, w.protect_bg, true);
+				uncolorChar(ctileX, ctileY, ccharX, ccharY, "qprot*");
+				colorChar(ctileX, ctileY, ccharX, ccharY, "qprot" + mode);
 			}
 			updTiles[ctileY + "," + ctileX] = 1;
 		}
@@ -903,7 +905,7 @@ function mousemove_tileProtectAuto() {
 			if(precision == 0) {
 				tile.backgroundColor = "";
 			} else if(precision == 1) {
-				uncolorChar(tileX, tileY, charX, charY);
+				uncolorChar(tileX, tileY, charX, charY, "qprot*");
 			}
 			delete tileProtectAuto.selected[pos];
 			w.setTileRender(tileX, tileY);
@@ -960,7 +962,7 @@ function keydown_tileProtectAuto(e) {
 				w.setTileRender(tileX, tileY);
 			} else if(precision == 1) {
 				delete selected[i];
-				uncolorChar(tileX, tileY, charX, charY);
+				uncolorChar(tileX, tileY, charX, charY, "qprot*");
 				w.setTileRedraw(tileX, tileY);
 			}
 
@@ -990,11 +992,6 @@ function mousemove_linkAuto() {
 	var charX = currentPosition[2];
 	var charY = currentPosition[3];
 	var lastPos = linkAuto.lastPos;
-	
-	var color = "blue";
-	if(linkAuto.mode == 1) {
-		color = "green";
-	}
 
 	if(linkAuto.ctrlDown) {
 		var line = null;
@@ -1018,7 +1015,8 @@ function mousemove_linkAuto() {
 			var ccharX = x - ctileX * tileC;
 			var ccharY = y - ctileY * tileR;
 
-			colorChar(ctileX, ctileY, ccharX, ccharY, color);
+			uncolorChar(ctileX, ctileY, ccharX, ccharY, "qlink*");
+			colorChar(ctileX, ctileY, ccharX, ccharY, "qlink" + linkAuto.mode);
 			updTiles[ctileY + "," + ctileX] = 1;
 			var ar = [ctileX, ctileY, ccharX, ccharY, linkAuto.mode];
 			if(linkAuto.mode == 0) {
@@ -1038,7 +1036,7 @@ function mousemove_linkAuto() {
 	if(linkAuto.shiftDown) {
 		var elm = linkAuto.selected[tileY + "," + tileX + "," + charY + "," + charX];
 		if(elm !== void 0) {
-			uncolorChar(tileX, tileY, charX, charY);
+			uncolorChar(tileX, tileY, charX, charY, "qlink*");
 			w.setTileRedraw(tileX, tileY);
 			delete linkAuto.selected[tileY + "," + tileX + "," + charY + "," + charX];
 		}
@@ -1091,7 +1089,7 @@ function keydown_linkAuto(e) {
 			autoTotal--;
 			updateAutoProg();
 			delete selected[i];
-			uncolorChar(tileX, tileY, charX, charY);
+			uncolorChar(tileX, tileY, charX, charY, "qlink*");
 			w.setTileRedraw(tileX, tileY);
 
 			if(idx >= keys.length) return;
@@ -1554,7 +1552,7 @@ function stopLinkUI() {
 	var charX = lastLinkHover[2];
 	var charY = lastLinkHover[3];
 	// remove highlight
-	uncolorChar(tileX, tileY, charX, charY);
+	uncolorChar(tileX, tileY, charX, charY, "link");
 	w.setTileRedraw(tileX, tileY);
 }
 
@@ -1570,7 +1568,7 @@ function removeTileProtectHighlight() {
 		if(precision == 0) {
 			Tile.get(tileX, tileY).backgroundColor = "";
 		} else if(precision == 1) {
-			uncolorChar(tileX, tileY, charX, charY);
+			uncolorChar(tileX, tileY, charX, charY, "prot");
 		}
 	}
 	w.setTileRedraw(tileX, tileY);
@@ -1903,8 +1901,7 @@ function is_link(tileX, tileY, charX, charY) {
 
 function flushWrites() {
 	if(w.socket.socket.readyState != WebSocket.OPEN) return;
-	network.write(writeBuffer.slice(0, 512));
-	writeBuffer.splice(0, 512);
+	network.write(writeBuffer.splice(0, 512));
 }
 
 var writeInterval;
@@ -1959,39 +1956,57 @@ function moveCursor(direction, preserveVertPos) {
 }
 
 // place a character
-function writeCharTo(char, charColor, tileX, tileY, charX, charY) {
+function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo) {
 	if(!Tile.get(tileX, tileY)) {
 		Tile.set(tileX, tileY, blankTile());
 	}
+	var tile = Tile.get(tileX, tileY);
 	
-	var cell_props = Tile.get(tileX, tileY).properties.cell_props;
+	var cell_props = tile.properties.cell_props;
 	if(!cell_props) cell_props = {};
-	var color = Tile.get(tileX, tileY).properties.color;
+	var color = tile.properties.color;
 	if(!color) color = new Array(tileArea).fill(0);
+
+	var hasChanged = false;
+	var prevColor = 0;
+	var prevChar = "";
+	var prevLink = getLink(tileX, tileY, charX, charY);
 
 	// delete link locally
 	if(cell_props[charY]) {
 		if(cell_props[charY][charX]) {
 			delete cell_props[charY][charX];
+			hasChanged = true;
 		}
 	}
 	// change color
 	if(Permissions.can_color_text(state.userModel, state.worldModel)) {
+		prevColor = color[charY * tileC + charX];
 		color[charY * tileC + charX] = charColor;
-		Tile.get(tileX, tileY).properties.color = color; // if the color array doesn't already exist in the tile
+		if(prevColor != charColor) hasChanged = true;
+		tile.properties.color = color; // if the color array doesn't already exist in the tile
 	}
 
 	// update cell properties (link positions)
-	Tile.get(tileX, tileY).properties.cell_props = cell_props;
+	tile.properties.cell_props = cell_props;
 
 	// set char locally
-	var con = Tile.get(tileX, tileY).content;
+	var con = tile.content;
+	prevChar = con[charY * tileC + charX]
 	con[charY * tileC + charX] = char;
+	if(prevChar != char) hasChanged = true;
 	w.setTileRedraw(tileX, tileY);
 	if(bufferLargeChars) {
 		if(charY == 0) w.setTileRedraw(tileX, tileY - 1);
 		if(charX == tileC - 1) w.setTileRedraw(tileX + 1, tileY);
 		if(charY == 0 && charX == tileC - 1) w.setTileRedraw(tileX + 1, tileY - 1);
+	}
+
+	if(hasChanged && (!noUndo || noUndo == -1)) {
+		if(noUndo != -1) {
+			undoBuffer.trim();
+		}
+		undoBuffer.push([tileX, tileY, charX, charY, prevChar, prevColor, prevLink]);
 	}
 
 	var editArray = [tileY, tileX, charY, charX, getDate(), char, nextObjId];
@@ -2002,9 +2017,40 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY) {
 	if(charColor && Permissions.can_color_text(state.userModel, state.worldModel)) {
 		editArray.push(charColor);
 	}
-	tellEdit.push([tileX, tileY, charX, charY, nextObjId]);
-	writeBuffer.push(editArray);
+	tellEdit.push(editArray); // track local changes
+	writeBuffer.push(editArray); // send edits to server
 	nextObjId++;
+}
+
+function undoWrite() {
+	var edit = undoBuffer.pop();
+	if(!edit) return;
+	var tileX = edit[0];
+	var tileY = edit[1];
+	var charX = edit[2];
+	var charY = edit[3];
+	var char = edit[4];
+	var color = edit[5];
+	var link = edit[6];
+	writeCharTo(char, color, tileX, tileY, charX, charY, -1);
+	if(link) {
+		if(link.type == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
+			linkQueue.push(["url", tileX, tileY, charX, charY, link.url]);
+		} else if(link.type == "coord" && Permissions.can_coordlink(state.userModel, state.worldModel)) {
+			linkQueue.push(["coord", tileX, tileY, charX, charY, link.coord_tileX, link.coord_tileY]);
+		}
+	}
+	renderCursor([edit[0], edit[1], edit[2], edit[3]]);
+	undoBuffer.pop();
+}
+
+function redoWrite() {
+	var edit = undoBuffer.unpop();
+	if(!edit) return;
+	undoBuffer.pop();
+	writeCharTo(edit[4], edit[5], edit[0], edit[1], edit[2], edit[3], -1);
+	renderCursor([edit[0], edit[1], edit[2], edit[3]]);
+	moveCursor("right");
 }
 
 function writeCharToXY(char, charColor, x, y) {
@@ -2013,10 +2059,6 @@ function writeCharToXY(char, charColor, x, y) {
 		Math.floor(y / tileR),
 		x - Math.floor(x / tileC) * tileC,
 		y - Math.floor(y / tileR) * tileR);
-}
-
-function pushUndoBuffer(char, color, tileX, tileY, charX, charY) {
-
 }
 
 // type a character
@@ -2620,6 +2662,14 @@ function event_keydown(e) {
 		for(var i = 0; i < 4; i++) writeChar(" ");
 		e.preventDefault();
 	}
+	if(checkKeyPress(e, keyConfig.undo)) {
+		undoWrite();
+		e.preventDefault();
+	}
+	if(checkKeyPress(e, keyConfig.redo)) {
+		redoWrite();
+		e.preventDefault();
+	}
 	w.emit("keyDown", e);
 }
 document.addEventListener("keydown", event_keydown);
@@ -2950,7 +3000,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 					Tile.get(tileX, tileY).backgroundColor = "";
 				}
 			} else {
-				uncolorChar(tileX, tileY, charX, charY);
+				uncolorChar(tileX, tileY, charX, charY, "reg");
 			}
 			w.setTileRedraw(tileX, tileY);
 		}
@@ -2963,7 +3013,8 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 			if(reg.tiled) {
 				Tile.get(newTileX, newTileY).backgroundColor = reg.charColor;
 			} else {
-				colorChar(newTileX, newTileY, newCharX, newCharY, reg.charColor, true);
+				colorClasses.reg = reg.charColor;
+				colorChar(newTileX, newTileY, newCharX, newCharY, "reg");
 			}
 			// re-render tile
 			w.setTileRedraw(newTileX, newTileY);
@@ -2979,7 +3030,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 			var tileY = lastLinkHover[1];
 			var charX = lastLinkHover[2];
 			var charY = lastLinkHover[3];
-			uncolorChar(tileX, tileY, charX, charY);
+			uncolorChar(tileX, tileY, charX, charY, "link");
 			w.setTileRedraw(tileX, tileY);
 		}
 		lastLinkHover = currentPosition;
@@ -2988,7 +3039,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 		var newCharX = currentPosition[2];
 		var newCharY = currentPosition[3];
 		if(Tile.get(newTileX, newTileY)) {
-			colorChar(newTileX, newTileY, newCharX, newCharY, "#aaf", true);
+			colorChar(newTileX, newTileY, newCharX, newCharY, "link");
 			// re-render tile
 			w.setTileRedraw(newTileX, newTileY);
 		}
@@ -3007,7 +3058,7 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 					Tile.get(tileX, tileY).backgroundColor = "";
 				}
 			} else if(precision == 1) {
-				uncolorChar(tileX, tileY, charX, charY);
+				uncolorChar(tileX, tileY, charX, charY, "prot");
 				w.setTileRedraw(tileX, tileY);
 			}
 			w.setTileRedraw(tileX, tileY);
@@ -3025,7 +3076,8 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 			}
 		} else if(protectPrecision == 1) {
 			if(Tile.get(newTileX, newTileY)) {
-				colorChar(newTileX, newTileY, newCharX, newCharY, w.protect_bg);
+				colorClasses.prot = w.protect_bg;
+				colorChar(newTileX, newTileY, newCharX, newCharY, "prot");
 				w.setTileRedraw(newTileX, newTileY);
 			}
 		}
@@ -3496,47 +3548,94 @@ function blankTile() {
 	return newTile;
 }
 
-/*
-	coloredChars format:
-	{
-		"tileY,tileX": {
-			charY: {
-				charX: colorCode,
-				etc...
-			},
-			etc...
-		},
-		etc...
-	}
-*/
+var colorClasses = {
+	qprot0: "#DDD", // owner
+	qprot1: "#EEE", // member
+	qprot2: "#FFF", // public
+	qprot3: "#FFF", // default
+	qlink0: "#0000FF", // url
+	qlink1: "#008000", // coord
+	link: "#AAF",
+	prot: "#000",
+	reg: "#00F",
+	err: "#BBC"
+};
 
-function colorChar(tileX, tileY, charX, charY, color, is_link_hovers) {
-	var pos = tileY + "," + tileX + "," + charY + "," + charX;
-	if(linkAuto.selected[pos] && is_link_hovers) return;
-	if(!coloredChars[tileY + "," + tileX]) {
-		coloredChars[tileY + "," + tileX] = {};
+function colorChar(tileX, tileY, charX, charY, colorClass) {
+	var container = coloredChars[tileY + "," + tileX];
+	if(!container) {
+		container = {};
+		coloredChars[tileY + "," + tileX] = container;
 	}
-	if(!coloredChars[tileY + "," + tileX][charY]) {
-		coloredChars[tileY + "," + tileX][charY] = {};
+	if(!container[charY]) {
+		container[charY] = {};
 	}
-	coloredChars[tileY + "," + tileX][charY][charX] = color;
+	var list = container[charY][charX];
+	if(!list) {
+		container[charY][charX] = colorClass;
+		return;
+	}
+	if(typeof list == "string") {
+		if(list == colorClass) return;
+		container[charY][charX] = [list, colorClass]; // transform string into array
+		return;
+	}
+	var cidx = list.indexOf(colorClass);
+	if(cidx > -1) {
+		list.splice(cidx, 1);
+	}
+	list.push(colorClass);
 }
 
-function uncolorChar(tileX, tileY, charX, charY) {
-	var pos = tileY + "," + tileX + "," + charY + "," + charX;
-	if(coloredChars[tileY + "," + tileX] && !linkAuto.selected[pos] && !tileProtectAuto.selected[pos]) {
-		if(coloredChars[tileY + "," + tileX][charY]) {
-			if(coloredChars[tileY + "," + tileX][charY][charX]) {
-				delete coloredChars[tileY + "," + tileX][charY][charX];
+function uncolorChar(tileX, tileY, charX, charY, colorClass) {
+	var container = coloredChars[tileY + "," + tileX];
+	if(!container) return false;
+	if(!container[charY]) return false;
+	var cell = container[charY][charX];
+	if(!cell) return false;
+	if(colorClass == void 0 || !colorClass) {
+		delete container[charY][charX];
+		return true;
+	}
+	var wildcard = colorClass[colorClass.length - 1] == "*";
+	if(wildcard) {
+		colorClass = colorClass.slice(0, -1);
+	}
+	if(typeof cell == "string") {
+		if(wildcard) {
+			if(cell.startsWith(colorClass)) {
+				delete container[charY][charX];
 			}
-			if(Object.keys(coloredChars[tileY + "," + tileX][charY]).length == 0) {
-				delete coloredChars[tileY + "," + tileX][charY];
-			}
+		} else if(cell == colorClass) {
+			delete container[charY][charX];
 		}
-		if(Object.keys(coloredChars[tileY + "," + tileX]).length == 0) {
-			delete coloredChars[tileY + "," + tileX];
+	} else {
+		if(wildcard) {
+			for(var i = 0; i < cell.length; i++) {
+				if(cell[i].startsWith(colorClass)) {
+					cell.splice(i, 1);
+					i--;
+				}
+			}
+		} else {
+			var cidx = cell.indexOf(colorClass);
+			if(cidx == -1) return false;
+			cell.splice(cidx, 1);
+		}
+		if(!cell.length) {
+			delete container[charY][charX];
+		} else if(cell.length == 1) {
+			container[charY][charX] = cell[0]; // transform array back to string
+			return true;
 		}
 	}
+	if(Object.keys(container[charY]).length == 0) {
+		delete container[charY];
+	}
+	if(Object.keys(container).length == 0) {
+		delete coloredChars[tileY + "," + tileX];
+	}
+	return true;
 }
 
 var isTileLoaded = Tile.loaded;
@@ -3710,12 +3809,16 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 	var char = content[y * tileC + x];
 	if(!char) char = " ";
 	var cCode = char.codePointAt(0);
-	var isSpecial = char.codePointAt(1) !== void 0; // contains combining chars? (which don't work with Courier)
+	var isSpecial = char.codePointAt(1) !== void 0; // contains combining chars? (not compatible with Courier New)
 	if(surrogatesOnly && cCode <= 65535) return;
 
 	// fill background if defined
 	if(coloredChars[str] && coloredChars[str][y] && coloredChars[str][y][x]) {
 		var color = coloredChars[str][y][x];
+		if(Array.isArray(color)) {
+			color = color[color.length - 1];
+		}
+		color = colorClasses[color];
 		textRender.fillStyle = color;
 		textRender.fillRect(fontX, fontY, cellW, cellH);
 	}
@@ -4443,7 +4546,7 @@ function RegionSelection() {
 				Tile.get(tileX, tileY).backgroundColor = "";
 			}
 		} else {
-			uncolorChar(tileX, tileY, charX, charY);
+			uncolorChar(tileX, tileY, charX, charY, "reg");
 		}
 		w.setTileRedraw(tileX, tileY);
 		this.deselect();
@@ -5357,13 +5460,13 @@ var simplemodal_onclose = function() {
 }
 
 var tellEdit = [];
-// tileX, tileY, charX, charY, editID
+// tileY, tileX, charY, charX, X, X, editID
 function searchTellEdit(tileX, tileY, charX, charY) {
 	for(var i = 0; i < tellEdit.length; i++) {
-		if(tellEdit[i][0] == tileX &&
-			tellEdit[i][1] == tileY &&
-			tellEdit[i][2] == charX &&
-			tellEdit[i][3] == charY) {
+		if(tellEdit[i][1] == tileX &&
+			tellEdit[i][0] == tileY &&
+			tellEdit[i][3] == charX &&
+			tellEdit[i][2] == charY) {
 			return true;
 		}
 	}
@@ -5497,13 +5600,12 @@ var ws_functions = {
 				var oCol = oldColors[g];
 				var nCol = newColors[g];
 				if(oChar != nChar || oCol != nCol) {
-					// make sure it won't overwrite the clients changes before they get sent.
-					// if edits are from client, don't overwrite, but leave the highlight flashes
-					if(!searchTellEdit(tileX, tileY, charX, charY) && (data.channel != w.socketChannel || w.acceptOwnEdits)) {
+					// don't overwrite local changes until those changes are confirmed
+					if(!searchTellEdit(tileX, tileY, charX, charY)) {
 						oldContent[g] = nChar;
 						oldColors[g] = nCol;
 					}
-					// briefly highlight these edits (10 at a time)
+					// briefly highlight these changes (10 at a time)
 					if(useHighlight && Tile.visible(tileX, tileY)) highlights.push([tileX, tileY, charX, charY]);
 				}
 				charX++;
@@ -5538,14 +5640,13 @@ var ws_functions = {
 			}
 		}
 		w.emit("writeResponse", data);
-		// after user has written text, the client should expect list of all edit ids that passed
 		for(var i = 0; i < data.accepted.length; i++) {
 			for(var x = 0; x < tellEdit.length; x++) {
-				if(tellEdit[x][4] == data.accepted[i]) {
-					var tileX = tellEdit[x][0];
-					var tileY = tellEdit[x][1];
-					var charX = tellEdit[x][2];
-					var charY = tellEdit[x][3];
+				if(tellEdit[x][6] == data.accepted[i]) {
+					var tileX = tellEdit[x][1];
+					var tileY = tellEdit[x][0];
+					var charX = tellEdit[x][3];
+					var charY = tellEdit[x][2];
 					// check if there are links in queue
 					for(var r = 0; r < linkQueue.length; r++) {
 						var queueItem = linkQueue[r];
@@ -5570,10 +5671,28 @@ var ws_functions = {
 							break;
 						}
 					}
+					if(uncolorChar(tileX, tileY, charX, charY, "err")) {
+						w.setTileRedraw(tileX, tileY);
+					}
 					tellEdit.splice(x, 1);
 					// because the element has been removed, the length of the array is shorter
 					x--;
 				}
+			}
+		}
+		for(var i in data.rejected) {
+			var rej = data.rejected[i];
+			if(rej != 2) continue;
+			for(var x = 0; x < tellEdit.length; x++) {
+				if(tellEdit[x][6] != i) continue;
+				var tileX = tellEdit[x][1];
+				var tileY = tellEdit[x][0];
+				var charX = tellEdit[x][3];
+				var charY = tellEdit[x][2];
+				colorChar(tileX, tileY, charX, charY, "err");
+				w.setTileRedraw(tileX, tileY);
+				tellEdit[x][4] = Date.now();
+				writeBuffer.push(tellEdit[x]);
 			}
 		}
 	},

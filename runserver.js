@@ -1596,11 +1596,57 @@ function wait_response_data(req, dispatch, binary_post_data, raise_limit) {
 }
 
 var restrictions = {};
+var coalition = {
+	v4: [],
+	v6: []
+};
 function setRestrictions(obj) {
 	restrictions = obj;
 }
 function getRestrictions() {
 	return restrictions;
+}
+function setCoalition(list) {
+	coalition = list;
+}
+function checkCoalition(val, fam) {
+	var list = null;
+	if(fam == 4) {
+		list = coalition.v4;
+	} else if(fam == 6) {
+		list = coalition.v6;
+	} else {
+		return false;
+	}
+	if(!list.length) return false;
+	var posa = 0;
+	var posb = list.length - 1;
+	// binary search through the list
+	for(var i = 0; i < list.length; i++) {
+		var pos = Math.floor((posa + posb) / 2);
+		var item = list[pos];
+		var a = item[0];
+		var b = item[1];
+		if(a <= val && b >= val) return true;
+		if(posb - posa == 1) {
+			var ra = list[posa];
+			var rb = list[posb];
+			if(ra[0] <= val && ra[1] >= val) return true;
+			if(rb[0] <= val && rb[1] >= val) return true;
+			return false;
+		}
+		if(a > val) {
+			if(posb - posa == 0) return false;
+			posb = pos - 1;
+			continue;
+		}
+		if(b < val) {
+			if(posb - posa == 0) return false;
+			posa = pos + 1;
+			continue;
+		}
+	}
+	return false;
 }
 
 function new_token(len) {
@@ -3083,6 +3129,8 @@ var global_data = {
 	client_cursor_pos,
 	setRestrictions,
 	getRestrictions,
+	setCoalition,
+	checkCoalition,
 	modifyWorldProp,
 	sanitizeWorldname,
 	fetchWorldMembershipsByUserId,
