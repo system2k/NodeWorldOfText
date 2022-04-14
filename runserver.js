@@ -70,6 +70,7 @@ var parseTextcode        = utils.parseTextcode;
 var checkDuplicateCookie = utils.checkDuplicateCookie;
 
 var gzipEnabled = true;
+var shellEnabled = true;
 
 // Global
 CONST = {};
@@ -3056,6 +3057,7 @@ var global_data = {
 	wsSend,
 	memTileCache,
 	isTestServer,
+	shellEnabled,
 	announcement: function() { return announcement_cache },
 	get_bypass_key: function() { return bypass_key_cache },
 	add_background_cache: pages.other.load_backgrounds.add_cache, // TODO: move 'add_cache' somewhere else

@@ -3,8 +3,10 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var user = evars.user;
 
 	var loadShellFile = vars.loadShellFile;
+	var shellEnabled = vars.shellEnabled;
 
 	if(!user.superuser) return;
+	if(!shellEnabled) return serve("Shell is not enabled");
 
 	/*
 	shell.js template:
@@ -33,8 +35,10 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var user = evars.user;
 
 	var runShellScript = vars.runShellScript;
+	var shellEnabled = vars.shellEnabled;
 
 	if(!user.superuser) return;
+	if(!shellEnabled) return serve("Shell is not enabled");
 
 	if(post_data.command == "exec") {
 		var result = await runShellScript(post_data.colors === "true");

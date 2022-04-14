@@ -1919,34 +1919,33 @@ function setWriteInterval() {
 }
 setWriteInterval();
 
-function moveCursor(direction, preserveVertPos) {
+function moveCursor(direction, preserveVertPos, amount) {
 	if(!cursorCoords) return;
+	if(amount == null) amount = 1;
 	// [tileX, tileY, charX, charY]
 	var pos = cursorCoords.slice(0);
 	if(direction == "up") {
-		pos[3]--;
-		if(pos[3] < 0) {
-			pos[3] = tileR - 1;
-			pos[1]--
-		}
+		pos[3] -= amount;
 	} else if(direction == "down") {
-		pos[3]++;
-		if(pos[3] > tileR - 1) {
-			pos[3] = 0;
-			pos[1]++;
-		}
+		pos[3] += amount;
 	} else if(direction == "left") {
-		pos[2]--;
-		if(pos[2] < 0) {
-			pos[2] = tileC - 1;
-			pos[0]--;
-		}
+		pos[2] -= amount;
 	} else if(direction == "right") {
-		pos[2]++;
-		if(pos[2] > tileC - 1) {
-			pos[2] = 0;
-			pos[0]++;
-		}
+		pos[2] += amount;
+	}
+	if(pos[2] < 0) {
+		pos[0] += Math.floor(pos[2] / tileC);
+		pos[2] = tileC + pos[2] % tileC;
+	} else if(pos[2] >= tileC) {
+		pos[0] += Math.floor(pos[2] / tileC);
+		pos[2] %= tileC;
+	}
+	if(pos[3] < 0) {
+		pos[1] += Math.floor(pos[3] / tileR);
+		pos[3] = tileR + pos[3] % tileR;
+	} else if(pos[3] >= tileR) {
+		pos[1] += Math.floor(pos[3] / tileR);
+		pos[3] %= tileR;
 	}
 	if(!preserveVertPos) {
 		verticalEnterPos[0] = pos[0];
@@ -1956,7 +1955,7 @@ function moveCursor(direction, preserveVertPos) {
 }
 
 // place a character
-function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo) {
+function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOffset) {
 	if(!Tile.get(tileX, tileY)) {
 		Tile.set(tileX, tileY, blankTile());
 	}
@@ -2006,7 +2005,7 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo) {
 		if(noUndo != -1) {
 			undoBuffer.trim();
 		}
-		undoBuffer.push([tileX, tileY, charX, charY, prevChar, prevColor, prevLink]);
+		undoBuffer.push([tileX, tileY, charX, charY, prevChar, prevColor, prevLink, undoOffset]);
 	}
 
 	var editArray = [tileY, tileX, charY, charX, getDate(), char, nextObjId];
@@ -2032,7 +2031,8 @@ function undoWrite() {
 	var char = edit[4];
 	var color = edit[5];
 	var link = edit[6];
-	writeCharTo(char, color, tileX, tileY, charX, charY, -1);
+	var offset = edit[7] || 0;
+	writeCharTo(char, color, tileX, tileY, charX, charY, -1, offset);
 	if(link) {
 		if(link.type == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
 			linkQueue.push(["url", tileX, tileY, charX, charY, link.url]);
@@ -2041,6 +2041,7 @@ function undoWrite() {
 		}
 	}
 	renderCursor([edit[0], edit[1], edit[2], edit[3]]);
+	moveCursor("right", false, offset);
 	undoBuffer.pop();
 }
 
@@ -2048,9 +2049,10 @@ function redoWrite() {
 	var edit = undoBuffer.unpop();
 	if(!edit) return;
 	undoBuffer.pop();
-	writeCharTo(edit[4], edit[5], edit[0], edit[1], edit[2], edit[3], -1);
+	var offset = edit[7] || 0;
+	writeCharTo(edit[4], edit[5], edit[0], edit[1], edit[2], edit[3], -1, offset);
 	renderCursor([edit[0], edit[1], edit[2], edit[3]]);
-	moveCursor("right");
+	moveCursor("right", false, -offset + 1);
 }
 
 function writeCharToXY(char, charColor, x, y) {
@@ -2062,10 +2064,10 @@ function writeCharToXY(char, charColor, x, y) {
 }
 
 // type a character
-function writeChar(char, doNotMoveCursor, temp_color, noNewline) {
+function writeChar(char, doNotMoveCursor, tempColor, noNewline, undoCursorOffset) {
 	char += "";
-	var charColor = temp_color || YourWorld.Color;
-	if(temp_color == 0) charColor = 0;
+	var charColor = tempColor || YourWorld.Color;
+	if(tempColor == 0) charColor = 0;
 	var cursor = cursorCoords;
 	if(!cursor && (char == "\n" || char == "\r") && !noNewline) {
 		cursor = cursorCoordsCurrent;
@@ -2095,7 +2097,7 @@ function writeChar(char, doNotMoveCursor, temp_color, noNewline) {
 			pos.tileX, pos.tileY,
 			pos.charX, pos.charY
 		]);
-		// wait if the tile hasn't loaded
+		// yield to unloaded tile
 		if(cursorCoords) {
 			var compare = cursor.slice(0);
 			if(cursorCoords[0] == compare[0] && cursorCoords[1] == compare[1] &&
@@ -2115,7 +2117,7 @@ function writeChar(char, doNotMoveCursor, temp_color, noNewline) {
 		};
 
 		w.emit("writeBefore", data);
-		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY);
+		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, false, undoCursorOffset);
 		w.emit("write", data);
 	}
 }
@@ -2652,7 +2654,7 @@ function event_keydown(e) {
 	}
 	if(checkKeyPress(e, keyConfig.erase)) { // erase character
 		moveCursor("left", true);
-		writeChar(" ", true);
+		writeChar(" ", true, null, false, 1);
 		previousErase = getDate();
 	}
 	if(checkKeyPress(e, keyConfig.cellErase)) {
