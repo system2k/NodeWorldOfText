@@ -2,6 +2,7 @@ var emptyWriteResponse = { accepted: [], rejected: {} };
 
 var editRateLimits = {}; // TODO: flush
 var tileRateLimits = {};
+var tileHolds = {}; // TODO
 
 var editReqLimit = 512;
 var superuserEditReqLimit = 1280;

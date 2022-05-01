@@ -172,6 +172,19 @@ a:visited {
 	color: white;
 	padding: 4px;
 }
+#protect_selection {
+	display: block;
+	text-decoration: underline;
+	color: white;
+	text-align: center;
+	cursor: pointer;
+}
+#protect_selection:hover {
+	color: #F3DB65;
+}
+#protect_selection:active {
+	color: #917c17;
+}
 #char_choice {
 	margin-left: 14px;
 }
@@ -185,7 +198,7 @@ a:visited {
 .auto_prog_panel {
 	position: absolute;
 	left: 0px;
-	top: 90px;
+	top: 100px;
 	width: 150px;
 	height: 30px;
 	background-color: rgb(104, 104, 104);

@@ -13,7 +13,7 @@ var chatWriteTmpBuffer   = "";
 var defaultChatColor     = window.localStorage ? parseInt(localStorage.getItem("chatcolor")) : null; // 24-bit Uint
 var chatPageUnreadBar    = null;
 var chatGlobalUnreadBar  = null;
-var chatGreentext        = false;
+var chatGreentext        = true;
 var acceptChatDeletions  = true;
 
 if(isNaN(defaultChatColor)) {
@@ -63,7 +63,6 @@ if(!canChat) {
 
 function api_chat_send(message, opts) {
 	if(!message) return;
-	message = message.replace(/\uFDFD/g, "");
 	if(!opts) opts = {};
 	var exclude_commands = opts.exclude_commands;
 	var nick = opts.nick || YourWorld.Nickname;

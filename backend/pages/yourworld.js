@@ -83,6 +83,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		} else {
 			char_rate = [20480, 1000];
 		}
+		var write_int = world.opts.writeInt;
+		if(write_int == -1) write_int = 1000;
 		var state = {
 			userModel: {
 				username: username,
@@ -106,7 +108,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 				chat_permission: world.feature.chat,
 				color_text: world.feature.colorText,
 				show_cursor: world.feature.showCursor,
-				char_rate: char_rate
+				char_rate: char_rate,
+				write_interval: write_int
 			}
 		};
 		if(CONST.tileRows != 8) {

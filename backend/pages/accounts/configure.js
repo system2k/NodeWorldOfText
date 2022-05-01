@@ -1,3 +1,5 @@
+const { F } = require("../../../lib/swig/dateformatter");
+
 var wss;
 var wsSend;
 module.exports.startup_internal = function(vars) {
@@ -139,11 +141,17 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var member_text_color = world.theme.memberText || "default";
 	var owner_text_color = world.theme.ownerText || "default";
 
-	var is_ratelim_enabled = false;
-	var ratelim_char = 20480;
+	var ratelim_val = 0;
+	var ratelim_per = 0;
 	if(world.opts.charRate) {
-		is_ratelim_enabled = true;
-		ratelim_char = world.opts.charRate.split("/")[0];
+		var ratelim_raw = world.opts.charRate.split("/");
+		ratelim_val = ratelim_raw[0];
+		ratelim_per = ratelim_raw[1];
+	}
+	
+	var write_int = world.opts.writeInt;
+	if(write_int == -1) {
+		write_int = 1000;
 	}
 
 	var is_memkey_enabled = false;
@@ -200,10 +208,11 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		half_chars,
 		mixed_chars,
 
-		is_ratelim_enabled,
-		ratelim_char,
+		ratelim_val,
+		ratelim_per,
 		is_memkey_enabled,
 		memkey_value: world.opts.memKey,
+		writeinterval_val: write_int,
 
 		background_path: world.background.url,
 		background_x: world.background.x,
@@ -483,6 +492,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		var msgResponseMisc = [];
 		var memkeyUpdated = false;
 		var charrateUpdated = false;
+		var writeintUpdated = false;
 		var newCharrate = null;
 		if(user.superuser) {
 			if(!post_data.world_background) {
@@ -549,20 +559,44 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			modifyWorldProp(world, "opts/noLogEdits", false);
 		}
 
-		if(post_data.ratelim_enabled == "on") {
-			var val = post_data.ratelim_value;
-			if(!val) val = 4096;
-			val = san_nbr(val);
-			if(val < 0) val = 0;
-			if(val > 20480) val = 20480;
-			if(modifyWorldProp(world, "opts/charRate", val + "/" + 1000)) {
-				charrateUpdated = true;
-				newCharrate = [val, 1000];
+		if("ratelim_val" in post_data && "ratelim_per" in post_data) {
+			// 0/0 = disabled
+			// 0/1 = not writable
+			// 16/1000 = 16 chars per second
+			var ratelim_val = san_nbr(post_data.ratelim_val);
+			var ratelim_per = san_nbr(post_data.ratelim_per);
+			if(ratelim_val < 0) ratelim_val = 0;
+			if(ratelim_val == 0 && ratelim_per) {
+				ratelim_per = 1;
 			}
-		} else {
-			if(modifyWorldProp(world, "opts/charRate", "")) {
-				charrateUpdated = true;
-				newCharrate = [20480, 1000];
+			if(ratelim_val > 20480) ratelim_val = 20480;
+			if(ratelim_per <= 0) {
+				ratelim_per = 0;
+				ratelim_val = 0;
+			} else if(ratelim_per > 1000 * 60 * 60 * 7) {
+				ratelim_per = 1000 * 60 * 60 * 7;
+			}
+			if(ratelim_val == 0 && ratelim_per == 0) {
+				if(modifyWorldProp(world, "opts/charRate", "")) {
+					charrateUpdated = true;
+					newCharrate = [20480, 1000];
+				}
+			} else {
+				if(modifyWorldProp(world, "opts/charRate", ratelim_val + "/" + ratelim_per)) {
+					charrateUpdated = true;
+					newCharrate = [ratelim_val, ratelim_per];
+				}
+			}
+		}
+
+		if("writeinterval_val" in post_data) {
+			var writeinterval_val = san_nbr(post_data.writeinterval_val);
+			var wint = -1;
+			if(writeinterval_val >= 66 && writeinterval_val <= 10000) {
+				wint = writeinterval_val;
+			}
+			if(modifyWorldProp(world, "opts/writeInt", wint)) {
+				writeintUpdated = true;
 			}
 		}
 
@@ -573,6 +607,18 @@ module.exports.POST = async function(req, serve, vars, evars) {
 					{
 						type: "charRate",
 						value: newCharrate
+					}
+				]
+			}, world.id);
+		}
+
+		if(writeintUpdated) {
+			ws_broadcast({
+				kind: "propUpdate",
+				props: [
+					{
+						type: "writeInt",
+						value: world.opts.writeInt == -1 ? 1000 : world.opts.writeInt
 					}
 				]
 			}, world.id);

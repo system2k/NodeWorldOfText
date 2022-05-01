@@ -371,6 +371,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 			id += "";
 			message += "";
 			message = message.trim();
+			var noClient = false;
 			if(!id) {
 				return serverChatResponse("No id given", location);
 			}
@@ -405,7 +406,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 			});
 
 			if(!client) {
-				return serverChatResponse("User not found", location);
+				noClient = true;
+				//return serverChatResponse("User not found", location);
 			}
 
 			hasPrivateMsged = true;
@@ -425,7 +427,6 @@ module.exports = async function(ws, data, send, vars, evars) {
 				kind: "chat",
 				privateMessage: "to_me"
 			};
-			if(isShadowMuted) return;
 
 			if(user.authenticated && user.id in ranks_cache.users) {
 				var rank = ranks_cache[ranks_cache.users[user.id]];
@@ -462,6 +463,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 				}
 			}
 
+			if(isShadowMuted || noClient) return;
 			wsSend(client, JSON.stringify(privateMessage));
 			broadcastMonitorEvent("TellSpam", "Tell from " + clientId + " (" + ws.sdata.ipAddress + ") to " + id + ", first 4 chars: [" + message.slice(0, 4) + "]");
 		},

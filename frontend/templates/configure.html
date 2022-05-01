@@ -8,16 +8,53 @@
 <link rel="stylesheet" type="text/css" href="/static/css/autocomplete.css">
 <script>
 	var actionMethod = "";
-	onload = function() {
+	var writeintCustom;
+	// rate limit toggles
+	var rl_0;
+	var rl_64;
+	var rl_16;
+	var rl_x;
+	window.onload = function() {
+		var miscform = document.getElementById("miscform");
+		rl_0 = document.getElementById("rl_0");
+		rl_64 = document.getElementById("rl_64");
+		rl_16 = document.getElementById("rl_16");
+		rl_x = document.getElementById("rl_x");
+
 		unclaim.onclick = function() { actionMethod = "unclaim" };
 		clear_public.onclick = function() { actionMethod = "clear_public" };
 		clear_all.onclick = function() { actionMethod = "clear_all" };
 		clear_chat_hist.onclick = function() { actionMethod = "clear_chat_hist" };
 
-		updateRatelimBox();
-		ratelim_enabled.onclick = updateRatelimBox;
+		//ratelim_enabled.onclick = updateRatelimBox;
 		updateMemkeyBox();
 		memkey_enabled.onclick = updateMemkeyBox;
+
+		var writeint = document.getElementById("writeinterval_val");
+		document.getElementsByName("writeinterval").forEach(function(elm) {
+			elm.onclick = updateWriteIntBox;
+			if(elm.value == "custom") {
+				writeintCustom = elm;
+			} else if(elm.value == writeint.value) {
+				elm.checked = true;
+			}
+		});
+		updateWriteIntBox();
+
+		rl_0.onclick = updateRatelimBox;
+		rl_64.onclick = updateRatelimBox;
+		rl_16.onclick = updateRatelimBox;
+		rl_x.onclick = updateRatelimBox;
+		updateRatelimBox();
+
+		miscform.onsubmit = function() {
+			var writeint = document.getElementById("writeinterval_val");
+			var ratelimVal = document.getElementById("ratelim_val");
+			var ratelimPer = document.getElementById("ratelim_per");
+			writeint.disabled = false;
+			ratelimVal.disabled = false;
+			ratelimPer.disabled = false;
+		}
 	}
 	function action_confirm() {
 		var msg = "";
@@ -47,25 +84,62 @@
 		}
 	}
 
-	function updateRatelimBox() {
-		var ratelim_enabled = document.getElementById("ratelim_enabled");
-		var ratelim_value = document.getElementById("ratelim_value");
-		var checked = ratelim_enabled.checked;
-		if(checked) {
-			ratelim_value.disabled = false;
+	function updateRatelimBox(e) {
+		var ratelimVal = document.getElementById("ratelim_val");
+		var ratelimPer = document.getElementById("ratelim_per");
+
+		if(!e) {
+			if(ratelimVal.value == "0" && ratelimPer.value == "0") {
+				rl_0.checked = true;
+			} else if(ratelimVal.value == "64" && ratelimPer.value == "1000") {
+				rl_64.checked = true;
+			} else if(ratelimVal.value == "16" && ratelimPer.value == "1000") {
+				rl_16.checked = true;
+			} else {
+				rl_x.checked = true;
+			}
 		} else {
-			ratelim_value.disabled = true;
+			var type = e.target.value;
+			if(type == "off") {
+				ratelimVal.value = "0";
+				ratelimPer.value = "0";
+			} else if(type == "p64") {
+				ratelimVal.value = "64";
+				ratelimPer.value = "1000";
+			} else if(type == "p16") {
+				ratelimVal.value = "16";
+				ratelimPer.value = "1000";
+			} else if(type == "custom") {
+				if(ratelimPer.value == "0") {
+					ratelimVal.value = "512";
+					ratelimPer.value = "1000";
+				}
+			}
+		}
+
+		if(!rl_x.checked) {
+			ratelimVal.disabled = true;
+			ratelimPer.disabled = true;
+		} else {
+			ratelimVal.disabled = false;
+			ratelimPer.disabled = false;
 		}
 	}
 
 	function updateMemkeyBox() {
 		var memkey_enabled = document.getElementById("memkey_enabled");
 		var memkey_value = document.getElementById("memkey_value");
-		var checked = memkey_enabled.checked;
-		if(checked) {
-			memkey_value.disabled = false;
-		} else {
-			memkey_value.disabled = true;
+		memkey_value.disabled = !memkey_enabled.checked;
+	}
+
+	function updateWriteIntBox(e) {
+		var custom = document.getElementById("writeinterval_val");
+		custom.disabled = !writeintCustom.checked;
+		if(e) {
+			var val = e.target.value;
+			if(val != "custom") {
+				custom.value = val;
+			}
 		}
 	}
 </script>
@@ -363,7 +437,7 @@
 			<p class="set_description">
 				Other features that may not meet the categories.
 			</p>
-			<form method="POST" action="">
+			<form method="POST" action="" id="miscform">
 				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 				<p>
 					Name of this world:
@@ -406,75 +480,101 @@
 					</p>
 				{% endif %}
 				<a href="javascript: showAdvancedMisc();" style="display: block; margin-bottom: 7px;">Advanced...</a>
-				<div id="advanced" style="display: none;">
-					<div style="background-color: #EEEEEE;">
+				<div id="advanced" style="display: none; background-color: #EEEEEE; padding: 3px; margin-bottom: 4px;">
+					<div>
 						<b>Cell Dimensions</b>
 						<div>
-							Default (10x18)
 							<input type="radio" name="charsize" value="default"{%if !half_chars && !square_chars%} checked{%endif%}>
+							Default (10x18)
 						</div>
 						<div>
-							Square (18x18)
 							<input type="radio" name="charsize" value="square"{%if square_chars%} checked{%endif%}>
+							Square (18x18)
 						</div>
 						<div>
-							Half (10x20)
 							<input type="radio" name="charsize" value="half"{%if half_chars%} checked{%endif%}>
+							Half (10x20)
 						</div>
 						<div>
-							Mixed (18x20)
 							<input type="radio" name="charsize" value="mixed"{%if mixed_chars%} checked{%endif%}>
+							Mixed (18x20)
 						</div>
 					</div>
-					<div style="background-color: #EEEEEE;">
+					<div>
+						<b>Write Interval</b>
 						<div>
-							<b>Meta Description</b>
-							<br><textarea name="meta_desc" style="width: 400px; height: 32px;" maxlength="600">{{meta_desc}}</textarea>
+							<input type="radio" name="writeinterval" value="66">
+							1/15 seconds
 						</div>
-					</div>
-					<div style="background-color: #EEEEEE;">
 						<div>
-							<b>Options</b>
-							<br>
-							<div>
-								This page is NSFW
-								<input name="nsfw_page" type="checkbox"{%if page_is_nsfw%} checked{%endif%}>
-							</div>
-							<div>
-								Do not log edits
-								<input name="no_log_edits" type="checkbox"{%if no_log_edits%} checked{%endif%}>
-							</div>
+							<input type="radio" name="writeinterval" value="500">
+							1/2 seconds
 						</div>
-					</div>
-					<div style="background-color: #EEEEEE;">
 						<div>
-							<b>Rate Limits</b>
-							<br>
-							<div>
-								Enabled
-								<input id="ratelim_enabled" name="ratelim_enabled" type="checkbox"{%if is_ratelim_enabled%} checked{%endif%}>
-							</div>
-							<div>
-								Characters per second:
-								<input id="ratelim_value" name="ratelim_value" type="input" value={{ratelim_char}}>
-							</div>
+							<input type="radio" name="writeinterval" value="1000">
+							1 second (default)
 						</div>
-					</div>
-					<div style="background-color: #EEEEEE;">
 						<div>
-							<b>Membership Key</b>
-							<br>
-							<div>
-								Enabled
-								<input id="memkey_enabled" name="memkey_enabled" type="checkbox"{%if is_memkey_enabled%} checked{%endif%}>
-							</div>
-							<div>
-								Key:
-								<input id="memkey_value" name="memkey_value" type="input" maxlength="64" value={{memkey_value}}>
-							</div>
+							<input type="radio" name="writeinterval" value="2000">
+							2 seconds
+						</div>
+						<div>
+							<input type="radio" name="writeinterval" value="custom" checked>
+							Custom:
+							<input name="writeinterval_val" id="writeinterval_val" style="width:60px" value="{{writeinterval_val}}"> ms
 						</div>
 					</div>
-					<br>
+					<div>
+						<b>Meta Description</b>
+						<br><textarea name="meta_desc" style="width: 400px; height: 32px;" maxlength="600">{{meta_desc}}</textarea>
+					</div>
+					<div>
+						<b>Options</b>
+						<br>
+						<div>
+							<input name="nsfw_page" type="checkbox"{%if page_is_nsfw%} checked{%endif%}>
+							This page is NSFW
+						</div>
+						<div>
+							<input name="no_log_edits" type="checkbox"{%if no_log_edits%} checked{%endif%}>
+							Do not log edits
+						</div>
+					</div>
+					<div>
+						<b>Rate Limit</b>
+						<div>
+							<input type="radio" name="ratelim" id="rl_0" value="off">
+							Disabled
+						</div>
+						<div>
+							<input type="radio" name="ratelim" id="rl_64" value="p64">
+							64 characters per second
+						</div>
+						<div>
+							<input type="radio" name="ratelim" id="rl_16" value="p16">
+							16 characters per second
+						</div>
+						<div>
+							<input type="radio" name="ratelim" id="rl_x" value="custom">
+							Custom:
+							<input id="ratelim_val" name="ratelim_val" value="{{ratelim_val}}" style="width: 60px;">
+							per
+							<input id="ratelim_per" name="ratelim_per" value="{{ratelim_per}}" style="width: 60px;">
+							ms 
+						</div>
+					</div>
+					<div>
+						<b>Membership Key</b>
+						<br>
+						<div>
+							<input id="memkey_enabled" name="memkey_enabled" type="checkbox"{%if is_memkey_enabled%} checked{%endif%}>
+							Enabled
+						</div>
+						<div>
+							Key:
+							<input id="memkey_value" name="memkey_value" type="input" maxlength="64" value={{memkey_value}}>
+						</div>
+					</div>
 				</div>
 				<input type="hidden" name="form" value="misc">
 				<input type="submit" value="Submit">

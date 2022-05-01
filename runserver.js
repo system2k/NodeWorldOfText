@@ -1085,7 +1085,7 @@ async function initialize_server() {
 	if(accountSystem == "local") {
 		await loadEmail();
 	}
-	await init_image_database();
+	await initialize_image_db();
 	if(!await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='server_info'")) {
 		// table to inform that the server is initialized
 		await db.run("CREATE TABLE 'server_info' (name TEXT, value TEXT)");
@@ -1129,6 +1129,12 @@ async function initialize_misc_db() {
 async function initialize_edits_db() {
 	if(!await db_edits.get("SELECT name FROM sqlite_master WHERE type='table' AND name='edit'")) {
 		await db_edits.exec(fs.readFileSync(sql_edits_init).toString());
+	}
+}
+
+async function initialize_image_db() {
+	if(!await db_img.get("SELECT name FROM sqlite_master WHERE type='table' AND name='images'")) {
+		await db_img.run("CREATE TABLE 'images' (id INTEGER NOT NULL PRIMARY KEY, name TEXT, date_created INTEGER, mime TEXT, data BLOB)");
 	}
 }
 
@@ -2207,12 +2213,6 @@ function announce(text) {
 	})();
 }
 
-async function init_image_database() {
-	if(!await db_img.get("SELECT name FROM sqlite_master WHERE type='table' AND name='images'")) {
-		await db_img.run("CREATE TABLE 'images' (id INTEGER NOT NULL PRIMARY KEY, name TEXT, date_created INTEGER, mime TEXT, data BLOB)");
-	}
-}
-
 var worldData = {};
 function getWorldData(worldId) {
 	if(worldData[worldId]) return worldData[worldId];
@@ -2711,7 +2711,8 @@ async function manageWebsocketConnection(ws, req) {
 		hasBroadcastedCursorPosition: false,
 		cursorPositionHidden: false,
 		messageBackpressure: 0,
-		receiveContentUpdates: true
+		receiveContentUpdates: true,
+		chatDmInteractions: {}
 	};
 
 	var bytesWritten = 0;
