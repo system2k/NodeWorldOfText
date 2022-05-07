@@ -407,12 +407,16 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 			if(!client) {
 				noClient = true;
-				//return serverChatResponse("User not found", location);
 			}
 
 			hasPrivateMsged = true;
 
 			if(isMuted && !isShadowMuted) return;
+
+			if(noClient && ws.sdata.chatDmInteractions && ws.sdata.chatDmInteractions[id]) {
+				return serverChatResponse("User not found", location);
+			}
+
 			var privateMessage = {
 				nickname: nick,
 				realUsername: username_to_display,
@@ -465,6 +469,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 			if(isShadowMuted || noClient) return;
 			wsSend(client, JSON.stringify(privateMessage));
+			if(client.sdata.chatDmInteractions) {
+				client.sdata.chatDmInteractions[clientId] = true;
+			}
 			broadcastMonitorEvent("TellSpam", "Tell from " + clientId + " (" + ws.sdata.ipAddress + ") to " + id + ", first 4 chars: [" + message.slice(0, 4) + "]");
 		},
 		channel: async function() {

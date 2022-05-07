@@ -454,6 +454,8 @@ async function commitWorld(world) {
 		background_alpha: world.background.alpha,
 		views: world.views
 	};
+
+	// if a property is a default value, delete it from the world's config object
 	for(var prop in properties) {
 		properties[prop] = normWorldProp(properties[prop], prop);
 	}

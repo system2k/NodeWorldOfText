@@ -17,6 +17,7 @@
 				<span style="font-size:80%"><i>{{ message }}</i></span>
 			{% endif %}
 			<form method="POST" action=".">
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 				Set custom rank to this user: <select name="rank">
 				<option value="-1"{% if current_rank == "none" %} selected{% endif %}>(No custom rank)</option>
 				{% for rank in ranks %}

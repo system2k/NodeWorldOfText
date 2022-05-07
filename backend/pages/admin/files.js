@@ -5,12 +5,19 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var user = evars.user;
 
 	var dispage = vars.dispage;
+	var createCSRF = vars.createCSRF;
 
 	if(!user.superuser) {
 		return await dispage("404", null, req, serve, vars, evars);
 	}
 
-	serve(HTML("administrator_files.html"));
+	var csrftoken = createCSRF(user.id.toString(), 0);
+
+	var data = {
+		csrftoken
+	};
+
+	serve(HTML("administrator_files.html", data));
 }
 
 module.exports.POST = async function(req, serve, vars, evars) {
@@ -18,10 +25,16 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var user = evars.user;
 
 	var static_fileData_append = vars.static_fileData_append;
+	var checkCSRF = vars.checkCSRF;
 
 	if(!user.superuser) return;
 
 	if(!post_data.length) return;
+
+	var csrftoken = req.headers["x-csrf-token"];
+	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
+		return serve("CSRF verification failed");
+	}
 
 	var len = post_data[0];
 	var name = "";

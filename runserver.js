@@ -121,6 +121,16 @@ function loadShellFile() {
 	return file;
 }
 
+var csrfkeys = [crypto.randomBytes(8), crypto.randomBytes(8)];
+function createCSRF(userid, kclass) {
+	var csrftoken = crypto.createHmac("sha1", csrfkeys[kclass]).update(userid.toString()).digest("hex").toLowerCase();
+	return csrftoken;
+}
+function checkCSRF(token, userid, kclass) {
+	if(typeof token != "string" || !token) return false;
+	return token.toLowerCase() == createCSRF(userid, kclass);
+}
+
 function normalize_ipv6(ip) {
 	ip = ip.replace(/^:|:$/g, "");
 	ip = ip.split(":");
@@ -1764,7 +1774,6 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 				} else {
 					user.scripts = [];
 				}
-				user.scripts = [];
 			}
 			user.session_key = s_data.session_key;
 		}
@@ -1829,7 +1838,6 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 					} else {
 						user.scripts = [];
 					}
-					user.scripts = [];
 
 					user.csrftoken = new_token(32);
 					user.session_key = cookies.token;
@@ -3056,6 +3064,8 @@ function start_server() {
 
 var global_data = {
 	wsSend,
+	createCSRF,
+	checkCSRF,
 	memTileCache,
 	isTestServer,
 	shellEnabled,

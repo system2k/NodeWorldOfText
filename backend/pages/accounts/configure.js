@@ -1,5 +1,3 @@
-const { F } = require("../../../lib/swig/dateformatter");
-
 var wss;
 var wsSend;
 module.exports.startup_internal = function(vars) {
@@ -61,6 +59,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var uvias = vars.uvias;
 	var accountSystem = vars.accountSystem;
 	var releaseWorld = vars.releaseWorld;
+	var createCSRF = vars.createCSRF;
 
 	if(!user.authenticated) {
 		return serve(null, null, {
@@ -168,11 +167,14 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		mixed_chars = true;
 	}
 
+	// This isn't secure by all means, but it's good enough for now (temporary solution)
+	var csrftoken = createCSRF(user.id.toString(), 0);
+
 	var data = {
 		user,
 
 		world: world_name,
-		csrftoken: user.csrftoken,
+		csrftoken,
 		members: member_list,
 		add_member_message: params.message,
 		misc_message: params.misc_message,
@@ -251,6 +253,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var revokeMembershipByWorldName = vars.revokeMembershipByWorldName;
 	var renameWorld = vars.renameWorld;
 	var releaseWorld = vars.releaseWorld;
+	var checkCSRF = vars.checkCSRF;
 
 	var clearChatlog = chat_mgr.clearChatlog;
 
@@ -276,6 +279,11 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	}
 
 	var new_world_name = null;
+
+	var csrftoken = post_data.csrfmiddlewaretoken;
+	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
+		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
+	}
 
 	if(post_data.form == "add_member") {
 		var username = post_data.add_member;
@@ -595,6 +603,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			if(writeinterval_val >= 66 && writeinterval_val <= 10000) {
 				wint = writeinterval_val;
 			}
+			if(wint == 1000) wint = -1; // reset the value
 			if(modifyWorldProp(world, "opts/writeInt", wint)) {
 				writeintUpdated = true;
 			}

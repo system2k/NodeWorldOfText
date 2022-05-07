@@ -95,6 +95,8 @@
 		var ordering = {{rank_order}};
 	</script>
 	<script>
+		var csrftoken = "{{csrftoken}}";
+
 		function moveUp(rankId) {
 			var rankPos = ordering.indexOf(rankId);
 			if(rankPos <= 0) return;
@@ -134,6 +136,7 @@
 			}
 			var xhr = new XMLHttpRequest();
 			xhr.open("POST", "/administrator/manage_ranks/", true);
+			xhr.setRequestHeader("X-CSRF-Token", csrftoken);
 			xhr.onload = function(res) {
 				isUpdating = false;
 				var stat = xhr.responseText;
@@ -180,6 +183,7 @@
 
 			var xhr = new XMLHttpRequest();
 			xhr.open("POST", "/administrator/manage_ranks/", true);
+			xhr.setRequestHeader("X-CSRF-Token", csrftoken);
 			xhr.onload = function(res) {
 				isAdding = false;
 				var stat = xhr.responseText;

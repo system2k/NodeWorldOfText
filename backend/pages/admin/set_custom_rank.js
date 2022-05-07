@@ -9,6 +9,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var ranks_cache = vars.ranks_cache;
 	var uvias = vars.uvias;
 	var accountSystem = vars.accountSystem;
+	var createCSRF = vars.createCSRF;
 
 	if(!user.superuser) {
 		return await dispage("404", null, req, serve, vars, evars);
@@ -48,11 +49,14 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		}
 	}
 
+	var csrftoken = createCSRF(user.id.toString(), 0);
+
 	var data = {
 		user_edit,
 		message: params.message,
 		ranks: custom_ranks,
-		current_rank: user_edit.id in ranks_cache.users ? ranks_cache.users[user_edit.id] : "none"
+		current_rank: user_edit.id in ranks_cache.users ? ranks_cache.users[user_edit.id] : "none",
+		csrftoken
 	};
 
 	serve(HTML("administrator_set_custom_rank.html", data));
@@ -72,9 +76,15 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var db_misc = vars.db_misc;
 	var uvias = vars.uvias;
 	var accountSystem = vars.accountSystem;
+	var checkCSRF = vars.checkCSRF;
 
 	if(!user.superuser) {
 		return;
+	}
+
+	var csrftoken = post_data.csrfmiddlewaretoken;
+	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
+		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	var username = checkURLParam("/administrator/set_custom_rank/:username", path).username;

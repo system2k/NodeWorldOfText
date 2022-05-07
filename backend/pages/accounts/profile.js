@@ -32,6 +32,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var plural = vars.plural;
 	var fetchWorldMembershipsByUserId = vars.fetchWorldMembershipsByUserId;
 	var fetchOwnedWorldsByUserId = vars.fetchOwnedWorldsByUserId;
+	var createCSRF = vars.createCSRF;
 
 	if(!user.authenticated) {
 		return serve(null, null, {
@@ -105,9 +106,11 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	if(world_list.length == 0) world_list = null;
 	if(html_memberships.length == 0) html_memberships = null;
 
+	var csrftoken = createCSRF(user.id.toString(), 0);
+
 	var data = {
 		message: message,
-		csrftoken: cookies.csrftoken, // TODO: fix entire CSRFTOKEN system
+		csrftoken,
 		worlds_owned: world_list,
 		memberships: html_memberships,
 		email_verified: user.is_active
@@ -125,9 +128,15 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var claimWorldByName = vars.claimWorldByName;
 	var revokeMembershipByWorldName = vars.revokeMembershipByWorldName;
 	var wss = vars.wss;
+	var checkCSRF = vars.checkCSRF;
 
 	if(!user.authenticated) {
 		return serve(null, 403);
+	}
+
+	var csrftoken = post_data.csrfmiddlewaretoken;
+	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
+		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	var message = null;

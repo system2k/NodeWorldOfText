@@ -13,6 +13,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var uvias = vars.uvias;
 	var accountSystem = vars.accountSystem;
 	var acme = vars.acme;
+	var createCSRF = vars.createCSRF;
 
 	// not a superuser...
 	if(!user.superuser) {
@@ -70,6 +71,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		user_ranks = await db.all("SELECT * FROM auth_user WHERE level > 0 ORDER BY level DESC");
 	}
 
+	var csrftoken = createCSRF(user.id, 0);
+
 	var data = {
 		user_ranks,
 		announcement: announcement(),
@@ -82,7 +85,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		bypass_key: get_bypass_key(),
 		custom_ranks,
 		acme_enabled: acme.enabled,
-		acme_pass: acme.enabled ? (acme.pass ? acme.pass : "") : ""
+		acme_pass: acme.enabled ? (acme.pass ? acme.pass : "") : "",
+		csrftoken
 	};
 
 	serve(HTML("administrator.html", data));
@@ -100,9 +104,15 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var modify_bypass_key = vars.modify_bypass_key;
 	var stopServer = vars.stopServer;
 	var acme = vars.acme;
+	var checkCSRF = vars.checkCSRF;
 
 	if(!user.superuser) {
 		return await dispage("404", null, req, serve, vars, evars);
+	}
+
+	var csrftoken = post_data.csrfmiddlewaretoken;
+	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
+		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	if("set_acme_pass" in post_data) {

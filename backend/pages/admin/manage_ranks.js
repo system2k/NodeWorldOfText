@@ -11,6 +11,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var dispage = vars.dispage;
 	var ranks_cache = vars.ranks_cache;
+	var createCSRF = vars.createCSRF;
 
 	if(!user.superuser) {
 		return await dispage("404", null, req, serve, vars, evars);
@@ -31,9 +32,12 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		rank_order.push(mr.id);
 	}
 
+	var csrftoken = createCSRF(user.id.toString(), 0);
+
 	var data = {
 		misc_ranks,
-		rank_order: JSON.stringify(rank_order)
+		rank_order: JSON.stringify(rank_order),
+		csrftoken
 	};
 
 	serve(HTML("administrator_manage_ranks.html", data));
@@ -45,8 +49,14 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var db_misc = vars.db_misc;
 	var ranks_cache = vars.ranks_cache;
+	var checkCSRF = vars.checkCSRF;
 
 	if(!user.superuser) return;
+
+	var csrftoken = req.headers["x-csrf-token"];
+	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
+		return serve("CSRF verification failed");
+	}
 
 	var action = post_data.action;
 

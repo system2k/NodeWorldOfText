@@ -17,7 +17,8 @@
 				<span style="font-size:80%"><i>{{ message }}</i></span>
 			{% endif %}
 			<form method="POST" action=".">
-			Set rank to this user: <select name="rank">
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
+				Set rank to this user: <select name="rank">
 				<option value="operator"{% if user_edit.level == 3 %} selected{% endif %}>Operator (manages user ranks and the site)</option>
 				<option value="superuser"{% if user_edit.level == 2 %} selected{% endif %}>Superuser (basic administrator privileges)</option>
 				<option value="staff"{% if user_edit.level == 1 %} selected{% endif %}>Staff (access to the script manager)</option>

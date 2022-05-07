@@ -239,11 +239,16 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var HTML = evars.HTML;
 	var user = evars.user;
 
+	var createCSRF = vars.createCSRF;
+
 	if(!user.superuser) return;
+
+	var csrftoken = createCSRF(user.id.toString(), 0);
 
 	serve(HTML("administrator_restrictions.html", {
 		rstr: restrictions_string,
-		coal: coalition_group
+		coal: coalition_group,
+		csrftoken
 	}));
 }
 
@@ -251,8 +256,14 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var post_data = evars.post_data;
 	var user = evars.user;
 	var query_data = evars.query_data;
+	var checkCSRF = vars.checkCSRF;
 
 	if(!user.superuser) return;
+
+	var csrftoken = req.headers["x-csrf-token"];
+	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
+		return serve("CSRF verification failed");
+	}
 
 	var type = query_data.type;
 

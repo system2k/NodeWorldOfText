@@ -31,11 +31,14 @@
 			return false;
 		}
 
+		var csrftoken = "{{csrftoken}}";
+
 		function manageServerCommand(command) {
 			ajaxRequest({
 				type: "POST",
 				data: {
-					manage_server: command
+					manage_server: command,
+					csrfmiddlewaretoken: csrftoken
 				},
 				url: "/administrator/",
 				done: function(e) {
@@ -241,6 +244,7 @@
 				<span style="font-size:80%"><i>{{ announcement_update_msg }}</i></span>
 			{% endif %}
 			<form method="POST" action=".">
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 				Text: 
 				<input type="text" name="announcement" id="announcement" value="{{ announcement }}" style="width: 100%;">
 				<input type="submit" value="Set">
@@ -271,6 +275,7 @@
 			<span style="font-size:80%"><i>{{ cons_update_msg }}</i></span>
 			{% endif %}
 			<form method="POST" action=".">
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 				Bypass key: 
 				<input type="text" name="set_bypass_key" id="set_bypass_key" value="{{ bypass_key }}" style="width: 100%;">
 				<input type="submit" value="Set">
@@ -299,6 +304,7 @@
 			<span style="font-size:80%"><i>{{ acme_update_msg }}</i></span>
 			{% endif %}
 			<form method="POST" action=".">
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 				ACME Enabled: {{ acme_enabled }}<br>
 				ACME Password:
 				<input type="text" name="set_acme_pass" id="set_acme_pass" value="{{ acme_pass }}" style="width: 100%;">

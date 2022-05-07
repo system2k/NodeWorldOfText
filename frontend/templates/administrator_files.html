@@ -25,6 +25,8 @@
 		</div>
 	</div>
 	<script>
+		var csrftoken = "{{csrftoken}}";
+
 		var file_input = document.getElementById("file_input");
 		var file_name = document.getElementById("file_name");
 		var server_success_pan = document.getElementById("server_success_pan");
@@ -62,6 +64,7 @@
 			}
 			var xhr = new XMLHttpRequest();
 			xhr.open("POST", "/administrator/files/", true);
+			xhr.setRequestHeader("X-CSRF-Token", csrftoken);
 			xhr.onload = function() {
 				server_pending.style.display = "none";
 				file_name.value = "";

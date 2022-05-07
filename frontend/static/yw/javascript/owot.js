@@ -2388,6 +2388,10 @@ var linkQueue = [];
 var char_input_check = setInterval(function() {
 	if(w._state.uiModal) return;
 	if(write_busy) return;
+	if(state.worldModel.char_rate[0] == 0) {
+		elm.textInput.value = "";
+		return;
+	}
 	var value = elm.textInput.value;
 	var hasErased = getDate() - previousErase < 1000;
 	if(!value) {
@@ -2482,6 +2486,13 @@ var char_input_check = setInterval(function() {
 		return;
 	}
 	write_busy = true;
+	var rate = state.worldModel.char_rate;
+	var base = rate[1];
+	if(base > 60 * 1000) base = 60 * 1000;
+	var speed = Math.floor(1000 / base * rate[0]) - 1;
+	if(speed < 1) speed = 1;
+	if(speed > 280) speed = 280;
+	if(state.userModel.is_member || state.userModel.is_owner) speed = 280;
 	pasteInterval = setInterval(function() {
 		var res = pasteFunc();
 		if(res == -1) {
@@ -2489,7 +2500,7 @@ var char_input_check = setInterval(function() {
 			write_busy = false;
 			elm.textInput.value = "";
 		}
-	}, Math.floor(1000 / 230));
+	}, Math.floor(1000 / speed));
 }, 10);
 
 function stopPasting() {
@@ -2655,16 +2666,22 @@ function event_keydown(e) {
 		writeChar("\n");
 	}
 	if(checkKeyPress(e, keyConfig.erase)) { // erase character
-		moveCursor("left", true);
-		writeChar(" ", true, null, false, 1);
-		previousErase = getDate();
+		if(state.worldModel.char_rate[0] > 0) {
+			moveCursor("left", true);
+			writeChar(" ", true, null, false, 1);
+			previousErase = getDate();
+		}
 	}
 	if(checkKeyPress(e, keyConfig.cellErase)) {
-		writeChar(" ", true);
+		if(state.worldModel.char_rate[0] > 0) {
+			writeChar(" ", true);
+		}
 	}
 	if(checkKeyPress(e, keyConfig.tab)) { // tab
-		for(var i = 0; i < 4; i++) writeChar(" ");
-		e.preventDefault();
+		if(state.worldModel.char_rate[0] > 0) {
+			for(var i = 0; i < 4; i++) writeChar(" ");
+			e.preventDefault();
+		}
 	}
 	if(checkKeyPress(e, keyConfig.undo)) {
 		undoWrite();
@@ -5739,13 +5756,10 @@ var ws_functions = {
 		if(tileFetchOffsetX || tileFetchOffsetY) {
 			tile_offset_object(data.tiles, tileFetchOffsetX, tileFetchOffsetY);
 		}
-		var vis = getVisibleTileRange(200);
 		for(var tileKey in data.tiles) {
 			var pos = getPos(tileKey);
 			var tileX = pos[1];
 			var tileY = pos[0];
-			var tileWithinRange = tileX >= vis[0][0] && tileX <= vis[1][0] && tileY >= vis[0][1] && tileY <= vis[1][1];
-			if(!tileWithinRange) continue;
 			// if tile isn't loaded, load it blank
 			if(!tiles[tileKey]) {
 				Tile.set(tileX, tileY, blankTile());
@@ -5792,7 +5806,9 @@ var ws_functions = {
 						oldColors[g] = nCol;
 					}
 					// briefly highlight these changes (10 at a time)
-					if(useHighlight && Tile.visible(tileX, tileY)) highlights.push([tileX, tileY, charX, charY]);
+					if(useHighlight && Tile.visible(tileX, tileY)) {
+						highlights.push([tileX, tileY, charX, charY]);
+					}
 				}
 				charX++;
 				if(charX >= tileC) {

@@ -4,6 +4,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 
 	var loadShellFile = vars.loadShellFile;
 	var shellEnabled = vars.shellEnabled;
+	var createCSRF = vars.createCSRF;
 
 	if(!user.superuser) return;
 	if(!shellEnabled) return serve("Shell is not enabled");
@@ -27,7 +28,13 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		}
 	}
 
-	serve(HTML("administrator_shell.html"));
+	var csrftoken = createCSRF(user.id.toString(), 0);
+
+	var data = {
+		csrftoken
+	};
+
+	serve(HTML("administrator_shell.html", data));
 }
 
 module.exports.POST = async function(req, serve, vars, evars) {
@@ -36,9 +43,15 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var runShellScript = vars.runShellScript;
 	var shellEnabled = vars.shellEnabled;
+	var checkCSRF = vars.checkCSRF;
 
 	if(!user.superuser) return;
 	if(!shellEnabled) return serve("Shell is not enabled");
+
+	var csrftoken = post_data.csrfmiddlewaretoken;
+	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
+		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
+	}
 
 	if(post_data.command == "exec") {
 		var result = await runShellScript(post_data.colors === "true");

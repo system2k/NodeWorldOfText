@@ -9,6 +9,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var db_misc = vars.db_misc;
 	var uvias = vars.uvias;
 	var accountSystem = vars.accountSystem;
+	var createCSRF = vars.createCSRF;
 
 	if(!user.operator) {
 		return await dispage("404", null, req, serve, vars, evars);
@@ -41,9 +42,12 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		}
 	}
 
+	var csrftoken = createCSRF(user.id, 0);
+
 	var data = {
 		user_edit,
-		message: params.message
+		message: params.message,
+		csrftoken
 	};
 
 	serve(HTML("administrator_user.html", data));
@@ -62,9 +66,15 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var uvias = vars.uvias;
 	var db_misc = vars.db_misc;
 	var accountSystem = vars.accountSystem;
+	var checkCSRF = vars.checkCSRF;
 
 	if(!user.operator) {
 		return;
+	}
+
+	var csrftoken = post_data.csrfmiddlewaretoken;
+	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
+		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	var username = checkURLParam("/administrator/user/:username", path).username;

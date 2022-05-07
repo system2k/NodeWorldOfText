@@ -34,6 +34,8 @@
 
 {% block endbody %}
 <script>
+	var csrftoken = "{{csrftoken}}";
+
 	function pushLine(content, color) {
 		var elm = document.createElement("span");
 		elm.innerText = content;
@@ -107,7 +109,8 @@
 			type: "GET",
 			url: "/administrator/shell/",
 			data: {
-				command: "load"
+				command: "load",
+				csrfmiddlewaretoken: csrftoken
 			},
 			done: function(data) {
 				printShell(data);
@@ -128,7 +131,8 @@
 			url: "/administrator/shell/",
 			data: {
 				command: "exec",
-				colors: "true"
+				colors: "true",
+				csrfmiddlewaretoken: csrftoken
 			},
 			done: function(data) {
 				printShell("Result:\n" + data);

@@ -4,6 +4,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var dispage = vars.dispage;
 	var db_img = vars.db_img;
+	var createCSRF = vars.createCSRF;
 
 	if(!user.superuser) {
 		return await dispage("404", null, req, serve, vars, evars);
@@ -11,8 +12,11 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var images = await db_img.all("SELECT id, name, date_created, mime, LENGTH(data) AS len FROM images");
 
+	var csrftoken = createCSRF(user.id, 0);
+
 	var data = {
-		images
+		images,
+		csrftoken
 	};
 
 	serve(HTML("administrator_backgrounds.html", data));
@@ -24,10 +28,16 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var db_img = vars.db_img;
 	var add_background_cache = vars.add_background_cache;
+	var checkCSRF = vars.checkCSRF;
 
 	if(!user.superuser) return;
 
 	if(!post_data.length) return;
+
+	var csrftoken = req.headers["x-csrf-token"];
+	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
+		return serve("CSRF verification failed");
+	}
 
 	var len = post_data[0];
 	var name = "";

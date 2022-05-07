@@ -49,6 +49,7 @@
 				<span style="font-size:80%"><i>{{ message }}</i></span>
 			{% endif %}
 			<form method="POST" action=".">
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 				<span>Script title:</span>
 				<br>
 				<input type="text" name="title" value="{{ name }}" style="width: 400px;">
@@ -69,6 +70,7 @@
 		<div class="content_set_title">Script Status</div>
 		<div class="content_set_content">
 			<form method="POST" action=".">
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 				<input type="checkbox" name="enabled" {% if enabled %} checked{% endif %}>
 				<span>enabled</span>
 				<input type="hidden" name="form" value="enable_disable_script">

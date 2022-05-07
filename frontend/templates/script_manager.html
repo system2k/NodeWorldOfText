@@ -16,6 +16,7 @@
 				<span style="font-size:80%"><i>{{ message }}</i></span>
 			{% endif %}
 			<form method="POST" action=".">
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 				Create Script: 
 				<input type="text" name="scriptname" value="">
 				<input type="submit" value="Create">

@@ -4,6 +4,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var dispage = vars.dispage;
 	var db = vars.db;
+	var createCSRF = vars.createCSRF;
 
 	// not staff
 	if(!user.staff) {
@@ -19,9 +20,12 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		});
 	});
 
+	var csrftoken = createCSRF(user.id.toString(), 0);
+
 	var data = {
 		message: params.message,
-		scripts
+		scripts,
+		csrftoken
 	}
 
 	serve(HTML("script_manager.html", data));
@@ -33,9 +37,15 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var db = vars.db;
 	var dispage = vars.dispage;
+	var checkCSRF = vars.checkCSRF;
 
 	if(!user.staff) {
 		return;
+	}
+
+	var csrftoken = post_data.csrfmiddlewaretoken;
+	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
+		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	var name = post_data.scriptname;

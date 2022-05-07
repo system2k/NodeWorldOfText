@@ -5,7 +5,7 @@
 {% endblock %}
 
 {% block header %}
-	<h1>Your account</h1>
+	<h1>Your Account</h1>
 {% endblock %}
 
 {% block endhead %}
@@ -23,7 +23,8 @@
 			{% if message %}
 				<span style="font-size:80%"><i>{{ message }}</i></span>
 			{% endif %}
-			<form method="POST" action="."><div style='display:none'><input type='hidden' name='csrfmiddlewaretoken' value='{{ csrftoken }}' /></div>
+			<form method="POST" action=".">
+				<div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" /></div>
 				<input type="hidden" name="form" value="claim">
 				World name: 
 				<input type="text" name="worldname" value="">
@@ -62,6 +63,7 @@
 	{% endif %}
 	{% if memberships %}
 	<form method="POST" action="." onsubmit="return leave_confirm();" id="leave">
+		<div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" /></div>
 		<input type="hidden" name="form" value="leave">
 		<div class="content_set">
 			<div class="content_set_title">Worlds you're a member of</div>

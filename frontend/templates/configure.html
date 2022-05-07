@@ -10,15 +10,15 @@
 	var actionMethod = "";
 	var writeintCustom;
 	// rate limit toggles
-	var rl_0;
-	var rl_64;
-	var rl_16;
-	var rl_x;
+	var rl_0; // no rate limit
+	var rl_512; // 512 chars/sec
+	var rl_32; // 32 chars/sec
+	var rl_x; // custom (the actual form input)
 	window.onload = function() {
 		var miscform = document.getElementById("miscform");
 		rl_0 = document.getElementById("rl_0");
-		rl_64 = document.getElementById("rl_64");
-		rl_16 = document.getElementById("rl_16");
+		rl_512 = document.getElementById("rl_512");
+		rl_32 = document.getElementById("rl_32");
 		rl_x = document.getElementById("rl_x");
 
 		unclaim.onclick = function() { actionMethod = "unclaim" };
@@ -42,8 +42,8 @@
 		updateWriteIntBox();
 
 		rl_0.onclick = updateRatelimBox;
-		rl_64.onclick = updateRatelimBox;
-		rl_16.onclick = updateRatelimBox;
+		rl_512.onclick = updateRatelimBox;
+		rl_32.onclick = updateRatelimBox;
 		rl_x.onclick = updateRatelimBox;
 		updateRatelimBox();
 
@@ -91,10 +91,10 @@
 		if(!e) {
 			if(ratelimVal.value == "0" && ratelimPer.value == "0") {
 				rl_0.checked = true;
-			} else if(ratelimVal.value == "64" && ratelimPer.value == "1000") {
-				rl_64.checked = true;
-			} else if(ratelimVal.value == "16" && ratelimPer.value == "1000") {
-				rl_16.checked = true;
+			} else if(ratelimVal.value == "512" && ratelimPer.value == "1000") {
+				rl_512.checked = true;
+			} else if(ratelimVal.value == "32" && ratelimPer.value == "1000") {
+				rl_32.checked = true;
 			} else {
 				rl_x.checked = true;
 			}
@@ -103,11 +103,11 @@
 			if(type == "off") {
 				ratelimVal.value = "0";
 				ratelimPer.value = "0";
-			} else if(type == "p64") {
-				ratelimVal.value = "64";
+			} else if(type == "p512") {
+				ratelimVal.value = "512";
 				ratelimPer.value = "1000";
-			} else if(type == "p16") {
-				ratelimVal.value = "16";
+			} else if(type == "p32") {
+				ratelimVal.value = "32";
 				ratelimPer.value = "1000";
 			} else if(type == "custom") {
 				if(ratelimPer.value == "0") {
@@ -547,12 +547,12 @@
 							Disabled
 						</div>
 						<div>
-							<input type="radio" name="ratelim" id="rl_64" value="p64">
-							64 characters per second
+							<input type="radio" name="ratelim" id="rl_512" value="p512">
+							512 characters per second
 						</div>
 						<div>
-							<input type="radio" name="ratelim" id="rl_16" value="p16">
-							16 characters per second
+							<input type="radio" name="ratelim" id="rl_32" value="p32">
+							32 characters per second
 						</div>
 						<div>
 							<input type="radio" name="ratelim" id="rl_x" value="custom">
@@ -587,11 +587,12 @@
 		<div class="content_set_content">
 			{% if members %}
 				<ul>
-					<form method="POST" action="."><div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" /></div>
-					<input type="hidden" name="form" value="remove_member">
-					{% for member in members %}
-						<li>{{ member.member_name }} <input type="submit" name="remove_{{ member.member_name }}" value="Remove {{ member.member_name }}">
-					{% endfor %}
+					<form method="POST" action=".">
+						<div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" /></div>
+						<input type="hidden" name="form" value="remove_member">
+						{% for member in members %}
+							<li>{{ member.member_name }} <input type="submit" name="remove_{{ member.member_name }}" value="Remove {{ member.member_name }}">
+						{% endfor %}
 					</form>
 				</ul>
 			{% else %}
@@ -599,7 +600,8 @@
 			{% endif %}
 			{% if add_member_message %}<div><i>{{ add_member_message }}</i></div>{% endif %}
 			<div style="margin-top:.3em">
-				<form method="POST" action="."><div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" /></div>
+				<form method="POST" action=".">
+					<div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" /></div>
 					<label for="choose_member">Add a member: </label>
 					<input id="choose_member" type="text" name="add_member" value="">
 					<input type="hidden" name="form" value="add_member">
@@ -611,6 +613,7 @@
 
 	<form method="POST" action="." id="action_form" onsubmit="return action_confirm();">
 		<input type="hidden" name="form" value="action">
+		<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 		<table>
 			<tbody>
 				<tr>

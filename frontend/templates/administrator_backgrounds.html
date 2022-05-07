@@ -84,6 +84,8 @@
 		</div>
 	</div>
 	<script>
+		var csrftoken = "{{csrftoken}}";
+
 		var back_input = document.getElementById("back_input");
 		var img_name = document.getElementById("img_name");
 		var rd_png = document.getElementById("rd_png");
@@ -134,6 +136,7 @@
 			}
 			var xhr = new XMLHttpRequest();
 			xhr.open("POST", "/administrator/backgrounds/", true);
+			xhr.setRequestHeader("X-CSRF-Token", csrftoken);
 			xhr.onload = function() {
 				server_pending.style.display = "none";
 				img_name.value = "";

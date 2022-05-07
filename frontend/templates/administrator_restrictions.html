@@ -53,6 +53,8 @@
 		}
 	</style>
 	<script>
+		var csrftoken = "{{csrftoken}}";
+		
 		var rlist = document.getElementById("rlist");
 		function updList(type) {
 			var list = null;
@@ -61,6 +63,7 @@
 
 			var xhr = new XMLHttpRequest();
 			xhr.open("POST", "/administrator/restrictions/?type=" + type, true);
+			xhr.setRequestHeader("X-CSRF-Token", csrftoken);
 
 			xhr.onload = function(res, b) {
 				alert("Response: " + xhr.responseText);
