@@ -69,7 +69,7 @@ var normalizeCacheTile   = utils.normalizeCacheTile;
 var parseTextcode        = utils.parseTextcode;
 var checkDuplicateCookie = utils.checkDuplicateCookie;
 
-var gzipEnabled = true;
+var gzipEnabled = false;
 var shellEnabled = true;
 
 // Global
@@ -1454,8 +1454,88 @@ var ms = {
 	decade: 315569520000
 };
 
-// TODO: rate limits
-var url_regexp = [ // regexp , function/redirect to , options
+var http_rate_limits = [ // function ; hold limit ; [method]
+	[pages.accounts.login, 2],
+	[pages.accounts.logout, 2],
+	[pages.accounts.register, 1],
+	[pages.accounts.profile, 2, "GET"],
+	[pages.accounts.profile, 10, "POST"],
+	[pages.accounts.configure, 2],
+	[pages.accounts.member_autocomplete, 4],
+	[pages.accounts.download, 2],
+	[pages.accounts.tabular, 2],
+	[pages.accounts.sso, 3],
+	[pages.protect, 128],
+	[pages.unprotect, 128],
+	[pages.protect_char, 512],
+	[pages.unprotect_char, 512],
+	[pages.coordlink, 512],
+	[pages.urllink, 512],
+	[pages.yourworld, 512, "POST"]
+];
+
+var http_req_holds = {}; // ip/identifier -> {"<index>": {holds: <number>, resp: [<promises>,...]},...}
+
+async function check_http_rate_limit(ip, func, method) {
+	var idx = -1;
+	var max = 0;
+	for(var i = 0; i < http_rate_limits.length; i++) {
+		var line = http_rate_limits[i];
+		var lf = line[0];
+		var lc = line[1];
+		var lm = line[2];
+		if(lf != func) continue;
+		if(lm && lm != method) continue;
+		idx = i;
+		max = lc;
+		break;
+	}
+	if(idx == -1) return -1;
+	if(!http_req_holds[ip]) {
+		http_req_holds[ip] = {};
+	}
+	holdObj = http_req_holds[ip];
+	if(!holdObj[idx]) {
+		holdObj[idx] = {
+			holds: 1,
+			max,
+			resp: []
+		};
+		return idx;
+	}
+	var obj = holdObj[idx];
+	if(obj.holds >= max) {
+		return new Promise(function(res) {
+			obj.resp.push(res);
+		});
+	}
+	obj.holds++;
+	return idx;
+}
+
+function release_http_rate_limit(ip, rate_id) {
+	var obj = http_req_holds[ip];
+	if(!obj) return;
+	var lim = obj[rate_id];
+	if(!lim) return;
+	lim.holds--;
+	var diff = lim.max - lim.holds;
+	if(lim.holds <= 0) { // failsafe
+		diff = lim.resp.length;
+		lim.holds = 0;
+	}
+	for(var i = 0; i < diff; i++) {
+		var func = lim.resp[0];
+		if(!func) continue;
+		func(rate_id);
+		lim.resp.splice(0, 1);
+	}
+	if(!lim.holds && !lim.resp.length) {
+		delete obj[rate_id];
+	}
+}
+
+var url_regexp = [ // regexp ; function/redirection ; options
 	[/^favicon\.ico[\/]?$/g, "/static/favicon.png", { no_login: true }],
 	[/^robots\.txt[\/]?$/g, "/static/robots.txt", { no_login: true }],
 	[/^home[\/]?$/g, pages.home],
@@ -2062,8 +2142,10 @@ async function process_request(req, res, compCallbacks) {
 
 	var URLparse = url.parse(req.url);
 	var URL = URLparse.pathname;
-	if(URL.charAt(0) == "/") { URL = URL.substr(1); }
-	try { URL = decodeURIComponent(URL); } catch (e) {};
+	if(URL.charAt(0) == "/") { URL = URL.slice(1); }
+	try {
+		URL = decodeURIComponent(URL);
+	} catch (e) {};
 
 	if(hostname.length == 1 && valid_subdomains.indexOf(hostname[0]) > -1) {
 		URL = "other/" + hostname[0] + "/" + URL;
@@ -2104,6 +2186,7 @@ async function process_request(req, res, compCallbacks) {
 			page_resolved = true;
 			if(typeof pageRes == "object") {
 				var method = req.method.toUpperCase();
+				var rate_id = await check_http_rate_limit(ipAddress, pageRes, method);
 				var post_data = {};
 				var query_data = querystring.parse(url.parse(req.url).query);
 				var cookies = parseCookie(req.headers.cookie);
@@ -2166,13 +2249,17 @@ async function process_request(req, res, compCallbacks) {
 						compCallbacks.push(cb);
 					}
 				};
+				var pageStat;
 				if(pageRes[method] && valid_method(method)) {
 					// Return the page
-					var pageStat = await pageRes[method](req, dispatch, global_data, evars, {});
-					if(pageStat === -1) continue;
+					pageStat = await pageRes[method](req, dispatch, global_data, evars, {});
 				} else {
 					dispatch("Method " + method + " not allowed.", 405);
 				}
+				if(rate_id != -1) {
+					release_http_rate_limit(ipAddress, rate_id);
+				}
+				if(pageStat === -1) continue;
 			} else if(typeof pageRes == "string") { // redirection
 				dispatch(null, null, { redirect: pageRes });
 			} else {

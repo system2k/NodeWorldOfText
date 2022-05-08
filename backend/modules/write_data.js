@@ -1,11 +1,8 @@
 var emptyWriteResponse = { accepted: [], rejected: {} };
 
-var editRateLimits = {}; // TODO: flush
+var editRateLimits = {}; // TODO: garbage collection
 var tileRateLimits = {};
 var tileHolds = {}; // TODO
-
-var editReqLimit = 512;
-var superuserEditReqLimit = 1280;
 
 function checkCharRateLimit(ipObj, cRate, editCount) {
 	if(!cRate) return false;
@@ -112,6 +109,25 @@ function checkColorRestr(list, ipVal, ipFam, isGrouped, world, tileX, tileY) {
 	return false;
 }
 
+function clearHolds(obj, tileSet) {
+	if(obj.count <= 0) return;
+	for(var pos in tileSet) {
+		if(obj.tiles[pos]) {
+			obj.tiles[pos]--;
+		}
+		if(obj.tiles[pos] <= 0) {
+			delete obj.tiles[pos];
+			obj.count--;
+		}
+	}
+	if(obj.count <= 0) {
+		obj.count = 0;
+		for(var i in obj.tiles) {
+			delete obj.tiles[i];
+		}
+	}
+}
+
 function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main";
 }
@@ -143,6 +159,9 @@ module.exports = async function(data, vars, evars) {
 	var getRestrictions = vars.getRestrictions;
 	var checkCoalition = vars.checkCoalition;
 
+	var editReqLimit = 512;
+	var superuserEditReqLimit = 1280;
+	var tileHoldLimit = 100;
 	var defaultCharRatePerSecond = 20480;
 	var tileRatePerSecond = 256;
 
@@ -187,9 +206,17 @@ module.exports = async function(data, vars, evars) {
 	1: NO_TILE_PERM
 	2: RATE_LIMIT
 	*/
+
+	var idLabel = isGrouped ? "cg1" : ipAddress;
 	
-	var tileLimiter = prepareRateLimiter(tileRateLimits, isGrouped ? "cg1" : ipAddress);
-	var editLimiter = prepareRateLimiter(editRateLimits, isGrouped ? "cg1" : ipAddress);
+	var tileLimiter = prepareRateLimiter(tileRateLimits, idLabel);
+	var editLimiter = prepareRateLimiter(editRateLimits, idLabel);
+
+	if(!tileHolds[idLabel]) tileHolds[idLabel] = {
+		count: 0,
+		tiles: {}
+	};
+	var tileHoldObj = tileHolds[idLabel];
 
 	var customLimit = world.opts.charRate;
 	var customLimiter = null;
@@ -236,6 +263,16 @@ module.exports = async function(data, vars, evars) {
 			if(!checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world_id)) {
 				rejected[editID] = 2;
 				continue;
+			}
+			if(!tileHoldObj.tiles[tileStr]) {
+				if(tileHoldObj.count >= tileHoldLimit) {
+					rejected[editID] = 2;
+					continue;
+				}
+				tileHoldObj.count++;
+				tileHoldObj.tiles[tileStr] = 1;
+			} else {
+				tileHoldObj.tiles[tileStr]++;
 			}
 			tiles[tileStr] = [];
 			tileCount++;
@@ -353,10 +390,13 @@ module.exports = async function(data, vars, evars) {
 		}
 	}
 
-	if(!tile_edits.length) return {
-		accepted: [],
-		rejected
-	};
+	if(!tile_edits.length) {
+		clearHolds(tileHoldObj, tiles);
+		return {
+			accepted: [],
+			rejected
+		};
+	}
 
 	// send to tile database manager
 	tile_database.write(call_id, tile_database.types.write, {
@@ -370,6 +410,8 @@ module.exports = async function(data, vars, evars) {
 	});
 
 	var resp = await tile_database.editResponse(call_id);
+
+	clearHolds(tileHoldObj, tiles);
 
 	return { accepted: resp[0], rejected };
 }

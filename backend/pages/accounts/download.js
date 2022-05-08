@@ -1,17 +1,3 @@
-var download_busy = {};
-var intv;
-
-module.exports.startup_internal = function(vars) {
-	intv = vars.intv;
-
-	// periodically clear the list in case of a bug
-	intv.downloadBusyCheck = setInterval(function() {
-		for(var i in download_busy) {
-			delete download_busy[i];
-		}
-	}, 1000 * 60 * 5);
-}
-
 async function iterateWorld(db, worldId, onTile) {
 	var groupSize = 512;
 	var initPos = await db.get("SELECT tileX, tileY FROM tile WHERE world_id=? LIMIT 1", [worldId]);
@@ -24,7 +10,7 @@ async function iterateWorld(db, worldId, onTile) {
 		for(var t = 0; t < td.length; t++) {
 			var tile = td[t];
 			var resp = await onTile(tile);
-			if(resp === false) return;
+			if(resp == -1) return;
 		}
 		if(td.length < groupSize) return; // last batch
 		var lastTile = td[td.length - 1];
@@ -54,21 +40,12 @@ module.exports.GET = async function(req, serve, vars, evars) {
 
 	setCallback(function() {
 		releaseWorld(world);
-		delete download_busy[user.id];
 	});
 
 	// not a superuser nor owner
 	var is_owner = world.ownerId == user.id;
 	if(!(user.superuser || is_owner)) {
 		return await dispage("404", null, req, serve, vars, evars);
-	}
-
-	if(is_owner && !user.superuser) {
-		if(download_busy[user.id]) {
-			return serve("You are already downloading a world. Please wait.");
-		} else {
-			download_busy[user.id] = true;
-		}
 	}
 
 	serve.startStream();
@@ -91,7 +68,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		});
 		if(!firstTile) data = "," + data;
 		firstTile = false;
-		if(await serve.writeStream(data)) return false; // aborted
+		if(await serve.writeStream(data)) return -1; // aborted
 	}
 
 	if(await serve.writeStream("[")) return;
