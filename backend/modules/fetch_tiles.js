@@ -187,9 +187,9 @@ module.exports = async function(data, vars, evars) {
 
 		if(memTileCache[world.id] && memTileCache[world.id][tileY] && memTileCache[world.id][tileY][tileX]) {
 			var memTile = memTileCache[world.id][tileY][tileX];
-			tiles[t] = normalizeCacheTile(memTile);
-			properties = memTile.properties;
-			content = memTile.content;
+			var normTile = normalizeCacheTile(memTile);
+			properties = normTile.properties;
+			content = normTile.content;
 		} else {
 			properties = JSON.parse(tile.properties);
 			properties.writability = tile.writability;
