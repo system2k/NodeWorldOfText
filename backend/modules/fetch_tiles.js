@@ -1,3 +1,5 @@
+var WebSocket = require("ws");
+
 var surrogateRegexStr = "([\\uD800-\\uDBFF][\\uDC00-\\uDFFF])";
 var surrogateRegex = new RegExp(surrogateRegexStr, "g");
 var combiningRegexStr = "(([\\0-\\u02FF\\u0370-\\u1DBF\\u1E00-\\u20CF\\u2100-\\uD7FF\\uDC00-\\uFE1F\\uFE30-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF])([\\u0300-\\u036F\\u1DC0-\\u1DFF\\u20D0-\\u20FF\\uFE20-\\uFE2F]+))";
@@ -28,6 +30,46 @@ function filterUTF16(str) {
 }
 // TODO: use proper util string splitter
 
+function partitionRectangle(rect) {
+	var minY = rect.minY;
+	var minX = rect.minX;
+	var maxY = rect.maxY;
+	var maxX = rect.maxX;
+
+	var regWidth = maxX - minX + 1;
+	var regHeight = maxY - minY + 1;
+
+	if(!regWidth || !regHeight) {
+		return [];
+	}
+
+	var res = [];
+
+	var sectorWidth, sectorHeight;
+	if(regWidth > 100) {
+		sectorWidth = 100;
+		sectorHeight = 1;
+	} else {
+		sectorWidth = regWidth;
+		sectorHeight = Math.floor(100 / regWidth);
+	}
+
+	var divW = Math.ceil(regWidth / sectorWidth);
+	var divH = Math.ceil(regHeight / sectorHeight);
+
+	for(var y = 0; y < divH; y++) {
+		for(var x = 0; x < divW; x++) {
+			var x1 = minX + sectorWidth * x;
+			var y1 = minY + sectorHeight * y;
+			var x2 = Math.min(x1 + sectorWidth - 1, maxX);
+			var y2 = Math.min(y1 + sectorHeight - 1, maxY);
+			res.push([x1, y1, x2, y2]);
+		}
+	}
+
+	return res;
+}
+
 module.exports = async function(data, vars, evars) {
 	var user = evars.user;
 	var world = evars.world;
@@ -40,6 +82,7 @@ module.exports = async function(data, vars, evars) {
 	var normalizeCacheTile = vars.normalizeCacheTile;
 	var monitorEventSockets = vars.monitorEventSockets;
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
+	var tile_fetcher = vars.tile_fetcher;
 
 	var tiles = {};
 	var fetchRectLimit = 50;
@@ -55,10 +98,10 @@ module.exports = async function(data, vars, evars) {
 	if(!Array.isArray(data.fetchRectangles)) return "Invalid parameters";
 	var len = data.fetchRectangles.length;
 	if(len >= fetchRectLimit) len = fetchRectLimit;
-	var q_utf16 = data.utf16;
-	var q_array = data.array;
-	var q_content_only = data.content_only;
-	var q_concat = data.concat; // only if content_only is enabled
+	var q_utf16 = data.utf16; // strip out surrogates and combining chars
+	var q_array = data.array; // split content into array
+	var q_content_only = data.content_only; // return an array of contents only
+	var q_concat = data.concat; // (q_content_only required) return a string of joined contents, or array of joined contents (q_array)
 
 	// if not null, return special value instead of object containing tiles
 	var alt_return_obj = null;
@@ -106,80 +149,96 @@ module.exports = async function(data, vars, evars) {
 		rect.maxX = maxX;
 	}
 
+	var fetchedTiles = [];
 	for(var i = 0; i < len; i++) {
-		var rect = data.fetchRectangles[i];
-		var minY = rect.minY;
-		var minX = rect.minX;
-		var maxY = rect.maxY;
-		var maxX = rect.maxX;
+		var rect = partitionRectangle(data.fetchRectangles[i]);
+		for(var x = 0; x < rect.length; x++) {
+			var subRect = rect[x];
 
-		if(q_concat && q_content_only) {
-			if(alt_return_obj === null) {
-				alt_return_obj = "";
-				if(q_array) alt_return_obj = [];
-			}
-		} else {
-			for(var ty = minY; ty <= maxY; ty++) {
-				for(var tx = minX; tx <= maxX; tx++) {
+			// set all tiles to null first
+			var x1 = subRect[0];
+			var y1 = subRect[1];
+			var x2 = subRect[2];
+			var y2 = subRect[3];
+			for(var ty = y1; ty <= y2; ty++) {
+				for(var tx = x1; tx <= x2; tx++) {
 					tiles[ty + "," + tx] = null;
 				}
 			}
-		}
-		var db_tiles = await db.all("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?",
-			[world.id, minY, minX, maxY, maxX]);
-		for(var t in tiles) {
-			if(tiles[t] == null) {
-				var pos = t.split(",");
-				var tileY = parseInt(pos[0]);
-				var tileX = parseInt(pos[1]);
 
-				if(memTileCache[world.id] && memTileCache[world.id][tileY] && memTileCache[world.id][tileY][tileX]) {
-					var memTile = memTileCache[world.id][tileY][tileX];
-					tiles[t] = normalizeCacheTile(memTile);
-				}
+			var tileData = await tile_fetcher.fetch(ipAddress, world.id, subRect);
+			if(evars.ws && evars.ws.readyState !== WebSocket.OPEN) {
+				return "Socket error";
+			}
+			// merge our fetched tiles together
+			for(var t = 0; t < tileData.length; t++) {
+				fetchedTiles.push(tileData[t]);
 			}
 		}
-		for(var t = 0; t < db_tiles.length; t++) {
-			var tdata = db_tiles[t];
-			// tile writability is put in properties object
-			var cachedTile = null;
-			if(memTileCache[world.id] && memTileCache[world.id][tdata.tileY] && memTileCache[world.id][tdata.tileY][tdata.tileX]) {
-				var memTile = memTileCache[world.id][tdata.tileY][tdata.tileX];
-				cachedTile = normalizeCacheTile(memTile);
-			}
+	}
 
-			var properties;
-			var content;
-			if(cachedTile) {
-				properties = cachedTile.properties;
-				content = cachedTile.content;
+	for(var i = 0; i < fetchedTiles.length; i++) {
+		var tile = fetchedTiles[i];
+		var tileX = tile.tileX;
+		var tileY = tile.tileY;
+		var pos = tileY + "," + tileX;
+
+		var properties, content;
+
+		if(memTileCache[world.id] && memTileCache[world.id][tileY] && memTileCache[world.id][tileY][tileX]) {
+			var memTile = memTileCache[world.id][tileY][tileX];
+			tiles[t] = normalizeCacheTile(memTile);
+			properties = memTile.properties;
+			content = memTile.content;
+		} else {
+			properties = JSON.parse(tile.properties);
+			properties.writability = tile.writability;
+			content = tile.content;
+		}
+
+		if(q_utf16) content = filterUTF16(content);
+		if(q_array) content = advancedSplitCli(content);
+
+		tiles[pos] = {
+			content,
+			properties
+		};
+	}
+
+	// special parameters
+	if(q_content_only) {
+		if(q_concat) {
+			if(q_array) {
+				alt_return_obj = [];
 			} else {
-				properties = JSON.parse(tdata.properties);
-				properties.writability = tdata.writability;
-				content = tdata.content;
+				alt_return_obj = "";
 			}
-
-			if(q_utf16) content = filterUTF16(content);
-			if(q_array) content = advancedSplitCli(content);
-			if(q_concat && q_content_only) {
-				if(q_array) {
-					for(var p = 0; p < content.length; p++) {
-						alt_return_obj.push(content[p]);
+			var joinedTiles = {};
+			for(var i = 0; i < len; i++) {
+				var reg = data.fetchRectangles[i];
+				var x1 = reg.minX;
+				var y1 = reg.minY;
+				var x2 = reg.maxX;
+				var y2 = reg.maxY;
+				for(var ty = y1; ty <= y2; ty++) {
+					for(var tx = x1; tx <= x2; tx++) {
+						var pos = ty + "," + tx;
+						var tile = tiles[pos];
+						if(!tile) continue;
+						if(joinedTiles[pos]) continue;
+						joinedTiles[pos] = true;
+						if(q_array) {
+							alt_return_obj.push(...tile.content);
+						} else {
+							alt_return_obj += tile.content;
+						}
 					}
-				} else {
-					alt_return_obj += content;
 				}
-			} else {
-				var tileRes;
-				if(q_content_only) {
-					tileRes = content;
-				} else {
-					tileRes = {
-						content,
-						properties
-					};
-				}
-				tiles[tdata.tileY + "," + tdata.tileX] = tileRes;
+			}
+		} else {
+			for(var i in tiles) {
+				if(!tiles[i]) continue;
+				tiles[i] = tiles[i].content;
 			}
 		}
 	}
@@ -189,5 +248,6 @@ module.exports = async function(data, vars, evars) {
 			data: alt_return_obj
 		};
 	}
+
 	return tiles;
 }

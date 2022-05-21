@@ -859,6 +859,7 @@ var modules = {
 var subsystems = {
 	chat_mgr: require("./backend/subsystems/chat_mgr.js"),
 	tile_database: require("./backend/subsystems/tile_database.js"),
+	tile_fetcher: require("./backend/subsystems/tile_fetcher.js"),
 	world_mgr: require("./backend/subsystems/world_mgr.js")
 };
 
@@ -3204,6 +3205,7 @@ var global_data = {
 	modify_bypass_key,
 	trimHTML,
 	tile_database: subsystems.tile_database,
+	tile_fetcher: subsystems.tile_fetcher,
 	chat_mgr: subsystems.chat_mgr,
 	intv,
 	WebSocket,
