@@ -21,6 +21,8 @@ function init_dom() {
 		textInput: textInput
 	});
 	addColorShortcuts();
+	setCursorOutlineToggle();
+
 }
 function getWndWidth() {
 	return document.body.clientWidth || window.innerWidth;
@@ -135,6 +137,7 @@ var shiftOptimization      = false;
 var transparentBackground  = true;
 var writeFlushRate         = state.worldModel.write_interval;
 var bufferLargeChars       = true; // prevents certain large characters from being cut off by the grid
+var cursorOutlineEnabled   = false;
 
 var keyConfig = {
 	reset: "ESC",
@@ -189,7 +192,8 @@ defineElements({ // elm[<name>]
 	link_element: byId("link_element"),
 	link_div: byId("link_div"),
 	color_shortcuts: byId("color_shortcuts"),
-	protect_selection: byId("protect_selection")
+	protect_selection: byId("protect_selection"),
+	cursor_outline_toggle: byId("cursor_outline_toggle")
 });
 
 w.on("clientLoaded", function() {
@@ -256,7 +260,19 @@ function addColorShortcuts() {
 	elm.color_shortcuts.appendChild(rand);
 }
 
-init_dom();
+function setCursorOutlineToggle() {
+	elm.cursor_outline_toggle.oninput = function() {
+		var val = elm.cursor_outline_toggle.checked;
+		cursorOutlineEnabled = val;
+		storeConfig();
+		if(!cursorCoords) return;
+		var cursorTileX = cursorCoords[0];
+		var cursorTileY = cursorCoords[1];
+		w.setTileRedraw(cursorTileX, cursorTileY);
+	}
+}
+
+init_dom(); // TODO: put this elsewhere
 
 var draggable_element_mousemove = [];
 var draggable_element_mouseup = [];
@@ -364,7 +380,25 @@ function storeNickname() {
 	}
 }
 
+function getStoredConfig() {
+	if(!window.localStorage || !localStorage.getItem) return;
+	var conf = localStorage.getItem("config");
+	if(!conf) return;
+	conf = JSON.parse(conf);
+	cursorOutlineEnabled = conf.cursorOutline;
+	// dom
+	elm.cursor_outline_toggle.checked = cursorOutlineEnabled;
+}
+function storeConfig() {
+	if(!window.localStorage || !localStorage.setItem) return;
+	var conf = {
+		cursorOutline: cursorOutlineEnabled
+	};
+	localStorage.setItem("config", JSON.stringify(conf));
+}
+
 getStoredNickname();
+getStoredConfig();
 
 function loadBackgroundData(cb, timeout_cb) {
 	if(!backgroundEnabled || !state.background) {
@@ -4196,8 +4230,13 @@ function renderTile(tileX, tileY, redraw) {
 			startX: offsetX, startY: offsetY,
 			endX: offsetX + clampW - 1, endY: offsetY + clampH - 1
 		});
-		if(unobstructCursor && cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
-			drawObstructedCursor(owotCtx, tile.content, cursorCoords[2], cursorCoords[3], offsetX, offsetY);
+		if(cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
+			if(unobstructCursor) {
+				drawObstructedCursor(owotCtx, tile.content, cursorCoords[2], cursorCoords[3], offsetX, offsetY);
+			}
+			if(cursorOutlineEnabled) {
+				renderCursorOutline(owotCtx, offsetX, offsetY, tileX, tileY);
+			}
 		}
 		return;
 	}
@@ -4246,8 +4285,13 @@ function renderTile(tileX, tileY, redraw) {
 	// add image to main canvas
 	owotCtx.drawImage(textRenderCanvas, 0, 0, clampW, clampH, offsetX, offsetY, clampW, clampH);
 
-	if(unobstructCursor && cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
-		drawObstructedCursor(owotCtx, tile.content, cursorCoords[2], cursorCoords[3], offsetX, offsetY);
+	if(cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
+		if(unobstructCursor) {
+			drawObstructedCursor(owotCtx, tile.content, cursorCoords[2], cursorCoords[3], offsetX, offsetY);
+		}
+		if(cursorOutlineEnabled) {
+			renderCursorOutline(owotCtx, offsetX, offsetY, tileX, tileY);
+		}
 	}
 
 	if(w.events.tilerendered) w.emit("tileRendered", {
@@ -4354,6 +4398,20 @@ function clearAllGuestCursors() {
 		}
 		w.setTileRedraw(tileX, tileY);
 	}
+}
+
+function renderCursorOutline(renderCtx, offsetX, offsetY) {
+	if(!cursorCoords) return;
+	var color = YourWorld.Color;
+	var tileX = cursorCoords[0];
+	var tileY = cursorCoords[1];
+	var charX = cursorCoords[2];
+	var charY = cursorCoords[3];
+	renderCtx.strokeStyle = "rgb(" + (color >> 16 & 255) + "," + (color >> 8 & 255) + "," + (color & 255) + ")";
+	renderCtx.lineWidth = 2;
+	renderCtx.beginPath();
+	renderCtx.rect(offsetX + charX * cellW + 1, offsetY + charY * cellH + 1, cellW - 2, cellH - 2);
+	renderCtx.stroke();
 }
 
 function renderLoop() {
@@ -5572,6 +5630,11 @@ Object.assign(w, {
 		// update color textbox in "change color" menu
 		var rgb = int_to_rgb(color);
 		setRGBColorPicker(rgb[0], rgb[1], rgb[2]);
+		if(cursorCoords) {
+			var cursorTileX = cursorCoords[0];
+			var cursorTileY = cursorCoords[1];
+			w.setTileRedraw(cursorTileX, cursorTileY);
+		}
 	},
 	fetchUpdates: function(margin) {
 		if(!margin) margin = 0;

@@ -445,3 +445,9 @@ a:visited {
 	text-align: right;
 	padding-top: 3px;
 }
+#cursor_outline_toggle_label {
+	position: absolute;
+	left: 9px;
+	margin-top: 5px;
+	user-select: none;
+}
