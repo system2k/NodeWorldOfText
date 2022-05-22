@@ -149,7 +149,7 @@ module.exports = async function(data, vars, evars) {
 		rect.maxX = maxX;
 	}
 
-	var fetchedTiles = [];
+	var fetchedTiles = {};
 	for(var i = 0; i < len; i++) {
 		var rect = partitionRectangle(data.fetchRectangles[i]);
 		for(var x = 0; x < rect.length; x++) {
@@ -172,16 +172,18 @@ module.exports = async function(data, vars, evars) {
 			}
 			// merge our fetched tiles together
 			for(var t = 0; t < tileData.length; t++) {
-				fetchedTiles.push(tileData[t]);
+				var tileX = tileData[t].tileX;
+				var tileY = tileData[t].tileY;
+				fetchedTiles[tileY + "," + tileX] = tileData[t];
 			}
 		}
 	}
 
-	for(var i = 0; i < fetchedTiles.length; i++) {
-		var tile = fetchedTiles[i];
-		var tileX = tile.tileX;
-		var tileY = tile.tileY;
-		var pos = tileY + "," + tileX;
+	for(var i in tiles) {
+		var pos = i.split(",");
+		var tileX = parseInt(pos[1]);
+		var tileY = parseInt(pos[0]);
+		var dbTile = fetchedTiles[i];
 
 		var properties, content;
 
@@ -190,16 +192,18 @@ module.exports = async function(data, vars, evars) {
 			var normTile = normalizeCacheTile(memTile);
 			properties = normTile.properties;
 			content = normTile.content;
+		} else if(dbTile) {
+			properties = JSON.parse(dbTile.properties);
+			properties.writability = dbTile.writability;
+			content = dbTile.content;
 		} else {
-			properties = JSON.parse(tile.properties);
-			properties.writability = tile.writability;
-			content = tile.content;
+			continue;
 		}
 
 		if(q_utf16) content = filterUTF16(content);
 		if(q_array) content = advancedSplitCli(content);
 
-		tiles[pos] = {
+		tiles[i] = {
 			content,
 			properties
 		};
