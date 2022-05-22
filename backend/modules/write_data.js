@@ -1,133 +1,5 @@
 var emptyWriteResponse = { accepted: [], rejected: {} };
 
-var editRateLimits = {}; // TODO: garbage collection
-var tileRateLimits = {};
-var tileHolds = {}; // TODO
-
-function checkCharRateLimit(ipObj, cRate, editCount) {
-	if(!cRate) return false;
-	var sec = Math.floor(Date.now() / 1000);
-	var currentSec = ipObj.currentSecond;
-	ipObj.currentSecond = sec;
-	if(currentSec != sec || ipObj.value == null) {
-		ipObj.value = editCount;
-		return true;
-	}
-	ipObj.value += editCount;
-	if(ipObj.value > cRate) {
-		return false;
-	}
-	return true;
-}
-
-function checkTileRateLimit(ipObj, tRate, tileX, tileY, worldId) {
-	if(!tRate) return false;
-	var sec = Math.floor(Date.now() / 1000);
-	var currentSec = ipObj.currentSecond;
-	ipObj.currentSecond = sec;
-	if(currentSec != sec || ipObj.value == null) {
-		ipObj.value = {};
-		return true;
-	}
-	ipObj.value[tileY + "," + tileX + "," + worldId] = 1;
-	var tileCount = Object.keys(ipObj.value).length;
-	if(tileCount > tRate) {
-		return false;
-	}
-	return true;
-}
-
-function prepareRateLimiter(limObj, ipAddress) {
-	var obj = limObj[ipAddress];
-	if(obj) return obj;
-	obj = {
-		currentSecond: 0,
-		value: null
-	};
-	limObj[ipAddress] = obj;
-	return obj;
-}
-
-function checkCharrateRestr(list, ipVal, ipFam, isGrouped, world, tileX, tileY) {
-	if(!list) return null;
-	for(var i = 0; i < list.length; i++) {
-		var item = list[i];
-
-		var ip = item.ip;
-		var group = item.group;
-		if(ip) {
-			var riRange = ip[0];
-			var riFam = ip[1];
-			if(riFam != ipFam) continue;
-			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
-		} else if(group) {
-			if(!(group == "cg1" && isGrouped)) continue;
-		}
-
-		var type = item.type;
-		if(type == "charrate") {
-			var rRate = item.rate;
-			var rRorld = item.world;
-			var rRegion = item.region;
-			if(rRorld == null || rRorld.toUpperCase() == world.toUpperCase()) {
-				if(rRegion == null || rRegion[0] <= tileX && tileX <= rRegion[2] && rRegion[1] <= tileY && tileY <= rRegion[3]) {
-					return rRate;
-				}
-			}
-		}
-	}
-	return null;
-}
-
-function checkColorRestr(list, ipVal, ipFam, isGrouped, world, tileX, tileY) {
-	if(!list) return false;
-	for(var i = 0; i < list.length; i++) {
-		var item = list[i];
-
-		var ip = item.ip;
-		var group = item.group;
-		if(ip) {
-			var riRange = ip[0];
-			var riFam = ip[1];
-			if(riFam != ipFam) continue;
-			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
-		} else if(group) {
-			if(!(group == "cg1" && isGrouped)) continue;
-		}
-
-		var type = item.type;
-		if(type == "color") {
-			var rRegion = item.region;
-			var rWorld = item.world;
-			if(rWorld == null || rWorld.toUpperCase() == world.toUpperCase()) {
-				if(rRegion == null || rRegion[0] <= tileX && tileX <= rRegion[2] && rRegion[1] <= tileY && tileY <= rRegion[3]) {
-					return true;
-				}
-			}
-		}
-	}
-	return false;
-}
-
-function clearHolds(obj, tileSet) {
-	if(obj.count <= 0) return;
-	for(var pos in tileSet) {
-		if(obj.tiles[pos]) {
-			obj.tiles[pos]--;
-		}
-		if(obj.tiles[pos] <= 0) {
-			delete obj.tiles[pos];
-			obj.count--;
-		}
-	}
-	if(obj.count <= 0) {
-		obj.count = 0;
-		for(var i in obj.tiles) {
-			delete obj.tiles[i];
-		}
-	}
-}
-
 function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main";
 }
@@ -158,10 +30,10 @@ module.exports = async function(data, vars, evars) {
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 	var getRestrictions = vars.getRestrictions;
 	var checkCoalition = vars.checkCoalition;
+	var rate_limiter = vars.rate_limiter;
 
 	var editReqLimit = 512;
 	var superuserEditReqLimit = 1280;
-	var tileHoldLimit = 100;
 	var defaultCharRatePerSecond = 20480;
 	var tileRatePerSecond = 256;
 
@@ -209,22 +81,18 @@ module.exports = async function(data, vars, evars) {
 
 	var idLabel = isGrouped ? "cg1" : ipAddress;
 	
-	var tileLimiter = prepareRateLimiter(tileRateLimits, idLabel);
-	var editLimiter = prepareRateLimiter(editRateLimits, idLabel);
-
-	if(!tileHolds[idLabel]) tileHolds[idLabel] = {
-		count: 0,
-		tiles: {}
-	};
-	var tileHoldObj = tileHolds[idLabel];
+	var tileLimiter = rate_limiter.prepareRateLimiter(rate_limiter.tileRateLimits, 1000, idLabel);
+	var editLimiter = rate_limiter.prepareRateLimiter(rate_limiter.editRateLimits, 1000, idLabel);
 
 	var customLimit = world.opts.charRate;
 	var customLimiter = null;
+	var charsPerPeriod;
 	if(customLimit && !is_member) {
 		customLimit = customLimit.split("/");
 		if(customLimit.length == 2) {
-			customLimit = parseInt(customLimit[0]);
-			customLimiter = prepareRateLimiter(editRateLimits, ipAddress + "-world-" + world_id);
+			charsPerPeriod = parseInt(customLimit[0]);
+			var periodLength = parseInt(customLimit[1]);
+			customLimiter = rate_limiter.prepareRateLimiter(rate_limiter.editRateLimits, periodLength, ipAddress + "-world-" + world_id);
 		}
 	}
 
@@ -239,7 +107,7 @@ module.exports = async function(data, vars, evars) {
 		var tileX = san_nbr(segment[1]);
 		var charRatePerSecond = defaultCharRatePerSecond;
 
-		var rrate = checkCharrateRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name, tileX, tileY);
+		var rrate = rate_limiter.checkCharrateRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name, tileX, tileY);
 		if(rrate != null) {
 			charRatePerSecond = rrate;
 		}
@@ -249,30 +117,24 @@ module.exports = async function(data, vars, evars) {
 		segment[6] = san_nbr(segment[6]); // edit id
 		var editID = segment[6];
 		if(typeof char != "string") continue;
-		if(!checkCharRateLimit(editLimiter, charRatePerSecond, 1)) {
+		if(!rate_limiter.checkCharRateLimit(editLimiter, charRatePerSecond, 1)) {
 			rejected[editID] = 2;
 			continue;
 		}
 		if(customLimiter) {
-			if(!checkCharRateLimit(customLimiter, customLimit, 1)) {
+			if(!rate_limiter.checkCharRateLimit(customLimiter, charsPerPeriod, 1)) {
 				rejected[editID] = 2;
 				continue;
 			}
 		}
 		if(!tiles[tileStr]) {
-			if(!checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world_id)) {
+			if(!rate_limiter.checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world_id)) {
 				rejected[editID] = 2;
 				continue;
 			}
-			if(!tileHoldObj.tiles[tileStr]) {
-				if(tileHoldObj.count >= tileHoldLimit) {
-					rejected[editID] = 2;
-					continue;
-				}
-				tileHoldObj.count++;
-				tileHoldObj.tiles[tileStr] = 1;
-			} else {
-				tileHoldObj.tiles[tileStr]++;
+			if(!rate_limiter.setHold(idLabel, tileX, tileY)) {
+				rejected[editID] = 2;
+				continue;
 			}
 			tiles[tileStr] = [];
 			tileCount++;
@@ -313,7 +175,7 @@ module.exports = async function(data, vars, evars) {
 		var pos = i.split(",");
 		var tileX = parseInt(pos[1]);
 		var tileY = parseInt(pos[0]);
-		if(checkColorRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name, tileX, tileY)) {
+		if(rate_limiter.checkColorRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name, tileX, tileY)) {
 			canColor = false;
 		}
 
@@ -391,7 +253,7 @@ module.exports = async function(data, vars, evars) {
 	}
 
 	if(!tile_edits.length) {
-		clearHolds(tileHoldObj, tiles);
+		rate_limiter.clearHolds(idLabel, tiles);
 		return {
 			accepted: [],
 			rejected
@@ -411,7 +273,7 @@ module.exports = async function(data, vars, evars) {
 
 	var resp = await tile_database.editResponse(call_id);
 
-	clearHolds(tileHoldObj, tiles);
+	rate_limiter.clearHolds(idLabel, tiles);
 
 	return { accepted: resp[0], rejected };
 }

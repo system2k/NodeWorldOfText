@@ -29,9 +29,10 @@ const WebSocket   = require("ws");
 const zip         = require("adm-zip");
 const zlib        = require("zlib");
 
-const bin_packet = require("./backend/utils/bin_packet.js");
-const utils      = require("./backend/utils/utils.js");
-const templates  = require("./backend/utils/templates.js");
+const bin_packet   = require("./backend/utils/bin_packet.js");
+const utils        = require("./backend/utils/utils.js");
+const templates    = require("./backend/utils/templates.js");
+const rate_limiter = require("./backend/utils/rate_limiter.js");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -2808,7 +2809,8 @@ async function manageWebsocketConnection(ws, req) {
 		cursorPositionHidden: false,
 		messageBackpressure: 0,
 		receiveContentUpdates: true,
-		chatDmInteractions: {}
+		chatDmInteractions: {},
+		origin: req.headers["origin"]
 	};
 
 	var bytesWritten = 0;
@@ -3247,7 +3249,8 @@ var global_data = {
 	releaseWorld,
 	loadShellFile,
 	process_error_arg,
-	runShellScript
+	runShellScript,
+	rate_limiter
 };
 
 async function sysLoad() {

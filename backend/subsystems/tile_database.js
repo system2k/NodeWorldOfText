@@ -73,6 +73,8 @@ module.exports.server_exit = async function() {
 
 var tileClientUpdateQueue = {};
 var microTileUpdateRefs = {};
+var linkBandwidthInPeriod = 0;
+var linkBandwidthPeriod = 0;
 
 function deepTileCopy(tile) {
 	var props = {};
@@ -146,6 +148,24 @@ function generateFullTileUpdate(worldQueue, worldID) {
 		}
 		if(Object.keys(tile.prop_cell_props).length > 0) {
 			properties.cell_props = tile.prop_cell_props;
+		}
+		var currentPeriod = Math.floor(Date.now() / 1000);
+		if(currentPeriod == linkBandwidthPeriod) {
+			if(linkBandwidthInPeriod > 3000000) {
+				delete properties.cell_props;
+			}
+		} else {
+			linkBandwidthInPeriod = 0;
+		}
+		linkBandwidthPeriod = currentPeriod;
+		var cprops = tile.prop_cell_props;
+		for(var y in cprops) {
+			for(var x in cprops[y]) {
+				var link = cprops[y][x].link;
+				if(link.type == "url") {
+					linkBandwidthInPeriod += link.url.length;
+				}
+			}
 		}
 		cliUpdData[coord] = {
 			content,

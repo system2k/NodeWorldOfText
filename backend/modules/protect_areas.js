@@ -11,6 +11,9 @@ module.exports = async function(data, vars, evars) {
 	var tile_database = vars.tile_database;
 	var monitorEventSockets = vars.monitorEventSockets;
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
+	var getRestrictions = vars.getRestrictions;
+	var checkCoalition = vars.checkCoalition;
+	var rate_limiter = vars.rate_limiter;
 
 	var memkeyAccess = world.opts.memKey && world.opts.memKey == evars.keyQuery;
 
@@ -26,11 +29,22 @@ module.exports = async function(data, vars, evars) {
 	var type = data.type;
 
 	var ipAddress;
+	var ipAddressVal;
+	var ipAddressFam;
 	if(evars.ws && evars.ws.sdata) {
 		ipAddress = evars.ws.sdata.ipAddress;
+		ipAddressVal = evars.ws.sdata.ipAddressVal;
+		ipAddressFam = evars.ws.sdata.ipAddressFam;
 	} else {
 		ipAddress = evars.ipAddress;
+		ipAddressVal = evars.ipAddressVal;
+		ipAddressFam = evars.ipAddressFam;
 	}
+
+	var restr = getRestrictions();
+	var isGrouped = checkCoalition(ipAddressVal, ipAddressFam);
+
+	var idLabel = isGrouped ? "cg1" : ipAddress;
 
 	if(monitorEventSockets.length) {
 		broadcastMonitorEvent("Protect", ipAddress + " set 'protect' on world '" + world.name + "' (" + world.id + "), coords (" + tileX + ", " + tileY + ")");
@@ -64,6 +78,10 @@ module.exports = async function(data, vars, evars) {
 		return [true, "PARAM"];
 	}
 
+	if(!rate_limiter.setHold(idLabel, tileX, tileY)) {
+		return [true, "RATE"];
+	}
+
 	var call_id = tile_database.newCallId();
 	tile_database.reserveCallId(call_id);
 
@@ -74,6 +92,8 @@ module.exports = async function(data, vars, evars) {
 		channel, no_log_edits,
 		no_update: false
 	});
+
+	rate_limiter.releaseHold(idLabel, tileX, tileY);
 
 	var resp = await tile_database.editResponse(call_id);
 

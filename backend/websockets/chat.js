@@ -69,6 +69,11 @@ module.exports = async function(ws, data, send, vars, evars) {
 		}
 	}
 
+	var safeOrigin = false;
+	if(ws.sdata.origin == "https://ourworldoftext.com" || ws.sdata.origin == "https://testserver1.ourworldoftext.com") {
+		safeOrigin = true;
+	}
+
 	// sends `[ Server ]: <message>` in chat.
 	function serverChatResponse(message, location) {
 		send({
@@ -695,6 +700,11 @@ module.exports = async function(ws, data, send, vars, evars) {
 		} else if(location == "global") {
 			await add_to_chatlog(chatData, 0);
 		}
+	}
+
+	if(!isCommand && user.operator && !safeOrigin) {
+		msg = html_tag_esc(msg);
+		chatData.message = msg;
 	}
 
 	if(isMuted && !isShadowMuted) return;

@@ -19,6 +19,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var accountSystem = vars.accountSystem;
 	var releaseWorld = vars.releaseWorld;
 	var modifyWorldProp = vars.modifyWorldProp;
+	var createCSRF = vars.createCSRF;
 
 	var world_name = path;
 
@@ -161,12 +162,14 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		if(!world.name) {
 			meta_desc = "";
 		}
+		var csrftoken = createCSRF(user.id, 0);
 		var data = {
 			state: JSON.stringify(state),
 			page_title,
 			nsfw: world.opts.nsfw,
-			meta_desc
-		}
+			meta_desc,
+			csrftoken
+		};
 		return serve(HTML("yourworld.html", data), null, {
 			mime: "text/html; charset=utf-8"
 		});

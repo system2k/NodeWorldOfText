@@ -102,7 +102,7 @@ function procRest(list) {
 				props[key] = val;
 			}
 		}
-		if((!itemip && !itemgroup) || (itemtype != "charrate" && itemtype != "color")) continue;
+		if((!itemip && !itemgroup) || (itemtype != "charrate" && itemtype != "color" && itemtype != "linkrate")) continue;
 		if(itemgroup && itemip) continue; // can't have both
 		
 		var obj = null;
@@ -121,6 +121,20 @@ function procRest(list) {
 			obj = {
 				type: "charrate",
 				rate, world, region
+			};
+		} else if(itemtype == "linkrate") {
+			var rate = props.rate;
+			var world = props.world;
+			if(!("world" in props)) {
+				world = null;
+			}
+			rate = parseInt(rate);
+			if(isNaN(rate)) continue;
+			if(rate < 0) rate = 0;
+			if(rate > 1000000) rate = 1000000;
+			obj = {
+				type: "linkrate",
+				rate, world
 			};
 		} else if(itemtype == "color") {
 			var region = props.region;
@@ -179,6 +193,14 @@ function procRest(list) {
 			}
 			if(region != null) {
 				rstrLine.push("region=" + region.join(","));
+			}
+			rstr += rstrLine.join(";") + "\n";
+		} else if(type == "linkrate") {
+			var rate = restr.rate;
+			var world = restr.world;
+			var rstrLine = [identifier, "type=linkrate", "rate=" + rate];
+			if(world != null) {
+				rstrLine.push("world=" + world);
 			}
 			rstr += rstrLine.join(";") + "\n";
 		} else if(type == "color") {
