@@ -3845,12 +3845,20 @@ function fillBlockChar(charCode, textRender, x, y) {
 	}
 	var dir = transform[0];
 	var frac = transform[1];
+
+	var sx = x;
+	var sy = y;
+	var ex = sx + cellW;
+	var ey = sy + cellH;
+
 	switch(dir) {
-		case 0: textRender.fillRect(x, y, cellW * frac, cellH); break;
-		case 1: textRender.fillRect(x + cellW - (cellW * frac), y, cellW * frac, cellH); break;
-		case 2: textRender.fillRect(x, y, cellW, cellH * frac); break;
-		case 3: textRender.fillRect(x, y + cellH - (cellH * frac), cellW, cellH * frac);
+		case 0: ex -= cellW - (cellW * frac); break;
+		case 1: sx += cellW - (cellW * frac); break;
+		case 2: ey -= cellH - (cellH * frac); break;
+		case 3: sy += cellH - (cellH * frac); break;
 	}
+
+	textRender.fillRect(sx, sy, ex - sx, ey - sy);
 	return true;
 }
 
