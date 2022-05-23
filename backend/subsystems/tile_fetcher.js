@@ -34,7 +34,7 @@ async function fetchNext() {
 	var ipQueue = fetchesByIp[nextIp];
 	if(!ipQueue) {
 		ipAddrQueue.shift();
-		return false;
+		return true;
 	}
 	var queue = ipQueue.queue;
 
@@ -48,14 +48,22 @@ async function fetchNext() {
 		var range = current.range;
 		var worldID = current.worldID;
 		var resolve = current.promise;
+		var socket = current.socket;
 		var x1 = range[0];
 		var y1 = range[1];
 		var x2 = range[2];
 		var y2 = range[3];
 		var area = (y2 - y1 + 1) * (x2 - x1 + 1);
+		if(socket && socket.readyState != 1) {
+			queue.shift();
+			if(queue.length) {
+				ipAddrQueue.push(nextIp);
+			}
+			return true;
+		}
 		if(ipQueue.tilesInPeriod + area > 100) {
 			ipAddrQueue.push(nextIp);
-			return false;
+			return true;
 		}
 		ipQueue.tilesInPeriod += area;
 		rangesPeriod.push(current);
@@ -86,7 +94,7 @@ async function fetchNext() {
 	return true;
 }
 
-function queueFetch(ip, worldID, range) { // TODO: what if client closes in the middle of fetching multiple ranges?
+function queueFetch(ip, worldID, range, socket) { // TODO: what if client closes in the middle of fetching multiple ranges?
 	if(!ipAddrQueue.includes(ip)) {
 		ipAddrQueue.push(ip);
 		if(!fetchesByIp[ip]) {
@@ -102,7 +110,8 @@ function queueFetch(ip, worldID, range) { // TODO: what if client closes in the 
 		queue.push({
 			range,
 			worldID,
-			promise: res
+			promise: res,
+			socket
 		});
 	});
 }

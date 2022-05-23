@@ -166,7 +166,7 @@ module.exports = async function(data, vars, evars) {
 				}
 			}
 
-			var tileData = await tile_fetcher.fetch(ipAddress, world.id, subRect);
+			var tileData = await tile_fetcher.fetch(ipAddress, world.id, subRect, evars.ws);
 			if(evars.ws && evars.ws.readyState !== WebSocket.OPEN) {
 				return "Socket error";
 			}

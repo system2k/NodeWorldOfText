@@ -3034,8 +3034,6 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 		draggable_element_mousemove[i](e, e.pageX, e.pageY);
 	}
 	updateHoveredLink(pageX, pageY, e);
-	//if(e.target != elm.owot && e.target != linkDiv && !isDragging) return; // TODO
-	//if(!isDragging) return;
 
 	var canvasTarget = e.target == elm.owot;
 

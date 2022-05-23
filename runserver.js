@@ -2721,7 +2721,7 @@ var ip_address_req_limit = {}; // TODO: Cleanup objects
 var ws_req_per_second = 1000;
 var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	chat:			[256, 1000, 0], // rate-limiting handled separately
-	chathistory:	[2, 1000, 0],
+	chathistory:	[4, 500, 0],
 	clear_tile:		[1000, 1000, 0],
 	cmd_opt:		[10, 1000, 0],
 	cmd:			[256, 1000, 0],
