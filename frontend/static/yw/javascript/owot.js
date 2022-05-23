@@ -3857,6 +3857,12 @@ function fillBlockChar(charCode, textRender, x, y) {
 		case 2: ey -= cellH - (cellH * frac); break;
 		case 3: sy += cellH - (cellH * frac); break;
 	}
+	if(ex - sx > 1 && ey - sy > 1) {
+		sx = Math.round(sx);
+		sy = Math.round(sy);
+		ex = Math.round(ex);
+		ey = Math.round(ey);
+	}
 
 	textRender.fillRect(sx, sy, ex - sx, ey - sy);
 	return true;
