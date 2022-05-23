@@ -396,14 +396,16 @@ module.exports = async function(ws, data, send, vars, evars) {
 				if(!ws.sdata.userClient) return;
 				var dstClientId = ws.sdata.clientId;
 				var clientWorld = ws.sdata.world;
+				if(dstClientId != id) return;
 				if(location == "page") {
-					if(clientWorld.id == world.id && dstClientId == id) {
+					if(clientWorld.id == world.id) {
 						client = ws;
 					}
 				} else if(location == "global") {
 					var cliObj = client_ips[clientWorld.id][dstClientId];
 					var cliTime = cliObj[3];
-					if(cliTime != -1 && cliTime >= latestGlobalClientTime) {
+					var disconnected = cliObj[2];
+					if((!disconnected && cliTime != -1 && cliTime >= latestGlobalClientTime) || (dstClientId == clientId)) { // allow self-dm
 						latestGlobalClientTime = cliTime;
 						client = ws;
 					}
@@ -474,8 +476,11 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 			if(isShadowMuted || noClient) return;
 			wsSend(client, JSON.stringify(privateMessage));
-			if(client.sdata.chatDmInteractions) {
-				client.sdata.chatDmInteractions[clientId] = true;
+			if(ws.sdata.chatDmInteractions) {
+				ws.sdata.chatDmInteractions[clientId] = true;
+			}
+			if(clientIpObj && location == "global") {
+				clientIpObj[3] = Date.now();
 			}
 			broadcastMonitorEvent("TellSpam", "Tell from " + clientId + " (" + ws.sdata.ipAddress + ") to " + id + ", first 4 chars: [" + message.slice(0, 4) + "]");
 		},
