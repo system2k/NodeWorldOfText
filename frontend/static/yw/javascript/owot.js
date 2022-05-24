@@ -121,6 +121,7 @@ var defaultCoordLinkColor  = "#008000";
 var defaultURLLinkColor    = "#0000FF";
 var defaultHighlightColor  = [0xFF, 0xFF, 0x99];
 var secureJSLink           = true; // display warning prompt when clicking on javascript links
+var secureLink             = true; // display confirmation when clicking on links in a suspicious setting
 var priorityOverwriteChar  = false; // (Experimental) prevents characters from lower protection levels from overflowing to higher levels
 var pasteDirRight          = true; // move cursor right when writing
 var pasteDirDown           = true; // move cursor down after pressing enter
@@ -2886,17 +2887,20 @@ linkElm.onclick = function(e) {
 		w.broadcastCommand(url, true);
 		return false;
 	}
-	var lTileX = currentSelectedLinkCoords[0];
-	var lTileY = currentSelectedLinkCoords[1];
-	var lCharX = currentSelectedLinkCoords[2];
-	var lCharY = currentSelectedLinkCoords[3];
-	var linkProt = getCharProtection(lTileX, lTileY, lCharX, lCharY);
-	var isMain = state.worldModel.name == "" || state.worldModel.name.toLowerCase() == "main";
-	var isCenter = (-20 <= lTileX && 20 >= lTileX) && (-20 <= lTileY && 20 >= lTileY);
-	if(isMain && isCenter && linkProt == 0 && !isSafeHostname(linkParams.host)) {
-		var acpt = confirm("Are you sure you want to visit this link?\n" + url);
-		if(!acpt) {
-			return false;
+	if(secureLink && !e.ctrlKey) {
+		var lTileX = currentSelectedLinkCoords[0];
+		var lTileY = currentSelectedLinkCoords[1];
+		var lCharX = currentSelectedLinkCoords[2];
+		var lCharY = currentSelectedLinkCoords[3];
+		var charInfo = getCharInfo(lTileX, lTileY, lCharX, lCharY);
+		var isMain = state.worldModel.name == "" || state.worldModel.name.toLowerCase() == "main";
+		var isCenter = (-20 <= lTileX && 20 >= lTileX) && (-20 <= lTileY && 20 >= lTileY);
+		var badChar = isMain && charInfo.char == "\u2588";
+		if(((isMain && isCenter && charInfo.protection == 0) || badChar) && !isSafeHostname(linkParams.host)) {
+			var acpt = confirm("Are you sure you want to visit this link?\n" + url);
+			if(!acpt) {
+				return false;
+			}
 		}
 	}
 	if(linkEvent && linkEvent[0]) {
@@ -3331,6 +3335,7 @@ function createSocket() {
 		}
 		w.doAnnounce("", "err_connect");
 		w.doAnnounce("", "err_access");
+		w.doAnnounce("", "err_limit");
 		clearTimeout(disconnectTimeout);
 		disconnectTimeout = null;
 	}
@@ -6170,6 +6175,8 @@ var ws_functions = {
 				console.log("Received error from the server with code [" + code + "]: " + message);
 				if(code == "NO_PERM") {
 					w.doAnnounce("Access to this world is denied. Please make sure you are logged in.", "err_access");
+				} else if(code == "CONN_LIMIT") {
+					w.doAnnounce("You have too many connections.", "err_limit");
 				}
 				break;
 			case "PARAM": // invalid parameters in message

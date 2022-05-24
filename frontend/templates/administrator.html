@@ -276,8 +276,14 @@
 			{% endif %}
 			<form method="POST" action=".">
 				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
-				Bypass key: 
+				Bypass key:
 				<input type="text" name="set_bypass_key" id="set_bypass_key" value="{{ bypass_key }}" style="width: 100%;">
+				<input type="submit" value="Set">
+			</form>
+			<form method="POST" action=".">
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
+				Client version:
+				<input type="text" name="set_cli_version" id="set_cli_version" value="{{ client_version }}" style="width: 100%;">
 				<input type="submit" value="Set">
 			</form>
 		</div>

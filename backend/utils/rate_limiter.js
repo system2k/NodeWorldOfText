@@ -5,11 +5,20 @@ var tileHolds = {};
 
 function checkCharRateLimit(ipObj, cRate, editCount) {
 	if(!cRate) return false;
-	var per = Math.floor(Date.now() / ipObj.periodLength);
+	var date = Date.now();
+	if(!ipObj.value) {
+		ipObj.periodEpoch = date;
+	}
+	var per = Math.floor((date - ipObj.periodEpoch) / ipObj.periodLength);
 	var currentPer = ipObj.currentPeriod;
 	ipObj.currentPeriod = per;
-	if(currentPer != per || ipObj.value == null) {
+	if(currentPer != per || !ipObj.value) {
 		ipObj.value = editCount;
+		// reset the period offset if the beat drifts too far
+		if(date - (ipObj.periodEpoch + (per * ipObj.periodLength) < 1500)) {
+			ipObj.periodEpoch = date;
+			ipObj.currentPeriod = 0;
+		}
 		return true;
 	}
 	ipObj.value += editCount;
@@ -21,14 +30,16 @@ function checkCharRateLimit(ipObj, cRate, editCount) {
 
 function checkTileRateLimit(ipObj, tRate, tileX, tileY, worldId) {
 	if(!tRate) return false;
-	var per = Math.floor(Date.now() / ipObj.periodLength);
+	var per = Math.floor((Date.now() - ipObj.periodEpoch) / ipObj.periodLength);
 	var currentPer = ipObj.currentPeriod;
+	var pos = tileY + "," + tileX + "," + worldId;
 	ipObj.currentPeriod = per;
 	if(currentPer != per || ipObj.value == null) {
 		ipObj.value = {};
+		ipObj.value[pos] = 1;
 		return true;
 	}
-	ipObj.value[tileY + "," + tileX + "," + worldId] = 1;
+	ipObj.value[pos] = 1;
 	var tileCount = Object.keys(ipObj.value).length;
 	if(tileCount > tRate) {
 		return false;
@@ -44,9 +55,10 @@ function prepareRateLimiter(limObj, periodLength, ipAddress) {
 		}
 	}
 	obj = {
+		periodEpoch: 0, // period offset
 		currentPeriod: 0,
-		periodLength,
-		value: null
+		periodLength, // rate-limit interval
+		value: null // number of items in current period
 	};
 	limObj[ipAddress] = obj;
 	return obj;

@@ -14,6 +14,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var accountSystem = vars.accountSystem;
 	var acme = vars.acme;
 	var createCSRF = vars.createCSRF;
+	var getClientVersion = vars.getClientVersion;
 
 	// not a superuser...
 	if(!user.superuser) {
@@ -86,6 +87,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		custom_ranks,
 		acme_enabled: acme.enabled,
 		acme_pass: acme.enabled ? (acme.pass ? acme.pass : "") : "",
+		client_version: getClientVersion(),
 		csrftoken
 	};
 
@@ -105,6 +107,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var stopServer = vars.stopServer;
 	var acme = vars.acme;
 	var checkCSRF = vars.checkCSRF;
+	var setClientVersion = vars.setClientVersion;
 
 	if(!user.superuser) {
 		return await dispage("404", null, req, serve, vars, evars);
@@ -137,10 +140,19 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	}
 	if("set_bypass_key" in post_data) {
 		var new_bypass_key = post_data.set_bypass_key;
-		modify_bypass_key(new_bypass_key);
-		return await dispage("admin/administrator", {
-			cons_update_msg: "Bypass key updated successfully"
-		}, req, serve, vars, evars);
+		if(modify_bypass_key(new_bypass_key)) {
+			return await dispage("admin/administrator", {
+				cons_update_msg: "Bypass key updated successfully"
+			}, req, serve, vars, evars);
+		}
+	}
+	if("set_cli_version" in post_data) {
+		var new_cli_version = post_data.set_cli_version;
+		if(setClientVersion(new_cli_version)) {
+			return await dispage("admin/administrator", {
+				cons_update_msg: "Client version updated successfully"
+			}, req, serve, vars, evars);
+		}
 	}
 	if("announcement" in post_data) {
 		var new_announcement = post_data.announcement;

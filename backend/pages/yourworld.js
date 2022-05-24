@@ -20,6 +20,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var releaseWorld = vars.releaseWorld;
 	var modifyWorldProp = vars.modifyWorldProp;
 	var createCSRF = vars.createCSRF;
+	var getClientVersion = vars.getClientVersion;
 
 	var world_name = path;
 
@@ -163,11 +164,16 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			meta_desc = "";
 		}
 		var csrftoken = createCSRF(user.id, 0);
+		var staticVersion = getClientVersion();
+		if(staticVersion) {
+			staticVersion = "?v=" + staticVersion;
+		}
 		var data = {
 			state: JSON.stringify(state),
 			page_title,
 			nsfw: world.opts.nsfw,
 			meta_desc,
+			staticVersion,
 			csrftoken
 		};
 		return serve(HTML("yourworld.html", data), null, {

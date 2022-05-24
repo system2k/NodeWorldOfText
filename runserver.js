@@ -72,6 +72,7 @@ var checkDuplicateCookie = utils.checkDuplicateCookie;
 
 var gzipEnabled = false;
 var shellEnabled = true;
+var clientVersion = "";
 
 // Global
 CONST = {};
@@ -120,6 +121,19 @@ function loadShellFile() {
 		file = file.toString("utf8");
 	}
 	return file;
+}
+
+function getClientVersion() {
+	return clientVersion;
+}
+function setClientVersion(ver) {
+	if(clientVersion === ver) return false;
+	if(ver) {
+		clientVersion = ver;
+	} else {
+		clientVersion = "";
+	}
+	return true;
 }
 
 var csrfkeys = [crypto.randomBytes(8), crypto.randomBytes(8)];
@@ -2296,10 +2310,12 @@ async function MODIFY_ANNOUNCEMENT(text) {
 	});
 }
 
-async function modify_bypass_key(key) {
+function modify_bypass_key(key) {
 	key += "";
+	if(bypass_key_cache === key) return false;
 	fs.writeFileSync(settings.bypass_key, key);
 	bypass_key_cache = key;
+	return true;
 }
 
 // command-line only
@@ -2765,7 +2781,7 @@ function get_ip_kind_limits(ip) {
 	return obj;
 }
 
-var connections_per_ip = 50;
+var connections_per_ip = 32;
 function can_connect_ip_address(ip) {
 	if(!ip_address_conn_limit[ip] || !ip || ip == "0.0.0.0") return true;
 	if(ip_address_conn_limit[ip] >= connections_per_ip) return false;
@@ -2809,7 +2825,6 @@ async function manageWebsocketConnection(ws, req) {
 		cursorPositionHidden: false,
 		messageBackpressure: 0,
 		receiveContentUpdates: true,
-		chatDmInteractions: {},
 		origin: req.headers["origin"]
 	};
 
@@ -3250,7 +3265,9 @@ var global_data = {
 	loadShellFile,
 	process_error_arg,
 	runShellScript,
-	rate_limiter
+	rate_limiter,
+	getClientVersion,
+	setClientVersion
 };
 
 async function sysLoad() {

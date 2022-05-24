@@ -420,7 +420,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 			if(isMuted && !isShadowMuted) return;
 
-			if(noClient && ws.sdata.chatDmInteractions && ws.sdata.chatDmInteractions[id]) {
+			if(noClient) {
 				return serverChatResponse("User not found", location);
 			}
 
@@ -476,9 +476,6 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 			if(isShadowMuted || noClient) return;
 			wsSend(client, JSON.stringify(privateMessage));
-			if(ws.sdata.chatDmInteractions) {
-				ws.sdata.chatDmInteractions[clientId] = true;
-			}
 			if(clientIpObj && location == "global") {
 				clientIpObj[3] = Date.now();
 			}
