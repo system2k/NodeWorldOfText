@@ -307,8 +307,6 @@ module.exports = async function(ws, data, send, vars, evars) {
 		return null;
 	}
 
-	var hasPrivateMsged = false;
-
 	var com = {
 		worlds: function() {
 			var topCount = 1000;
@@ -595,65 +593,19 @@ module.exports = async function(ws, data, send, vars, evars) {
 		}
 	}
 
-	var isCommand = false;
-	// This is a command
-	if(msg[0] == "/") {
-		var args = msg.substr(1).split(" ");
-		var command = args[0].toLowerCase();
-		isCommand = true;
-
-		var operator = user.operator;
-		var superuser = user.superuser;
-		var staff = user.staff;
-
-		switch(command) {
-			case "worlds":
-				if(superuser) com.worlds();
-				return;
-			case "help":
-				com.help();
-				return;
-			case "uptime":
-				com.uptime();
-				return;
-			case "block":
-				com.block(args[1]);
-				return;
-			case "unblockall":
-				com.unblockall();
-			case "tell":
-				com.tell(args[1], args.slice(2).join(" "));
-				return;
-			case "channel":
-				com.channel();
-				return;
-			case "mute":
-				com.mute(args[1], args[2], args[3]);
-				return;
-			case "clearmutes":
-				com.clearmutes();
-				return;
-			case "whoami":
-				com.whoami();
-				return;
-			case "stats":
-				com.stats();
-				return;
-			case "delete":
-				if(staff) com.delete(args[1], args[2]);
-				return;
-			default:
-				serverChatResponse("Invalid command: " + html_tag_esc(msg));
-		}
+	var isCommand = (msg[0] == "/");
+	var commandArgs, commandType;
+	if(isCommand) {
+		commandArgs = msg.slice(1).split(" ");
+		commandType = commandArgs[0].toLowerCase();
 	}
 
+	// chat limiter
 	var msNow = Date.now();
-
 	var second = Math.floor(msNow / 1000);
 	var chatsEverySecond = 2;
-	if(isCommand && !hasPrivateMsged) chatsEverySecond = 512;
+	if(isCommand && commandType != "tell") chatsEverySecond = 512;
 
-	// chat limiter
 	if(!chat_ip_limits[ipHeaderAddr]) {
 		chat_ip_limits[ipHeaderAddr] = {};
 	}
@@ -669,6 +621,52 @@ module.exports = async function(ws, data, send, vars, evars) {
 			}
 		} else {
 			cil.chatsSentInSecond++;
+		}
+	}
+
+	if(isCommand) {
+		var operator = user.operator;
+		var superuser = user.superuser;
+		var staff = user.staff;
+
+		switch(commandType) {
+			case "worlds":
+				if(superuser) com.worlds();
+				return;
+			case "help":
+				com.help();
+				return;
+			case "uptime":
+				com.uptime();
+				return;
+			case "block":
+				com.block(commandArgs[1]);
+				return;
+			case "unblockall":
+				com.unblockall();
+			case "tell":
+				com.tell(commandArgs[1], commandArgs.slice(2).join(" "));
+				return;
+			case "channel":
+				com.channel();
+				return;
+			case "mute":
+				com.mute(commandArgs[1], commandArgs[2], commandArgs[3]);
+				return;
+			case "clearmutes":
+				com.clearmutes();
+				return;
+			case "whoami":
+				com.whoami();
+				return;
+			case "stats":
+				com.stats();
+				return;
+			case "delete":
+				if(staff) com.delete(commandArgs[1], commandArgs[2]);
+				return;
+			default:
+				serverChatResponse("Invalid command: " + html_tag_esc(msg));
 		}
 	}
 
