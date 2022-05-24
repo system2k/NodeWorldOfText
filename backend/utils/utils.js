@@ -980,9 +980,6 @@ function arrayIsEntirely(arr, elm) {
 
 // convert cached tile object into format client uses
 function normalizeCacheTile(ctile) {
-	if(!ctile.tile_exists && !ctile.props_updated && !ctile.content_updated && !ctile.writability_updated) {
-		return null;
-	}
 	var tile = {
 		content: ctile.content.join(""),
 		properties: {

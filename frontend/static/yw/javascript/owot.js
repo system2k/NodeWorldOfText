@@ -4438,9 +4438,9 @@ function renderLoop() {
 	} else if(w.hasSelectiveUpdated) {
 		renderTilesSelective();
 	}
-	w.emit("frame"); // emitted before update flags are reset
 	w.hasUpdated = false;
 	w.hasSelectiveUpdated = false;
+	w.emit("frame"); // emitted after update flags are reset
 	if(!writeBuffer.length) sendCursorPosition();
 	requestAnimationFrame(renderLoop);
 }
