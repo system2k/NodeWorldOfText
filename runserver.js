@@ -1492,14 +1492,14 @@ var http_rate_limits = [ // function ; hold limit ; [method]
 
 var http_req_holds = {}; // ip/identifier -> {"<index>": {holds: <number>, resp: [<promises>,...]},...}
 
-async function check_http_rate_limit(ip, func, method) {
+function check_http_rate_limit(ip, func, method) {
 	var idx = -1;
 	var max = 0;
 	for(var i = 0; i < http_rate_limits.length; i++) {
 		var line = http_rate_limits[i];
-		var lf = line[0];
-		var lc = line[1];
-		var lm = line[2];
+		var lf = line[0]; // function
+		var lc = line[1]; // number of requests at a time to process
+		var lm = line[2]; // method (optional)
 		if(lf != func) continue;
 		if(lm && lm != method) continue;
 		idx = i;
@@ -1543,8 +1543,11 @@ function release_http_rate_limit(ip, rate_id) {
 	for(var i = 0; i < diff; i++) {
 		var func = lim.resp[0];
 		if(!func) continue;
-		func(rate_id);
-		lim.resp.splice(0, 1);
+		if(lim.holds < lim.max) {
+			lim.holds++;
+			func(rate_id);
+			lim.resp.splice(0, 1);
+		}
 	}
 	if(!lim.holds && !lim.resp.length) {
 		delete obj[rate_id];
@@ -2203,6 +2206,11 @@ async function process_request(req, res, compCallbacks) {
 			if(typeof pageRes == "object") {
 				var method = req.method.toUpperCase();
 				var rate_id = await check_http_rate_limit(ipAddress, pageRes, method);
+				if(rate_id != -1) { // release handle when this request finishes
+					compCallbacks.push(function() {
+						release_http_rate_limit(ipAddress, rate_id);
+					});
+				}
 				var post_data = {};
 				var query_data = querystring.parse(url.parse(req.url).query);
 				var cookies = parseCookie(req.headers.cookie);
@@ -2271,9 +2279,6 @@ async function process_request(req, res, compCallbacks) {
 					pageStat = await pageRes[method](req, dispatch, global_data, evars, {});
 				} else {
 					dispatch("Method " + method + " not allowed.", 405);
-				}
-				if(rate_id != -1) {
-					release_http_rate_limit(ipAddress, rate_id);
 				}
 				if(pageStat === -1) continue;
 			} else if(typeof pageRes == "string") { // redirection
