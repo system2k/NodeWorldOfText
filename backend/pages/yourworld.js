@@ -21,6 +21,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var modifyWorldProp = vars.modifyWorldProp;
 	var createCSRF = vars.createCSRF;
 	var getClientVersion = vars.getClientVersion;
+	var http_time = vars.http_time;
 
 	var world_name = path;
 
@@ -35,7 +36,12 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var read_permission = await canViewWorld(world, user, { memkeyAccess });
 	if(!read_permission) {
+		var privCookie = [];
+		if(world.opts.privNote) {
+			privCookie.push("privateworldmsg=" + encodeURIComponent(world.opts.privNote) + "; path=/;");
+		}
 		return serve(null, null, {
+			cookie: privCookie,
 			redirect: "/accounts/private/"
 		});
 	}

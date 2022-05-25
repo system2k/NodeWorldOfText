@@ -73,6 +73,7 @@ var world_default_props = {
 	background_rmod: 0,
 	background_alpha: 1,
 	meta_desc: "",
+	priv_note: "",
 	write_int: -1
 };
 
@@ -177,6 +178,7 @@ function makeWorldObject() {
 			charRate: "",
 			writeInt: 0,
 			memKey: "",
+			privNote: "",
 			desc: ""
 		},
 		background: {
@@ -268,6 +270,7 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.opts.charRate = getAndProcWorldProp(wprops, "char_rate");
 	wobj.opts.memKey = getAndProcWorldProp(wprops, "mem_key");
 	wobj.opts.desc = getAndProcWorldProp(wprops, "meta_desc");
+	wobj.opts.privNote = getAndProcWorldProp(wprops, "priv_note");
 	wobj.opts.writeInt = getAndProcWorldProp(wprops, "write_int");
 
 	wobj.background.url = getAndProcWorldProp(wprops, "background");
@@ -418,6 +421,7 @@ async function commitWorld(world) {
 		"opts/halfChars",
 		"opts/charRate",
 		"opts/desc",
+		"opts/privNote",
 		"opts/writeInt",
 		"background/url",
 		"background/x",
@@ -444,6 +448,7 @@ async function commitWorld(world) {
 		char_rate: world.opts.charRate,
 		mem_key: world.opts.memKey,
 		meta_desc: world.opts.desc,
+		priv_note: world.opts.privNote,
 		write_int: world.opts.writeInt,
 		background: world.background.url,
 		background_x: world.background.x,

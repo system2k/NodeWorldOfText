@@ -90,7 +90,7 @@
 				<a href="/accounts/password_change/">Change Password</a>
 				{% if !email_verified && ver_count == 0 %}
 				<br>
-				<a href="/accounts/verify_email/{{ csrftoken }}/">Verify Email</a>
+				<a href="/accounts/verify_email/{{ classic_csrftoken }}/">Verify Email</a>
 				{% endif %}
 			{% endif %}
 			<br>

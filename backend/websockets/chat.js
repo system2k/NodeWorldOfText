@@ -644,6 +644,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 				return;
 			case "unblockall":
 				com.unblockall();
+				return;
 			case "tell":
 				com.tell(commandArgs[1], commandArgs.slice(2).join(" "));
 				return;

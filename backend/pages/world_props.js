@@ -58,6 +58,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 			halfChars: world.opts.halfChars,
 			charRate: world.opts.charRate,
 			writeInt: world.opts.writeInt,
+			privNote: world.opts.privNote,
 			desc: world.opts.desc
 		},
 		background: {

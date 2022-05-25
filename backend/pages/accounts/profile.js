@@ -111,6 +111,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var data = {
 		message: message,
 		csrftoken,
+		classic_csrftoken: user.csrftoken,
 		worlds_owned: world_list,
 		memberships: html_memberships,
 		email_verified: user.is_active

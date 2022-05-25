@@ -121,7 +121,7 @@ module.exports = async function(data, vars, evars) {
 			rejected[editID] = 2;
 			continue;
 		}
-		if(customLimiter) {
+		if(customLimiter && rrate == null) {
 			if(!rate_limiter.checkCharRateLimit(customLimiter, charsPerPeriod, 1)) {
 				rejected[editID] = 2;
 				continue;

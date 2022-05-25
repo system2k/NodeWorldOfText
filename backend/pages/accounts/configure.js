@@ -223,6 +223,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		background_h: world.background.h,
 		background_rmod: world.background.rmod,
 		background_alpha: world.background.alpha,
+		priv_note: world.opts.privNote,
 		meta_desc: world.opts.desc
 	};
 
@@ -661,6 +662,17 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			modifyWorldProp(world, "opts/desc", mdesc);
 		} else {
 			modifyWorldProp(world, "opts/desc", "");
+		}
+
+		if(post_data.priv_note) {
+			var pnote = post_data.priv_note;
+			if(typeof pnote != "string") pnote = "";
+			pnote = pnote.trim();
+			pnote = pnote.slice(0, 600);
+			pnote = pnote.replace(/\r|\n/g, " ");
+			modifyWorldProp(world, "opts/privNote", pnote);
+		} else {
+			modifyWorldProp(world, "opts/privNote", "");
 		}
 
 		if(post_data.charsize == "default") {
