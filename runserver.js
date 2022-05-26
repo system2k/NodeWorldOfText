@@ -1488,7 +1488,8 @@ var http_rate_limits = [ // function ; hold limit ; [method]
 	[pages.unprotect_char, 512],
 	[pages.coordlink, 512],
 	[pages.urllink, 512],
-	[pages.yourworld, 512, "POST"]
+	[pages.yourworld, 512, "POST"],
+	[pages.yourworld, 6, "GET"]
 ];
 
 var http_req_holds = {}; // ip/identifier -> {"<index>": {holds: <number>, resp: [<promises>,...]},...}
