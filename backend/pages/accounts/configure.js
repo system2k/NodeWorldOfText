@@ -321,7 +321,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		}
 
 		if(await promoteMembershipByWorldName(world.name, user_id)) {
-			sendWorldStatusUpdate(world.id, user.id, "isMember", true);
+			sendWorldStatusUpdate(world.id, user_id, "isMember", true);
 		}
 
 		return await dispage("accounts/configure", {
@@ -335,7 +335,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			if(!e.sdata.userClient) return;
 			if(e.sdata.world.id == world.id) {
 				var memkeyAccess = world.opts.memKey && world.opts.memKey == e.sdata.keyQuery;
-				var isOwner = world.ownerId == e.sdata.user.id;
+				var isOwner = world.ownerId == e.sdata.user.id; // TODO: what if superuser on main page? again, overhaul this system.
 				var isMember = !!world.members.map[e.sdata.user.id] || memkeyAccess;
 				if(readability == 1 && !isMember && !isOwner) {
 					e.close();
@@ -644,8 +644,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				if(key.length > 64) {
 					msgResponseMisc.push("Member key is too long (max 64 chars)");
 				} else {
-					modifyWorldProp(world, "opts/memKey", key);
-					memkeyUpdated = true;
+					memkeyUpdated = modifyWorldProp(world, "opts/memKey", key);
 				}
 			}
 		} else {
@@ -709,6 +708,16 @@ module.exports.POST = async function(req, serve, vars, evars) {
 						e.close();
 						return;
 					}
+					// TODO: overhaul system
+					wsSend(e, JSON.stringify({
+						kind: "propUpdate",
+						props: [
+							{
+								type: "isMember",
+								value: isMember
+							}
+						]
+					}));
 				}
 			});
 		}
@@ -749,6 +758,10 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		if("unclaim" in post_data) {
 			if(modifyWorldProp(world, "ownerId", null)) {
 				sendWorldStatusUpdate(world.id, user.id, "isOwner", false);
+				var isMember = Boolean(world.members.map[user.id]);
+				if(!isMember) {
+					sendWorldStatusUpdate(world.id, user.id, "isMember", false);
+				}
 			}
 			return serve(null, null, {
 				redirect: "/accounts/profile/"

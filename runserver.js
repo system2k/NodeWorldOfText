@@ -136,7 +136,8 @@ function setClientVersion(ver) {
 	return true;
 }
 
-var csrfkeys = [crypto.randomBytes(8), crypto.randomBytes(8)];
+// temporary solution - TODO: make more secure
+var csrfkeys = [Math.floor(Date.now() / 86400000).toString(), crypto.randomBytes(8)];
 function createCSRF(userid, kclass) {
 	var csrftoken = crypto.createHmac("sha1", csrfkeys[kclass]).update(userid.toString()).digest("hex").toLowerCase();
 	return csrftoken;
@@ -2786,7 +2787,7 @@ function get_ip_kind_limits(ip) {
 	return obj;
 }
 
-var connections_per_ip = 32;
+var connections_per_ip = 50;
 function can_connect_ip_address(ip) {
 	if(!ip_address_conn_limit[ip] || !ip || ip == "0.0.0.0") return true;
 	if(ip_address_conn_limit[ip] >= connections_per_ip) return false;

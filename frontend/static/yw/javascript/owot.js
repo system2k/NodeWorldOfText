@@ -6053,7 +6053,7 @@ var ws_functions = {
 					}
 					ws_path = createWsPath();
 					if(window.history && window.history.replaceState) {
-						history.replaceState({}, "", value + window.location.search + window.location.hash);
+						history.replaceState({}, "", state.worldModel.pathname + window.location.search + window.location.hash);
 					}
 					break;
 				case "charRate":

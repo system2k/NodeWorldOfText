@@ -11,7 +11,6 @@ module.exports = async function(data, vars, evars) {
 	var tile_database = vars.tile_database;
 	var monitorEventSockets = vars.monitorEventSockets;
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
-	var getRestrictions = vars.getRestrictions;
 	var checkCoalition = vars.checkCoalition;
 	var rate_limiter = vars.rate_limiter;
 
@@ -41,7 +40,6 @@ module.exports = async function(data, vars, evars) {
 		ipAddressFam = evars.ipAddressFam;
 	}
 
-	var restr = getRestrictions();
 	var isGrouped = checkCoalition(ipAddressVal, ipAddressFam);
 
 	var idLabel = isGrouped ? "cg1" : ipAddress;

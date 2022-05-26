@@ -5,18 +5,29 @@ module.exports.startup_internal = function(vars) {
 	wsSend = vars.wsSend;
 }
 
-function sendWorldStatusUpdate(worldId, userId, type, val) {
+function sendWorldStatusUpdate(worldId, userId) {
 	wss.clients.forEach(function(client) {
 		if(!client.sdata) return;
 		if(!client.sdata.userClient) return;
 		if(client.sdata.world.id != worldId) return;
 		if(client.sdata.user.id != userId) return;
+
+		// TODO: overhaul this entire system
+		var world = client.sdata.world;
+		var memKeyAccess = world.opts.memKey && world.opts.memKey == client.sdata.keyQuery;
+		var isOwner = world.ownerId == userId;
+		var isMember = Boolean(world.members.map[userId]) || isOwner || memKeyAccess;
+
 		wsSend(client, JSON.stringify({
 			kind: "propUpdate",
 			props: [
 				{
-					type: type,
-					value: val
+					type: "isOwner",
+					value: isOwner
+				},
+				{
+					type: "isMember",
+					value: isMember
 				}
 			]
 		}));
@@ -153,8 +164,9 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			} else {
 				var status = await claimWorldByName(worldname, user);
 				message = status.message;
+				// TODO: what about isMember?
 				if(status.success) {
-					sendWorldStatusUpdate(status.world.id, user.id, "isOwner", true);
+					sendWorldStatusUpdate(status.world.id, user.id);
 				}
 			}
 		}
@@ -164,7 +176,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				var worldName = key.substr("leave_".length);
 				var revoke = await revokeMembershipByWorldName(worldName, user.id);
 				if(revoke && revoke[0]) {
-					sendWorldStatusUpdate(revoke[1], user.id, "isMember", false);
+					sendWorldStatusUpdate(revoke[1], user.id);
 				}
 				break;
 			}
