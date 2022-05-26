@@ -2074,7 +2074,7 @@ function undoWrite() {
 		if(link.type == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
 			linkQueue.push(["url", tileX, tileY, charX, charY, link.url]);
 		} else if(link.type == "coord" && Permissions.can_coordlink(state.userModel, state.worldModel)) {
-			linkQueue.push(["coord", tileX, tileY, charX, charY, link.coord_tileX, link.coord_tileY]);
+			linkQueue.push(["coord", tileX, tileY, charX, charY, link.link_tileX, link.link_tileY]);
 		}
 	}
 	renderCursor([edit[0], edit[1], edit[2], edit[3]]);

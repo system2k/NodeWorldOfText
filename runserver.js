@@ -2447,6 +2447,21 @@ function setupClearClosedClientsInterval() {
 	}, 1000 * 60 * 2); // 2 minutes
 }
 
+// ping clients every 30 seconds
+function initPingAuto() {
+	intv.ping_clients = setInterval(function() {
+		if(!wss) return;
+		wss.clients.forEach(function(ws) {
+			if(ws.readyState != WebSocket.OPEN) return;
+			try {
+				ws.ping();
+			} catch(e) {
+				handle_error(e);
+			}
+		});
+	}, 1000 * 30);
+}
+
 async function uviasSendIdentifier() {
 	await uvias.run("SELECT accounts.set_service_info($1::text, $2::text, $3::text, $4::text, $5::text, $6::integer, $7::boolean, $8::boolean, $9::text);",
 		[uvias.id, uvias.name, uvias.domain, uvias.sso, uvias.logout, process.pid, uvias.private, uvias.only_verified, uvias.custom_css_file_path]);
@@ -2644,6 +2659,9 @@ async function initialize_server_components() {
 
 	// initialize variables in page handlers
 	await sintLoad(pages);
+
+	// ping clients at a regular interval to ensure they dont disconnect constantly
+	initPingAuto();
 
 	serverLoaded = true;
 	for(var i = 0; i < serverLoadWaitQueue.length; i++) {
