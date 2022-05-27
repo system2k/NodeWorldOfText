@@ -2050,9 +2050,11 @@ function createDispatcher(res, opts) {
 	
 	var requestResolved = false;
 	var requestStreaming = false;
+	var requestEnded = false;
+	var requestPromises = [];
 	var cookiesToReturn = [];
 	function dispatch(data, status_code, params) {
-		if(requestResolved) return; // if request response is already sent
+		if(requestResolved || requestEnded) return; // if request response is already sent
 		if(!requestStreaming) {
 			requestResolved = true;
 		}
@@ -2128,6 +2130,13 @@ function createDispatcher(res, opts) {
 			periodHTTPOutboundBytes += data.length;
 		}
 	}
+	res.on("close", function() {
+		requestEnded = true;
+		for(var i = 0; i < requestPromises.length; i++) {
+			var prom = requestPromises[i];
+			prom();
+		}
+	});
 	dispatch.isResolved = function() {
 		return requestResolved;
 	}
@@ -2138,15 +2147,24 @@ function createDispatcher(res, opts) {
 		requestStreaming = true;
 	}
 	dispatch.endStream = function() {
-		if(requestResolved) return;
+		if(requestResolved || requestEnded) return;
 		requestResolved = true;
 		res.end();
 	}
 	dispatch.writeStream = function(data) {
-		if(requestResolved) return;
-		if(!requestStreaming) return;
+		if(requestResolved || requestEnded) return true;
+		if(!requestStreaming) return false;
 		return new Promise(function(resolve) {
-			res.write(data, resolve);
+			requestPromises.push(resolve);
+			res.write(data, function() {
+				var loc = requestPromises.indexOf(resolve);
+				if(loc > -1) {
+					requestPromises.splice(loc, 1);
+				} else {
+					return; // already resolved
+				}
+				resolve(requestResolved || requestEnded);
+			});
 			periodHTTPOutboundBytes += data.length;
 		});
 	}
