@@ -2257,6 +2257,11 @@ async function process_request(req, res, compCallbacks) {
 					data.registerPath = registerPath;
 					data.profilePath = profilePath;
 					data.accountSystem = accountSystem;
+					var staticVersion = getClientVersion();
+					if(staticVersion) {
+						staticVersion = "?v=" + staticVersion;
+					}
+					data.staticVersion = staticVersion;
 					return template_data[path](data);
 				}
 				var evars = { // request-specific variables

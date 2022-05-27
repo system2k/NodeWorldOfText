@@ -6079,6 +6079,7 @@ var ws_functions = {
 			admin: data.admin,
 			staff: data.staff,
 			color: data.color,
+			date: data.date,
 			dataObj: data,
 			hide: false
 		});

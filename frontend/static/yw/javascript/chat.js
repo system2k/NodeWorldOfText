@@ -131,7 +131,7 @@ var client_commands = {
 		network.ping(function() {
 			var pongTime = getDate();
 			var pingMs = pongTime - pingTime;
-			clientChatResponse("Ping: " + pingMs);
+			clientChatResponse("Ping: " + pingMs + " MS");
 		});
 	},
 	gridsize: function (args) {
@@ -242,7 +242,7 @@ function event_on_chat(data) {
 	}
 	updateUnread();
 	addChat(data.location, data.id, data.type,
-		data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, getDate(), data.dataObj);
+		data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, data.date, data.dataObj);
 }
 
 elm.chatsend.addEventListener("click", function() {
@@ -505,7 +505,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 		message = message.join("");
 	}
 
-	if(chatGreentext && message[0] == ">") {
+	if(chatGreentext && message[0] == ">" && !(":;_-".includes(message[1]))) { // exception to some emoticons
 		message = message.substr(1);
 		isGreen = true;
 	}
