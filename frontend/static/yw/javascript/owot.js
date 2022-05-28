@@ -254,6 +254,9 @@ function toggleCursorCoordsDisplay() {
 	updateCoordDisplay();
 }
 
+w.on("cursorMove", updateCoordDisplay);
+w.on("cursorHide", updateCoordDisplay);
+
 function createColorButton(color) {
 	var celm = document.createElement("span");
 	var colorInt = resolveColorValue(color);
@@ -1815,7 +1818,6 @@ function renderCursor(coords) {
 	}
 	cursorCoords = coords.slice(0);
 	cursorCoordsCurrent = coords.slice(0);
-	if (showCursorCoordinates) updateCoordDisplay();
 	w.setTileRender(coords[0], coords[1]);
 
 	var pixelX = (coords[0] * tileW) + (coords[2] * cellW) + positionX + Math.trunc(owotWidth / 2);
