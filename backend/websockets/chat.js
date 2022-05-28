@@ -387,7 +387,11 @@ module.exports = async function(ws, data, send, vars, evars) {
 			serverChatResponse("Blocked chats from user: " + html_tag_esc(username), location);
 		},
 		unblockall: function() {
-			ws.sdata.chat_blocks.splice(0);
+			ws.sdata.chat_blocks.id.splice(0);
+			ws.sdata.chat_blocks.user.splice(0);
+			ws.sdata.chat_blocks.block_all = false;
+			ws.sdata.chat_blocks.no_tell = false;
+			
 			var tblocks = tell_blocks[ipHeaderAddr];
 			if(tblocks) {
 				for(var b in tblocks) {
