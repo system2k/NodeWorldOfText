@@ -2655,8 +2655,9 @@ async function initialize_server_components() {
 						// -1: unavailable to all
 						if(chatPerm == -1) return;
 						// check if user has blocked this client
-						if(client.sdata.chat_blocks && (client.sdata.chat_blocks.indexOf(opts.clientId) > -1 ||
-							((client.sdata.chat_blocks.indexOf("*") > -1) && opts.clientId != 0))) return;
+						if ((client.sdata.chat_blocks.block_all && opts.clientId != 0) ||
+							client.sdata.chat_blocks.id.includes(opts.clientId) ||
+							(opts.username && client.sdata.chat_blocks.user.includes(opts.username))) return;
 					}
 					wsSend(client, data);
 				}
@@ -3076,7 +3077,12 @@ async function manageWebsocketConnection(ws, req) {
 	// [Ip, Disconnect time, Is disconnected, Last chat time (on global)]
 
 	ws.sdata.clientId = clientId;
-	ws.sdata.chat_blocks = [];
+	ws.sdata.chat_blocks = {
+		id: [],
+		user: [],
+		no_tell: false,
+		block_all: false
+	};
 
 	if(monitorEventSockets.length) {
 		broadcastMonitorEvent("Connect", ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + world.name + "', " + world.id + "]");
