@@ -1,5 +1,4 @@
 - script manager scripts stored in localstorage
-- cursor coords in coords bar
 - accept/deny membership requests (blocking included)
 - Binary format
 - erase spam from chat
