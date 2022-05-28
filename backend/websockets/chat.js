@@ -171,7 +171,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 		username_to_display = user.display_username;
 	}
 
-	var chatIdBlockLimit = 1280;
+	var chatBlockLimit = 1280;
 
 	// [rank, name, args, description, example]
 	var command_list = [
@@ -192,7 +192,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 		[0, "warp", ["world"], "go to another world", "forexample"], // client-side
 		[0, "warpserver", ["server"], "use a different server", "wss://www.yourworldoftext.com/~help/ws/"], // client-side
 		[0, "gridsize", ["WxH"], "change the size of cells", "10x20"], // client-side
-		[0, "block", ["id"], "mute a user", "1220"],
+		[0, "block", ["id"], "mute someone by id", "1220"],
+		[0, "blockuser", ["username"], "mute someone by username", "JohnDoe"],
 		[0, "unblockall", null, "unblock all users", null],
 		[0, "mute", ["id", "seconds"], "mute a user for everyone", "1220 9999"], // check for permission
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
@@ -334,15 +335,25 @@ module.exports = async function(ws, data, send, vars, evars) {
 			return serverChatResponse(generate_command_list(), location);
 		},
 		block: function(id) {
-			if(id != "*" && id != "tell") {
-				id = san_nbr(id);
-				if(id < 0) return;
-			}
 			var blocks = ws.sdata.chat_blocks;
-			if(blocks.length >= chatIdBlockLimit) return serverChatResponse("Too many blocked IDs", location);
-			if(blocks.indexOf(id) > -1) return;
-			blocks.push(id);
 
+			switch (id) {
+			case "*":
+				blocks.block_all = true;
+				break;
+			case "tell":
+				blocks.no_tell = true;
+				break;
+			default:
+				id = san_nbr(id);
+				if (id < 0) return;
+
+				if ((blocks.id.length + blocks.user.length) >= chatBlockLimit)
+					return serverChatResponse("Too many blocked IDs/users", location);
+				if (blocks.id.indexOf(id) > -1) return;
+				blocks.id.push(id);
+			}
+			
 			var blocked_ip = getClientIPByChatID(id, location == "global");
 			if(blocked_ip) {
 				var blist = tell_blocks[ipHeaderAddr];
@@ -357,8 +368,30 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 			serverChatResponse("Blocked chats from ID: " + id, location);
 		},
+		blockuser: function(username) {
+			var blocks = ws.sdata.chat_blocks;
+			username = username + "";
+
+			// Regexp taken from Uvias login page.
+			if (!/^[a-zA-Z0-9_.-]+$/.test(username)) return;
+
+			// The case-insensitive value to be stored in chat_blocks.
+			var username_value = username.toUpperCase();
+
+			// Ensure maximum block count not exceeded, and check if it already exists.
+			if ((blocks.id.length + blocks.user.length) >= chatBlockLimit)
+					return serverChatResponse("Too many blocked IDs/users", location);
+			if (blocks.user.indexOf(username_value) > -1) return;
+			blocks.user.push(username_value);
+
+			serverChatResponse("Blocked chats from user: " + html_tag_esc(username), location);
+		},
 		unblockall: function() {
-			ws.sdata.chat_blocks.splice(0);
+			ws.sdata.chat_blocks.id.splice(0);
+			ws.sdata.chat_blocks.user.splice(0);
+			ws.sdata.chat_blocks.block_all = false;
+			ws.sdata.chat_blocks.no_tell = false;
+			
 			var tblocks = tell_blocks[ipHeaderAddr];
 			if(tblocks) {
 				for(var b in tblocks) {
@@ -457,9 +490,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 				privateMessage: "from_me"
 			});
 			// if user has blocked TELLs, don't let the /tell-er know
-			if(ws.sdata.chat_blocks && (ws.sdata.chat_blocks.includes(clientId) || // is ID of the /tell sender? (not destination)
-				(ws.sdata.chat_blocks.includes("*") && opts.clientId != 0)) ||
-				(ws.sdata.chat_blocks.includes("tell"))) return;
+			if(ws.sdata.chat_blocks.id && (ws.sdata.chat_blocks.id.includes(clientId) || // is ID of the /tell sender? (not destination)
+				(ws.sdata.chat_blocks.block_all && opts.clientId != 0)) ||
+				(ws.sdata.chat_blocks.no_tell)) return;
 				
 			// user has blocked the TELLer by IP
 			var tellblock = tell_blocks[ws.sdata.ipAddress];
@@ -642,6 +675,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 			case "block":
 				com.block(commandArgs[1]);
 				return;
+			case "blockuser":
+				com.blockuser(commandArgs[1]);
+				return;
 			case "unblockall":
 				com.unblockall();
 				return;
@@ -722,7 +758,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var chatOpts = {
 		// Global and Page updates should not appear in worlds with chat disabled
 		isChat: true,
-		clientId
+		clientId,
+		username: user.authenticated ? username_to_display.toUpperCase() : null
 	};
 
 	if(!isCommand) {
