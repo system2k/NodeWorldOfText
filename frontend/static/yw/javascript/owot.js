@@ -248,12 +248,6 @@ function updateCoordDisplay() {
 	}
 }
 
-function toggleCursorCoordsDisplay() {
-	showCursorCoordinates = !showCursorCoordinates;
-	elm.cursor_coords.style.display = showCursorCoordinates ? "" : "none";
-	updateCoordDisplay();
-}
-
 w.on("cursorMove", updateCoordDisplay);
 w.on("cursorHide", updateCoordDisplay);
 
@@ -4652,10 +4646,22 @@ function buildMenu() {
 	homeLink.appendChild(homeLinkIcon);
 	menuOptions.home = menu.addEntry(homeLink);
 	menuOptions.showCoords = menu.addCheckboxOption("Show coordinates", function() {
+		menu.showEntry(menuOptions.showCursorCoords);
 		return elm.coords.style.display = "";
 	}, function() {
+		menu.hideEntry(menuOptions.showCursorCoords);
 		return elm.coords.style.display = "none";
 	});
+	menuOptions.showCursorCoords = menu.addCheckboxOption("Cursor coords", function() {
+		showCursorCoordinates = true;
+		elm.cursor_coords.style.display = "";
+		updateCoordDisplay();
+	}, function() {
+		showCursorCoordinates = false;
+		elm.cursor_coords.style.display = "none";
+		updateCoordDisplay();
+	});
+	menu.hideEntry(menuOptions.showCursorCoords);
 	menuOptions.changeColor = menu.addOption("Change color", w.color);
 	menuOptions.goToCoords = menu.addOption("Go to coordinates", w.goToCoord);
 	menuOptions.coordLink = menu.addOption("Create link to coordinates", w.coordLink);
