@@ -242,7 +242,7 @@ function event_on_chat(data) {
 	}
 	updateUnread();
 	addChat(data.location, data.id, data.type,
-		data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, data.date, data.dataObj);
+		data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, data.date || Date.now(), data.dataObj);
 }
 
 elm.chatsend.addEventListener("click", function() {
