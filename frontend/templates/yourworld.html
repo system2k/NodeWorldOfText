@@ -33,7 +33,18 @@
 		<div id="coords" class="ui ui-vis" style="display: none;">
 			X: <span id="coord_X"></span>
 			Y: <span id="coord_Y"></span>
+			<div id="cursor_coords" style="display: none;">
+				Cursor:
+				<span id="cursor_on" style="display: none;">
+					<span id="tile_X"></span>, <span id="tile_Y"></span> /
+					<span id="char_X"></span>, <span id="char_Y"></span>
+				</span>
+				<span id="cursor_off" style="display: none">
+					N/A
+				</span>
+			</div>
 		</div>
+		
 		<div id="simplemodal-overlay" class="simplemodal-overlay" style="opacity: 0.5; height: 100%; width: 100%; position: fixed; left: 0px; top: 0px; z-index: 1001; display: none;"></div>
 		<div id="coord_input_panel" class="simplemodal-container" style="position: fixed; z-index: 1002; display: none;">
 			<div tabindex="-1" class="simplemodal-wrap" style="height: 100%; outline: 0px; width: 100%;">

@@ -139,6 +139,7 @@ var transparentBackground  = true;
 var writeFlushRate         = state.worldModel.write_interval;
 var bufferLargeChars       = true; // prevents certain large characters from being cut off by the grid
 var cursorOutlineEnabled   = false;
+var showCursorCoordinates  = false; // show cursor coords in coordinate bar
 
 var keyConfig = {
 	reset: "ESC",
@@ -176,6 +177,10 @@ defineElements({ // elm[<name>]
 	loading: byId("loading"),
 	coord_Y: byId("coord_Y"),
 	coord_X: byId("coord_X"),
+	tile_Y: byId("tile_Y"),
+	tile_X: byId("tile_X"),
+	char_Y: byId("char_Y"),
+	char_X: byId("char_X"),
 	chatbar: byId("chatbar"),
 	color_input_form_input: byId("color_input_form_input"),
 	protect_precision: byId("protect_precision"),
@@ -185,6 +190,9 @@ defineElements({ // elm[<name>]
 	menu_elm: byId("menu"),
 	nav_elm: byId("nav"),
 	coords: byId("coords"),
+	cursor_coords: byId("cursor_coords"),
+	cursor_on: byId("cursor_on"),
+	cursor_off: byId("cursor_off"),
 	chat_window: byId("chat_window"),
 	confirm_js: byId("confirm_js"),
 	confirm_js_code: byId("confirm_js_code"),
@@ -223,7 +231,25 @@ function updateCoordDisplay() {
 	var centerX = Math.floor(tileCoordX / coordSizeX);
 	elm.coord_Y.innerText = centerY;
 	elm.coord_X.innerText = centerX;
+
+	if (showCursorCoordinates) {
+		if (cursorCoords === null) {
+			elm.cursor_on.style.display = "none";
+			elm.cursor_off.style.display = "";
+			return;
+		}
+
+		elm.cursor_on.style.display = "";
+		elm.cursor_off.style.display = "none";
+		[elm.tile_X.innerText,
+	     elm.tile_Y.innerText,
+		 elm.char_X.innerText,
+		 elm.char_Y.innerText] = [...cursorCoords];
+	}
 }
+
+w.on("cursorMove", updateCoordDisplay);
+w.on("cursorHide", updateCoordDisplay);
 
 function createColorButton(color) {
 	var celm = document.createElement("span");
@@ -4620,10 +4646,22 @@ function buildMenu() {
 	homeLink.appendChild(homeLinkIcon);
 	menuOptions.home = menu.addEntry(homeLink);
 	menuOptions.showCoords = menu.addCheckboxOption("Show coordinates", function() {
+		menu.showEntry(menuOptions.showCursorCoords);
 		return elm.coords.style.display = "";
 	}, function() {
+		menu.hideEntry(menuOptions.showCursorCoords);
 		return elm.coords.style.display = "none";
 	});
+	menuOptions.showCursorCoords = menu.addCheckboxOption("Cursor coords", function() {
+		showCursorCoordinates = true;
+		elm.cursor_coords.style.display = "";
+		updateCoordDisplay();
+	}, function() {
+		showCursorCoordinates = false;
+		elm.cursor_coords.style.display = "none";
+		updateCoordDisplay();
+	});
+	menu.hideEntry(menuOptions.showCursorCoords);
 	menuOptions.changeColor = menu.addOption("Change color", w.color);
 	menuOptions.goToCoords = menu.addOption("Go to coordinates", w.goToCoord);
 	menuOptions.coordLink = menu.addOption("Create link to coordinates", w.coordLink);
