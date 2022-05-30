@@ -226,6 +226,9 @@ var SelectionModal = (function() {
 		this.c_rlnbrk = document.getElementById("area_cbox_rlnbrk");
 		this.c_rsurrog = document.getElementById("area_cbox_rsurrog");
 		this.c_rcomb = document.getElementById("area_cbox_rcomb");
+		this.region_bounds = document.getElementById("region_bounds"),
+		this.rb_coord1 = document.getElementById("rb_coord1"),
+		this.rb_coord2 = document.getElementById("rb_coord2"),
 		this.textData = null;
 		this.colorData = null;
 		this.linkData = null;
@@ -344,7 +347,7 @@ var SelectionModal = (function() {
 		this.c_rsurrog.onclick = _this.updateTextOutput;
 		this.c_rcomb.onclick = _this.updateTextOutput;
 	}
-	SelectionModal.prototype.open = function(str, colors, links, protections) {
+	SelectionModal.prototype.open = function(str, colors, links, protections, coords) {
 		CurrentModalPanel = this.panel;
 		this.textData = str;
 		this.colorData = colors;
@@ -358,6 +361,14 @@ var SelectionModal = (function() {
 		setModalPosition();
 		setModalScroll();
 		this.updateTextOutput();
+
+		if (!showCursorCoordinates) {
+			this.region_bounds.style.display = "none";
+		} else {
+			this.region_bounds.style.display = "";
+			this.rb_coord1.innerText = JSON.stringify(coords[0]);
+			this.rb_coord2.innerText = JSON.stringify(coords[1]);
+		}
 	}
 	return SelectionModal;
 }());

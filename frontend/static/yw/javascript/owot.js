@@ -524,7 +524,7 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 			tileY++;
 		}
 	}
-	w._ui.selectionModal.open(reg, colors, links, protections);
+	w._ui.selectionModal.open(reg, colors, links, protections, [coordA, coordB]);
 	w.emit("regionSelected", {
 		a: coordA,
 		b: coordB
