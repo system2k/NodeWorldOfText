@@ -2874,7 +2874,8 @@ async function manageWebsocketConnection(ws, req) {
 		cursorPositionHidden: false,
 		messageBackpressure: 0,
 		receiveContentUpdates: true,
-		origin: req.headers["origin"]
+		origin: req.headers["origin"],
+		passiveCmd: false
 	};
 
 	var bytesWritten = 0;

@@ -93,7 +93,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		}
 		memberships[i] = name;
 	}
-	memberships.sort();
 
 	for(var i = 0; i < memberships.length; i++) {
 		var wname = memberships[i];

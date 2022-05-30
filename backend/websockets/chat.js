@@ -76,6 +76,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	// sends `[ Server ]: <message>` in chat.
 	function serverChatResponse(message, location) {
+		if(ws.sdata.passiveCmd) return;
 		send({
 			nickname: "[ Server ]",
 			realUsername: "[ Server ]",
@@ -207,6 +208,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 		// hidden by default
 		// "/search Phrase" (client) -> searches for Phrase within a 25 tile radius
 		// "/stats" -> view stats of a world; only available for front page
+		// "/passive on/off" -> disable or enable server responses to commands (e.g. /block)
 	];
 
 	function generate_command_list() {
@@ -370,7 +372,10 @@ module.exports = async function(ws, data, send, vars, evars) {
 		},
 		blockuser: function(username) {
 			var blocks = ws.sdata.chat_blocks;
-			username = username + "";
+			if(typeof username != "string" || !username) {
+				serverChatResponse("Invalid username", location);
+				return;
+			}
 
 			// Regexp taken from Uvias login page.
 			if (!/^[a-zA-Z0-9_.-]+$/.test(username)) return;
@@ -623,6 +628,13 @@ module.exports = async function(ws, data, send, vars, evars) {
 				time: timestamp
 			});
 			return serverChatResponse("Deleted " + res + " message(s)", location);
+		},
+		passive: function(mode) {
+			if(mode == "on") {
+				ws.sdata.passiveCmd = true;
+			} else if(mode == "off") {
+				ws.sdata.passiveCmd = false;
+			}
 		}
 	}
 
@@ -701,6 +713,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 				return;
 			case "delete":
 				if(staff) com.delete(commandArgs[1], commandArgs[2]);
+				return;
+			case "passive":
+				com.passive(commandArgs[1]);
 				return;
 			default:
 				serverChatResponse("Invalid command: " + html_tag_esc(msg));
