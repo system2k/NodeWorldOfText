@@ -2719,6 +2719,7 @@ function broadcastMonitorEvent(type, data) {
 	}
 }
 
+// todo: fix this
 function evaluateIpAddress(remIp, realIp, cfIp) {
 	var ipAddress = remIp;
 	var ipAddressFam = 4;
@@ -2754,9 +2755,11 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 				}
 				if(ipAddress.indexOf(".") > -1) {
 					ipAddressFam = 4;
+					ipAddressVal = ipv4_to_int(ipAddress);
 				} else {
 					ipAddressFam = 6;
 					ipAddress = normalize_ipv6(ipAddress);
+					ipAddressVal = ipv6_to_int(ipAddress);
 				}
 			}
 		} else if(ipAddressFam == 6) {
@@ -2768,9 +2771,11 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 				}
 				if(ipAddress.indexOf(".") > -1) {
 					ipAddressFam = 4;
+					ipAddressVal = ipv4_to_int(ipAddress);
 				} else {
 					ipAddressFam = 6;
 					ipAddress = normalize_ipv6(ipAddress);
+					ipAddressVal = ipv6_to_int(ipAddress);
 				}
 			}
 		}
