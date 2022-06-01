@@ -34,6 +34,24 @@ function procRegionString(region) {
 	return [x1, y1, x2, y2];
 }
 
+function removeOverlaps(list) {
+    var res = [];
+    for(var i = 0; i < list.length; i++) {
+        var a = list[i][0];
+        var b = list[i][1];
+        if(res.length) {
+            var last = res[res.length - 1];
+            if(a >= last[0] && b <= last[1]) continue;
+            if(a <= last[1] && b >= last[1]) {
+                last[1] = b;
+                continue;
+            }
+        }
+        res.push([a, b]);
+    }
+    return res;
+}
+
 function procIP(str) {
 	if(str.includes(":")) {
 		return [ipv6_to_range(str), 6];
@@ -250,6 +268,8 @@ function procCoal(list) {
 	for(var i = 0; i < ranges6.length; i++) {
 		cstr += reconIPv6(ranges6[i][0], ranges6[i][1]) + "\n";
 	}
+	ranges4 = removeOverlaps(ranges4); // must be done after list reconstruction
+	ranges6 = removeOverlaps(ranges6);
 	coalition_group = cstr;
 	setCoalition({
 		v4: ranges4,
