@@ -771,8 +771,8 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			var tileCount = await db.get("SELECT COUNT(id) AS cnt FROM tile WHERE world_id=?", world.id);
 			if(!tileCount) return;
 			tileCount = tileCount.cnt;
-			// tile limit of 30000
-			if(tileCount <= 30000) {
+			// tile limit of 2000000
+			if(tileCount <= 2000000) {
 				var call_id = tile_database.newCallId();
 				tile_database.reserveCallId(call_id);
 				tile_database.write(call_id, tile_database.types.publicclear, {
