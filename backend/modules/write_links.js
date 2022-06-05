@@ -97,13 +97,13 @@ module.exports = async function(data, vars, evars) {
 		return [true, "PARAM"];
 	}
 
-	if(!rate_limiter.setHold(idLabel, tileX, tileY)) {
-		return [true, "RATE"];
-	}
 	if(lrate != null) {
 		if(!rate_limiter.checkCharRateLimit(linkLimiter, lrate, 1)) {
 			return [true, "RATE"];
 		}
+	}
+	if(!rate_limiter.setHold(idLabel, tileX, tileY)) {
+		return [true, "RATE"];
 	}
 
 	var call_id = tile_database.newCallId();
