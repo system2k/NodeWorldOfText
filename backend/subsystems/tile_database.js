@@ -162,6 +162,7 @@ function generateFullTileUpdate(worldQueue, worldID) {
 		for(var y in cprops) {
 			for(var x in cprops[y]) {
 				var link = cprops[y][x].link;
+				if(!link) continue;
 				if(link.type == "url") {
 					linkBandwidthInPeriod += link.url.length;
 				}
