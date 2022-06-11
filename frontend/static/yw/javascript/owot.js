@@ -5,7 +5,9 @@
 
 var owot, owotCtx, textInput;
 var linkElm, linkDiv;
-var jscolorInput;
+//var jscolorInput;
+var colorInput;
+var colorShortcuts;
 function init_dom() {
 	owot = document.getElementById("owot");
 	owot.style.display = "block";
@@ -20,9 +22,6 @@ function init_dom() {
 		owot: owot,
 		textInput: textInput
 	});
-	addColorShortcuts();
-	setCursorOutlineToggle();
-
 }
 function getWndWidth() {
 	return document.body.clientWidth || window.innerWidth;
@@ -200,27 +199,35 @@ defineElements({ // elm[<name>]
 	usr_online: byId("usr_online"),
 	link_element: byId("link_element"),
 	link_div: byId("link_div"),
-	color_shortcuts: byId("color_shortcuts"),
 	protect_selection: byId("protect_selection"),
 	cursor_outline_toggle: byId("cursor_outline_toggle")
 });
 
-w.on("clientLoaded", function() {
+
+
+/*w.on("clientLoaded", function() {
 	jscolorInput = elm.color_input_form_input.jscolor;
 	var r = (YourWorld.Color >> 16) & 255;
 	var g = (YourWorld.Color >> 8) & 255;
 	var b = YourWorld.Color & 255;
 	setRGBColorPicker(r, g, b);
-});
+});*/
 
 function setRGBColorPicker(r, g, b) {
-	jscolorInput.fromRGB(r, g, b);
+	colorInput.jscolor.fromRGB(r, g, b);
 }
 
 function setColorPickerRandom() {
 	var r = Math.floor(Math.random() * 256);
 	var g = Math.floor(Math.random() * 256);
 	var b = Math.floor(Math.random() * 256);
+	setRGBColorPicker(r, g, b);
+}
+
+function updateColorPicker() {
+	var r = (YourWorld.Color >> 16) & 255;
+	var g = (YourWorld.Color >> 8) & 255;
+	var b = YourWorld.Color & 255;
 	setRGBColorPicker(r, g, b);
 }
 
@@ -261,7 +268,7 @@ function createColorButton(color) {
 	celm.title = hex.toUpperCase();
 	celm.onclick = function() {
 		setRGBColorPicker(colorValues[0], colorValues[1], colorValues[2]);
-		w._ui.colorInputModal.onSubmit();
+		w.ui.colorModal.submitForm();
 	}
 	return celm;
 }
@@ -276,7 +283,7 @@ function addColorShortcuts() {
 	];
 	for(var i = 0; i < colors.length; i++) {
 		var col = colors[i];
-		elm.color_shortcuts.appendChild(createColorButton(col));
+		colorShortcuts.appendChild(createColorButton(col));
 	}
 	var rand = document.createElement("span");
 	rand.className = "color_btn";
@@ -284,19 +291,7 @@ function addColorShortcuts() {
 	rand.innerText = "?";
 	rand.title = "Random color";
 	rand.onclick = setColorPickerRandom;
-	elm.color_shortcuts.appendChild(rand);
-}
-
-function setCursorOutlineToggle() {
-	elm.cursor_outline_toggle.oninput = function() {
-		var val = elm.cursor_outline_toggle.checked;
-		cursorOutlineEnabled = val;
-		storeConfig();
-		if(!cursorCoords) return;
-		var cursorTileX = cursorCoords[0];
-		var cursorTileY = cursorCoords[1];
-		w.setTileRedraw(cursorTileX, cursorTileY);
-	}
+	colorShortcuts.appendChild(rand);
 }
 
 init_dom(); // TODO: put this elsewhere
@@ -425,7 +420,7 @@ function storeConfig() {
 }
 
 getStoredNickname();
-getStoredConfig();
+//getStoredConfig();
 
 function loadBackgroundData(cb, timeout_cb) {
 	if(!backgroundEnabled || !state.background) {
@@ -464,7 +459,7 @@ function loadBackgroundData(cb, timeout_cb) {
 
 function keydown_regionSelect(e) {
 	if(!checkKeyPress(e, keyConfig.copyRegion) || regionSelectionsActive()) return;
-	if(w._state.uiModal) return;
+	if(Modal.isOpen) return;
 	if(!worldFocused) return;
 	e.preventDefault();
 	w.regionSelect.startSelection();
@@ -524,7 +519,7 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 			tileY++;
 		}
 	}
-	w._ui.selectionModal.open(reg, colors, links, protections, [coordA, coordB]);
+	w.ui.selectionModal.open(reg, colors, links, protections, [coordA, coordB]);
 	w.emit("regionSelected", {
 		a: coordA,
 		b: coordB
@@ -1319,7 +1314,7 @@ function getLinkXY(x, y) {
 
 // copy individual chars
 function event_keydown_copy_char(e) {
-	if(w._state.uiModal) return;
+	if(Modal.isOpen) return;
 	if(!worldFocused) return;
 	if(document.activeElement.tagName == "INPUT" && document.activeElement.type == "text" && document.activeElement != elm.textInput) return;
 	var textCursorCopy = checkKeyPress(e, keyConfig.copyCharacterText);
@@ -2447,7 +2442,7 @@ var write_busy = false; // currently pasting
 var pasteInterval;
 var linkQueue = [];
 var char_input_check = setInterval(function() {
-	if(w._state.uiModal) return;
+	if(Modal.isOpen) return;
 	if(write_busy) return;
 	if(state.worldModel.char_rate[0] == 0) {
 		elm.textInput.value = "";
@@ -2689,7 +2684,7 @@ function autoArrowKeyMoveStop(dir) {
 function event_keydown(e) {
 	var actElm = document.activeElement;
 	if(!worldFocused) return;
-	if(w._state.uiModal) return;
+	if(Modal.isOpen) return;
 	if(actElm == elm.chatbar) return;
 	if(actElm == elm.confirm_js_code) return;
 	if(actElm.tagName == "INPUT" && actElm.type == "text" && actElm != elm.textInput) return;
@@ -3179,7 +3174,7 @@ function event_touchmove(e) {
 	var pos = touch_pagePos(e);
 	touchPosX = pos[0];
 	touchPosY = pos[1];
-	if(closest(e.target, elm.main_view) || w._state.uiModal) {
+	if(closest(e.target, elm.main_view) || Modal.isOpen) {
 		e.preventDefault();
 	}
 	event_mousemove(e, pos[0], pos[1]);
@@ -3193,7 +3188,7 @@ function touch_pagePos(e) {
 }
 
 function event_wheel(e) {
-	if(w._state.uiModal) return;
+	if(Modal.isOpen) return;
 	if(!scrollingEnabled) return; // return if disabled
 	// if focused on chat, don't scroll world
 	if(closest(e.target, getChatfield())) return;
@@ -4857,6 +4852,7 @@ function RegionSelection() {
 		for(var i = 0; i < onselectionEvents.length; i++) {
 			var func = onselectionEvents[i];
 			this.regionSelected = true;
+			if(!this.regionCoordA) continue;
 			this.setSelection(this.regionCoordA, this.regionCoordB);
 			var coordA = this.regionCoordA.slice(0);
 			var coordB = this.regionCoordB.slice(0);
@@ -5275,13 +5271,13 @@ Object.assign(w, {
 	nightMode: 0, // 0 = normal, 1 = night, 2 = night with normal background patterns
 	input: elm.textInput,
 	menu: null,
-	_state: state,
-	_ui: {
+	ui: {
 		announcements: {},
-		coordinateInputModal: new CoordinateInputModal(),
-		urlInputModal: new URLInputModal(),
-		colorInputModal: new ColorInputModal(),
-		selectionModal: new SelectionModal()
+		coordLinkModal: null,
+		coordGotoModal: null,
+		urlModal: null,
+		colorModal: null,
+		selectionModal: null
 	},
 	styles: styles,
 	backgroundInfo: {
@@ -5306,7 +5302,7 @@ Object.assign(w, {
 		if(!announceClass) {
 			announceClass = "main";
 		}
-		var an = w._ui.announcements[announceClass];
+		var an = w.ui.announcements[announceClass];
 		if(an) {
 			if(text) {
 				an.text.innerHTML = text;
@@ -5330,7 +5326,7 @@ Object.assign(w, {
 			anBar.appendChild(anText);
 			anBar.appendChild(anClose);
 			elm.announce_container.appendChild(anBar);
-			w._ui.announcements[announceClass] = {
+			w.ui.announcements[announceClass] = {
 				bar: anBar,
 				text: anText,
 				close: anClose
@@ -5340,20 +5336,10 @@ Object.assign(w, {
 	regionSelect: new RegionSelection(),
 	protectSelect: new RegionSelection(),
 	color: function() {
-		w._ui.colorInputModal.open(function(color) {
-			var this_color = 0;
-			if(color) {
-				this_color = parseInt(color, 16);
-			}
-			if(!this_color) {
-				this_color = 0;
-			}
-			w.changeColor(this_color);
-			localStorage.setItem("color", this_color);
-		});
+		w.ui.colorModal.open();
 	},
 	goToCoord: function() {
-		w._ui.coordinateInputModal.open("Go to coordinates:", w.doGoToCoord.bind(w));
+		w.ui.coordGotoModal.open();
 	},
 	doGoToCoord: function(y, x) {
 		var maxX = Number.MAX_SAFE_INTEGER / 160 / 4;
@@ -5377,7 +5363,7 @@ Object.assign(w, {
 		w.link_input_type = 0;
 	},
 	urlLink: function() {
-		w._ui.urlInputModal.open(w.doUrlLink.bind(w));
+		w.ui.urlModal.open();
 	},
 	doCoordLink: function(y, x) {
 		linkAuto.active = true;
@@ -5393,7 +5379,7 @@ Object.assign(w, {
 		w.link_input_type = 1;
 	},
 	coordLink: function() {
-		w._ui.coordinateInputModal.open("Enter the coordinates to create a link to. You can then click on a letter to create the link.", w.doCoordLink.bind(w));
+		w.ui.coordLinkModal.open();
 	},
 	doProtect: function(protectType, unprotect) {
 		// show the protection precision menu
@@ -5424,7 +5410,6 @@ Object.assign(w, {
 		} else if(protectType == "public") {
 			w.protect_type = 0;
 		}
-		//w.protectSelect.charColor = w.protect_bg;
 	},
 	doUnprotect: function() {
 		w.doProtect("public", true);
@@ -5742,23 +5727,223 @@ document.onselectstart = function(e) {
 	if(closest(target, getChatfield()) || target == elm.chatbar || closest(target, elm.confirm_js_code) || closest(target, elm.announce_text)) {
 		return true;
 	}
-	return w._state.uiModal;
+	return Modal.isOpen;
 }
 
-w._state.uiModal = false; // is the UI open? (coord, url, go to coord)
+w._state = w.state; // deprecated
 
-if(state.announce) {
-	w.doAnnounce(state.announce);
+
+
+
+
+function makeCoordLinkModal() {
+	var modal = new Modal();
+	modal.createForm();
+	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a letter to create the link.");
+	var coordX = modal.addEntry("X", "text", "number").input;
+	var coordY = modal.addEntry("Y", "text", "number").input;
+	modal.setMaximumSize(360, 300);
+	modal.onSubmit(function() {
+		w.doCoordLink(parseInt(coordY.value), parseInt(coordX.value));
+	});
+	w.ui.coordLinkModal = modal;
 }
-buildMenu();
-updateMenuEntryVisiblity();
-w.regionSelect.onselection(handleRegionSelection);
-w.regionSelect.init();
 
-w.protectSelect.onselection(protectSelectionStart);
-w.protectSelect.oncancel(protectSelectionCancel);
-w.protectSelect.tiled = true;
-w.protectSelect.init();
+function makeCoordGotoModal() {
+	var modal = new Modal();
+	modal.createForm();
+	modal.setFormTitle("Go to coordinates:");
+	var coordX = modal.addEntry("X", "text", "number").input;
+	var coordY = modal.addEntry("Y", "text", "number").input;
+	modal.onSubmit(function() {
+		w.doGoToCoord(parseInt(coordY.value), parseInt(coordX.value));
+	});
+	w.ui.coordGotoModal = modal;
+}
+
+function makeURLModal() {
+	var modal = new Modal();
+	modal.createForm();
+	var urlInput = modal.addEntry("URL", "text").input;
+	modal.onSubmit(function() {
+		w.doUrlLink(urlInput.value);
+	});
+	modal.unalignForm();
+	w.ui.urlModal = modal;
+}
+
+function makeColorModal() {
+	var modal = new Modal();
+	modal.createForm();
+	colorInput = modal.addEntry("Color Code", "color").input;
+	modal.onSubmit(function() {
+		var color = colorInput.value;
+		var this_color = 0;
+		if(color) {
+			this_color = parseInt(color, 16);
+		}
+		if(!this_color) {
+			this_color = 0;
+		}
+		w.changeColor(this_color);
+		localStorage.setItem("color", this_color);
+	});
+	modal.onClose(function(canceled) {
+		if(!canceled) {
+			modal.submitForm();
+		}
+	});
+	modal.setFooter();
+	modal.setFooterCheckbox(function(checked) {
+		cursorOutlineEnabled = checked;
+		storeConfig();
+		if(!cursorCoords) return;
+		var cursorTileX = cursorCoords[0];
+		var cursorTileY = cursorCoords[1];
+		w.setTileRedraw(cursorTileX, cursorTileY);
+	});
+	w.ui.colorModal = modal;
+
+	colorShortcuts = document.createElement("div");
+	colorShortcuts.id = "color_shortcuts";
+	modal.setFooterContentRight(colorShortcuts);
+}
+
+function makeSelectionModal() {
+	var area_copy = document.createElement("button");
+	area_copy.style.marginBottom = "1px";
+	area_copy.innerText = "Copy to Clipboard";
+	area_copy.onclick = function() {
+		w.clipboard.copy(region_text.value);
+	}
+
+	var region_bounds = document.createElement("span");
+	region_bounds.style.display = "none";
+	var reg_label = document.createElement("b");
+	reg_label.innerText = "Selection: ";
+	var rb_coord1 = document.createElement("span");
+	var rb_coord2 = document.createElement("span");
+	region_bounds.appendChild(reg_label);
+	region_bounds.appendChild(rb_coord1);
+	region_bounds.appendChild(document.createTextNode(", "));
+	region_bounds.appendChild(rb_coord2);
+	var region_text = document.createElement("textarea")
+	region_text.id = "area_results";
+
+	function updateOutput() {
+		var o_color = c_color.cbElm.checked;
+		var o_link = c_link.cbElm.checked;
+		var o_prot = c_prot.cbElm.checked;
+		var o_protpub = c_pprot.cbElm.checked;
+		var o_tleft = t_left.cbElm.checked;
+		var o_tright = t_right.cbElm.checked;
+		var o_tempty = t_empty.cbElm.checked;
+		var o_rgap = r_gap.cbElm.checked;
+		var o_rlnbrk = r_br.cbElm.checked;
+		var o_rsurrog = r_surr.cbElm.checked;
+		var o_rcomb = r_comb.cbElm.checked;
+		var text = s_str.split("\n");
+		var currentCol = -1;
+		for(var y = 0; y < text.length; y++) {
+			text[y] = w.split(text[y], o_rsurrog, o_rcomb);
+			var colRow;
+			var linkRow;
+			var protRow;
+			if(o_color) colRow = s_colors.slice(y * text[y].length, y * text[y].length + text[y].length);
+			if(o_link) linkRow = s_links.slice(y * text[y].length, y * text[y].length + text[y].length);
+			if(o_prot) protRow = s_prots.slice(y * text[y].length, y * text[y].length + text[y].length);
+			if(o_tleft || o_tright || o_rgap) spaceTrim(text[y], o_tleft, o_tright, o_rgap, [colRow, linkRow, protRow]);
+			var line = text[y];
+			if(o_color) {
+				for(var x = 0; x < line.length; x++) {
+					var col = colRow[x];
+					if(col == currentCol) continue;
+					currentCol = col;
+					var chr = "\x1b";
+					if(col == 0) {
+						chr += "x";
+					} else {
+						chr += "F" + col.toString(16).padStart(6, 0);
+					}
+					chr += line[x];
+					line[x] = chr;
+				}
+			}
+			if(o_link) {
+				for(var x = 0; x < line.length; x++) {
+					var link = linkRow[x];
+					if(!link) continue;
+					line[x] = "\x1b" + link + line[x];
+				}
+			}
+			if(o_prot) {
+				for(var x = 0; x < line.length; x++) {
+					var prot = protRow[x];
+					if(prot == 0 && !o_protpub) continue;
+					line[x] = "\x1b" + "P" + prot + line[x]; // prot should be one character in length
+				}
+			}
+			text[y] = text[y].join("");
+		}
+		if(o_tempty) {
+			for(var y = 0; y < text.length; y++) {
+				if(!text[y]) {
+					text.splice(y, 1);
+					y--;
+				}
+			}
+		}
+		if(!o_rlnbrk) {
+			text = text.join("\n");
+		} else {
+			text = text.join("");
+		}
+		region_text.value = text;
+	}
+
+	var s_str;
+	var s_colors;
+	var s_links
+	var s_prots;
+
+	var modal = new Modal();
+	modal.setMinimumSize(500, 450);
+	modal.append(area_copy);
+	modal.append(document.createElement("br"));
+	modal.append(region_bounds);
+	modal.append(region_text);
+	modal.setCheckboxField();
+	modal.setClose();
+	var c_color = modal.addCheckbox("Copy colors");
+	var c_link = modal.addCheckbox("Copy links");
+	var c_prot = modal.addCheckbox("Copy protections");
+	var c_pprot = modal.addCheckbox(c_prot, "Copy public protections");
+	var t_left = modal.addCheckbox("Trim left");
+	var t_right = modal.addCheckbox("Trim right");
+	var t_empty = modal.addCheckbox("Trim empty lines");
+	var r_gap = modal.addCheckbox("Remove gaps");
+	var r_br = modal.addCheckbox("Remove line breaks");
+	var r_surr = modal.addCheckbox("Remove surrogates");
+	var r_comb = modal.addCheckbox("Remove combining chars");
+	modal.checkboxFieldOnInput(function(obj, checked) {
+		updateOutput();
+	});
+	modal.onOpen(function(str, colors, links, protections, coords) {
+		s_str = str;
+		s_colors = colors;
+		s_links = links;
+		s_prots = protections;
+		if(!showCursorCoordinates) {
+			region_bounds.style.display = "none";
+		} else {
+			region_bounds.style.display = "";
+			rb_coord1.innerText = JSON.stringify(coords[0]);
+			rb_coord2.innerText = JSON.stringify(coords[1]);
+		}
+		updateOutput();
+	});
+	w.ui.selectionModal = modal;
+}
 
 if(state.userModel.is_superuser) {
 	w.loadScript("/static/yw/javascript/world_tools.js");
@@ -5771,13 +5956,6 @@ if(state.background) {
 	w.backgroundInfo.h = ("h" in state.background) ? state.background.h : 0;
 	w.backgroundInfo.rmod = ("rmod" in state.background) ? state.background.rmod : 0;
 	w.backgroundInfo.alpha = ("alpha" in state.background) ? state.background.alpha : 1;
-}
-
-var simplemodal_onopen = function() {
-	return w._state.uiModal = true;
-}
-var simplemodal_onclose = function() {
-	return w._state.uiModal = false;
 }
 
 var tellEdit = [];
@@ -6225,6 +6403,28 @@ var ws_functions = {
 };
 
 function begin() {
+	makeCoordLinkModal();
+	makeCoordGotoModal();
+	makeURLModal();
+	makeColorModal();
+	makeSelectionModal();
+
+	addColorShortcuts();
+	updateColorPicker();
+
+	if(state.announce) {
+		w.doAnnounce(state.announce);
+	}
+	buildMenu();
+	updateMenuEntryVisiblity();
+	w.regionSelect.onselection(handleRegionSelection);
+	w.regionSelect.init();
+
+	w.protectSelect.onselection(protectSelectionStart);
+	w.protectSelect.oncancel(protectSelectionCancel);
+	w.protectSelect.tiled = true;
+	w.protectSelect.init();
+
 	manageCoordHash();
 	getWorldProps(state.worldModel.name, "style", function(style, error) {
 		if(error) {
