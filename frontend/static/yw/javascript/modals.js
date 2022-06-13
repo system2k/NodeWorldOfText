@@ -1,374 +1,578 @@
-function setModalPosition() {
-	// center the modal panels
-	for(var i = 0; i < ModalRefs.length; i++) {
-		var ref = ModalRefs[i];
-		if(!ref.open) continue;
-		var wndWidth = window.innerWidth;
-		var wndHeight = window.innerHeight;
-		var elm = ref.panel;
-		var divWidth = elm.offsetWidth;
-		var divHeight = elm.offsetHeight;
-		elm.style.top = ((wndHeight - divHeight) / 2) + "px";
-		elm.style.left = ((wndWidth - divWidth) / 2) + "px";
+var modalOverlay = document.getElementById("modal_overlay");
+modalOverlay.onclick = function(e) {
+	if(e.target != modalOverlay) return;
+	if(Modal.current) {
+		Modal.current.close();
 	}
 }
 
-function setModalScroll() {
-	if(!ModalOverlay || !document.documentElement) return;
-	setTimeout(function() {
-		var scrollheight = document.documentElement.scrollHeight;
-		if(!scrollheight) return;
-		var halfPos = Math.floor((scrollheight - window.innerHeight) / 2);
-		window.scrollTo(0, halfPos);
-	}, 200);
-}
-
-window.addEventListener("resize", setModalPosition);
-window.addEventListener("orientationchange", setModalPosition);
-
-var ModalRefs = [];
-var CurrentModalPanel = null;
-var ModalOverlay = document.getElementById("simplemodal-overlay");
-var ModalOverlayCloseFunc = null;
-ModalOverlay.onclick = function() {
-	if(CurrentModalPanel) {
-		CurrentModalPanel.style.display = "none";
-		ModalOverlay.style.display = "none";
-		simplemodal_onclose();
-		if(ModalOverlayCloseFunc) {
-			ModalOverlayCloseFunc();
-			ModalOverlayCloseFunc = null;
-		}
-	}
-}
-
-var URLInputModal = (function() {
-	function URLInputModal() {
-		var _this = this;
-		this.isOpen = false;
-		this.panel = document.getElementById("url_input_panel");
-		this.overlay = document.getElementById("simplemodal-overlay");
-		this.input = document.getElementById("url_input_form_input");
-		this.cancel = document.getElementById("url_input_cancel");
-		this.form = document.getElementById("url_input_form");
-		this.el = document.getElementById("url_input_modal");
-		ModalRefs.push(this);
-		this.close = function() {
-			_this.panel.style.display = "none";
-			_this.overlay.style.display = "none";
-			simplemodal_onclose();
-		};
-		this.cancel.onclick = this.close;
-		this.onSubmit = function() {
-			var url = _this.input.value;
-			_this.close();
-			setTimeout((function() {
-				return _this.callback(url);
-			}), 0);
-			return false;
-		};
-		this.form.onsubmit = this.onSubmit;
-	}
-	URLInputModal.prototype.open = function(callback) {
-		CurrentModalPanel = this.panel;
-		this.isOpen = true;
-		this.callback = callback;
-		this.panel.style.display = "";
-		this.overlay.style.display = "";
-		this.input.focus();
-		simplemodal_onopen();
-		this.panel.style.width = "";
-		this.panel.style.height = "";
-		var el_width = this.el.offsetWidth;
-		var el_height = this.el.offsetHeight;
-		if(el_height < 80) el_height = 80;
-		if(el_width < 160) el_width = 160;
-		this.panel.style.width = el_width + "px";
-		this.panel.style.height = el_height + "px";
-		setModalPosition();
-		setModalScroll();
-	};
-	return URLInputModal;
-}());
-
-var CoordinateInputModal = (function() {
-	function CoordinateInputModal() {
-		var _this = this;
-		this.isOpen = false;
-		this.panel = document.getElementById("coord_input_panel");
-		this.overlay = document.getElementById("simplemodal-overlay");
-		this.input = document.getElementById("coord_input_X");
-		this.cancel = document.getElementById("coord_input_cancel");
-		this.form = document.getElementById("coord_input_form");
-		this.el = document.getElementById("coordinate_input_modal");
-		ModalRefs.push(this);
-		this.title = document.getElementById("coord_input_title");
-		this.close = function() {
-			_this.panel.style.display = "none";
-			_this.overlay.style.display = "none";
-			simplemodal_onclose();
-		};
-		this.cancel.onclick = this.close;
-		this.onSubmit = function() {
-			var f = _this.form;
-			var y = parseFloat(f.coord_input_Y.value);
-			var x = parseFloat(f.coord_input_X.value);
-			if(!isFinite(y)) y = NaN;
-			if(!isFinite(x)) x = NaN;
-			var fail = false;
-			if (isNaN(y)) {
-				fail = true;
-				f.coord_input_Y.style.border = "1px solid red";
-			} else {
-				f.coord_input_Y.style.border = "";
-				f.coord_input_Y.value = y;
+function updateModalCheckboxField(list, parent) {
+	if(parent) {
+		if(!parent.cbElm.checked || parent.cbElm.disabled) {
+			for(var i = 0; i < list.length; i++) {
+				list[i].cbElm.disabled = true;
 			}
-			if (isNaN(x)) {
-				fail = true;
-				f.coord_input_X.style.border = "1px solid red";
-			} else {
-				f.coord_input_X.style.border = "";
-				f.coord_input_X.value = x;
-			}
-			if (!fail) {
-				_this.close();
-				setTimeout((function() {
-					return _this.callback(y, x);
-				}), 0);
-			}
-			return false;
-		};
-		this.form.onsubmit = this.onSubmit;
-	}
-	CoordinateInputModal.prototype.open = function(title, callback) {
-		CurrentModalPanel = this.panel;
-		this.title.innerText = title;
-		this.isOpen = true;
-		this.callback = callback;
-		this.panel.style.display = "";
-		this.overlay.style.display = "";
-		this.input.focus();
-		simplemodal_onopen();
-		this.panel.style.width = "";
-		this.panel.style.height = "";
-		var el_width = this.el.offsetWidth;
-		var el_height = this.el.offsetHeight;
-		if(el_height < 80) el_height = 80;
-		if(el_width < 160) el_width = 160;
-		this.panel.style.width = el_width + "px";
-		this.panel.style.height = el_height + "px";
-		setModalPosition();
-		setModalScroll();
-	};
-	return CoordinateInputModal;
-}());
-
-var ColorInputModal = (function() {
-	function ColorInputModal() {
-		var _this = this;
-		this.isOpen = false;
-		this.panel = document.getElementById("color_input_panel");
-		this.overlay = document.getElementById("simplemodal-overlay");
-		this.input = document.getElementById("color_input_form_input");
-		this.cancel = document.getElementById("color_input_cancel");
-		this.form = document.getElementById("color_input_form");
-		this.el = document.getElementById("color_input_modal");
-		ModalRefs.push(this);
-		this.close = function() {
-			_this.panel.style.display = "none";
-			_this.overlay.style.display = "none";
-			simplemodal_onclose();
-		};
-		this.cancel.onclick = this.close;
-		this.onSubmit = function() {
-			var code = _this.input.value;
-			_this.close();
-			setTimeout((function() {
-				return _this.callback(code);
-			}), 0);
-			return false;
-		};
-		this.form.onsubmit = this.onSubmit;
-	}
-	ColorInputModal.prototype.open = function(callback) {
-		CurrentModalPanel = this.panel;
-		ModalOverlayCloseFunc = this.onSubmit;
-		this.isOpen = true;
-		this.callback = callback;
-		this.panel.style.display = "";
-		this.overlay.style.display = "";
-		this.input.focus();
-		simplemodal_onopen();
-		setModalPosition();
-		setModalScroll();
-	};
-	return ColorInputModal;
-}());
-
-var SelectionModal = (function() {
-	function SelectionModal() {
-		var _this = this;
-		this.isOpen = false;
-		this.panel = document.getElementById("area_panel");
-		this.overlay = document.getElementById("simplemodal-overlay");
-		this.cancel = document.getElementById("area_cancel");
-		this.el = document.getElementById("area_modal");
-		this.res = document.getElementById("area_results");
-		this.cpy = document.getElementById("area_copy");
-		this.c_color = document.getElementById("area_cbox_color");
-		this.c_link = document.getElementById("area_cbox_link");
-		this.c_prot = document.getElementById("area_cbox_prot");
-		this.c_protpub = document.getElementById("area_cbox_protpub");
-		this.c_tleft = document.getElementById("area_cbox_tleft");
-		this.c_tright = document.getElementById("area_cbox_tright");
-		this.c_tempty = document.getElementById("area_cbox_tempty");
-		this.c_rgap = document.getElementById("area_cbox_rgap");
-		this.c_rlnbrk = document.getElementById("area_cbox_rlnbrk");
-		this.c_rsurrog = document.getElementById("area_cbox_rsurrog");
-		this.c_rcomb = document.getElementById("area_cbox_rcomb");
-		this.region_bounds = document.getElementById("region_bounds"),
-		this.rb_coord1 = document.getElementById("rb_coord1"),
-		this.rb_coord2 = document.getElementById("rb_coord2"),
-		this.textData = null;
-		this.colorData = null;
-		this.linkData = null;
-		this.protectionData = null;
-		this.setDimensions = function() {
-			this.panel.style.width = "";
-			this.panel.style.height = "";
-			var el_width = this.el.offsetWidth;
-			var el_height = this.el.offsetHeight;
-			if(el_height < 300) el_height = 300;
-			if(el_width < 460) el_width = 460;
-			this.panel.style.width = el_width + "px";
-			this.panel.style.height = el_height + "px";
-		}
-		this.updateTextOutput = function() {
-			if(!_this.isOpen) return;
-			var o_color = _this.c_color.checked;
-			var o_link = _this.c_link.checked;
-			var o_prot = _this.c_prot.checked;
-			var o_protpub = _this.c_protpub.checked;
-			var o_tleft = _this.c_tleft.checked;
-			var o_tright = _this.c_tright.checked;
-			var o_tempty = _this.c_tempty.checked;
-			var o_rgap = _this.c_rgap.checked;
-			var o_rlnbrk = _this.c_rlnbrk.checked;
-			var o_rsurrog = _this.c_rsurrog.checked;
-			var o_rcomb = _this.c_rcomb.checked;
-			var text = _this.textData.split("\n");
-			var currentCol = -1;
-			for(var y = 0; y < text.length; y++) {
-				text[y] = w.split(text[y], o_rsurrog, o_rcomb);
-				var colRow;
-				var linkRow;
-				var protRow;
-				if(o_color) colRow = _this.colorData.slice(y * text[y].length, y * text[y].length + text[y].length);
-				if(o_link) linkRow = _this.linkData.slice(y * text[y].length, y * text[y].length + text[y].length);
-				if(o_prot) protRow = _this.protectionData.slice(y * text[y].length, y * text[y].length + text[y].length);
-				if(o_tleft || o_tright || o_rgap) spaceTrim(text[y], o_tleft, o_tright, o_rgap, [colRow, linkRow, protRow]);
-				var line = text[y];
-				if(o_color) {
-					for(var x = 0; x < line.length; x++) {
-						var col = colRow[x];
-						if(col == currentCol) continue;
-						currentCol = col;
-						var chr = "\x1b";
-						if(col == 0) {
-							chr += "x";
-						} else {
-							chr += "F" + col.toString(16).padStart(6, 0);
-						}
-						chr += line[x];
-						line[x] = chr;
-					}
-				}
-				if(o_link) {
-					for(var x = 0; x < line.length; x++) {
-						var link = linkRow[x];
-						if(!link) continue;
-						line[x] = "\x1b" + link + line[x];
-					}
-				}
-				if(o_prot) {
-					for(var x = 0; x < line.length; x++) {
-						var prot = protRow[x];
-						if(prot == 0 && !o_protpub) continue;
-						line[x] = "\x1b" + "P" + prot + line[x]; // prot should be one character in length
-					}
-				}
-				text[y] = text[y].join("");
-			}
-			if(o_tempty) {
-				for(var y = 0; y < text.length; y++) {
-					if(!text[y]) {
-						text.splice(y, 1);
-						y--;
-					}
-				}
-			}
-			if(!o_rlnbrk) {
-				text = text.join("\n");
-			} else {
-				text = text.join("");
-			}
-			_this.res.value = text;
-		}
-		
-		ModalRefs.push(this);
-		this.close = function() {
-			_this.panel.style.display = "none";
-			_this.overlay.style.display = "none";
-			_this.textData = null;
-			_this.colorData = null;
-			simplemodal_onclose();
-		};
-		this.cancel.onclick = this.close;
-		this.cpy.onclick = function() {
-			w.clipboard.copy(_this.res.value);
-		}
-		this.c_color.onclick = _this.updateTextOutput;
-		this.c_link.onclick = _this.updateTextOutput;
-		this.c_prot.onclick = function() {
-			if(_this.c_prot.checked) {
-				document.getElementById("acb_protpub").style.display = "";
-			} else {
-				document.getElementById("acb_protpub").style.display = "none";
-			}
-			_this.setDimensions();
-			_this.updateTextOutput();
-		}
-		this.c_protpub.onclick = _this.updateTextOutput;
-		this.c_tleft.onclick = _this.updateTextOutput;
-		this.c_tright.onclick = _this.updateTextOutput;
-		this.c_tempty.onclick = _this.updateTextOutput;
-		this.c_rgap.onclick = _this.updateTextOutput;
-		this.c_rlnbrk.onclick = _this.updateTextOutput;
-		this.c_rsurrog.onclick = _this.updateTextOutput;
-		this.c_rcomb.onclick = _this.updateTextOutput;
-	}
-	SelectionModal.prototype.open = function(str, colors, links, protections, coords) {
-		CurrentModalPanel = this.panel;
-		this.textData = str;
-		this.colorData = colors;
-		this.linkData = links;
-		this.protectionData = protections;
-		this.isOpen = true;
-		this.panel.style.display = "";
-		this.overlay.style.display = "";
-		simplemodal_onopen();
-		this.setDimensions();
-		setModalPosition();
-		setModalScroll();
-		this.updateTextOutput();
-
-		if (!showCursorCoordinates) {
-			this.region_bounds.style.display = "none";
 		} else {
-			this.region_bounds.style.display = "";
-			this.rb_coord1.innerText = JSON.stringify(coords[0]);
-			this.rb_coord2.innerText = JSON.stringify(coords[1]);
+			for(var i = 0; i < list.length; i++) {
+				list[i].cbElm.disabled = false;
+			}
 		}
 	}
-	return SelectionModal;
-}());
+	for(var i = 0; i < list.length; i++) {
+		updateModalCheckboxField(list[i].children, list[i]);
+	}
+}
+
+function Modal() {
+	this.inputField = null;
+	this.formTitle = null;
+	this.formField = null;
+	this.formInputs = [];
+
+	this.footerCont = [];
+	this.footerField = null;
+
+	this.isOpen = false;
+	this.hasSubmitted = false;
+
+	this.submitFn = null;
+	this.openFn = null;
+	this.closeFn = null;
+
+	this.cbField = null;
+	this.cbList = [];
+	this.cbCallback = null;
+
+	var frame = document.createElement("div");
+	frame.style.flexDirection = "column";
+	frame.style.display = "none";
+	frame.style.backgroundColor = "#c3c3ff";
+	frame.style.position = "absolute";
+	frame.style.minWidth = "250px";
+	frame.style.minHeight = "120px";
+
+	var fClient = document.createElement("div");
+	fClient.style.backgroundColor = "#e5e5ff";
+	fClient.style.flex = "1";
+	fClient.style.margin = "6px";
+	fClient.style.padding = "12px";
+	fClient.style.position = "relative";
+
+	frame.appendChild(fClient)
+	modalOverlay.appendChild(frame);
+
+	this.frame = frame;
+	this.client = fClient;
+
+	Modal.list.push(this);
+	return this;
+}
+
+Modal.closeAll = function() {
+	for(var i = 0; i < Modal.list.length; i++) {
+		var modal = Modal.list[i];
+		modal.close();
+	}
+}
+Modal.isOpen = false;
+Modal.current = null;
+Modal.list = [];
+
+/*
+	Creates a form section in the modal.
+	Modals are currently limited to one form only.
+*/
+Modal.prototype.createForm = function() {
+	if(this.formField) return;
+	var self = this;
+	var formField = document.createElement("div");
+	var inputField = document.createElement("div");
+	var title = document.createElement("div");
+	var subField = document.createElement("div");
+
+	inputField.style.display = "grid";
+	inputField.style.gap = "2px";
+	inputField.style.marginBottom = "2px";
+
+	var subm = document.createElement("button");
+	subm.innerText = "Go";
+	subm.style.paddingLeft = "11px";
+	subm.style.paddingRight = "11px";
+	subm.onclick = function() {
+		self.submitForm();
+	}
+	var canc = document.createElement("span");
+	canc.innerText = "cancel";
+	canc.style.color = "blue";
+	canc.style.textDecoration = "underline";
+	canc.style.cursor = "pointer";
+	canc.onclick = function() {
+		self.cancelForm();
+	}
+	subField.appendChild(subm);
+	subField.append(" or ");
+	subField.appendChild(canc);
+
+	formField.appendChild(title);
+	formField.appendChild(inputField);
+	formField.appendChild(subField);
+	this.formTitle = title;
+	this.formField = formField;
+	this.inputField = inputField;
+	this.subField = subField;
+	this.client.appendChild(formField);
+	this.alignForm();
+}
+
+/*
+	Validates, processes, and submits the form.
+	This triggers the onSubmit callback.
+*/
+Modal.prototype.submitForm = function() {
+	if(this.hasSubmitted) return;
+
+	// validation
+	var formFailed = false;
+	for(var i = 0; i < this.formInputs.length; i++) {
+		var fInput = this.formInputs[i];
+		var val = fInput.input.value;
+		var failed = false;
+		if(fInput.validation == "number") {
+			var num = parseFloat(val);
+			if(!isFinite(num) || isNaN(num)) {
+				failed = true;
+			}
+		} else if(fInput.validation == "required") {
+			failed = !val;
+		}
+		if(failed) {
+			fInput.validationFailed = true;
+			fInput.input.style.border = "1px solid red";
+			formFailed = true;
+		} else if(fInput.validationFailed) {
+			fInput.validationFailed = false;
+			fInput.input.style.border = "";
+		}
+	}
+	if(formFailed) {
+		return;
+	}
+
+	this.hasSubmitted = true;
+	if(this.submitFn) {
+		var argList = {};
+		for(var i = 0; i < this.formInputs.length; i++) {
+			var fInput = this.formInputs[i];
+			argList[fInput.label] = fInput.input.value;
+			argList[i] = fInput.input.value;
+		}
+		argList.length = this.formInputs.length;
+		this.submitFn(argList);
+	}
+	if(this.isOpen) {
+		this.close();
+	}
+}
+
+/*
+	Revert the form and close the modal.
+*/
+Modal.prototype.cancelForm = function() {
+	// revert the form values
+	this.close(true);
+}
+
+/*
+	Line up all form labels.
+	The form labels are set to the left and the inputs are set to the right.
+*/
+Modal.prototype.alignForm = function() {
+	if(!this.formField) {
+		throw "No form exists";
+	}
+	this.inputField.style.gridTemplateColumns = "0fr 1fr";
+}
+
+/*
+	Set each form label on its own line.
+*/
+Modal.prototype.unalignForm = function() {
+	if(!this.formField) {
+		throw "No form exists";
+	}
+	this.inputField.style.gridTemplateColumns = "";
+}
+
+/*
+	Add an input entry to the form.
+	label: The label to be shown next to the input.
+	type (optional): 'text' or 'color'.
+	validation (optional): 'number'. Check if the entry contains a valid value.
+*/
+Modal.prototype.addEntry = function(label, type, validation) {
+	if(!this.formField) {
+		throw "No form exists";
+	}
+	var self = this;
+	var lab = document.createElement("label");
+	lab.innerText = label + ":";
+	lab.style.marginRight = "3px";
+	lab.style.whiteSpace = "nowrap";
+	var inp = document.createElement("input");
+	inp.style.width = "150px";
+	var isColor = false;
+	if(!type) {
+		type = "text";
+	}
+	if(type == "color") {
+		inp.className = "jscolor";
+		isColor = true;
+	}
+	inp.onkeydown = function(e) {
+		if(e.key == "Enter") {
+			self.submitForm();
+		}
+	}
+	this.inputField.appendChild(lab);
+	this.inputField.appendChild(inp);
+	if(isColor) {
+		window.jscolor.installByClassName("jscolor");
+	}
+	this.formInputs.push({
+		input: inp,
+		value: inp.value,
+		validation: validation,
+		validationFailed: false,
+		type: type,
+		label: label
+	});
+	return {
+		input: inp
+	};
+}
+
+/*
+	Sets the fixed size of the modal.
+	Any overflown content will be hidden.
+	Setting either dimension to zero will reset that dimension.
+*/
+Modal.prototype.setSize = function(width, height) {
+	if(width) {
+		this.frame.style.width = width + "px";
+	} else {
+		this.frame.style.width = "";
+	}
+	if(height) {
+		this.frame.style.height = height + "px";
+	} else {
+		this.frame.style.height = "";
+	}
+}
+
+/*
+	Sets the minimum size of the modal.
+	The modal cannot be smaller than this size.
+	Setting either dimension to zero will reset that dimension.
+*/
+Modal.prototype.setMinimumSize = function(width, height) {
+	if(width) {
+		this.frame.style.minWidth = width + "px";
+	} else {
+		this.frame.style.minWidth = "";
+	}
+	if(height) {
+		this.frame.style.minHeight = height + "px";
+	} else {
+		this.frame.style.minHeight = "";
+	}
+}
+
+/*
+	Sets the maximum size of the modal.
+	The modal cannot be bigger than this size. Overflown content will be hidden.
+	Setting either dimension to zero will reset that dimension.
+*/
+Modal.prototype.setMaximumSize = function(width, height) {
+	if(width) {
+		this.frame.style.maxWidth = width + "px";
+	} else {
+		this.frame.style.maxWidth = "";
+	}
+	if(height) {
+		this.frame.style.maxHeight = height + "px";
+	} else {
+		this.frame.style.maxHeight = "";
+	}
+}
+
+/*
+	Set a title or description at the top of the modal.
+*/
+Modal.prototype.setFormTitle = function(title) {
+	this.formTitle.innerText = title;
+}
+
+/*
+	Add a footer to the bottom of the modal.
+	The footer is split into three parts (left, center, right).
+*/
+Modal.prototype.setFooter = function() {
+	if(this.footerField) return;
+	var footer = document.createElement("div");
+	footer.style.margin = "6px";
+	footer.style.minHeight = "18px";
+	footer.style.display = "flex";
+	footer.style.justifyContent = "space-between";
+	var cLeft = document.createElement("div");
+	var cMid = document.createElement("div");
+	var cRight = document.createElement("div");
+	this.footerCont = [cLeft, cMid, cRight];
+	footer.appendChild(cLeft);
+	footer.appendChild(cMid);
+	footer.appendChild(cRight);
+	this.client.style.marginBottom = "0px";
+	this.frame.appendChild(footer);
+	this.footerField = footer;
+}
+
+/*
+	Removes the footer from the modal.
+*/
+Modal.prototype.removeFooter = function() {
+	if(!this.footerField) return;
+	this.frame.removeChild(this.footerField);
+	this.footerCont = [];
+}
+
+/*
+	Adds a checkbox to the left section of the footer.
+	labelName: name of the checkbox.
+	callback: to be called when the checkbox is checked (parameter: checked)
+*/
+Modal.prototype.setFooterCheckbox = function(labelName, callback, defaultState) {
+	if(!this.footerField) {
+		this.setFooter();
+	}
+	var lab = document.createElement("label");
+	lab.className = "modal_corner_checkbox_label";
+	var cb = document.createElement("input");
+	cb.type = "checkbox";
+	cb.checked = Boolean(defaultState);
+	cb.oninput = function() {
+		if(callback) {
+			callback(cb.checked);
+		}
+	}
+	lab.appendChild(cb);
+	lab.append(" " + labelName);
+	this.footerCont[0].appendChild(lab);
+}
+
+/*
+	Adds content to a section of the footer.
+*/
+Modal.prototype.setFooterContentLeft = function(data) {
+	if(!this.footerField) throw "No footer exists";
+	this.footerCont[0].appendChild(data);
+}
+Modal.prototype.setFooterContentCenter = function(data) {
+	if(!this.footerField) throw "No footer exists";
+	this.footerCont[1].appendChild(data);
+}
+Modal.prototype.setFooterContentRight = function(data) {
+	if(!this.footerField) throw "No footer exists";
+	this.footerCont[2].appendChild(data);
+}
+
+/*
+	Clears a section of the footer.
+*/
+Modal.prototype.removeFooterContentLeft = function() {
+	if(!this.footerField) return;
+	this.footerCont[0].innerHTML = "";
+}
+Modal.prototype.removeFooterContentCenter = function() {
+	if(!this.footerField) return;
+	this.footerCont[1].innerHTML = "";
+}
+Modal.prototype.removeFooterContentRight = function() {
+	if(!this.footerField) return;
+	this.footerCont[2].innerHTML = "";
+}
+
+/*
+	Set event callbacks.
+	onSubmit: to be called whenever the form is submitted.
+	onOpen: to be called whenever the modal is opened.
+	onClose: to be called whenever the modal is closed.
+*/
+Modal.prototype.onSubmit = function(callback) {
+	this.submitFn = callback;
+}
+Modal.prototype.onOpen = function(callback) {
+	this.openFn = callback;
+}
+Modal.prototype.onClose = function(callback) {
+	this.closeFn = callback;
+}
+Modal.prototype.checkboxFieldOnInput = function(callback) {
+	this.cbCallback = callback;
+}
+
+/*
+	Display the modal.
+	All parameters will be passed to the onOpen event.
+*/
+Modal.prototype.open = function(...params) {
+	if(Modal.isOpen) {
+		Modal.closeAll();
+	}
+	Modal.isOpen = true;
+	Modal.current = this;
+	modalOverlay.style.display = "";
+	this.hasSubmitted = false;
+	this.isOpen = true;
+	this.frame.style.display = "flex"; // make visible
+	if(this.formInputs.length) {
+		var firstForm = this.formInputs[0].input;
+		firstForm.focus();
+	}
+	for(var i = 0; i < this.formInputs.length; i++) {
+		var fInput = this.formInputs[i];
+		fInput.value = fInput.input.value;
+	}
+	if(this.openFn) {
+		this.openFn(...params);
+	}
+}
+
+/*
+	Hide the modal.
+	canceled: This modal has closed as a result of form cancelation. This will revert the values of the form inputs.
+*/
+Modal.prototype.close = function(canceled) {
+	if(!this.isOpen) return;
+	this.isOpen = false;
+	this.frame.style.display = "none";
+	Modal.isOpen = false;
+	Modal.current = null;
+	modalOverlay.style.display = "none";
+	// revert all values if canceled, otherwise record them
+	for(var i = 0; i < this.formInputs.length; i++) {
+		var fInput = this.formInputs[i];
+		if(canceled) {
+			if(fInput.type == "color") {
+				fInput.input.jscolor.fromString(fInput.value);
+			} else {
+				fInput.input.value = fInput.value;
+			}
+		} else {
+			fInput.value = fInput.input.value;
+		}
+	}
+	if(this.closeFn) {
+		this.closeFn(canceled);
+	}
+}
+
+/*
+	Add a checkbox section to the modal.
+	The checkbox section contains a nestable list of checkbox inputs.
+	Only one checkbox field is currently supported.
+*/
+Modal.prototype.createCheckboxField = function() {
+	if(this.cbField) return;
+	var field = document.createElement("div");
+	this.cbField = field;
+	this.client.appendChild(field);
+}
+
+/*
+	Adds a checkbox to the checkbox field.
+	label: The name of the checkbox.
+	parent (optional): The parent checkbox. Nested checkboxes will be indented.
+*/
+Modal.prototype.addCheckbox = function(label, parent) {
+	if(!this.cbField) {
+		throw "No checkbox field exists";
+	}
+	var self = this;
+	var cbTitle = label;
+	var cbParent = null;
+	if(parent) {
+		cbParent = parent;
+	}
+
+	var label = document.createElement("label");
+	var cb = document.createElement("input");
+	cb.type = "checkbox";
+	label.style.display = "block";
+	label.style.userSelect = "none";
+	label.appendChild(cb);
+	label.append(" " + cbTitle);
+
+	var threshold = 0;
+	var cbObj = {
+		elm: label,
+		cbElm: cb,
+		children: []
+	};
+	if(cbParent) {
+		threshold = cbParent.level + 1;
+		label.style.marginLeft = (20 * threshold) + "px";
+		if(cbParent.children.length) {
+			var lastChild = cbParent.children[cbParent.children.length - 1];
+			var nextElm = lastChild.nextSibling;
+			if(nextElm) {
+				lastChild.elm.insertBefore(label, nextElm);
+			} else {
+				this.cbField.appendChild(label);
+			}
+		} else {
+			var nextElm = cbParent.elm.nextSibling;
+			if(nextElm) {
+				cbParent.elm.insertBefore(label, nextElm);
+			} else {
+				this.cbField.appendChild(label);
+			}
+		}
+		cbObj.level = threshold;
+		cbParent.children.push(cbObj);
+	} else {
+		this.cbField.appendChild(label);
+		cbObj.level = threshold;
+		this.cbList.push(cbObj);
+	}
+
+	cb.onclick = function() {
+		if(self.cbCallback) {
+			self.cbCallback(cbObj, cb.checked);
+		}
+		updateModalCheckboxField(cbObj.children, cbObj);
+	}
+
+	updateModalCheckboxField(this.cbList);
+
+	return cbObj;
+}
+
+/*
+	Insert content to the modal.
+*/
+Modal.prototype.append = function(elm) {
+	this.client.appendChild(elm);
+}
+
+/*
+	Adds a close caption to the bottom right of the modal.
+*/
+Modal.prototype.createClose = function() {
+	var span = document.createElement("span");
+	span.className = "modal_close";
+	span.innerText = "Close";
+	var self = this;
+	span.onclick = function() {
+		self.close();
+	}
+	this.client.appendChild(span);
+}

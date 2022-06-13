@@ -135,31 +135,6 @@ a:visited {
 #nav li.hover {
 	background-color: white;
 }
-#simplemodal-overlay {
-	background-color: #000;
-	cursor: default;
-}
-.simplemodal-container {
-	color: #333;
-	background-color: #e5e5ff;
-	border: 6px solid #c3c3ff;
-	padding: 12px;
-}
-.simplemodal-container a {
-	color: #ddd;
-}
-.simplemodal-closelink {
-	color: blue;
-	text-decoration: underline;
-	cursor: pointer
-}
-.simplemodal-closebutton {
-	position: absolute;
-	top: -15px;
-	right: -15px;
-	cursor: pointer;
-	font-size: 160%;
-}
 #goto_submit {
 	margin-left: 1em;
 	margin-top: 3px;
@@ -394,13 +369,6 @@ a:visited {
 	overflow: auto;
 	overflow-x: scroll;
 }
-#area_cancel {
-	position: absolute;
-	right: 0px;
-	bottom: 0px;
-	margin-right: 8px;
-	margin-bottom: 8px;
-}
 #link_element {
 	position: absolute;
 	display: block;
@@ -437,17 +405,30 @@ a:visited {
 .color_btn:active {
 	border-color: rgb(165, 107, 0);
 }
-#color_shortcuts {
-	background-color: #C3C3FF;
-	margin-left: -13px;
-	margin-right: -13px;
-	margin-bottom: -13px;
-	text-align: right;
-	padding-top: 3px;
-}
-#cursor_outline_toggle_label {
-	position: absolute;
-	left: 9px;
-	margin-top: 5px;
+.modal_corner_checkbox_label {
+	margin-left: 5px;
 	user-select: none;
+}
+#modal_overlay {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	width: 100%;
+	height: 100%;
+	cursor: default;
+	background-color: rgba(0, 0, 0, 0.5);
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	z-index: 1000;
+}
+.modal_close {
+	position: absolute;
+	right: 0px;
+	bottom: 0px;
+	margin-right: 8px;
+	margin-bottom: 8px;
+	color: blue;
+	text-decoration: underline;
+	cursor: pointer
 }
