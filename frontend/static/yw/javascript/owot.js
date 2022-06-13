@@ -2667,7 +2667,12 @@ function autoArrowKeyMoveStop(dir) {
 function event_keydown(e) {
 	var actElm = document.activeElement;
 	if(!worldFocused) return;
-	if(Modal.isOpen) return;
+	if(Modal.isOpen) {
+		if(checkKeyPress(e, keyConfig.reset)) {
+			Modal.closeAll();
+		}
+		return;
+	}
 	if(actElm == elm.chatbar) return;
 	if(actElm == elm.confirm_js_code) return;
 	if(actElm.tagName == "INPUT" && actElm.type == "text" && actElm != elm.textInput) return;
@@ -5718,12 +5723,12 @@ w._state = w.state; // deprecated
 function makeCoordLinkModal() {
 	var modal = new Modal();
 	modal.createForm();
-	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a letter to create the link.");
+	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a letter to create the link.\n\n");
 	var coordX = modal.addEntry("X", "text", "number").input;
 	var coordY = modal.addEntry("Y", "text", "number").input;
 	modal.setMaximumSize(360, 300);
 	modal.onSubmit(function() {
-		w.doCoordLink(parseInt(coordY.value), parseInt(coordX.value));
+		w.doCoordLink(parseFloat(coordY.value), parseFloat(coordX.value));
 	});
 	w.ui.coordLinkModal = modal;
 }
@@ -5731,11 +5736,11 @@ function makeCoordLinkModal() {
 function makeCoordGotoModal() {
 	var modal = new Modal();
 	modal.createForm();
-	modal.setFormTitle("Go to coordinates:");
+	modal.setFormTitle("Go to coordinates:\n\n");
 	var coordX = modal.addEntry("X", "text", "number").input;
 	var coordY = modal.addEntry("Y", "text", "number").input;
 	modal.onSubmit(function() {
-		w.doGoToCoord(parseInt(coordY.value), parseInt(coordX.value));
+		w.doGoToCoord(parseFloat(coordY.value), parseFloat(coordX.value));
 	});
 	w.ui.coordGotoModal = modal;
 }
@@ -5743,6 +5748,7 @@ function makeCoordGotoModal() {
 function makeURLModal() {
 	var modal = new Modal();
 	modal.createForm();
+	modal.setFormTitle("\n");
 	var urlInput = modal.addEntry("URL", "text").input;
 	modal.onSubmit(function() {
 		w.doUrlLink(urlInput.value);
@@ -5754,6 +5760,7 @@ function makeURLModal() {
 function makeColorModal() {
 	var modal = new Modal();
 	modal.createForm();
+	modal.setFormTitle("\n");
 	colorInput = modal.addEntry("Color Code", "color").input;
 	modal.onSubmit(function() {
 		var color = colorInput.value;
@@ -5891,12 +5898,12 @@ function makeSelectionModal() {
 	modal.append(document.createElement("br"));
 	modal.append(region_bounds);
 	modal.append(region_text);
-	modal.setCheckboxField();
-	modal.setClose();
+	modal.createCheckboxField();
+	modal.createClose();
 	var c_color = modal.addCheckbox("Copy colors");
 	var c_link = modal.addCheckbox("Copy links");
 	var c_prot = modal.addCheckbox("Copy protections");
-	var c_pprot = modal.addCheckbox(c_prot, "Copy public protections");
+	var c_pprot = modal.addCheckbox("Copy public protections", c_prot);
 	var t_left = modal.addCheckbox("Trim left");
 	var t_right = modal.addCheckbox("Trim right");
 	var t_empty = modal.addCheckbox("Trim empty lines");
