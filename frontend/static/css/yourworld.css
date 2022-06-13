@@ -135,31 +135,6 @@ a:visited {
 #nav li.hover {
 	background-color: white;
 }
-/*#simplemodal-overlay {
-	background-color: #000;
-	cursor: default;
-}
-.simplemodal-container {
-	color: #333;
-	background-color: #e5e5ff;
-	border: 6px solid #c3c3ff;
-	padding: 12px;
-}
-.simplemodal-container a {
-	color: #ddd;
-}
-.simplemodal-closelink {
-	color: blue;
-	text-decoration: underline;
-	cursor: pointer
-}
-.simplemodal-closebutton {
-	position: absolute;
-	top: -15px;
-	right: -15px;
-	cursor: pointer;
-	font-size: 160%;
-}*/
 #goto_submit {
 	margin-left: 1em;
 	margin-top: 3px;
@@ -430,7 +405,7 @@ a:visited {
 .color_btn:active {
 	border-color: rgb(165, 107, 0);
 }
-#cursor_outline_toggle_label {
+.modal_corner_checkbox_label {
 	margin-left: 5px;
 	user-select: none;
 }

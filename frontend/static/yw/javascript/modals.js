@@ -34,6 +34,8 @@ function Modal() {
 	// placeholder names
 	this.formTitle = null;
 	this.formField = null;
+	this.formInputs = [];
+
 	this.inputField = null;
 	this.size = [0, 0];
 	this.footerCont = [];
@@ -48,13 +50,7 @@ function Modal() {
 	this.cbList = [];
 	this.cbCallback = null;
 
-// border: #c3c3ff
-// frame: #e5e5ff
-// TODO: allow Enter
 // TODO: easier inputting on mobile (put form up on top instead of center)
-// TODO: click on modal overlay to close
-// TODO: input focus
-// TODO: dont nest checkboxes
 
 	var frame = document.createElement("div");
 	frame.style.flexDirection = "column";
@@ -114,7 +110,7 @@ Modal.prototype.createForm = function() {
 		self.cancelForm();
 	}
 	subField.appendChild(subBtn);
-	subField.appendChild(document.createTextNode(" or "));
+	subField.append(" or ");
 	subField.appendChild(canc);
 
 	formField.appendChild(title);
@@ -138,7 +134,7 @@ Modal.prototype.submitForm = function() {
 	}
 }
 Modal.prototype.cancelForm = function() {
-	// TODO: revert input fields
+	// revert the form values
 	this.close(true);
 }
 Modal.prototype.alignForm = function() {
@@ -147,7 +143,6 @@ Modal.prototype.alignForm = function() {
 Modal.prototype.unalignForm = function() {
 	this.inputField.style.gridTemplateColumns = "";
 }
-// TODO: validation
 Modal.prototype.addEntry = function(label, type, validation) {
 	var lab = document.createElement("label");
 	lab.innerText = label + ":";
@@ -155,6 +150,7 @@ Modal.prototype.addEntry = function(label, type, validation) {
 	lab.style.whiteSpace = "nowrap";
 	var inp = document.createElement("input");
 	inp.style.width = "150px";
+	var self = this;
 	var isColor = false;
 	if(!type) {
 		type = "text";
@@ -163,11 +159,21 @@ Modal.prototype.addEntry = function(label, type, validation) {
 		inp.className = "jscolor";
 		isColor = true;
 	}
+	inp.onkeydown = function(e) {
+		if(e.key == "Enter") {
+			self.submitForm();
+		}
+	}
 	this.inputField.appendChild(lab);
 	this.inputField.appendChild(inp);
 	if(isColor) {
 		window.jscolor.installByClassName("jscolor");
 	}
+	this.formInputs.push({
+		input: inp,
+		value: inp.value,
+		validation: validation
+	});
 	return {
 		input: inp
 	};
@@ -205,20 +211,20 @@ Modal.prototype.setFooter = function() {
 	this.client.style.marginBottom = "0px";
 	this.frame.appendChild(footer);
 }
-Modal.prototype.setFooterCheckbox = function(callback) {
+Modal.prototype.setFooterCheckbox = function(labelName, callback, defaultState) {
 	if(!this.footerCont) return; // TODO (make footer)
 	var lab = document.createElement("label");
-	lab.id = "cursor_outline_toggle_label";
+	lab.className = "modal_corner_checkbox_label";
 	var cb = document.createElement("input");
-	cb.id = "cursor_outline_toggle";
 	cb.type = "checkbox";
+	cb.checked = Boolean(defaultState);
 	cb.oninput = function() {
 		if(callback) {
 			callback(cb.checked);
 		}
 	}
 	lab.appendChild(cb);
-	lab.appendChild(document.createTextNode(" Outline"));
+	lab.append(" " + labelName);
 	this.footerCont[0].appendChild(lab);
 }
 Modal.prototype.setFooterContentLeft = function(data) {
@@ -251,7 +257,11 @@ Modal.prototype.open = function(...params) {
 	modalOverlay.style.display = "";
 	this.hasSubmitted = false;
 	this.isOpen = true;
-	this.frame.style.display = "flex";
+	this.frame.style.display = "flex"; // make visible
+	if(this.formInputs.length) {
+		var firstForm = this.formInputs[0].input;
+		firstForm.focus();
+	}
 	if(this.openFn) {
 		this.openFn(...params);
 	}
@@ -263,6 +273,14 @@ Modal.prototype.close = function(canceled) {
 	Modal.isOpen = false;
 	Modal.current = null;
 	modalOverlay.style.display = "none";
+	for(var i = 0; i < this.formInputs.length; i++) {
+		var fInput = this.formInputs[i];
+		if(canceled) {
+			fInput.input.value = fInput.value;
+		} else {
+			fInput.value = fInput.input.value;
+		}
+	}
 	if(this.closeFn) {
 		this.closeFn(canceled);
 	}
@@ -291,7 +309,7 @@ Modal.prototype.addCheckbox = function(arg1, arg2) {
 	label.style.display = "block";
 	label.style.userSelect = "none";
 	label.appendChild(cb);
-	label.appendChild(document.createTextNode(" " + cbTitle));
+	label.append(" " + cbTitle);
 
 	var threshold = 0;
 	var cbObj = {
@@ -301,8 +319,23 @@ Modal.prototype.addCheckbox = function(arg1, arg2) {
 	};
 	if(cbParent) {
 		threshold = cbParent.level + 1;
-		label.style.marginLeft = "20px";
-		cbParent.elm.appendChild(label);
+		label.style.marginLeft = (20 * threshold) + "px";
+		if(cbParent.children.length) {
+			var lastChild = cbParent.children[cbParent.children.length - 1];
+			var nextElm = lastChild.nextSibling;
+			if(nextElm) {
+				lastChild.elm.insertBefore(label, nextElm);
+			} else {
+				this.cbField.appendChild(label);
+			}
+		} else {
+			var nextElm = cbParent.elm.nextSibling;
+			if(nextElm) {
+				cbParent.elm.insertBefore(label, nextElm);
+			} else {
+				this.cbField.appendChild(label);
+			}
+		}
 		cbObj.level = threshold;
 		cbParent.children.push(cbObj);
 	} else {

@@ -5,7 +5,6 @@
 
 var owot, owotCtx, textInput;
 var linkElm, linkDiv;
-//var jscolorInput;
 var colorInput;
 var colorShortcuts;
 function init_dom() {
@@ -199,19 +198,8 @@ defineElements({ // elm[<name>]
 	usr_online: byId("usr_online"),
 	link_element: byId("link_element"),
 	link_div: byId("link_div"),
-	protect_selection: byId("protect_selection"),
-	cursor_outline_toggle: byId("cursor_outline_toggle")
+	protect_selection: byId("protect_selection")
 });
-
-
-
-/*w.on("clientLoaded", function() {
-	jscolorInput = elm.color_input_form_input.jscolor;
-	var r = (YourWorld.Color >> 16) & 255;
-	var g = (YourWorld.Color >> 8) & 255;
-	var b = YourWorld.Color & 255;
-	setRGBColorPicker(r, g, b);
-});*/
 
 function setRGBColorPicker(r, g, b) {
 	colorInput.jscolor.fromRGB(r, g, b);
@@ -408,8 +396,6 @@ function getStoredConfig() {
 	if(!conf) return;
 	conf = JSON.parse(conf);
 	cursorOutlineEnabled = conf.cursorOutline;
-	// dom
-	elm.cursor_outline_toggle.checked = cursorOutlineEnabled;
 }
 function storeConfig() {
 	if(!window.localStorage || !localStorage.setItem) return;
@@ -418,9 +404,6 @@ function storeConfig() {
 	};
 	localStorage.setItem("config", JSON.stringify(conf));
 }
-
-getStoredNickname();
-//getStoredConfig();
 
 function loadBackgroundData(cb, timeout_cb) {
 	if(!backgroundEnabled || !state.background) {
@@ -5732,10 +5715,6 @@ document.onselectstart = function(e) {
 
 w._state = w.state; // deprecated
 
-
-
-
-
 function makeCoordLinkModal() {
 	var modal = new Modal();
 	modal.createForm();
@@ -5794,14 +5773,14 @@ function makeColorModal() {
 		}
 	});
 	modal.setFooter();
-	modal.setFooterCheckbox(function(checked) {
+	modal.setFooterCheckbox("Outline", function(checked) {
 		cursorOutlineEnabled = checked;
 		storeConfig();
 		if(!cursorCoords) return;
 		var cursorTileX = cursorCoords[0];
 		var cursorTileY = cursorCoords[1];
 		w.setTileRedraw(cursorTileX, cursorTileY);
-	});
+	}, cursorOutlineEnabled);
 	w.ui.colorModal = modal;
 
 	colorShortcuts = document.createElement("div");
@@ -6403,6 +6382,9 @@ var ws_functions = {
 };
 
 function begin() {
+	getStoredConfig();
+	getStoredNickname();
+
 	makeCoordLinkModal();
 	makeCoordGotoModal();
 	makeURLModal();
