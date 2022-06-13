@@ -323,9 +323,17 @@ Modal.prototype.setFooter = function() {
 	footer.style.minHeight = "18px";
 	footer.style.display = "flex";
 	footer.style.justifyContent = "space-between";
+
 	var cLeft = document.createElement("div");
 	var cMid = document.createElement("div");
 	var cRight = document.createElement("div");
+	cLeft.style.display = "flex";
+	cLeft.style.alignItems = "center";
+	cMid.style.display = "flex";
+	cMid.style.alignItems = "center";
+	cRight.style.display = "flex";
+	cRight.style.alignItems = "center";
+
 	this.footerCont = [cLeft, cMid, cRight];
 	footer.appendChild(cLeft);
 	footer.appendChild(cMid);
