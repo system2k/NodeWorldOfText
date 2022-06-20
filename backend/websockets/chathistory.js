@@ -8,7 +8,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	var chat_perm = world.feature.chat;
 	var is_member = !!world.members.map[user.id];
-	var is_owner = user.id == world.id;
+	var is_owner = user.id == world.ownerId;
 
 	var can_chat = false;
 	if(!chat_perm) can_chat = true;

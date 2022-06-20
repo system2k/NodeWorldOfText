@@ -1,9 +1,21 @@
 var modalOverlay = document.getElementById("modal_overlay");
-modalOverlay.onclick = function(e) {
-	if(e.target != modalOverlay) return;
-	if(Modal.current) {
-		Modal.current.close();
+var modalOverlaySelected = false;
+
+modalOverlay.onmousedown = function(e) {
+	if(e.target == modalOverlay) {
+		modalOverlaySelected = true;
+	} else {
+		modalOverlaySelected = false;
 	}
+}
+
+modalOverlay.onmouseup = function(e) {
+	if(modalOverlaySelected && e.target == modalOverlay) {
+		if(Modal.current) {
+			Modal.current.close();
+		}
+	}
+	modalOverlaySelected = false;
 }
 
 function updateModalCheckboxField(list, parent) {

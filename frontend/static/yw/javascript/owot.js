@@ -2427,7 +2427,7 @@ var linkQueue = [];
 var char_input_check = setInterval(function() {
 	if(Modal.isOpen) return;
 	if(write_busy) return;
-	if(state.worldModel.char_rate[0] == 0) {
+	if(state.worldModel.char_rate[0] == 0 && !state.userModel.is_member) {
 		elm.textInput.value = "";
 		return;
 	}
