@@ -76,8 +76,12 @@ module.exports = async function(data, vars, evars) {
 	var rejected = {};
 	/*
 	1: NO_TILE_PERM
-	2: RATE_LIMIT
+	2: CHAR_RATE_LIMIT
+	3: TILE_RATE_LIMIT
+	4: ZERO_RATE_LIMIT
+	5: TOO_MANY_HOLDS
 	*/
+	// TODO: use constants (some rejected values may be added by the tile manager subsystem)
 
 	var idLabel = isGrouped ? "cg1" : ipAddress;
 	
@@ -119,21 +123,23 @@ module.exports = async function(data, vars, evars) {
 		if(typeof char != "string") continue;
 		if(!rate_limiter.checkCharRateLimit(editLimiter, charRatePerSecond, 1)) {
 			rejected[editID] = 2;
+			if(charRatePerSecond == 0) rejected[editID] = 4;
 			continue;
 		}
 		if(customLimiter && rrate == null) {
 			if(!rate_limiter.checkCharRateLimit(customLimiter, charsPerPeriod, 1)) {
 				rejected[editID] = 2;
+				if(charsPerPeriod == 0) rejected[editID] = 4;
 				continue;
 			}
 		}
 		if(!tiles[tileStr]) {
 			if(!rate_limiter.checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world_id)) {
-				rejected[editID] = 2;
+				rejected[editID] = 3;
 				continue;
 			}
 			if(!rate_limiter.setHold(idLabel, tileX, tileY)) {
-				rejected[editID] = 2;
+				rejected[editID] = 5;
 				continue;
 			}
 			tiles[tileStr] = [];

@@ -3538,7 +3538,11 @@ function clearVisibleTiles() {
 	}
 }
 
-function highlight(positions, unlimited) {
+function highlight(positions, unlimited, color) {
+	var r = defaultHighlightColor[0];
+	var g = defaultHighlightColor[1];
+	var b = defaultHighlightColor[2];
+	if(!color) color = [r, g, b];
 	for(var i = 0; i < positions.length; i++) {
 		var tileX = positions[i][0];
 		var tileY = positions[i][1];
@@ -3552,10 +3556,7 @@ function highlight(positions, unlimited) {
 			highlightFlash[tileY + "," + tileX][charY] = {};
 		}
 		if(!highlightFlash[tileY + "," + tileX][charY][charX]) {
-			var r = defaultHighlightColor[0];
-			var g = defaultHighlightColor[1];
-			var b = defaultHighlightColor[2];
-			highlightFlash[tileY + "," + tileX][charY][charX] = [getDate(), [r, g, b]];
+			highlightFlash[tileY + "," + tileX][charY][charX] = [getDate(), color, color.slice(0)];
 			highlightCount++;
 		}
 	}
@@ -3571,7 +3572,7 @@ var flashAnimateInterval = setInterval(function() {
 				var data = highlightFlash[tile][charY][charX];
 				var time = data[0];
 				var diff = getDate() - time;
-				// after 500 milliseconds
+				// duration of 500 milliseconds
 				if(diff >= flashDuration) {
 					delete highlightFlash[tile][charY][charX];
 					if(!Object.keys(highlightFlash[tile][charY]).length) {
@@ -3583,9 +3584,10 @@ var flashAnimateInterval = setInterval(function() {
 					highlightCount--;
 				} else {
 					var pos = easeOutQuad(diff, 0, 1, flashDuration);
-					var r = defaultHighlightColor[0];
-					var g = defaultHighlightColor[1];
-					var b = defaultHighlightColor[2];
+					var flashColor = highlightFlash[tile][charY][charX][2];
+					var r = flashColor[0];
+					var g = flashColor[1];
+					var b = flashColor[2];
 					var flashRGB = highlightFlash[tile][charY][charX][1];
 					flashRGB[0] = r + (255 - r) * pos;
 					flashRGB[1] = g + (255 - g) * pos;
@@ -6166,13 +6168,18 @@ var ws_functions = {
 		}
 		for(var i in data.rejected) {
 			var rej = data.rejected[i];
-			if(rej != 2) continue;
 			for(var x = 0; x < tellEdit.length; x++) {
 				if(tellEdit[x][6] != i) continue;
 				var tileX = tellEdit[x][1];
 				var tileY = tellEdit[x][0];
 				var charX = tellEdit[x][3];
 				var charY = tellEdit[x][2];
+				if(rej == 1 || rej == 4) { // denied because zero rate limit
+					highlight([[tileX, tileY, charX, charY]], true, [255, 0, 0]);
+					tellEdit.splice(x, 1);
+					x--;
+					continue;
+				}
 				colorChar(tileX, tileY, charX, charY, "err");
 				w.setTileRedraw(tileX, tileY);
 				tellEdit[x][4] = Date.now();
