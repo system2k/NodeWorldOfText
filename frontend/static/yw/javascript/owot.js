@@ -246,6 +246,17 @@ function updateCoordDisplay() {
 w.on("cursorMove", updateCoordDisplay);
 w.on("cursorHide", updateCoordDisplay);
 
+elm.coords.onclick = function() {
+	showCursorCoordinates = !showCursorCoordinates;
+	if(showCursorCoordinates) {
+		elm.cursor_coords.style.display = "";
+		updateCoordDisplay();
+	} else {
+		elm.cursor_coords.style.display = "none";
+		updateCoordDisplay();
+	}
+}
+
 function createColorButton(color) {
 	var celm = document.createElement("span");
 	var colorInt = resolveColorValue(color);
@@ -4631,22 +4642,10 @@ function buildMenu() {
 	homeLink.appendChild(homeLinkIcon);
 	menuOptions.home = menu.addEntry(homeLink);
 	menuOptions.showCoords = menu.addCheckboxOption("Show coordinates", function() {
-		menu.showEntry(menuOptions.showCursorCoords);
 		return elm.coords.style.display = "";
 	}, function() {
-		menu.hideEntry(menuOptions.showCursorCoords);
 		return elm.coords.style.display = "none";
 	});
-	menuOptions.showCursorCoords = menu.addCheckboxOption("Cursor coords", function() {
-		showCursorCoordinates = true;
-		elm.cursor_coords.style.display = "";
-		updateCoordDisplay();
-	}, function() {
-		showCursorCoordinates = false;
-		elm.cursor_coords.style.display = "none";
-		updateCoordDisplay();
-	});
-	menu.hideEntry(menuOptions.showCursorCoords);
 	menuOptions.changeColor = menu.addOption("Change color", w.color);
 	menuOptions.goToCoords = menu.addOption("Go to coordinates", w.goToCoord);
 	menuOptions.coordLink = menu.addOption("Create link to coordinates", w.coordLink);
@@ -5801,6 +5800,8 @@ function makeColorModal() {
 }
 
 function makeSelectionModal() {
+	var headerBar = document.createElement("div");
+
 	var area_copy = document.createElement("button");
 	area_copy.style.marginBottom = "1px";
 	area_copy.innerText = "Copy to Clipboard";
@@ -5810,6 +5811,7 @@ function makeSelectionModal() {
 
 	var region_bounds = document.createElement("span");
 	region_bounds.style.display = "none";
+	region_bounds.style.marginLeft = "5px";
 	var reg_label = document.createElement("b");
 	reg_label.innerText = "Selection: ";
 	var rb_coord1 = document.createElement("span");
@@ -5820,6 +5822,9 @@ function makeSelectionModal() {
 	region_bounds.appendChild(rb_coord2);
 	var region_text = document.createElement("textarea")
 	region_text.id = "area_results";
+
+	headerBar.appendChild(area_copy);
+	headerBar.appendChild(region_bounds);
 
 	function updateOutput() {
 		var o_color = c_color.cbElm.checked;
@@ -5899,9 +5904,7 @@ function makeSelectionModal() {
 
 	var modal = new Modal();
 	modal.setMinimumSize(500, 450);
-	modal.append(area_copy);
-	modal.append(document.createElement("br"));
-	modal.append(region_bounds);
+	modal.append(headerBar);
 	modal.append(region_text);
 	modal.createCheckboxField();
 	modal.createClose();
