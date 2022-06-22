@@ -398,6 +398,7 @@ a:visited {
 	overflow: hidden;
 	margin: 3px;
 	user-select: none;
+	vertical-align: top;
 }
 .color_btn:hover {
 	border-color: orange;

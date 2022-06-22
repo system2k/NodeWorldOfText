@@ -60,8 +60,8 @@ function Modal() {
 	frame.style.display = "none";
 	frame.style.backgroundColor = "#c3c3ff";
 	frame.style.position = "absolute";
-	frame.style.minWidth = "250px";
-	frame.style.minHeight = "120px";
+	frame.style.minWidth = "16px";
+	frame.style.minHeight = "16px";
 
 	var fClient = document.createElement("div");
 	fClient.style.backgroundColor = "#e5e5ff";
@@ -315,13 +315,51 @@ Modal.prototype.setMaximumSize = function(width, height) {
 	} else {
 		this.frame.style.maxHeight = "";
 	}
+
+	// ensure client area doesn't overflow
+	if(width && height) {
+		this.client.style.overflow = "hidden";
+	} else if(width) {
+		this.client.style.overflowX = "hidden";
+		this.client.style.overflowY = "";
+	} else if(height) {
+		this.client.style.overflowX = "";
+		this.client.style.overflowY = "hidden";
+	} else {
+		this.client.style.overflow = "";
+	}
 }
 
 /*
 	Set a title or description at the top of the modal.
 */
-Modal.prototype.setFormTitle = function(title) {
+Modal.prototype.setFormTitle = function(title, opts) {
+	if(title == void 0) {
+		title = "";
+	}
+	title += "";
+	if(title[title.length - 1] == "\n" && title.length > 1) {
+		title += "\n"; // add an extra newline due to html behavior
+	}
 	this.formTitle.innerText = title;
+	if(opts) {
+		if("bold" in opts) {
+			if(opts.bold) {
+				this.formTitle.style.fontWeight = "bold";
+				this.formTitle.style.marginBottom = "4px";
+			} else {
+				this.formTitle.style.fontWeight = "";
+				this.formTitle.style.marginBottom = "";
+			}
+		}
+		if("center" in opts) {
+			if(opts.center) {
+				this.formTitle.style.textAlign = "center";
+			} else {
+				this.formTitle.style.textAlign = "";
+			}
+		}
+	}
 }
 
 /*

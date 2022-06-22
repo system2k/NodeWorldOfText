@@ -5725,7 +5725,7 @@ w._state = w.state; // deprecated
 function makeCoordLinkModal() {
 	var modal = new Modal();
 	modal.createForm();
-	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a letter to create the link.\n\n");
+	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a letter to create the link.\n");
 	var coordX = modal.addEntry("X", "text", "number").input;
 	var coordY = modal.addEntry("Y", "text", "number").input;
 	modal.setMaximumSize(360, 300);
@@ -5738,7 +5738,7 @@ function makeCoordLinkModal() {
 function makeCoordGotoModal() {
 	var modal = new Modal();
 	modal.createForm();
-	modal.setFormTitle("Go to coordinates:\n\n");
+	modal.setFormTitle("Go to coordinates:\n");
 	var coordX = modal.addEntry("X", "text", "number").input;
 	var coordY = modal.addEntry("Y", "text", "number").input;
 	modal.onSubmit(function() {
@@ -5749,9 +5749,11 @@ function makeCoordGotoModal() {
 
 function makeURLModal() {
 	var modal = new Modal();
+	modal.setMinimumSize(250, 120);
 	modal.createForm();
 	modal.setFormTitle("\n");
 	var urlInput = modal.addEntry("URL", "text").input;
+	urlInput.style.width = "175px";
 	modal.onSubmit(function() {
 		w.doUrlLink(urlInput.value);
 	});
@@ -5761,6 +5763,7 @@ function makeURLModal() {
 
 function makeColorModal() {
 	var modal = new Modal();
+	modal.setMinimumSize(290, 128);
 	modal.createForm();
 	modal.setFormTitle("\n");
 	colorInput = modal.addEntry("Color Code", "color").input;
