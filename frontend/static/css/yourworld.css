@@ -434,3 +434,9 @@ a:visited {
 	text-decoration: underline;
 	cursor: pointer
 }
+.modal_frame {
+	background-color: #C3C3FF;
+}
+.modal_client {
+	background-color: #E5E5FF;
+}

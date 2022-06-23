@@ -725,11 +725,11 @@ async function claimWorldByName(worldName, user) {
 			message: validation.message
 		};
 	}
-	var world = validation.world; // doesn't need to be released (TODO: is this a good design?)
+	var world = validation.world;
 	modifyWorldProp(world, "ownerId", user.id);
 	return {
 		success: true,
-		world: world,
+		world: world, // must be released later
 		message: validation.message
 	};
 }
@@ -898,13 +898,13 @@ async function validateWorldClaim(worldname, user, isRenaming) {
 		}
 		var world = await getOrCreateWorld(newname);
 		if(world) {
-			releaseWorld(world);
 			if(world.ownerId == null) {
 				return {
 					world: world,
 					message: "Successfully claimed the world"
 				};
 			} else {
+				releaseWorld(world);
 				return {
 					error: true,
 					message: "World already has an owner"
@@ -927,17 +927,17 @@ async function validateWorldClaim(worldname, user, isRenaming) {
 				message: "You do not own the base world in the path"
 			};
 		}
-		var fullWorldname = worldnamePath.join("/");
-		var subWorld = await getOrCreateWorld(fullWorldname, true);
 		releaseWorld(baseWorld);
-		releaseWorld(subWorld);
+		var fullWorldname = worldnamePath.join("/");
 		if(isRenaming) {
 			return {
 				error: false
 			};
 		}
+		var subWorld = await getOrCreateWorld(fullWorldname, true);
 		// already owned
 		if(subWorld.ownerId != null) {
+			releaseWorld(subWorld);
 			return {
 				error: true,
 				message: "You already own this subdirectory world"

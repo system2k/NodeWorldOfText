@@ -140,6 +140,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var revokeMembershipByWorldName = vars.revokeMembershipByWorldName;
 	var wss = vars.wss;
 	var checkCSRF = vars.checkCSRF;
+	var releaseWorld = vars.releaseWorld;
 
 	if(!user.authenticated) {
 		return serve(null, 403);
@@ -166,6 +167,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				// TODO: what about isMember?
 				if(status.success) {
 					sendWorldStatusUpdate(status.world.id, user.id);
+					releaseWorld(status.world);
 				}
 			}
 		}

@@ -4104,8 +4104,9 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 }
 
 function renderTileBackgroundImage(renderCtx, tileX, tileY, ctxOffX, ctxOffY) {
-	var startX = tileX * tileW;
-	var startY = tileY * tileH;
+	var startX = tileX * tileWidth;
+	var startY = tileY * tileHeight;
+	
 	var backRatioW = tileWidth / dTileW;
 	var backRatioH = tileHeight / dTileH;
 

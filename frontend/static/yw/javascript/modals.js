@@ -56,15 +56,15 @@ function Modal() {
 	this.cbCallback = null;
 
 	var frame = document.createElement("div");
+	frame.className = "modal_frame";
 	frame.style.flexDirection = "column";
 	frame.style.display = "none";
-	frame.style.backgroundColor = "#c3c3ff";
 	frame.style.position = "absolute";
 	frame.style.minWidth = "16px";
 	frame.style.minHeight = "16px";
 
 	var fClient = document.createElement("div");
-	fClient.style.backgroundColor = "#e5e5ff";
+	frame.className = "modal_client";
 	fClient.style.flex = "1";
 	fClient.style.margin = "6px";
 	fClient.style.padding = "12px";
