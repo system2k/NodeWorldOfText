@@ -64,7 +64,7 @@ function Modal() {
 	frame.style.minHeight = "16px";
 
 	var fClient = document.createElement("div");
-	frame.className = "modal_client";
+	fClient.className = "modal_client";
 	fClient.style.flex = "1";
 	fClient.style.margin = "6px";
 	fClient.style.padding = "12px";
