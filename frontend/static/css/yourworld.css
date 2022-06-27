@@ -410,6 +410,7 @@ a:visited {
 .modal_corner_checkbox_label {
 	margin-left: 5px;
 	user-select: none;
+	white-space: nowrap;
 }
 #modal_overlay {
 	position: absolute;
