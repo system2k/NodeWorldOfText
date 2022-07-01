@@ -510,7 +510,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 		isGreen = true;
 	}
 
-	if(!op) {
+	if(!op || id !== 0) {
 		message = html_tag_esc(message);
 		nickname = html_tag_esc(nickname);
 	}

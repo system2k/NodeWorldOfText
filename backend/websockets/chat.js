@@ -754,11 +754,6 @@ module.exports = async function(ws, data, send, vars, evars) {
 		}
 	}
 
-	if(!isCommand && user.operator && !safeOrigin) {
-		msg = html_tag_esc(msg);
-		chatData.message = msg;
-	}
-
 	if(isMuted && !isShadowMuted) return;
 	var websocketChatData = Object.assign({
 		kind: "chat"
