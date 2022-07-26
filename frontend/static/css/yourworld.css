@@ -441,3 +441,9 @@ a:visited {
 .modal_client {
 	background-color: #E5E5FF;
 }
+.chat_emote {
+	background: url(/static/emotes.png);
+	height: 1em;
+	vertical-align: middle;
+	display: inline-block;
+}

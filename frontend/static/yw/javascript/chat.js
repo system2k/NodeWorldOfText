@@ -479,58 +479,58 @@ function evaluateChatfield(chatfield) {
 	return field;
 }
 
-// A lookup table between the emote name and its CDN data ID.
-var emoteUrls = {
-	"403": "379283226759397377",
-	"OHHELLNO": "569193771296882718",
-	"aaaHD": "569193810765021204",
-	"aha": "569193771099488314",
-	"areyoukidding": "989614364891951124",
-	"awesome": "367483061165883403",
-	"awesome2": "569193771305271332",
-	"bad": "569193770713612289",
-	"beepboop": "569193771099488261",
-	"bootiful": "989623008824012810",
-	"bruh": "569193771187830784",
-	"catthinkaaa": "438773136633364480",
-	"chaos": "989601263756910602",
-	"ded": "989601280735449168",
-	"derp": "569193771388895253",
-	"dislike": "866007703871946783",
-	"durr": "989602011701973082",
-	"erhb": "569193770806149121",
-	"failwhale": "367481703389724675",
-	"fpthinkaaa": "477603662378696705",
-	"huh": "569193770940366848",
-	"karp": "367481437143826453",
-	"lenny": "989614787526799411",
-	"like": "367482468674043905",
-	"lol": "569193771254677505",
-	"mad": "989602657083736145",
-	"meh": "989621178123583509",
-	"mmm": "989603084755955782",
-	"neat": "569193770948493352",
-	"no": "371317644395020298",
-	"notcool": "569193771200151585",
-	"oOoo": "989604311518556190",
-	"ohno": "569193770902487051",
-	"okthen": "989603602022662184",
-	"omg": "989619002143830086",
-	"ouch": "989605206251679774",
-	"sad": "989610612973768784",
-	"sadsmug": "989622289349894154",
-	"scruffy": "367483210508140564",
-	"smug": "989617064706715668",
-	"stahp": "989605561089798185",
-	"teef": "989611145973346334",
-	"thinq": "989606271340670976",
-	"thunk": "989611705610932234",
-	"tri": "367483641523077122",
-	"troll1": "367481052966551552",
-	"void": "989612216955322408",
-	"what": "569193771191762954",
-	"yeesh": "440349428746944513",
-	"zzz": "569193771183374348",
+// a lookup table between the emote name and its atlas location
+var emoteList = {
+    "403": [0, 19],
+    "OHHELLNO": [19, 16],
+    "aaaHD": [35, 16],
+    "aha": [51, 16],
+    "areyoukidding": [67, 16],
+    "awesome": [83, 16],
+    "awesome2": [99, 16],
+    "bad": [115, 16],
+    "beepboop": [131, 16],
+    "bootiful": [147, 16],
+    "bruh": [163, 16],
+    "catthinkaaa": [179, 22],
+    "chaos": [201, 16],
+    "ded": [217, 16],
+    "derp": [233, 16],
+    "dislike": [249, 15],
+    "durr": [264, 16],
+    "erhb": [280, 16],
+    "failwhale": [296, 35],
+    "fpthinkaaa": [331, 16],
+    "huh": [347, 16],
+    "karp": [363, 17],
+    "lenny": [380, 16],
+    "like": [396, 15],
+    "lol": [411, 16],
+    "mad": [427, 16],
+    "meh": [443, 16],
+    "mmm": [459, 16],
+    "neat": [475, 16],
+    "no": [491, 16],
+    "notcool": [507, 16],
+    "oOoo": [523, 16],
+    "ohno": [539, 16],
+    "okthen": [555, 16],
+    "omg": [571, 16],
+    "ouch": [587, 16],
+    "sad": [603, 16],
+    "sadsmug": [619, 16],
+    "scruffy": [635, 19],
+    "smug": [654, 16],
+    "stahp": [670, 16],
+    "teef": [686, 16],
+    "thinq": [702, 16],
+    "thunk": [718, 16],
+    "tri": [734, 17],
+    "troll1": [751, 16],
+    "void": [767, 16],
+    "what": [783, 16],
+    "yeesh": [799, 16],
+    "zzz": [815, 16]
 };
 
 /*
@@ -670,12 +670,11 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 		for(var i = 0; i < (emote_split.length - 1); ++i) {
 			if(i % 2 == 0) { // isn't between two : chars
 				parsed.push(emote_split[i]);
-			} else if(emoteUrls.hasOwnProperty(emote_split[i])) { // good emote
-				parsed.push("<img src='https://cdn.discordapp.com/emojis/"
-							+ emoteUrls[emote_split[i]]
-							+ ".webp' alt=':"
-							+ emote_split[i]
-							+ ":' style='height:1em;vertical-align:middle' />");
+			} else if(emoteList.hasOwnProperty(emote_split[i])) { // good emote
+				var position = emoteList[emote_split[i]];
+				parsed.push("<div title=':" + emote_split[i]
+					+ ":' class='chat_emote' style='background-position-x:-" + position[0]
+					+ "px;width:" + position[1] + "px'></div>");
 			} else { // invalid emote
 				parsed.push(":" + emote_split[i] + ":");
 			}
