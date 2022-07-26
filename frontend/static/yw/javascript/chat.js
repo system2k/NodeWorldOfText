@@ -675,7 +675,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 							+ emoteUrls[emote_split[i]]
 							+ ".webp' alt=':"
 							+ emote_split[i]
-							+ ":' style='height:1em' />");
+							+ ":' style='height:1em;vertical-align:middle' />");
 			} else { // invalid emote
 				parsed.push(":" + emote_split[i] + ":");
 			}
