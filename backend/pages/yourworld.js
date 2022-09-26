@@ -1,5 +1,5 @@
 function isMainPage(name) {
-	return name == "" || name.toLowerCase() == "main";
+	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
 
 module.exports.GET = async function(req, serve, vars, evars, params) {

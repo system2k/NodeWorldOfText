@@ -2,7 +2,7 @@
 // this module implies the user has access to the world and that the world exists
 
 function isMainPage(name) {
-	return name == "" || name.toLowerCase() == "main";
+	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
 
 module.exports = async function(data, vars, evars) {

@@ -83,6 +83,8 @@ var clientGuestCursorPos   = { tileX: 0, tileY: 0, charX: 0, charY: 0, hidden: f
 var disconnectTimeout      = null;
 var menuOptions            = {};
 var undoBuffer             = new CircularBuffer(2048);
+var textDecorationOffset   = 0x20F0;
+var textDecorationModes    = { bold: false, italic: false, under: false, strike: false };
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -138,6 +140,7 @@ var writeFlushRate         = state.worldModel.write_interval;
 var bufferLargeChars       = true; // prevents certain large characters from being cut off by the grid
 var cursorOutlineEnabled   = false;
 var showCursorCoordinates  = false; // show cursor coords in coordinate bar
+var textDecorationsEnabled = true; // bold, italic, underline, and strikethrough
 
 var keyConfig = {
 	reset: "ESC",
@@ -1987,14 +1990,14 @@ function moveCursor(direction, preserveVertPos, amount) {
 	}
 	if(pos[2] < 0) {
 		pos[0] += Math.floor(pos[2] / tileC);
-		pos[2] = tileC + pos[2] % tileC;
+		pos[2] = pos[2] - Math.floor(pos[2] / tileC) * tileC;
 	} else if(pos[2] >= tileC) {
 		pos[0] += Math.floor(pos[2] / tileC);
 		pos[2] %= tileC;
 	}
 	if(pos[3] < 0) {
 		pos[1] += Math.floor(pos[3] / tileR);
-		pos[3] = tileR + pos[3] % tileR;
+		pos[3] = pos[3] - Math.floor(pos[3] / tileR) * tileR;
 	} else if(pos[3] >= tileR) {
 		pos[1] += Math.floor(pos[3] / tileR);
 		pos[3] %= tileR;
@@ -2012,6 +2015,8 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 		Tile.set(tileX, tileY, blankTile());
 	}
 	var tile = Tile.get(tileX, tileY);
+	var isErase = char == "\x08";
+	if(isErase) char = " ";
 	
 	var cell_props = tile.properties.cell_props;
 	if(!cell_props) cell_props = {};
@@ -2030,16 +2035,22 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 			hasChanged = true;
 		}
 	}
-	// change color
-	if(Permissions.can_color_text(state.userModel, state.worldModel)) {
-		prevColor = color[charY * tileC + charX];
-		color[charY * tileC + charX] = charColor;
-		if(prevColor != charColor) hasChanged = true;
-		tile.properties.color = color; // if the color array doesn't already exist in the tile
+	// change color locally
+	if(!Permissions.can_color_text(state.userModel, state.worldModel)) {
+		charColor = 0x000000;
 	}
+	prevColor = color[charY * tileC + charX];
+	color[charY * tileC + charX] = charColor;
+	if(prevColor != charColor) hasChanged = true;
+	tile.properties.color = color; // if the color array doesn't already exist in the tile
 
 	// update cell properties (link positions)
 	tile.properties.cell_props = cell_props;
+
+	if(!isErase) {
+		char = setCharTextDecorations(char,
+			textDecorationModes.bold, textDecorationModes.italic, textDecorationModes.under, textDecorationModes.strike);
+	}
 
 	// set char locally
 	var con = tile.content;
@@ -2058,6 +2069,11 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 			undoBuffer.trim();
 		}
 		undoBuffer.push([tileX, tileY, charX, charY, prevChar, prevColor, prevLink, undoOffset]);
+	}
+
+	//TEMP
+	if(window.payLoad && window.chunkMax && window.cleanMemory) {
+		return;
 	}
 
 	var editArray = [tileY, tileX, charY, charX, getDate(), char, nextObjId];
@@ -2723,13 +2739,13 @@ function event_keydown(e) {
 	if(checkKeyPress(e, keyConfig.erase)) { // erase character
 		if(state.worldModel.char_rate[0] > 0) {
 			moveCursor("left", true);
-			writeChar(" ", true, null, false, 1);
+			writeChar("\x08", true, null, false, 1);
 			previousErase = getDate();
 		}
 	}
 	if(checkKeyPress(e, keyConfig.cellErase)) {
 		if(state.worldModel.char_rate[0] > 0) {
-			writeChar(" ", true);
+			writeChar("\x08", true);
 		}
 	}
 	if(checkKeyPress(e, keyConfig.tab)) { // tab
@@ -2834,6 +2850,10 @@ function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
 	return [Math.trunc(x / zoomRatio), Math.trunc(y / zoomRatio)];
 }
 
+function isMainPage() {
+	return state.worldModel.name == "" || state.worldModel.name.toLowerCase() == "main" || state.worldModel.name.toLowerCase() == "owot";
+}
+
 function alertJS(data) {
 	js_alert_active = true;
 	elm.confirm_js.style.display = "";
@@ -2913,10 +2933,8 @@ linkElm.onclick = function(e) {
 		var lCharX = currentSelectedLinkCoords[2];
 		var lCharY = currentSelectedLinkCoords[3];
 		var charInfo = getCharInfo(lTileX, lTileY, lCharX, lCharY);
-		var isMain = state.worldModel.name == "" || state.worldModel.name.toLowerCase() == "main";
-		var isCenter = (-20 <= lTileX && 20 >= lTileX) && (-20 <= lTileY && 20 >= lTileY);
-		var badChar = isMain && charInfo.char == "\u2588";
-		if(((isMain && isCenter && charInfo.protection == 0) || badChar) && !isSafeHostname(linkParams.host)) {
+		var badChar = isMainPage() && charInfo.char == "\u2588";
+		if(((isMainPage() && charInfo.protection == 0) || badChar) && !isSafeHostname(linkParams.host)) {
 			var acpt = confirm("Are you sure you want to visit this link?\n" + url);
 			if(!acpt) {
 				return false;
@@ -3040,6 +3058,9 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 	if(arg_pageX != void 0) pageX = arg_pageX;
 	if(arg_pageY != void 0) pageY = arg_pageY;
 	var coords = getTileCoordsFromMouseCoords(pageX, pageY);
+	if(window.dcm) { // TEMP
+		return;
+	}
 	currentPosition = coords;
 	currentPositionInitted = true;
 	var tileX = coords[0];
@@ -3893,7 +3914,25 @@ function fillBlockChar(charCode, textRender, x, y) {
 	return true;
 }
 
-// TODO: simplify args
+function getCharTextDecorations(char) {
+	if(char.codePointAt(1) == void 0 || char.codePointAt(2)) return null;
+	var code = char.codePointAt(1);
+	code -= textDecorationOffset;
+	if(code <= 0 || code > 16) return null;
+	return {
+		bold: code >> 3 & 1,
+		italic: code >> 2 & 1,
+		under: code >> 1 & 1,
+		strike: code & 1
+	};
+}
+
+function setCharTextDecorations(char, bold, italic, under, strike) {
+	var bitMap = bold << 3 | italic << 2 | under << 1 | strike;
+	if(bitMap == 0) return char;
+	return char + String.fromCharCode(textDecorationOffset + bitMap);
+}
+
 function renderChar(textRender, x, y, str, content, colors, writability, props, offsetX, offsetY, charOverflowMode) {
 	// adjust baseline
 	var textYOffset = cellH - (5 * zoom);
@@ -3903,10 +3942,18 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 
 	var char = content[y * tileC + x];
 	if(!char) char = " ";
+
+	var deco = null;
+	if(textDecorationsEnabled) {
+		deco = getCharTextDecorations(char);
+		if(deco) {
+			char = String.fromCodePoint(char.codePointAt(0));
+		}
+	}
+
 	var cCode = char.codePointAt(0);
-	var isSpecial = char.codePointAt(1) !== void 0; // contains combining chars? (not compatible with Courier New)
 	if(charOverflowMode) {
-		if(cCode < 1024) return;
+		if(cCode < 1024 && !deco) return;
 		if(cCode == 0xFDFD) return;
 		if(cCode >= 0x12427 && cCode <= 0x1242B) return;
 	}
@@ -3961,8 +4008,28 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 		textRender.fillRect(fontX, fontY + textYOffset + zoom, cellW, zoom);
 	}
 
+	if(deco) {
+		if(deco.under) {
+			textRender.fillRect(fontX, fontY + textYOffset + zoom, cellW, zoom);
+		}
+		if(deco.strike) {
+			textRender.fillRect(fontX, fontY + Math.floor((16 * zoom) / 2), cellW, zoom);
+		}
+	}
+
 	// don't render whitespaces
 	if(cCode == 0x0020 || cCode == 0x00A0) return;
+
+	if(!surrogateCharsEnabled || !combiningCharsEnabled) {
+		char = w.split(char, !surrogateCharsEnabled, !combiningCharsEnabled);
+		if(char.length) {
+			char = char[0];
+		} else {
+			char = "?";
+		}
+	}
+
+	var isSpecial = char.codePointAt(1) !== void 0; // contains combining chars? (not compatible with Courier New)
 
 	if(brBlockFill && (cCode & 0x2800) == 0x2800) { // render braille chars as rectangles
 		var dimX = cellW / 2;
@@ -3974,9 +4041,22 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 	} else if(ansiBlockFill && fillBlockChar(cCode, textRender, fontX, fontY)) {
 		return;
 	} else { // character rendering
-		if(isSpecial) textRender.font = specialCharFont;
+		var tempFont = null;
+		var prevFont = null;
+		if(isSpecial || deco) {
+			prevFont = textRender.font;
+			tempFont = textRender.font;
+			if(isSpecial) tempFont = specialCharFont;
+			if(deco) {
+				if(deco.bold) tempFont = "bold " + tempFont;
+				if(deco.italic) tempFont = "italic " + tempFont;
+			}
+			textRender.font = tempFont;
+		}
 		textRender.fillText(char, Math.round(fontX + XPadding), Math.round(fontY + textYOffset));
-		if(isSpecial) textRender.font = font;
+		if(prevFont) {
+			textRender.font = prevFont;
+		}
 	}
 }
 
@@ -6262,7 +6342,7 @@ var ws_functions = {
 				case "name":
 					state.worldModel.name = value;
 					state.worldModel.pathname = value ? "/" + value : "";
-					if(!value || value.toLowerCase() == "main") {
+					if(!value || value.toLowerCase() == "main" || value.toLowerCase() == "owot") {
 						document.title = "Our World of Text";
 					} else {
 						document.title = state.worldModel.pathname;

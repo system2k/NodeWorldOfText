@@ -1,7 +1,7 @@
 var emptyWriteResponse = { accepted: [], rejected: {} };
 
 function isMainPage(name) {
-	return name == "" || name.toLowerCase() == "main";
+	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
 
 module.exports = async function(data, vars, evars) {
