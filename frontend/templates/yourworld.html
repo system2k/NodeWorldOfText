@@ -55,19 +55,28 @@
 
 		<textarea autocapitalize="off" autocorrect="off" autocomplete="off" style="left: -1000px; top: -1000px; position: absolute;" id="textInput"></textarea>
 
-		<div id="protect_precision" style="display: none;">
-			<div style="padding-bottom: 3px;">
-				Protect type:
+		<div id="west_gui">
+			<div id="text_decorations" style="display: none">
+				<div class="text_deco_btn" id="text_deco_b">A</div>
+				<div class="text_deco_btn" id="text_deco_i">A</div>
+				<div class="text_deco_btn" id="text_deco_u">A</div>
+				<div class="text_deco_btn" id="text_deco_s">A</div>
 			</div>
-			<div class="protect_button" id="tile_choice" onclick="protectPrecisionOption(0);">
-				Tile
+			<br>
+			<div id="protect_precision" style="display: none;">
+				<div style="padding-bottom: 3px;">
+					Protect type:
+				</div>
+				<div class="protect_button" id="tile_choice" onclick="protectPrecisionOption(0);">
+					Tile
+				</div>
+				<div class="protect_button" id="char_choice" onclick="protectPrecisionOption(1);">
+					Char
+				</div>
+				<a id="protect_selection" onclick="protectSelection();">Select</a>
 			</div>
-			<div class="protect_button" id="char_choice" onclick="protectPrecisionOption(1);">
-				Char
-			</div>
-			<a id="protect_selection" onclick="protectSelection();">Select</a>
+			<div id="auto_prog" class="auto_prog_panel" style="display: none"></div>
 		</div>
-		<div id="auto_prog" class="auto_prog_panel" style="display: none"></div>
 
 		<div id="chat_open" style="display: none;">
 			<span>Chat&nbsp;<b id="total_unread" class="unread" style="display: none;">(-)</b></span>

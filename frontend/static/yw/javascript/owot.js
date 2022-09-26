@@ -17,6 +17,7 @@ function init_dom() {
 	linkElm = elm.link_element;
 	linkDiv = elm.link_div;
 	updateCoordDisplay();
+	initTextDecoBar();
 	defineElements({
 		owot: owot,
 		textInput: textInput
@@ -161,7 +162,8 @@ var keyConfig = {
 	copyRegion: ["ALT+G", "CTRL+A"],
 	centerTeleport: "HOME",
 	undo: "CTRL+Z",
-	redo: ["CTRL+Y", "CTRL+SHIFT+Z"]
+	redo: ["CTRL+Y", "CTRL+SHIFT+Z"],
+	showTextDeco: "CTRL+Q"
 };
 
 window.addEventListener("load", function() {
@@ -201,7 +203,12 @@ defineElements({ // elm[<name>]
 	usr_online: byId("usr_online"),
 	link_element: byId("link_element"),
 	link_div: byId("link_div"),
-	protect_selection: byId("protect_selection")
+	protect_selection: byId("protect_selection"),
+	text_decorations: byId("text_decorations"),
+	text_deco_b: byId("text_deco_b"),
+	text_deco_i: byId("text_deco_i"),
+	text_deco_u: byId("text_deco_u"),
+	text_deco_s: byId("text_deco_s")
 });
 
 function setRGBColorPicker(r, g, b) {
@@ -2762,6 +2769,10 @@ function event_keydown(e) {
 		redoWrite();
 		e.preventDefault();
 	}
+	if(checkKeyPress(e, keyConfig.showTextDeco)) {
+		toggleTextDecoBar();
+		e.preventDefault();
+	}
 	w.emit("keyDown", e);
 }
 document.addEventListener("keydown", event_keydown);
@@ -2933,8 +2944,7 @@ linkElm.onclick = function(e) {
 		var lCharX = currentSelectedLinkCoords[2];
 		var lCharY = currentSelectedLinkCoords[3];
 		var charInfo = getCharInfo(lTileX, lTileY, lCharX, lCharY);
-		var badChar = isMainPage() && charInfo.char == "\u2588";
-		if(((isMainPage() && charInfo.protection == 0) || badChar) && !isSafeHostname(linkParams.host)) {
+		if((isMainPage() && charInfo.protection == 0) && !isSafeHostname(linkParams.host)) {
 			var acpt = confirm("Are you sure you want to visit this link?\n" + url);
 			if(!acpt) {
 				return false;
@@ -3930,6 +3940,8 @@ function getCharTextDecorations(char) {
 function setCharTextDecorations(char, bold, italic, under, strike) {
 	var bitMap = bold << 3 | italic << 2 | under << 1 | strike;
 	if(bitMap == 0) return char;
+	var code = char.codePointAt(1);
+	if(code > textDecorationOffset && code <= textDecorationOffset + 16) return char;
 	return char + String.fromCharCode(textDecorationOffset + bitMap);
 }
 
@@ -4564,6 +4576,37 @@ function protectPrecisionOption(option) {
 	elm.char_choice.style.backgroundColor = charChoiceColor;
 }
 protectPrecisionOption(protectPrecision);
+
+function toggleTextDecoBar() {
+	if(elm.text_decorations.style.display == "") {
+		elm.text_decorations.style.display = "none";
+	} else {
+		elm.text_decorations.style.display = "";
+	}
+}
+
+function initTextDecoBar() {
+	var set = {
+		bold: elm.text_deco_b,
+		italic: elm.text_deco_i,
+		under: elm.text_deco_u,
+		strike: elm.text_deco_s
+	};
+	function init_btn(name, elm) {
+		elm.onclick = function() {
+			if(textDecorationModes[name]) {
+				elm.style.backgroundColor = "";
+				textDecorationModes[name] = false;
+			} else {
+				elm.style.backgroundColor = "#C5C5DB";
+				textDecorationModes[name] = true;
+			}
+		}
+	}
+	for(var i in set) {
+		init_btn(i, set[i]);
+	}
+}
 
 function protectSelectionStart(start, end, width, height) {
 	var tileX1 = start[0];
@@ -5910,6 +5953,7 @@ function makeSelectionModal() {
 	function updateOutput() {
 		var o_color = c_color.cbElm.checked;
 		var o_link = c_link.cbElm.checked;
+		var o_deco = c_deco.cbElm.checked;
 		var o_prot = c_prot.cbElm.checked;
 		var o_protpub = c_pprot.cbElm.checked;
 		var o_tleft = t_left.cbElm.checked;
@@ -5931,6 +5975,16 @@ function makeSelectionModal() {
 			if(o_prot) protRow = s_prots.slice(y * text[y].length, y * text[y].length + text[y].length);
 			if(o_tleft || o_tright || o_rgap) spaceTrim(text[y], o_tleft, o_tright, o_rgap, [colRow, linkRow, protRow]);
 			var line = text[y];
+			if(!o_deco) {
+				for(var x = 0; x < line.length; x++) {
+					var chr = line[x];
+					var code = chr.codePointAt(1);
+					if(!code) continue;
+					if(code > textDecorationOffset && code <= textDecorationOffset + 16) {
+						line[x] = String.fromCodePoint(chr.codePointAt(0));
+					}
+				}
+			}
 			if(o_color) {
 				for(var x = 0; x < line.length; x++) {
 					var col = colRow[x];
@@ -5942,8 +5996,7 @@ function makeSelectionModal() {
 					} else {
 						chr += "F" + col.toString(16).padStart(6, 0);
 					}
-					chr += line[x];
-					line[x] = chr;
+					line[x] = chr + line[x];
 				}
 			}
 			if(o_link) {
@@ -5993,6 +6046,7 @@ function makeSelectionModal() {
 	var c_link = modal.addCheckbox("Copy links");
 	var c_prot = modal.addCheckbox("Copy protections");
 	var c_pprot = modal.addCheckbox("Copy public protections", c_prot);
+	var c_deco = modal.addCheckbox("Copy text decorations");
 	var t_left = modal.addCheckbox("Trim left");
 	var t_right = modal.addCheckbox("Trim right");
 	var t_empty = modal.addCheckbox("Trim empty lines");

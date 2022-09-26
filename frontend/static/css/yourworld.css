@@ -140,13 +140,17 @@ a:visited {
 	margin-left: 1em;
 	margin-top: 3px;
 }
-#protect_precision {
+#west_gui {
 	position: absolute;
-	left: 0px;
 	top: 30px;
+	left: 0px;
+}
+#protect_precision {
 	background-color: #626262;
 	color: white;
 	padding: 4px;
+	margin-bottom: 3px;
+	display: inline-block;
 }
 #protect_selection {
 	display: block;
@@ -172,9 +176,6 @@ a:visited {
 	display: inline-block;
 }
 .auto_prog_panel {
-	position: absolute;
-	left: 0px;
-	top: 100px;
 	width: 150px;
 	height: 30px;
 	background-color: rgb(104, 104, 104);
@@ -446,4 +447,34 @@ a:visited {
 	height: 1em;
 	vertical-align: middle;
 	display: inline-block;
+}
+#text_decorations {
+	background-color: #E5E5FF;
+	padding: 3px;
+	margin-bottom: 3px;
+	display: inline-block;
+}
+.text_deco_btn {
+	width: 32px;
+	height: 32px;
+	text-align: center;
+	display: inline-block;
+	font-size: 28px;
+	user-select: none;
+	font-family: Arial, Verdana;
+}
+.text_deco_btn:hover {
+	background-color: #CDCDFF;
+}
+#text_deco_b {
+	font-weight: bold;
+}
+#text_deco_i {
+	font-style: italic;
+}
+#text_deco_u {
+	text-decoration: underline;
+}
+#text_deco_s {
+	text-decoration: line-through;
 }
