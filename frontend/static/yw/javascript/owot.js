@@ -163,7 +163,7 @@ var keyConfig = {
 	centerTeleport: "HOME",
 	undo: "CTRL+Z",
 	redo: ["CTRL+Y", "CTRL+SHIFT+Z"],
-	showTextDeco: "CTRL+Q"
+	showTextDeco: ["CTRL+Q", "ALT+Q", "CTRL+SHIFT+F"]
 };
 
 window.addEventListener("load", function() {
@@ -479,6 +479,7 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 	var colors = [];
 	var links = [];
 	var protections = [];
+	var decorations = [];
 	for(var y = 0; y < regHeight; y++) {
 		if(y != 0) {
 			reg += "\n";
@@ -509,6 +510,7 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 			if(!containsLink) {
 				links.push(null);
 			}
+			decorations.push(charInfo.decoration);
 			charX++;
 			if(charX >= tileC) {
 				charX = 0;
@@ -523,7 +525,7 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 			tileY++;
 		}
 	}
-	w.ui.selectionModal.open(reg, colors, links, protections, [coordA, coordB]);
+	w.ui.selectionModal.open(reg, colors, links, protections, decorations, [coordA, coordB]);
 	w.emit("regionSelected", {
 		a: coordA,
 		b: coordB
@@ -1235,7 +1237,12 @@ function getChar(tileX, tileY, charX, charY) {
 	var tile = Tile.get(tileX, tileY);
 	if(!tile) return " ";
 	var content = tile.content;
-	return content[charY * tileC + charX];
+	var char = content[charY * tileC + charX];
+	var dCode = char.codePointAt(1);
+	if(dCode > textDecorationOffset && dCode <= textDecorationOffset + 16) {
+		return String.fromCharCode(char.codePointAt(0));
+	}
+	return char;
 }
 
 function getCharColor(tileX, tileY, charX, charY) {
@@ -1272,6 +1279,21 @@ function getCharProtection(tileX, tileY, charX, charY) {
 	return prot;
 }
 
+function getCharDecoration(tileX, tileY, charX, charY) {
+	if(tileX == void 0 && tileY == void 0 && charX == void 0 && charY == void 0) {
+		if(!cursorCoords) return -1;
+		tileX = cursorCoords[0];
+		tileY = cursorCoords[1];
+		charX = cursorCoords[2];
+		charY = cursorCoords[3];
+	}
+	var tile = Tile.get(tileX, tileY);
+	if(!tile) return null;
+	var content = tile.content;
+	var char = content[charY * tileC + charX];
+	return getCharTextDecorations(char);
+}
+
 function getCharInfo(tileX, tileY, charX, charY) {
 	if(tileX == void 0 && tileY == void 0 && charX == void 0 && charY == void 0) {
 		if(!cursorCoords) return -1;
@@ -1284,7 +1306,8 @@ function getCharInfo(tileX, tileY, charX, charY) {
 		loaded: isTileLoaded(tileX, tileY),
 		char: getChar(tileX, tileY, charX, charY),
 		color: getCharColor(tileX, tileY, charX, charY),
-		protection: getCharProtection(tileX, tileY, charX, charY)
+		protection: getCharProtection(tileX, tileY, charX, charY),
+		decoration: getCharDecoration(tileX, tileY, charX, charY)
 	};
 }
 
@@ -1983,6 +2006,7 @@ setWriteInterval();
 
 function moveCursor(direction, preserveVertPos, amount) {
 	if(!cursorCoords) return;
+	if(window.dcm) return; // TEMP
 	if(amount == null) amount = 1;
 	// [tileX, tileY, charX, charY]
 	var pos = cursorCoords.slice(0);
@@ -5970,18 +5994,21 @@ function makeSelectionModal() {
 			var colRow;
 			var linkRow;
 			var protRow;
+			var decoRow;
+			// TODO: simplify and clean up
 			if(o_color) colRow = s_colors.slice(y * text[y].length, y * text[y].length + text[y].length);
 			if(o_link) linkRow = s_links.slice(y * text[y].length, y * text[y].length + text[y].length);
 			if(o_prot) protRow = s_prots.slice(y * text[y].length, y * text[y].length + text[y].length);
+			if(o_deco) decoRow = s_decos.slice(y * text[y].length, y * text[y].length + text[y].length)
 			if(o_tleft || o_tright || o_rgap) spaceTrim(text[y], o_tleft, o_tright, o_rgap, [colRow, linkRow, protRow]);
 			var line = text[y];
-			if(!o_deco) {
+			if(o_deco) {
 				for(var x = 0; x < line.length; x++) {
 					var chr = line[x];
-					var code = chr.codePointAt(1);
-					if(!code) continue;
-					if(code > textDecorationOffset && code <= textDecorationOffset + 16) {
-						line[x] = String.fromCodePoint(chr.codePointAt(0));
+					var deco = decoRow[x];
+					if(deco) {
+						chr = setCharTextDecorations(chr, deco.bold, deco.italic, deco.under, deco.strike);
+						line[x] = chr;
 					}
 				}
 			}
@@ -6035,6 +6062,7 @@ function makeSelectionModal() {
 	var s_colors;
 	var s_links
 	var s_prots;
+	var s_decos;
 
 	var modal = new Modal();
 	modal.setMinimumSize(500, 450);
@@ -6057,11 +6085,12 @@ function makeSelectionModal() {
 	modal.checkboxFieldOnInput(function(obj, checked) {
 		updateOutput();
 	});
-	modal.onOpen(function(str, colors, links, protections, coords) {
+	modal.onOpen(function(str, colors, links, protections, decorations, coords) {
 		s_str = str;
 		s_colors = colors;
 		s_links = links;
 		s_prots = protections;
+		s_decos = decorations;
 		if(!showCursorCoordinates) {
 			region_bounds.style.display = "none";
 		} else {
