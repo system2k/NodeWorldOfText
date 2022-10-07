@@ -1238,10 +1238,7 @@ function getChar(tileX, tileY, charX, charY) {
 	if(!tile) return " ";
 	var content = tile.content;
 	var char = content[charY * tileC + charX];
-	var dCode = char.codePointAt(1);
-	if(dCode > textDecorationOffset && dCode <= textDecorationOffset + 16) {
-		return String.fromCharCode(char.codePointAt(0));
-	}
+	char = clearCharTextDecorations(char);
 	return char;
 }
 
@@ -1548,7 +1545,7 @@ function menu_color(color) {
 			"border-color: " + bColor + ";" +
 			"color: " + tColor + ";" +
 		"}\n" +
-			"#nav li {" +
+		"#nav li {" +
 			"border-top-color: " + bColor + ";" +
 		"}\n" +
 		"#nav li.hover {" +
@@ -3868,6 +3865,64 @@ function encodeCharProt(array, encoding) {
 	return str;
 }
 
+var lcsShardCharVectors = [
+	[[0,3],[1,4],[0,4],[0,3]],
+	[[0,3],[2,4],[0,4],[0,3]],
+	[[0,1],[1,4],[0,4],[0,1]],
+	[[0,1],[2,4],[0,4],[0,1]],
+	[[0,0],[1,4],[0,4],[0,0]],
+	[[1,0],[2,0],[2,4],[0,4],[0,1],[1,0]],
+	[[2,0],[2,4],[0,4],[0,1],[2,0]],
+	[[1,0],[2,0],[2,4],[0,4],[0,3],[1,0]],
+	[[2,0],[2,4],[0,4],[0,3],[2,0]],
+	[[1,0],[2,0],[2,4],[0,4],[1,0]],
+	[[2,1],[2,4],[0,4],[0,3],[2,1]],
+	[[2,3],[2,4],[1,4],[2,3]],
+	[[2,3],[2,4],[0,4],[2,3]],
+	[[2,1],[2,4],[1,4],[2,1]],
+	[[2,1],[2,4],[0,4],[2,1]],
+	[[2,0],[2,4],[1,4],[2,0]],
+	[[0,0],[1,0],[2,1],[2,4],[0,4],[0,0]],
+	[[0,0],[2,1],[2,4],[0,4],[0,0]],
+	[[0,0],[1,0],[2,3],[2,4],[0,4],[0,0]],
+	[[0,0],[2,3],[2,4],[0,4],[0,0]],
+	[[0,0],[1,0],[2,4],[0,4],[0,0]],
+	[[0,1],[2,3],[2,4],[0,4],[0,1]],
+	[[0,0],[2,0],[2,4],[1,4],[0,3],[0,0]],
+	[[0,0],[2,0],[2,4],[0,3],[0,0]],
+	[[0,0],[2,0],[2,4],[1,4],[0,1],[0,0]],
+	[[0,0],[2,0],[2,4],[0,1],[0,0]],
+	[[0,0],[2,0],[2,4],[1,4],[0,0]],
+	[[0,0],[1,0],[0,1],[0,0]],
+	[[0,0],[2,0],[0,1],[0,0]],
+	[[0,0],[1,0],[0,3],[0,0]],
+	[[0,0],[2,0],[0,3],[0,0]],
+	[[0,0],[1,0],[0,4],[0,0]],
+	[[0,0],[2,0],[2,1],[0,3],[0,0]],
+	[[0,0],[2,0],[2,3],[1,4],[0,4],[0,0]],
+	[[0,0],[2,0],[2,3],[0,4],[0,0]],
+	[[0,0],[2,0],[2,1],[1,4],[0,4],[0,0]],
+	[[0,0],[2,0],[2,1],[0,4],[0,0]],
+	[[0,0],[2,0],[1,4],[0,4],[0,0]],
+	[[1,0],[2,0],[2,1],[1,0]],
+	[[0,0],[2,0],[2,1],[0,0]],
+	[[1,0],[2,0],[2,3],[1,0]],
+	[[0,0],[2,0],[2,3],[0,0]],
+	[[1,0],[2,0],[2,4],[1,0]],
+	[[0,0],[2,0],[2,3],[0,1],[0,0]],
+	[[0,0],[2,0],[2,4],[0,4],[1,2],[0,0]],
+	[[0,0],[1,2],[2,0],[2,4],[0,4],[0,0]],
+	[[0,0],[2,0],[1,2],[2,4],[0,4],[0,0]],
+	[[0,0],[2,0],[2,4],[1,2],[0,4],[0,0]],
+	[[0,0],[1,2],[0,4],[0,0]],
+	[[0,0],[2,0],[1,2],[0,0]],
+	[[2,0],[2,4],[1,2],[2,0]],
+	[[1,2],[2,4],[0,4],[1,2]],
+
+	[[0,0],[2,4],[0,4],[2,0],[0,0]],
+	[[2,0],[2,4],[0,0],[0,4],[2,0]]
+];
+
 function fillBlockChar(charCode, textRender, x, y) {
 	if((charCode & 0x1FB00) != 0x1FB00 && (charCode & 0x2500) != 0x2500) return false; // symbols for legacy computing
 	var transform = [0, 1]; // (left, right, up, down = 0, 1, 2, 3), percentage
@@ -3919,6 +3974,32 @@ function fillBlockChar(charCode, textRender, x, y) {
 					textRender.fillRect(x + (cellW / 2) * (i & 1), y + (cellH / 3) * (i >> 1), cellW / 2, cellH / 3);
 				}
 				return true;
+			} else if((charCode >= 0x1FB3C && charCode <= 0x1FB6F) || (charCode >= 0x1FB9A && charCode <= 0x1FB9B)) { // LCS shard characters
+				var vecIndex = charCode - 0x1FB3C;
+				if(charCode >= 0x1FB9A && charCode <= 0x1FB9B) {
+					vecIndex -= 42;
+				}
+				var vecs = lcsShardCharVectors[vecIndex];
+				var gpX = [
+					0, cellW / 2, cellW
+				];
+				var gpY = [
+					0, cellH / 3, cellH / 2, (cellH / 3) * 2, cellH
+				];
+				textRender.beginPath();
+				for(var i = 0; i < vecs.length; i++) {
+					var vec = vecs[i];
+					var gx = gpX[vec[0]];
+					var gy = gpY[vec[1]];
+					if(i == 0) {
+						textRender.moveTo(x + gx, y + gy);
+						continue;
+					}
+					textRender.lineTo(x + gx, y + gy);
+				}
+				textRender.closePath();
+				textRender.fill();
+				return true;
 			} else {
 				return false;
 			}
@@ -3949,8 +4030,10 @@ function fillBlockChar(charCode, textRender, x, y) {
 }
 
 function getCharTextDecorations(char) {
-	if(char.codePointAt(1) == void 0 || char.codePointAt(2)) return null;
-	var code = char.codePointAt(1);
+	/*var checkIdx = 1;
+	if(char.codePointAt(0) > 65535) checkIdx = 2;
+	if(char.codePointAt(checkIdx) == void 0) return null;*/
+	var code = char.charCodeAt(char.length - 1);
 	code -= textDecorationOffset;
 	if(code <= 0 || code > 16) return null;
 	return {
@@ -3963,10 +4046,28 @@ function getCharTextDecorations(char) {
 
 function setCharTextDecorations(char, bold, italic, under, strike) {
 	var bitMap = bold << 3 | italic << 2 | under << 1 | strike;
-	if(bitMap == 0) return char;
-	var code = char.codePointAt(1);
-	if(code > textDecorationOffset && code <= textDecorationOffset + 16) return char;
+	char = clearCharTextDecorations(char);
+	if(!bitMap) return char;
 	return char + String.fromCharCode(textDecorationOffset + bitMap);
+}
+
+// trim off all text decoration modifiers at the end
+function clearCharTextDecorations(char) {
+	var len = char.length;
+	var decoCount = 0;
+	for(var i = 0; i < len; i++) {
+		var pos = len - 1 - i;
+		var code = char.charCodeAt(pos);
+		if(code >= textDecorationOffset + 1 && code <= textDecorationOffset + 16) {
+			decoCount++;
+		} else {
+			break;
+		}
+	}
+	if(decoCount > 0) {
+		return char.slice(0, len - decoCount);
+	}
+	return char;
 }
 
 function renderChar(textRender, x, y, str, content, colors, writability, props, offsetX, offsetY, charOverflowMode) {
@@ -3982,10 +4083,8 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 	var deco = null;
 	if(textDecorationsEnabled) {
 		deco = getCharTextDecorations(char);
-		if(deco) {
-			char = String.fromCodePoint(char.codePointAt(0));
-		}
 	}
+	char = clearCharTextDecorations(char);
 
 	var cCode = char.codePointAt(0);
 	if(charOverflowMode) {
@@ -4033,7 +4132,7 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 	if(color == 0 || !colorsEnabled || (isLink && !colorizeLinks)) {
 		textRender.fillStyle = linkColor;
 	} else {
-		textRender.fillStyle = "rgb(" + (color >> 16 & 255) + "," + (color >> 8 & 255) + "," + (color & 255) + ")";
+		textRender.fillStyle = `rgb(${color >> 16 & 255},${color >> 8 & 255},${color & 255})`;
 	}
 
 	// x padding of text if the char width is > 10
@@ -4054,7 +4153,7 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 	}
 
 	// don't render whitespaces
-	if(cCode == 0x0020 || cCode == 0x00A0) return;
+	if(char == "\u0020" || char == "\u00A0") return;
 
 	if(!surrogateCharsEnabled || !combiningCharsEnabled) {
 		char = w.split(char, !surrogateCharsEnabled, !combiningCharsEnabled);
@@ -4065,7 +4164,10 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 		}
 	}
 
-	var isSpecial = char.codePointAt(1) !== void 0; // contains combining chars? (not compatible with Courier New)
+	var isSpecial = false;
+	var checkIdx = 1;
+	if(char.codePointAt(0) > 65535) checkIdx = 2;
+	isSpecial = char.codePointAt(checkIdx) != void 0;
 
 	if(brBlockFill && (cCode & 0x2800) == 0x2800) { // render braille chars as rectangles
 		var dimX = cellW / 2;
@@ -5644,15 +5746,36 @@ Object.assign(w, {
 		textRenderCtx.font = font;
 		w.redraw();
 	},
-	fixFonts: function() {
-		var fnt_main = new FontFace("suppl_cour", "url('/static/font/cour.ttf')");
-		var fnt_cal = new FontFace("suppl_cal", "url('/static/font/calibri.ttf')");
-		var fnt_sym = new FontFace("suppl_sym", "url('/static/font/seguisym.ttf')");
-		Promise.all([fnt_main.load(), fnt_cal.load(), fnt_sym.load()]).then(function() {
-			document.fonts.add(fnt_main);
-			document.fonts.add(fnt_cal);
-			document.fonts.add(fnt_sym);
-			w.changeFont("$px suppl_cour, suppl_cal, suppl_sym");
+	fixFonts: function(mainType) {
+		if(!window.Promise || !window.FontFace) return;
+		var list = {
+			"courier": "url('/static/font/cour.ttf')",
+			"calibri": "url('/static/font/calibri.ttf')",
+			"seguisym": "url('/static/font/seguisym.ttf')",
+			"legacycomputing": "url('/static/font/legacycomputing.ttf')"
+		};
+		if(mainType) { // load just one specific type
+			for(var i in list) {
+				if(i != mainType) {
+					delete list[i];
+				}
+			}
+		}
+		var promises = [];
+		var fonts = {};
+		for(var name in list) {
+			var ff = new FontFace(name, list[name]);
+			fonts[name] = ff;
+			promises.push(ff.load());
+		}
+		if(!promises.length) return;
+		Promise.all(promises).then(function() {
+			var fontNames = [];
+			for(var name in fonts) {
+				document.fonts.add(fonts[name]);
+				fontNames.push(name);
+			}
+			w.changeFont("$px 'Courier New', monospace, " + fontNames.join(", "));
 		});
 	},
 	loadFont: function(name, path, cb) {
@@ -6590,6 +6713,8 @@ function begin() {
 	w.protectSelect.oncancel(protectSelectionCancel);
 	w.protectSelect.tiled = true;
 	w.protectSelect.init();
+
+	w.fixFonts("legacycomputing");
 
 	manageCoordHash();
 	getWorldProps(state.worldModel.name, "style", function(style, error) {

@@ -1,35 +1,5 @@
 var WebSocket = require("ws");
 
-var surrogateRegexStr = "([\\uD800-\\uDBFF][\\uDC00-\\uDFFF])";
-var surrogateRegex = new RegExp(surrogateRegexStr, "g");
-var combiningRegexStr = "(([\\0-\\u02FF\\u0370-\\u1DBF\\u1E00-\\u20CF\\u2100-\\uD7FF\\uDC00-\\uFE1F\\uFE30-\\uFFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[\\uD800-\\uDBFF])([\\u0300-\\u036F\\u1DC0-\\u1DFF\\u20D0-\\u20FF\\uFE20-\\uFE2F]+))";
-var combiningRegex = new RegExp(combiningRegexStr, "g");
-var splitRegex = new RegExp(surrogateRegexStr + "|" + combiningRegexStr + "|.|\\n|\\r|\\u2028|\\u2029", "g");
-function advancedSplitCli(str, noSurrog, noComb) {
-	str += "";
-	// look for surrogate pairs first. then look for combining characters. finally, look for the rest
-	var data = str.match(splitRegex);
-	if(data == null) return [];
-	for(var i = 0; i < data.length; i++) {
-		// contains surrogates without second character?
-		if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
-			data.splice(i, 1);
-			i--;
-		}
-		if(noSurrog && data[i].match(surrogateRegex)) {
-			data[i] = "?";
-		}
-		if(noComb && data[i].match(combiningRegex)) {
-			data[i] = data[i].charAt(0);
-		}
-	}
-	return data;
-}
-function filterUTF16(str) {
-	return advancedSplitCli(str, true, true).join("");
-}
-// TODO: use proper util string splitter
-
 function partitionRectangle(rect) {
 	var minY = rect.minY;
 	var minX = rect.minX;
@@ -200,8 +170,8 @@ module.exports = async function(data, vars, evars) {
 			continue;
 		}
 
-		if(q_utf16) content = filterUTF16(content);
-		if(q_array) content = advancedSplitCli(content);
+		if(q_utf16) content = advancedSplit(content, true, true).join("");
+		if(q_array) content = advancedSplit(content);
 
 		tiles[i] = {
 			content,

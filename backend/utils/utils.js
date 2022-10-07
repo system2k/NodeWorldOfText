@@ -866,46 +866,180 @@ function decodeCharProt(str) {
 		2: owners
 */
 
-// split a string properly with characters containing surrogates and combining characters
-function advancedSplit(str) {
-	str += "";
-	var data = str.match(/([\uD800-\uDBFF][\uDC00-\uDFFF])|(([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+))|.|\n|\r|\u2028|\u2029/g);
-	if(data == null) return [];
-	for(var i = 0; i < data.length; i++) {
-		// contains surrogates without second character?
-		// This invalid character would not have been added to the string anyway
-		if(data[i].match(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g)) {
-			data.splice(i, 1);
-			i--;
+/*
+	This function splits a string accounting for surrogate-based characters like emojis
+	and combining characters. This function also splits the string as-is and will make
+	no corrections or perform any trimming.
+*/
+function advancedSplit(str, noSurrog, noComb) {
+	var chars = [];
+	var buffer = "";
+	var surrogMode = false;
+	var charMode = false;
+	for(var i = 0; i < str.length; i++) {
+		var char = str[i];
+		var code = char.charCodeAt();
+		if(code >= 0xD800 && code <= 0xDBFF) { // 1st surrogate
+			if(surrogMode) {
+				chars.push("?");
+				buffer = "";
+			}
+			if(charMode) {
+				chars.push(buffer);
+			}
+			surrogMode = true;
+			charMode = false;
+			buffer = char;
+			continue;
+		}
+		if(code >= 0xDC00 && code <= 0xDFFF) { // 2nd surrogate
+			if(surrogMode) {
+				buffer += char;
+				if(noSurrog) {
+					buffer = "?";
+				}
+				charMode = true;
+			} else {
+				if(charMode) {
+					chars.push(buffer);
+				}
+				chars.push("?");
+				buffer = "";
+				charMode = false;
+			}
+			surrogMode = false;
+			continue;
+		}
+		if((code >= 0x0300 && code <= 0x036F) ||
+		  (code >= 0x1DC0 && code <= 0x1DFF) ||
+		  (code >= 0x20D0 && code <= 0x20FF) ||
+		  (code >= 0xFE20 && code <= 0xFE2F)) { // combining character
+			if(surrogMode) { // surrogate error
+				chars.push("?");
+				buffer = "";
+				surrogMode = false;
+			}
+			if(!noComb) {
+				buffer += char;
+				charMode = true;
+			}
+			continue;
+		} else { // non-special character
+			if(surrogMode) { // surrogate error
+				chars.push("?");
+				surrogMode = false;
+			}
+			if(charMode) {
+				chars.push(buffer);
+			}
+			charMode = true;
+			buffer = char;
 		}
 	}
-	for(var i = 0; i < data.length; i++) {
-		data[i] = data[i].slice(0, 16); // limit of 16 combining characters
+	if(buffer.length) {
+		if(surrogMode) {
+			chars.push("?");
+		} else {
+			chars.push(buffer);
+		}
 	}
-	// if a part contains a single nul character, make the entire part nul
-	for(var i = 0; i < data.length; i++) {
-		var chr = data[i];
-		for(var x = 0; x < chr.length; x++) {
-			if(chr[x] == "\0") {
-				data[i] = "\0";
-				break;
+	return chars;
+}
+
+function debugString(str) {
+	var res = "";
+	for(var i = 0; i < str.length; i++) {
+		var p = str[i];
+		var c = p.charCodeAt();
+		if(i != 0) {
+			res += ", ";
+		}
+		if(c < 32) {
+			res += "x" + c.toString(16).padStart(2, 0);
+		} else if(c > 255) {
+			res += "x" + c.toString(16).padStart(4, 0);
+		} else {
+			res += "'" + p + "'";
+		}
+	}
+	return res;
+}
+
+/*
+	Filter a character to avoid string corruption
+*/
+function filterEdit(char) {
+	if(!char || typeof char != "string") {
+		char = " ";
+	}
+	var maxComb = 16;
+	var charStart = false;
+	var surrogOpen = false;
+	var surrogClose = false;
+	var combMode = false;
+	var combCount = 0;
+	var buffer = "";
+	for(var i = 0; i < char.length; i++) {
+		var p = char[i];
+		var c = p.charCodeAt();
+		if(c == 0) {
+			if(charStart) {
+				return buffer;
+			} else {
+				return " ";
+			}
+		}
+		if(c >= 0xD800 && c <= 0xDBFF) {
+			if(charStart || combMode) {
+				return buffer;
+			}
+			if(surrogOpen || surrogClose) return "?";
+			surrogOpen = true;
+			buffer += p;
+			continue;
+		} else if(c >= 0xDC00 && c <= 0xDFFF) {
+			if(charStart || combMode) {
+				return buffer;
+			}
+			if(!surrogOpen || surrogClose) return "?";
+			surrogClose = true;
+			charStart = true;
+			buffer += p;
+			continue;
+		}
+		if(surrogOpen && !surrogClose) return "?";
+		if(!surrogOpen && surrogClose) return "?";
+		if((c >= 0x0300 && c <= 0x036F) ||
+					(c >= 0x1DC0 && c <= 0x1DFF) ||
+					(c >= 0x20D0 && c <= 0x20FF) ||
+					(c >= 0xFE20 && c <= 0xFE2F)) {
+			if(combCount >= maxComb) return buffer;
+			if(!charStart) {
+				buffer += " ";
+				charStart = true;
+			}
+			if(!combMode) {
+				combMode = true;
+			}
+			buffer += p;
+			combCount++;
+		} else {
+			if(charStart) {
+				return buffer;
+			} else {
+				charStart = true;
+				buffer += p;
 			}
 		}
 	}
-	return data;
+	if(surrogOpen && !surrogClose) return "?";
+	if(!surrogOpen && surrogClose) return "?";
+	return buffer;
 }
 
-var reg_non_comb = /([\0-\u02FF\u0370-\u1DBF\u1E00-\u20CF\u2100-\uD7FF\uDC00-\uFE1F\uFE30-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF])/;
-var reg_comb = /([\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]+)/;
-
 function change_char_in_array(arr, char, index) {
-	if(!char) return false;
-	char = advancedSplit(char);
-	char = char[0];
-	if(!char) return false;
-	if(char.indexOf("\0") > -1) return false;
-	if(reg_comb.test(char) && !reg_non_comb.test(char)) char = " ";
-	if(arr[index] == char) return false;
+	if(char.includes("\0")) return false;
+	char = filterEdit(char);
 	arr[index] = char;
 	return true;
 }
@@ -1049,6 +1183,7 @@ module.exports = {
 	encodeCharProt,
 	decodeCharProt,
 	advancedSplit,
+	filterEdit,
 	change_char_in_array,
 	html_tag_esc,
 	sanitize_color,

@@ -495,7 +495,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 				privateMessage: "from_me"
 			});
 			// if user has blocked TELLs, don't let the /tell-er know
-			if(ws.sdata.chat_blocks.id && (ws.sdata.chat_blocks.id.includes(clientId) || // is ID of the /tell sender? (not destination)
+			if(ws.sdata.chat_blocks[id] && (ws.sdata.chat_blocks.id.includes(clientId) || // is ID of the /tell sender? (not destination)
 				(ws.sdata.chat_blocks.block_all && opts.clientId != 0)) ||
 				(ws.sdata.chat_blocks.no_tell)) return;
 				

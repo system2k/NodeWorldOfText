@@ -231,7 +231,7 @@ module.exports = async function(data, vars, evars) {
 				// convert back to proper X/Y
 				var newX = newIdx % CONST.tileCols;
 				var newY = Math.floor(newIdx / CONST.tileCols);
-				var newChar = char[i];
+				var newChar = char[i]; // don't filter the edit yet. that is handled in the database subsystem.
 				var newColor = editIncome[7];
 				if(Array.isArray(newColor)) {
 					// color is an array, get individual values

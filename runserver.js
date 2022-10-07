@@ -58,7 +58,6 @@ var resembles_int_number = utils.resembles_int_number;
 var TerminalMessage      = utils.TerminalMessage;
 var encodeCharProt       = utils.encodeCharProt;
 var decodeCharProt       = utils.decodeCharProt;
-var advancedSplit        = utils.advancedSplit;
 var change_char_in_array = utils.change_char_in_array;
 var html_tag_esc         = utils.html_tag_esc;
 var sanitize_color       = utils.sanitize_color;
@@ -69,6 +68,8 @@ var arrayIsEntirely      = utils.arrayIsEntirely;
 var normalizeCacheTile   = utils.normalizeCacheTile;
 var parseTextcode        = utils.parseTextcode;
 var checkDuplicateCookie = utils.checkDuplicateCookie;
+var advancedSplit        = utils.advancedSplit;
+var filterEdit           = utils.filterEdit;
 
 var gzipEnabled = false;
 var shellEnabled = true;
@@ -3272,6 +3273,7 @@ var global_data = {
 	encodeCharProt,
 	decodeCharProt,
 	advancedSplit,
+	filterEdit,
 	change_char_in_array,
 	html_tag_esc,
 	wss, // this is undefined by default, but will get a value once wss is initialized
