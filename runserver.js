@@ -458,7 +458,7 @@ uvias.run = async function(query, data) {
 if(testUviasIds) {
 	uvias.id = "owottest";
 	uvias.name = "Our World Of Text Test Server";
-	uvias.domain = "testserver1.ourworldoftext.com";
+	uvias.domain = "test.ourworldoftext.com";
 	uvias.private = true;
 	uvias.only_verified = false;
 	uvias.custom_css_file_path = settings.uvias_custom_css_file_path;
