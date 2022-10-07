@@ -2172,7 +2172,7 @@ function createDispatcher(res, opts) {
 	return dispatch;
 }
 
-var valid_subdomains = ["test"];
+var valid_subdomains = []; // e.g. ["test"]
 
 async function process_request(req, res, compCallbacks) {
 	if(!serverLoaded) await waitForServerLoad();
