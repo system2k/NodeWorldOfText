@@ -2076,8 +2076,18 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 	tile.properties.cell_props = cell_props;
 
 	if(!isErase) {
-		char = setCharTextDecorations(char,
-			textDecorationModes.bold, textDecorationModes.italic, textDecorationModes.under, textDecorationModes.strike);
+		currDeco = getCharTextDecorations(char);
+		var cBold = textDecorationModes.bold;
+		var cItalic = textDecorationModes.italic;
+		var cUnder = textDecorationModes.under;
+		var cStrike = textDecorationModes.strike;
+		if(currDeco) {
+			cBold = cBold || currDeco.bold;
+			cItalic = cItalic || currDeco.italic;
+			cUnder = cUnder || currDeco.under;
+			cStrike = cStrike || currDeco.strike;
+		}
+		char = setCharTextDecorations(char, cBold, cItalic, cUnder, cStrike);
 	}
 
 	// set char locally
@@ -3980,12 +3990,8 @@ function fillBlockChar(charCode, textRender, x, y) {
 					vecIndex -= 42;
 				}
 				var vecs = lcsShardCharVectors[vecIndex];
-				var gpX = [
-					0, cellW / 2, cellW
-				];
-				var gpY = [
-					0, cellH / 3, cellH / 2, (cellH / 3) * 2, cellH
-				];
+				var gpX = [0, cellW / 2, cellW];
+				var gpY = [0, cellH / 3, cellH / 2, (cellH / 3) * 2, cellH];
 				textRender.beginPath();
 				for(var i = 0; i < vecs.length; i++) {
 					var vec = vecs[i];
@@ -4030,9 +4036,6 @@ function fillBlockChar(charCode, textRender, x, y) {
 }
 
 function getCharTextDecorations(char) {
-	/*var checkIdx = 1;
-	if(char.codePointAt(0) > 65535) checkIdx = 2;
-	if(char.codePointAt(checkIdx) == void 0) return null;*/
 	var code = char.charCodeAt(char.length - 1);
 	code -= textDecorationOffset;
 	if(code <= 0 || code > 16) return null;
