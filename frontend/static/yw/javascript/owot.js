@@ -4067,8 +4067,8 @@ function fillBlockChar(charCode, textRender, x, y) {
 					switch(charCode) {
 						case 0x1CEA8: code = 1; break;
 						case 0x1CEAB: code = 2; break;
-						case 0x1CEA4: code = 64; break;
-						case 0x1CEAF: code = 128; break;
+						case 0x1CEA3: code = 64; break;
+						case 0x1CEA0: code = 128; break;
 						case 0x1FBE6: code = 20; break;
 						case 0x1FBE7: code = 40; break;
 					}
