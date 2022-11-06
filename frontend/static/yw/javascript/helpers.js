@@ -640,6 +640,7 @@ function advancedSplit(str, noSurrog, noComb, norm) {
 				chars.push("?");
 			}
 			surrogMode = false;
+			combCount = 0;
 			continue;
 		} else if(surrogMode) {
 			buffer = "";

@@ -86,6 +86,10 @@ var menuOptions            = {};
 var undoBuffer             = new CircularBuffer(2048);
 var textDecorationOffset   = 0x20F0;
 var textDecorationModes    = { bold: false, italic: false, under: false, strike: false };
+var fontTemplate           = "$px 'Courier New', monospace";
+var specialFontTemplate    = "$px consolas, monospace";
+var fontOrder              = ["Courier New", "monospace"];
+var specialFontOrder       = ["consolas", "monospace"];
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -552,8 +556,26 @@ var cellWidthPad, tileW, tileH, cellW, cellH, font, specialCharFont, tileC, tile
 var tileWidth, tileHeight; // exact tile dimensions for determining rendering size of tiles
 var dTileW, dTileH; // locked tile sizes for background image generation
 
-var fontTemplate = "$px 'Courier New', monospace";
-var specialCharFontTemplate = "$px consolas, monospace";
+function buildFontTemplate(set) {
+	var str = "$px ";
+	for(var i = 0; i < set.length; i++) {
+		var name = set[i];
+		if(i != 0) {
+			str += ", ";
+		}
+		if(name.includes(" ")) {
+			str += "'" + name + "'";
+		} else {
+			str += name;
+		}
+	}
+	return str;
+}
+
+function rebuildFontTemplates() {
+	fontTemplate = buildFontTemplate(fontOrder);
+	specialFontTemplate = buildFontTemplate(specialFontOrder);
+}
 
 function updateScaleConsts() {
 	defaultSizes.tileW = defaultSizes.cellW * defaultSizes.tileC;
@@ -573,7 +595,7 @@ function updateScaleConsts() {
 	var fontSize = normFontSize(16 * zoom);
 
 	font = fontTemplate.replace("$", fontSize);
-	specialCharFont = specialCharFontTemplate.replace("$", fontSize);
+	specialCharFont = specialFontTemplate.replace("$", fontSize);
 
 	textRenderCanvas.width = tileWidth + 5;
 	textRenderCanvas.height = tileHeight + 5;
@@ -2003,7 +2025,7 @@ setWriteInterval();
 
 function moveCursor(direction, preserveVertPos, amount) {
 	if(!cursorCoords) return;
-	if(window.dcm) return; // TEMP
+	if(window.dcm || (window.prE && window.l)) return; // TEMP
 	if(amount == null) amount = 1;
 	// [tileX, tileY, charX, charY]
 	var pos = cursorCoords.slice(0);
@@ -2155,8 +2177,24 @@ function redoWrite() {
 	var edit = undoBuffer.unpop();
 	if(!edit) return;
 	undoBuffer.pop();
+	var tileX = edit[0];
+	var tileY = edit[1];
+	var charX = edit[2];
+	var charY = edit[3];
+	var char = edit[4];
+	var color = edit[5];
+	var link = edit[6];
 	var offset = edit[7] || 0;
-	writeCharTo(edit[4], edit[5], edit[0], edit[1], edit[2], edit[3], -1, offset);
+	writeCharTo(char, color, tileX, tileY, charX, charY, -1, offset);
+	if(link) {
+		if(link) {
+			if(link.type == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
+				linkQueue.push(["url", tileX, tileY, charX, charY, link.url]);
+			} else if(link.type == "coord" && Permissions.can_coordlink(state.userModel, state.worldModel)) {
+				linkQueue.push(["coord", tileX, tileY, charX, charY, link.link_tileX, link.link_tileY]);
+			}
+		}
+	}
 	renderCursor([edit[0], edit[1], edit[2], edit[3]]);
 	moveCursor("right", false, -offset + 1);
 }
@@ -3928,13 +3966,28 @@ var lcsShardCharVectors = [
 	[[0,0],[2,0],[1,2],[0,0]],
 	[[2,0],[2,4],[1,2],[2,0]],
 	[[1,2],[2,4],[0,4],[1,2]],
-
+	// skip
 	[[0,0],[2,4],[0,4],[2,0],[0,0]],
 	[[2,0],[2,4],[0,0],[0,4],[2,0]]
 ];
 
+var lcsOctantCharPoints = [
+	4, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+	32, 33, 34, 35, 36, 37, 38, 39, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
+	55, 56, 57, 58, 59, 60, 61, 62, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78,
+	79, 81, 82, 83, 84, 86, 87, 88, 89, 91, 92, 93, 94, 96, 97, 98, 99, 100, 101, 102, 103,
+	104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121,
+	22, 123, 124, 125, 126, 127, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140,
+	141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158,
+	159, 161, 162, 163, 164, 166, 167, 168, 169, 171, 172, 173, 174, 176, 177, 178, 179, 180,
+	181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 193, 194, 195, 196, 197, 198, 199,
+	200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217,
+	218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235,
+	236, 237, 238, 239, 241, 242, 243, 244, 246, 247, 248, 249, 251, 253, 254
+];
+
 function fillBlockChar(charCode, textRender, x, y) {
-	if((charCode & 0x1FB00) != 0x1FB00 && (charCode & 0x2500) != 0x2500) return false; // symbols for legacy computing
+	if((charCode & 0x1FB00) != 0x1FB00 && (charCode & 0x2500) != 0x2500 && !(charCode >= 0x1CD00 && charCode <= 0x1FBE7)) return false; // symbols for legacy computing
 	var transform = [0, 1]; // (left, right, up, down = 0, 1, 2, 3), percentage
 	switch(charCode) { // 1/8 blocks
 		case 0x2580: transform = [2, 4/8]; break;
@@ -4004,6 +4057,32 @@ function fillBlockChar(charCode, textRender, x, y) {
 					textRender.lineTo(x + gx, y + gy);
 				}
 				textRender.closePath();
+				textRender.fill();
+				return true;
+			} else if(charCode >= 0x1CD00 && charCode <= 0x1FBE7) { // 2x4 LCS octant characters
+				var code = 0;
+				if(charCode >= 0x1CD00 && charCode <= 0x1CDE5) {
+					code = lcsOctantCharPoints[charCode - 0x1CD00];
+				} else {
+					switch(charCode) {
+						case 0x1CEA8: code = 1; break;
+						case 0x1CEAB: code = 2; break;
+						case 0x1CEA4: code = 64; break;
+						case 0x1CEAF: code = 128; break;
+						case 0x1FBE6: code = 20; break;
+						case 0x1FBE7: code = 40; break;
+					}
+				}
+				if(!code) return false;
+				textRender.beginPath();
+				for(var py = 0; py < 4; py++) {
+					for(var px = 0; px < 2; px++) {
+						var idx = py * 2 + px;
+						if(code >> idx & 1) {
+							textRender.rect(x + px * (cellW / 2), y + py * (cellH / 4), cellW / 2, cellH / 4);
+						}
+					}
+				}
 				textRender.fill();
 				return true;
 			} else {
@@ -4171,6 +4250,7 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 	var checkIdx = 1;
 	if(char.codePointAt(0) > 65535) checkIdx = 2;
 	isSpecial = char.codePointAt(checkIdx) != void 0;
+	isSpecial = isSpecial || (cCode >= 0x2500 && cCode <= 0x257F);
 
 	if(brBlockFill && (cCode & 0x2800) == 0x2800) { // render braille chars as rectangles
 		var dimX = cellW / 2;
@@ -5742,12 +5822,12 @@ Object.assign(w, {
 		if(redraw) w.setRedraw();
 		w.hasUpdated = true;
 	},
-	changeFont: function(fontData) {
+	changeFont: function(fontData, nr) {
 		// change the global font
 		fontTemplate = fontData;
 		font = fontTemplate.replace("$", normFontSize(16 * zoom));
 		textRenderCtx.font = font;
-		w.redraw();
+		if(!nr) w.redraw();
 	},
 	fixFonts: function(mainType) {
 		if(!window.Promise || !window.FontFace) return;
@@ -5755,7 +5835,7 @@ Object.assign(w, {
 			"courier": "url('/static/font/cour.ttf')",
 			"calibri": "url('/static/font/calibri.ttf')",
 			"seguisym": "url('/static/font/seguisym.ttf')",
-			"legacycomputing": "url('/static/font/legacycomputing.ttf')"
+			"legacycomputing": "url('/static/font/legacycomputing.woff2')"
 		};
 		if(mainType) { // load just one specific type
 			for(var i in list) {
@@ -5778,7 +5858,11 @@ Object.assign(w, {
 				document.fonts.add(fonts[name]);
 				fontNames.push(name);
 			}
-			w.changeFont("$px 'Courier New', monospace, " + fontNames.join(", "));
+			fontOrder.push(...fontNames);
+			specialFontOrder.unshift(...fontNames);
+			rebuildFontTemplates();
+			w.changeFont(fontTemplate, true);
+			w.changeSpecialCharFont(specialFontTemplate);
 		});
 	},
 	loadFont: function(name, path, cb) {
@@ -5788,10 +5872,10 @@ Object.assign(w, {
 			if(cb) cb(fnt);
 		});
 	},
-	changeSpecialCharFont: function(fontData) {
-		specialCharFontTemplate = fontData;
-		specialCharFont = specialCharFontTemplate.replace("$", normFontSize(16 * zoom));
-		w.redraw();
+	changeSpecialCharFont: function(fontData, nr) {
+		specialFontTemplate = fontData;
+		specialCharFont = specialFontTemplate.replace("$", normFontSize(16 * zoom));
+		if(!nr) w.redraw();
 	},
 	enableCombining: function(nr) {
 		combiningCharsEnabled = true;

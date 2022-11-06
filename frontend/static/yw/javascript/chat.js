@@ -113,7 +113,7 @@ var client_commands = {
 	nick: function (args) {
 		var newDisplayName = args.join(" ");
 		if(!newDisplayName) {
-			newDisplayName = state.userModel.username;
+			newDisplayName = "";
 		}
 		var nickLim = state.userModel.is_staff ? Infinity : 40;
 		newDisplayName = newDisplayName.slice(0, nickLim);
@@ -542,9 +542,9 @@ var emoteList = {
 */
 function addChat(chatfield, id, type, nickname, message, realUsername, op, admin, staff, color, date, dataObj) {
 	if(!dataObj) dataObj = {};
-	if(!nickname) nickname = "";
 	if(!message) message = "";
 	if(!realUsername) realUsername = "";
+	if(!nickname) nickname = realUsername;
 	if(!color) color = assignColor(nickname);
 	var dateStr = "";
 	if(date) dateStr = convertToDate(date);
@@ -575,6 +575,14 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 
 	var tagDom;
 	var nickTitle = [];
+	var nickHasSpecialChars = false;
+
+	for(var i = 0; i < nickname.length; i++) {
+		if(nickname.charCodeAt(i) > 256) {
+			nickHasSpecialChars = true;
+			break;
+		}
+	}
 
 	if(type == "user" || type == "user_nick") {
 		nickTitle.push("ID " + id);
@@ -613,7 +621,9 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 
 	if(type == "user") {
 		nickDom.style.color = color;
-		nickDom.style.fontWeight = "bold";
+		if(!nickHasSpecialChars) {
+			nickDom.style.fontWeight = "bold";
+		}
 		nickDom.style.pointerEvents = "default";
 		if(state.userModel.is_operator) idTag = "[" + id + "]";
 	}
@@ -627,6 +637,10 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 		nickDom.style.color = color;
 		nickTitle.push("Username \"" + realUsername + "\"");
 		if(state.userModel.is_operator) idTag = "[*" + id + "]";
+	}
+
+	if(nickHasSpecialChars) {
+		nickTitle.push("Special chars");
 	}
 
 	if(state.userModel.is_operator) {
@@ -787,11 +801,25 @@ function updateUserCount() {
 
 function chatType(registered, nickname, realUsername) {
 	var nickMatches = (nickname + "").toUpperCase() == (realUsername + "").toUpperCase();
+	var hasSpecialChars = false;
 	if(realUsername == "[ Server ]") return "user";
-	var type = "";
-	if(registered && nickMatches) type = "user";
-	if(registered && !nickMatches) type = "user_nick";
-	if(!registered && !nickname) type = "anon";
-	if(!registered && nickname) type = "anon_nick";
+	if(nickname) {
+		for(var i = 0; i < nickname.length; i++) {
+			if(nickname.charCodeAt(i) > 256) {
+				hasSpecialChars = true;
+				break;
+			}
+		}
+	}
+	if(registered && (nickMatches || !nickname)) {
+		if(hasSpecialChars) {
+			return "user_nick";
+		} else {
+			return "user";
+		}
+	}
+	if(registered && !nickMatches) return "user_nick";
+	if(!registered && !nickname) return "anon";
+	if(!registered && nickname) return "anon_nick";
 	return type;
 }

@@ -120,7 +120,7 @@ function procRest(list) {
 				props[key] = val;
 			}
 		}
-		if((!itemip && !itemgroup) || (itemtype != "charrate" && itemtype != "color" && itemtype != "linkrate")) continue;
+		if((!itemip && !itemgroup) || (itemtype != "charrate" && itemtype != "color" && itemtype != "linkrate" && itemtype != "daccess")) continue;
 		if(itemgroup && itemip) continue; // can't have both
 		
 		var obj = null;
@@ -164,6 +164,16 @@ function procRest(list) {
 			obj = {
 				type: "color",
 				region, world
+			};
+		} else if(itemtype == "daccess") {
+			var mode = props.mode;
+			var note = props.note;
+			if(mode != "httpwrite" && mode != "site") continue;
+			if(typeof note != "string" || !note) note = null;
+			obj = {
+				type: "daccess",
+				mode,
+				note
 			};
 		}
 		if(obj) {
@@ -230,6 +240,15 @@ function procRest(list) {
 			}
 			if(region != null) {
 				rstrLine.push("region=" + region.join(","));
+			}
+			rstr += rstrLine.join(";") + "\n";
+		} else if(type == "daccess") {
+			var mode = restr.mode;
+			var note = restr.note;
+			var rstrLine = [identifier, "type=daccess"];
+			rstrLine.push("mode=" + mode);
+			if(note) {
+				rstrLine.push("note=" + note);
 			}
 			rstr += rstrLine.join(";") + "\n";
 		}

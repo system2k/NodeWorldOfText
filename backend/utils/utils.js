@@ -1038,6 +1038,7 @@ function filterEdit(char) {
 }
 
 function change_char_in_array(arr, char, index) {
+	if(!char) return false;
 	if(char.includes("\0")) return false;
 	char = filterEdit(char);
 	if(arr[index] == char) return false;

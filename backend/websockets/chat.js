@@ -110,6 +110,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	var isMuted = false;
 	var isShadowMuted = false;
+	var isTestMessage = false;
 	var muteInfo = null;
 	var worldChatMutes = blocked_ips_by_world_id[world.id];
 	if(location == "global") {
@@ -203,7 +204,8 @@ module.exports = async function(ws, data, send, vars, evars) {
 		[0, "night", null, "enable night mode", null], // client-side
 		[0, "day", null, "disable night mode", null], // client-side
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
-		[0, "whoami", null, "display your identity"]
+		[0, "whoami", null, "display your identity"],
+		[0, "test", null, "preview your appearance"]
 
 		// hidden by default
 		// "/search Phrase" (client) -> searches for Phrase within a 25 tile radius
@@ -635,6 +637,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 			} else if(mode == "off") {
 				ws.sdata.passiveCmd = false;
 			}
+		},
+		test: function() {
+			isTestMessage = true;
 		}
 	}
 
@@ -717,6 +722,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 			case "passive":
 				com.passive(commandArgs[1]);
 				return;
+			case "test":
+				com.test();
+				break;
 			default:
 				serverChatResponse("Invalid command: " + html_tag_esc(msg));
 		}
@@ -776,6 +784,11 @@ module.exports = async function(ws, data, send, vars, evars) {
 		clientId,
 		username: user.authenticated ? username_to_display.toUpperCase() : null
 	};
+
+	if(isTestMessage) {
+		websocketChatData.message = "This message is visible to only you.";
+		send(websocketChatData);
+	}
 
 	if(!isCommand) {
 		if(clientIpObj && location == "global") {

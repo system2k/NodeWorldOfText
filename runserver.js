@@ -2,7 +2,7 @@
 **  Our World of Text
 **  Est. May 1, 2016 as Your World of Text Node, and November 19, 2016 as Node World of Text
 **  Reprogrammed September 17, 2017
-**  Released October 10, 2017 as Our World of Text
+**  Released October 8, 2017 as Our World of Text
 **  This is the main file
 */
 
@@ -1965,6 +1965,35 @@ function plural(int, plEnding) {
 	return p;
 }
 
+function checkHTTPRestr(list, ipVal, ipFam) {
+	var resp = {
+		siteAccess: false,
+		siteAccessNote: null
+	};
+	if(!list) return resp;
+	for(var i = 0; i < list.length; i++) {
+		var item = list[i];
+
+		var ip = item.ip;
+		if(ip) {
+			var riRange = ip[0];
+			var riFam = ip[1];
+			if(riFam != ipFam) continue;
+			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
+		} else {
+			continue;
+		}
+
+		var type = item.type;
+		if(type == "daccess") {
+			var note = item.note;
+			resp.siteAccessNote = note;
+			resp.siteAccess = true;
+		}
+	}
+	return resp;
+}
+
 process.on("uncaughtException", function(e) {
 	try {
 		err = JSON.stringify(process_error_arg(e));
@@ -2200,6 +2229,19 @@ async function process_request(req, res, compCallbacks) {
 	var ipAddress = evalIp[0];
 	var ipAddressFam = evalIp[1];
 	var ipAddressVal = evalIp[2];
+
+	var restr = getRestrictions();
+	var deniedPages = checkHTTPRestr(restr, ipAddressVal, ipAddressFam);
+	if(deniedPages.siteAccess) {
+		var deny_notes = "None";
+		if(deniedPages.siteAccessNote) {
+			deny_notes = deniedPages.siteAccessNote;
+		}
+		res.writeHead(403);
+		return res.end(template_data["denied.html"]({
+			deny_notes
+		}));
+	}
 
 	var dispatch = createDispatcher(res, {
 		encoding: acceptEncoding,
