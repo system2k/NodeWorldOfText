@@ -676,27 +676,52 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 		message = "<span style=\"color: #789922\">&gt;" + message + "</span>";
 	}
 
-	emote_parse: if(chatEmotes) {
-		var emote_split = message.split(":");
-		if(emote_split.length < 3) break emote_parse;
-		var parsed = [];
-
-		for(var i = 0; i < (emote_split.length - 1); ++i) {
-			if(i % 2 == 0) { // isn't between two : chars
-				parsed.push(emote_split[i]);
-			} else if(emoteList.hasOwnProperty(emote_split[i])) { // good emote
-				var position = emoteList[emote_split[i]];
-				parsed.push("<div title=':" + emote_split[i]
-					+ ":' class='chat_emote' style='background-position-x:-" + position[0]
-					+ "px;width:" + position[1] + "px'></div>");
-			} else { // invalid emote
-				parsed.push(":" + emote_split[i] + ":");
+	// parse emoticons
+	if(chatEmotes) {
+		var emoteMessage = "";
+		var emoteBuffer = "";
+		var emoteMode = false;
+		var emoteCharset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+		// emotes are case sensitive
+		for(var i = 0; i < message.length; i++) {
+			var chr = message[i];
+			if(chr == ":") {
+				if(emoteBuffer == ":" && emoteMode) { // special case: two consecutive colons
+					emoteMessage += emoteBuffer;
+					continue;
+				}
+				emoteBuffer += chr;
+				if(emoteMode) {
+					var emoteName = emoteBuffer.slice(1, -1);
+					if(emoteList.hasOwnProperty(emoteName)) {
+						var position = emoteList[emoteName];
+						emoteMessage += "<div title=':" + emoteName
+							+ ":' class='chat_emote' style='background-position-x:-" + position[0]
+							+ "px;width:" + position[1] + "px'></div>";
+					} else {
+						emoteMessage += emoteBuffer;
+					}
+					emoteMode = false;
+					emoteBuffer = "";
+				} else {
+					emoteMode = true;
+				}
+			} else if(emoteMode) {
+				emoteBuffer += chr;
+				if(!emoteCharset.includes(chr)) {
+					emoteMode = false;
+					emoteMessage += emoteBuffer;
+					emoteBuffer = "";
+					continue;
+				}
+			} else {
+				emoteMessage += chr;
 			}
 		}
-
-		if (emote_split.length % 2 == 0) parsed.push(":")
-		parsed.push(emote_split[emote_split.length - 1])
-		message = parsed.join("");
+		if(emoteBuffer) { // leftovers
+			emoteMessage += emoteBuffer;
+		}
+		message = emoteMessage;
 	}
 
 	var msgDom = document.createElement("span");
