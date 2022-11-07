@@ -2109,6 +2109,10 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 			cUnder = cUnder || currDeco.under;
 			cStrike = cStrike || currDeco.strike;
 		}
+		if(char == " ") { // don't let spaces be bold/italic
+			cBold = false;
+			cItalic = false;
+		}
 		char = setCharTextDecorations(char, cBold, cItalic, cUnder, cStrike);
 	}
 
@@ -3966,9 +3970,18 @@ var lcsShardCharVectors = [
 	[[0,0],[2,0],[1,2],[0,0]],
 	[[2,0],[2,4],[1,2],[2,0]],
 	[[1,2],[2,4],[0,4],[1,2]],
-	// skip
+	// skip (lcs)
 	[[0,0],[2,4],[0,4],[2,0],[0,0]],
-	[[2,0],[2,4],[0,0],[0,4],[2,0]]
+	[[2,0],[2,4],[0,0],[0,4],[2,0]],
+	// box-drawing bold mode; four 90-deg, four iso
+	[[2,0],[2,4],[0,4],[2,0]], // 54
+	[[0,0],[2,4],[0,4],[0,0]],
+	[[0,0],[2,0],[0,4],[0,0]],
+	[[0,0],[2,0],[2,4],[0,0]],
+	[[1,0],[2,4],[0,4],[1,0]], // 58
+	[[0,0],[2,2],[0,4],[0,0]],
+	[[0,0],[2,0],[1,4],[0,0]],
+	[[2,0],[2,4],[0,2],[2,0]] 
 ];
 
 var lcsOctantCharPoints = [
@@ -3986,7 +3999,8 @@ var lcsOctantCharPoints = [
 	236, 237, 238, 239, 241, 242, 243, 244, 246, 247, 248, 249, 251, 253, 254
 ];
 
-function fillBlockChar(charCode, textRender, x, y) {
+function fillBlockChar(charCode, textRender, x, y, flags) {
+	var isBold = flags ? flags & 1 : 0;
 	if((charCode & 0x1FB00) != 0x1FB00 && (charCode & 0x2500) != 0x2500 && !(charCode >= 0x1CD00 && charCode <= 0x1FBE7)) return false; // symbols for legacy computing
 	var transform = [0, 1]; // (left, right, up, down = 0, 1, 2, 3), percentage
 	switch(charCode) { // 1/8 blocks
@@ -4020,14 +4034,22 @@ function fillBlockChar(charCode, textRender, x, y) {
 		case 0x1FB8A: transform = [1, 6/8]; break;
 		case 0x1FB8B: transform = [1, 7/8]; break;
 		default:
-			if(charCode >= 0x2596 && charCode <= 0x259F) { // 2x2 blocks
+			var is2by2 = charCode >= 0x2596 && charCode <= 0x259F;
+			var is2by3 = charCode >= 0x1FB00 && charCode <= 0x1FB3B;
+			var is2by4 = charCode >= 0x1CD00 && charCode <= 0x1FBE7;
+			var is90degTri = charCode >= 0x25E2 && charCode <= 0x25E5;
+			var isIsoTri = charCode == 0x25B2 || charCode == 0x25BA || charCode == 0x25BC || charCode == 0x25C4;
+			var isTriangleShard = (charCode >= 0x1FB3C && charCode <= 0x1FB6F) ||
+									(charCode >= 0x1FB9A && charCode <= 0x1FB9B) ||
+									isBold && (is90degTri || isIsoTri);
+			if(is2by2) { // 2x2 blocks
 				var pattern = [2, 1, 8, 11, 9, 14, 13, 4, 6, 7][charCode - 0x2596];
 				if(pattern & 8) textRender.fillRect(x, y, cellW / 2, cellH / 2);
 				if(pattern & 4) textRender.fillRect(x + cellW / 2, y, cellW / 2, cellH / 2);
 				if(pattern & 2) textRender.fillRect(x, y + cellH / 2, cellW / 2, cellH / 2);
 				if(pattern & 1) textRender.fillRect(x + cellW / 2, y + cellH / 2, cellW / 2, cellH / 2);
 				return true;
-			} else if(charCode >= 0x1FB00 && charCode <= 0x1FB3B) { // 2x3 blocks
+			} else if(is2by3) { // 2x3 blocks
 				var code = 0;
 				if(charCode >= 0x1FB00 && charCode <= 0x1FB13) code = charCode - 0x1FB00 + 1;
 				if(charCode >= 0x1FB14 && charCode <= 0x1FB27) code = charCode - 0x1FB00 + 2;
@@ -4037,10 +4059,19 @@ function fillBlockChar(charCode, textRender, x, y) {
 					textRender.fillRect(x + (cellW / 2) * (i & 1), y + (cellH / 3) * (i >> 1), cellW / 2, cellH / 3);
 				}
 				return true;
-			} else if((charCode >= 0x1FB3C && charCode <= 0x1FB6F) || (charCode >= 0x1FB9A && charCode <= 0x1FB9B)) { // LCS shard characters
+			} else if(isTriangleShard) { // LCS shard characters
 				var vecIndex = charCode - 0x1FB3C;
 				if(charCode >= 0x1FB9A && charCode <= 0x1FB9B) {
 					vecIndex -= 42;
+				} else if(is90degTri) {
+					vecIndex = (charCode - 0x25E2) + 54;
+				} else if(isIsoTri) {
+					switch(charCode) {
+						case 0x25B2: vecIndex = 58; break;
+						case 0x25BA: vecIndex = 59; break;
+						case 0x25BC: vecIndex = 60; break;
+						case 0x25C4: vecIndex = 61; break;
+					}
 				}
 				var vecs = lcsShardCharVectors[vecIndex];
 				var gpX = [0, cellW / 2, cellW];
@@ -4059,7 +4090,7 @@ function fillBlockChar(charCode, textRender, x, y) {
 				textRender.closePath();
 				textRender.fill();
 				return true;
-			} else if(charCode >= 0x1CD00 && charCode <= 0x1FBE7) { // 2x4 LCS octant characters
+			} else if(is2by4) { // 2x4 LCS octant characters
 				var code = 0;
 				if(charCode >= 0x1CD00 && charCode <= 0x1CDE5) {
 					code = lcsOctantCharPoints[charCode - 0x1CD00];
@@ -4246,11 +4277,13 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 		}
 	}
 
+	var fillBlockFlags = 0;
 	var isSpecial = false;
 	var checkIdx = 1;
 	if(char.codePointAt(0) > 65535) checkIdx = 2;
 	isSpecial = char.codePointAt(checkIdx) != void 0;
 	isSpecial = isSpecial || (cCode >= 0x2500 && cCode <= 0x257F);
+	if(deco && deco.bold) fillBlockFlags |= 1;
 
 	if(brBlockFill && (cCode & 0x2800) == 0x2800) { // render braille chars as rectangles
 		var dimX = cellW / 2;
@@ -4259,7 +4292,7 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 			if((cCode & brOrder[b]) == 0) continue;
 			textRender.fillRect(fontX + (b % 2) * dimX, fontY + ((b / 2) | 0) * dimY, dimX, dimY);
 		}
-	} else if(ansiBlockFill && fillBlockChar(cCode, textRender, fontX, fontY)) {
+	} else if(ansiBlockFill && fillBlockChar(cCode, textRender, fontX, fontY, fillBlockFlags)) {
 		return;
 	} else { // character rendering
 		var tempFont = null;
