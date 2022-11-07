@@ -168,12 +168,17 @@ function procRest(list) {
 		} else if(itemtype == "daccess") {
 			var mode = props.mode;
 			var note = props.note;
+			var world = props.world;
 			if(mode != "httpwrite" && mode != "site") continue;
 			if(typeof note != "string" || !note) note = null;
+			if(!("world" in props)) {
+				world = null;
+			}
 			obj = {
 				type: "daccess",
 				mode,
-				note
+				note,
+				world
 			};
 		}
 		if(obj) {
@@ -245,10 +250,14 @@ function procRest(list) {
 		} else if(type == "daccess") {
 			var mode = restr.mode;
 			var note = restr.note;
+			var world = restr.world;
 			var rstrLine = [identifier, "type=daccess"];
 			rstrLine.push("mode=" + mode);
 			if(note) {
 				rstrLine.push("note=" + note);
+			}
+			if(world != null) {
+				rstrLine.push("world=" + world);
 			}
 			rstr += rstrLine.join(";") + "\n";
 		}

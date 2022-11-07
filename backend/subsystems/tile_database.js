@@ -876,8 +876,12 @@ async function flushBulkWriteQueue() {
 			var sql = command[0];
 			var params = command[1];
 			var callback = command[2];
-			var resp = await db.run(sql, params);
-			if(callback) callback(resp);
+			try {
+				var resp = await db.run(sql, params);
+				if(callback) callback(resp);
+			} catch(e) {
+				handle_error(e, true);
+			}
 		}
 	} catch(e) {
 		handle_error(e, true);
@@ -1699,6 +1703,9 @@ module.exports.write = function(call_id, type, data) {
 			break;
 	}
 }
+
+// specifically for the worlds subsystem as it shares the same database as the tiles
+module.exports.bulkWriteEdits = bulkWriteEdits;
 
 module.exports.reserveCallId = function(id) {
 	if(!cids[id]) cids[id] = [null, null, null, 0, 0];

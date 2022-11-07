@@ -153,6 +153,34 @@ function checkColorRestr(list, ipVal, ipFam, isGrouped, world, tileX, tileY) {
 	return false;
 }
 
+function checkHTTPWriteRestr(list, ipVal, ipFam, isGrouped, world) {
+	if(!list) return false;
+	for(var i = 0; i < list.length; i++) {
+		var item = list[i];
+
+		var ip = item.ip;
+		var group = item.group;
+		if(ip) {
+			var riRange = ip[0];
+			var riFam = ip[1];
+			if(riFam != ipFam) continue;
+			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
+		} else if(group) {
+			if(!(group == "cg1" && isGrouped)) continue;
+		}
+
+		var type = item.type;
+		var mode = item.mode;
+		if(type == "daccess" && mode == "httpwrite") {
+			var rWorld = item.world;
+			if(rWorld == null || rWorld.toUpperCase() == world.toUpperCase()) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 function setHold(id, tileX, tileY) {
 	if(!tileHolds[id]) tileHolds[id] = {
 		count: 0,
@@ -223,6 +251,7 @@ module.exports = {
 	checkCharrateRestr,
 	checkLinkrateRestr,
 	checkColorRestr,
+	checkHTTPWriteRestr,
 	setHold,
 	releaseHold,
 	clearHolds

@@ -1985,7 +1985,8 @@ function checkHTTPRestr(list, ipVal, ipFam) {
 		}
 
 		var type = item.type;
-		if(type == "daccess") {
+		var mode = item.mode;
+		if(type == "daccess" && mode == "site") {
 			var note = item.note;
 			resp.siteAccessNote = note;
 			resp.siteAccess = true;

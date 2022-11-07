@@ -208,6 +208,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	}
 
 	evars.world = world;
+	evars.isHTTP = true;
 
 	var edits_parsed;
 	try {

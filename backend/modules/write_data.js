@@ -9,6 +9,7 @@ module.exports = async function(data, vars, evars) {
 	var channel = evars.channel;
 	var world = evars.world;
 	
+	var isHTTP = evars.isHTTP;
 	var ipAddress;
 	var ipAddressVal;
 	var ipAddressFam;
@@ -100,6 +101,8 @@ module.exports = async function(data, vars, evars) {
 		}
 	}
 
+	var httpWriteDenied = isHTTP && rate_limiter.checkHTTPWriteRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name);
+
 	var totalEdits = 0;
 	var tiles = {};
 	var tileCount = 0;
@@ -132,6 +135,10 @@ module.exports = async function(data, vars, evars) {
 				if(charsPerPeriod == 0) rejected[editID] = 4;
 				continue;
 			}
+		}
+		if(isHTTP && httpWriteDenied) {
+			rejected[editID] = 4;
+			continue;
 		}
 		if(!tiles[tileStr]) {
 			if(!rate_limiter.checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world_id)) {
