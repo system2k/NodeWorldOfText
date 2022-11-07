@@ -575,11 +575,11 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 
 	var tagDom;
 	var nickTitle = [];
-	var nickHasSpecialChars = false;
+	var usernameHasSpecialChars = false;
 
-	for(var i = 0; i < nickname.length; i++) {
-		if(nickname.charCodeAt(i) > 256) {
-			nickHasSpecialChars = true;
+	for(var i = 0; i < realUsername.length; i++) {
+		if(realUsername.charCodeAt(i) > 256) {
+			usernameHasSpecialChars = true;
 			break;
 		}
 	}
@@ -621,7 +621,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 
 	if(type == "user") {
 		nickDom.style.color = color;
-		if(!nickHasSpecialChars) {
+		if(!usernameHasSpecialChars) {
 			nickDom.style.fontWeight = "bold";
 		}
 		nickDom.style.pointerEvents = "default";
@@ -635,12 +635,12 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 	}
 	if(type == "user_nick") {
 		nickDom.style.color = color;
-		nickTitle.push("Username \"" + realUsername + "\"");
+		var impersonationWarning = "";
+		if(usernameHasSpecialChars) {
+			impersonationWarning = " (Special chars; Potential impersonator)";
+		}
+		nickTitle.push("Username \"" + realUsername + "\"" + impersonationWarning);
 		if(state.userModel.is_operator) idTag = "[*" + id + "]";
-	}
-
-	if(nickHasSpecialChars) {
-		nickTitle.push("Special chars");
 	}
 
 	if(state.userModel.is_operator) {
