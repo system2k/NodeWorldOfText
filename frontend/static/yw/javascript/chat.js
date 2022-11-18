@@ -66,7 +66,7 @@ function api_chat_send(message, opts) {
 	if(!message) return;
 	if(!opts) opts = {};
 	var exclude_commands = opts.exclude_commands;
-	var nick = opts.nick || YourWorld.Nickname;
+	var nick = opts.nick || YourWorld.Nickname || state.userModel.username;
 	var location = opts.location ? opts.location : (selectedChatTab == 0 ? "page" : "global");
 
 	var msgLim = state.userModel.is_staff ? 3030 : 400;
@@ -84,7 +84,7 @@ function api_chat_send(message, opts) {
 	var chatColor;
 	if(!opts.color) {
 		if(!YourWorld.Color) {
-			chatColor = assignColor(YourWorld.Nickname);
+			chatColor = assignColor(nick);
 		} else {
 			chatColor = "#" + ("00000" + YourWorld.Color.toString(16)).slice(-6);
 		}

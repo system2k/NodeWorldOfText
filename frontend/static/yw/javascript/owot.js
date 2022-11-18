@@ -1261,6 +1261,7 @@ function getChar(tileX, tileY, charX, charY) {
 	var content = tile.content;
 	var char = content[charY * tileC + charX];
 	char = clearCharTextDecorations(char);
+	char = resolveCharEmojiCombinations(char);
 	return char;
 }
 
@@ -2099,6 +2100,8 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 
 	if(!isErase) {
 		currDeco = getCharTextDecorations(char);
+		char = clearCharTextDecorations(char);
+		char = detectCharEmojiCombinations(char) || char;
 		var cBold = textDecorationModes.bold;
 		var cItalic = textDecorationModes.italic;
 		var cUnder = textDecorationModes.under;
@@ -2489,6 +2492,20 @@ function textcode_parser(value, coords, defaultColor) {
 				} else {
 					chr = hCode;
 				}
+			}
+		} else if(chr.codePointAt(0) >= 0x1F1E6 && chr.codePointAt(0) <= 0x1F1FF) { // flag emojis
+			var f1 = String.fromCodePoint(chr.codePointAt(0));
+			index++;
+			while(true) { // TODO: refactor
+				if(index >= value.length) break;
+				var f2 = value[index];
+				if(!(f2.codePointAt(0) >= 0x1F1E6 && f2.codePointAt(0) <= 0x1F1FF)) {
+					index--;
+					break;
+				}
+				chr = f1 + String.fromCharCode(0x1DC0 + (f2.codePointAt(0) - 0x1F1E6)); // custom combining-char format
+				index++;
+				break;
 			}
 		} else {
 			index++;
@@ -4164,6 +4181,33 @@ function setCharTextDecorations(char, bold, italic, under, strike) {
 	return char + String.fromCharCode(textDecorationOffset + bitMap);
 }
 
+function resolveCharEmojiCombinations(char) {
+	// for now, we only support flag emojis.
+	// we use regular combining characters to simplify everything.
+	if(!(char.codePointAt(0) >= 0x1F1E6 && char.codePointAt(0) <= 0x1F1FF)) {
+		return char;
+	}
+	if(char.length < 3) {
+		return char;
+	}
+	var code = char.charCodeAt(2);
+	if(code >= 0x1DC0 && code <= 0x1DD9) {
+		return String.fromCodePoint(char.codePointAt(0)) + String.fromCodePoint((code - 0x1DC0) + 0x1F1E6);
+	} else {
+		return char;
+	}
+}
+
+function detectCharEmojiCombinations(char) {
+	// convert an emoji combining sequence into a format using regular combining characters
+	if(char.length != 4) return false;
+	var c1 = char.codePointAt(0);
+	var c2 = char.codePointAt(2);
+	if(!(c1 >= 0x1F1E6 && c1 <= 0x1F1FF)) return false;
+	if(!(c2 >= 0x1F1E6 && c2 <= 0x1F1FF)) return false;
+	return String.fromCodePoint(c1) + String.fromCharCode((c2 - 0x1F1E6) + 0x1DC0);
+}
+
 // trim off all text decoration modifiers at the end
 function clearCharTextDecorations(char) {
 	var len = char.length;
@@ -4198,6 +4242,7 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 		deco = getCharTextDecorations(char);
 	}
 	char = clearCharTextDecorations(char);
+	char = resolveCharEmojiCombinations(char);
 
 	var cCode = char.codePointAt(0);
 	if(charOverflowMode) {
