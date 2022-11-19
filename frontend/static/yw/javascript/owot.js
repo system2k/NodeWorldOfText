@@ -479,21 +479,23 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 	var tileY = coordA[1];
 	var charX = coordA[2];
 	var charY = coordA[3];
-	var reg = "";
+	var reg = [];
 	var colors = [];
 	var links = [];
 	var protections = [];
 	var decorations = [];
 	for(var y = 0; y < regHeight; y++) {
-		if(y != 0) {
-			reg += "\n";
-		}
+		var r_reg = [];
+		var r_colors = [];
+		var r_links = [];
+		var r_protections = [];
+		var r_decorations = [];
 		for(var x = 0; x < regWidth; x++) {
 			var charInfo = getCharInfo(tileX, tileY, charX, charY);
 			var char = charInfo.char;
 			char = char.replace(/\r|\n|\x1b/g, " ");
-			reg += char;
-			colors.push(charInfo.color);
+			r_reg.push(char);
+			r_colors.push(charInfo.color);
 			var tile = Tile.get(tileX, tileY);
 			var containsLink = false;
 			if(tile && tile.properties && tile.properties.cell_props) {
@@ -503,24 +505,29 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 						link = link.link;
 						containsLink = true;
 						if(link.type == "url") {
-							links.push("$u" + "\"" + escapeQuote(link.url) + "\"");
+							r_links.push("$u" + "\"" + escapeQuote(link.url) + "\"");
 						} else if(link.type == "coord") {
-							links.push("$c" + "[" + link.link_tileX + "," + link.link_tileY + "]");
+							r_links.push("$c" + "[" + link.link_tileX + "," + link.link_tileY + "]");
 						}
 					}
 				}
 			}
-			protections.push(charInfo.protection);
+			r_protections.push(charInfo.protection);
 			if(!containsLink) {
-				links.push(null);
+				r_links.push(null);
 			}
-			decorations.push(charInfo.decoration);
+			r_decorations.push(charInfo.decoration);
 			charX++;
 			if(charX >= tileC) {
 				charX = 0;
 				tileX++;
 			}
 		}
+		reg.push(r_reg);
+		colors.push(r_colors);
+		links.push(r_links);
+		protections.push(r_protections);
+		decorations.push(r_decorations);
 		tileX = coordA[0];
 		charX = coordA[2];
 		charY++;
@@ -2067,7 +2074,10 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 	}
 	var tile = Tile.get(tileX, tileY);
 	var isErase = char == "\x08";
-	if(isErase) char = " ";
+	if(isErase) {
+		char = " ";
+		charColor = 0x000000;
+	}
 	
 	var cell_props = tile.properties.cell_props;
 	if(!cell_props) cell_props = {};
@@ -2500,10 +2510,13 @@ function textcode_parser(value, coords, defaultColor) {
 				if(index >= value.length) break;
 				var f2 = value[index];
 				if(!(f2.codePointAt(0) >= 0x1F1E6 && f2.codePointAt(0) <= 0x1F1FF)) {
-					index--;
+					//index--;
 					break;
 				}
-				chr = f1 + String.fromCharCode(0x1DC0 + (f2.codePointAt(0) - 0x1F1E6)); // custom combining-char format
+				var alpha1 = chr.codePointAt(0) - 0x1F1E6;
+				var alpha2 = f2.codePointAt(0) - 0x1F1E6;
+				var residue = f2.slice(2); // combining characters / formatting
+				chr = String.fromCodePoint(0xFF000 + (alpha1 * 26) + alpha2) + residue; // private use area
 				index++;
 				break;
 			}
@@ -4183,19 +4196,16 @@ function setCharTextDecorations(char, bold, italic, under, strike) {
 
 function resolveCharEmojiCombinations(char) {
 	// for now, we only support flag emojis.
-	// we use regular combining characters to simplify everything.
-	if(!(char.codePointAt(0) >= 0x1F1E6 && char.codePointAt(0) <= 0x1F1FF)) {
+	// the private use area is used to hold the values for the flags until
+	// its converted to the double-letter code
+	var code = char.codePointAt(0);
+	if(!(code >= 0xFF000 && char.codePointAt(0) <= 0xFF2A3)) {
 		return char;
 	}
-	if(char.length < 3) {
-		return char;
-	}
-	var code = char.charCodeAt(2);
-	if(code >= 0x1DC0 && code <= 0x1DD9) {
-		return String.fromCodePoint(char.codePointAt(0)) + String.fromCodePoint((code - 0x1DC0) + 0x1F1E6);
-	} else {
-		return char;
-	}
+	code -= 0xFF000;
+	var a1 = Math.floor(code / 26);
+	var a2 = code % 26;
+	return String.fromCodePoint(0x1F1E6 + a1) + String.fromCodePoint(0x1F1E6 + a2);
 }
 
 function detectCharEmojiCombinations(char) {
@@ -4205,7 +4215,9 @@ function detectCharEmojiCombinations(char) {
 	var c2 = char.codePointAt(2);
 	if(!(c1 >= 0x1F1E6 && c1 <= 0x1F1FF)) return false;
 	if(!(c2 >= 0x1F1E6 && c2 <= 0x1F1FF)) return false;
-	return String.fromCodePoint(c1) + String.fromCharCode((c2 - 0x1F1E6) + 0x1DC0);
+	var alpha1 = c1.codePointAt(0) - 0x1F1E6;
+	var alpha2 = c2.codePointAt(0) - 0x1F1E6;
+	return String.fromCodePoint(0xFF000 + (alpha1 * 26) + alpha2); // private use area
 }
 
 // trim off all text decoration modifiers at the end
@@ -6275,33 +6287,28 @@ function makeSelectionModal() {
 		var o_rlnbrk = r_br.cbElm.checked;
 		var o_rsurrog = r_surr.cbElm.checked;
 		var o_rcomb = r_comb.cbElm.checked;
-		var text = s_str.split("\n");
+		var text = s_str;
 		var currentCol = -1;
+		var resText = [];
 		for(var y = 0; y < text.length; y++) {
-			text[y] = w.split(text[y], o_rsurrog, o_rcomb);
-			var colRow;
-			var linkRow;
-			var protRow;
-			var decoRow;
-			// TODO: simplify and clean up
-			if(o_color) colRow = s_colors.slice(y * text[y].length, y * text[y].length + text[y].length);
-			if(o_link) linkRow = s_links.slice(y * text[y].length, y * text[y].length + text[y].length);
-			if(o_prot) protRow = s_prots.slice(y * text[y].length, y * text[y].length + text[y].length);
-			if(o_deco) decoRow = s_decos.slice(y * text[y].length, y * text[y].length + text[y].length)
-			if(o_tleft || o_tright || o_rgap) spaceTrim(text[y], o_tleft, o_tright, o_rgap, [colRow, linkRow, protRow]);
-			var line = text[y];
+			var textRow = text[y].slice(0);
+			var colRow = o_color && s_colors[y].slice(0);
+			var linkRow = o_link && s_links[y].slice(0);
+			var protRow = o_prot && s_prots[y].slice(0);
+			var decoRow = o_deco && s_decos[y].slice(0);
+			if(o_tleft || o_tright || o_rgap) spaceTrim(textRow, o_tleft, o_tright, o_rgap, [colRow, linkRow, protRow, decoRow]);
 			if(o_deco) {
-				for(var x = 0; x < line.length; x++) {
-					var chr = line[x];
+				for(var x = 0; x < textRow.length; x++) {
+					var chr = textRow[x];
 					var deco = decoRow[x];
 					if(deco) {
 						chr = setCharTextDecorations(chr, deco.bold, deco.italic, deco.under, deco.strike);
-						line[x] = chr;
+						textRow[x] = chr;
 					}
 				}
 			}
 			if(o_color) {
-				for(var x = 0; x < line.length; x++) {
+				for(var x = 0; x < textRow.length; x++) {
 					var col = colRow[x];
 					if(col == currentCol) continue;
 					currentCol = col;
@@ -6311,39 +6318,35 @@ function makeSelectionModal() {
 					} else {
 						chr += "F" + col.toString(16).padStart(6, 0);
 					}
-					line[x] = chr + line[x];
+					textRow[x] = chr + textRow[x];
 				}
 			}
 			if(o_link) {
-				for(var x = 0; x < line.length; x++) {
+				for(var x = 0; x < textRow.length; x++) {
 					var link = linkRow[x];
 					if(!link) continue;
-					line[x] = "\x1b" + link + line[x];
+					textRow[x] = "\x1b" + link + textRow[x];
 				}
 			}
 			if(o_prot) {
-				for(var x = 0; x < line.length; x++) {
+				for(var x = 0; x < textRow.length; x++) {
 					var prot = protRow[x];
 					if(prot == 0 && !o_protpub) continue;
-					line[x] = "\x1b" + "P" + prot + line[x]; // prot should be one character in length
+					textRow[x] = "\x1b" + "P" + prot + textRow[x]; // prot should be one character in length
 				}
 			}
-			text[y] = text[y].join("");
-		}
-		if(o_tempty) {
-			for(var y = 0; y < text.length; y++) {
-				if(!text[y]) {
-					text.splice(y, 1);
-					y--;
-				}
+			textRow = textRow.join("");
+			if(o_tempty && !textRow.length) {
+				continue;
 			}
+			resText.push(textRow);
 		}
 		if(!o_rlnbrk) {
-			text = text.join("\n");
+			resText = resText.join("\n");
 		} else {
-			text = text.join("");
+			resText = resText.join("");
 		}
-		region_text.value = text;
+		region_text.value = resText;
 	}
 
 	var s_str;
