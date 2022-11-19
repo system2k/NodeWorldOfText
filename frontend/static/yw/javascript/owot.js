@@ -2504,7 +2504,6 @@ function textcode_parser(value, coords, defaultColor) {
 				}
 			}
 		} else if(chr.codePointAt(0) >= 0x1F1E6 && chr.codePointAt(0) <= 0x1F1FF) { // flag emojis
-			var f1 = String.fromCodePoint(chr.codePointAt(0));
 			index++;
 			while(true) { // TODO: refactor
 				if(index >= value.length) break;
@@ -4215,8 +4214,8 @@ function detectCharEmojiCombinations(char) {
 	var c2 = char.codePointAt(2);
 	if(!(c1 >= 0x1F1E6 && c1 <= 0x1F1FF)) return false;
 	if(!(c2 >= 0x1F1E6 && c2 <= 0x1F1FF)) return false;
-	var alpha1 = c1.codePointAt(0) - 0x1F1E6;
-	var alpha2 = c2.codePointAt(0) - 0x1F1E6;
+	var alpha1 = c1 - 0x1F1E6;
+	var alpha2 = c2 - 0x1F1E6;
 	return String.fromCodePoint(0xFF000 + (alpha1 * 26) + alpha2); // private use area
 }
 
