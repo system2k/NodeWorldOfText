@@ -681,6 +681,38 @@ function advancedSplit(str, noSurrog, noComb, norm) {
 	return chars;
 }
 
+function filterAdvancedChars(array, noSurrogates, noCombining) {
+	if(!noSurrogates && !noCombining) {
+		return array;
+	}
+	for(var i = 0; i < array.length; i++) {
+		var char = array[i];
+		var combSize = 0;
+		for(var x = 0; x < char.length; x++) {
+			var subchar = char[char.length - 1 - x];
+			var scode = subchar.charCodeAt();
+			if(((scode >= 0x0300 && scode <= 0x036F) ||
+			  (scode >= 0x1DC0 && scode <= 0x1DFF) ||
+			  (scode >= 0x20D0 && scode <= 0x20FF) ||
+			  (scode >= 0xFE20 && scode <= 0xFE2F))) {
+				combSize++;
+			} else {
+				break;
+			}
+		}
+		var baseChar = char.slice(0, char.length - combSize);
+		var combChar = char.slice(char.length - combSize, char.length);
+		if(noSurrogates && baseChar.length > 1) {
+			baseChar = "?";
+		}
+		if(noCombining) {
+			combChar = "";
+		}
+		array[i] = baseChar + combChar;
+	}
+	return array;
+}
+
 var w = {
 	loadScript: function(url, callback) {
 		var script = document.createElement("script");

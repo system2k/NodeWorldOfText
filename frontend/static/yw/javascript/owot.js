@@ -6291,6 +6291,7 @@ function makeSelectionModal() {
 		var resText = [];
 		for(var y = 0; y < text.length; y++) {
 			var textRow = text[y].slice(0);
+			filterAdvancedChars(textRow, o_rsurrog, o_rcomb);
 			var colRow = o_color && s_colors[y].slice(0);
 			var linkRow = o_link && s_links[y].slice(0);
 			var protRow = o_prot && s_prots[y].slice(0);
