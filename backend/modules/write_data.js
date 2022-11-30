@@ -267,6 +267,13 @@ module.exports = async function(data, vars, evars) {
 				}
 				if(!newColor) newColor = 0;
 
+				if(newBgColor !== null) {
+					if(newBgColor === void 0) newBgColor = -1;
+					newBgColor = san_nbr(newBgColor);
+					if(newBgColor < -1) newBgColor = -1;
+					if(newBgColor > 16777215) newBgColor = 16777215;
+				}
+
 				var newAr = [editIncome[0], editIncome[1],
 							newY, newX,
 							editIncome[4], newChar, editIncome[6], newColor, newBgColor];

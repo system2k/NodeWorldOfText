@@ -6277,9 +6277,8 @@ document.onselectstart = function(e) {
 	return Modal.isOpen;
 }
 
-w._state = w.state; // deprecated
-
 function disableBgColorPicker() {
+	// a crude method of "clearing"/"disabling" the color picker
 	if(!colorInputBg.jscolor.refine) return;
 	colorInputBg.jscolor.fromRGB(255, 255, 255);
 	colorInputBg.value = "[ None ]";
@@ -6700,6 +6699,7 @@ var ws_functions = {
 			}
 			var newContent;
 			var newColors;
+			var newBgColors;
 			// get content and colors from new tile data
 			if(data.tiles[tileKey]) {
 				newContent = w.splitTile(data.tiles[tileKey].content);
@@ -6708,6 +6708,7 @@ var ws_functions = {
 				} else {
 					newColors = new Array(tileArea).fill(0);
 				}
+				newBgColors = data.tiles[tileKey].properties.bgcolor;
 			} else {
 				newContent = new Array(tileArea).fill(" ");
 			}
@@ -6724,13 +6725,14 @@ var ws_functions = {
 				var oCol = oldColors[g];
 				var nCol = newColors[g];
 				var oBgCol = oldBgColors ? oldBgColors[g] : -1;
-				var nBgCol = oldBgColors ? oldBgColors[g] : -1;
+				var nBgCol = newBgColors ? newBgColors[g] : -1;
 				if(oChar != nChar || oCol != nCol || oBgCol != nBgCol) {
 					// don't overwrite local changes until those changes are confirmed
 					if(!searchTellEdit(tileX, tileY, charX, charY)) {
 						oldContent[g] = nChar;
 						oldColors[g] = nCol;
-						if(oldBgColors) oldBgColors[g] = nBgCol;
+						if(!oldBgColors) oldBgColors = new Array(tileArea).fill(-1);
+						oldBgColors[g] = nBgCol;
 					}
 					// briefly highlight these changes (10 at a time)
 					if(useHighlight && Tile.visible(tileX, tileY)) {

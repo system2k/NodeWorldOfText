@@ -84,7 +84,20 @@ async function fetchNext() {
 		var y2 = range[3];
 		var area = (y2 - y1 + 1) * (x2 - x1 + 1);
 
-		var data = await db.all("SELECT * FROM tile WHERE world_id=? AND tileY >= ? AND tileX >= ? AND tileY <= ? AND tileX <= ?", [worldID, y1, x1, y2, x2]);
+		// ~~/~~/~~/~~/ !SECURITY ADVISORY! ~~/~~/~~/~~/
+		// We are going to be performing string-building (oh no!) which carries
+		// a risk of SQL injection if not properly done. In our case, this
+		// should not be a remote possibility.
+		var qParam = [worldID, x1, x2];
+		var height = y2 - y1 + 1;
+		var y_stmt = "";
+		for(var i = 0; i < height; i++) {
+			if(i != 0) y_stmt += ",";
+			y_stmt += "?";
+			qParam.push(y1 + i);
+		}
+		var qStr = "SELECT * FROM tile WHERE world_id=? AND tileX >= ? AND tileX <= ? AND tileY IN" + "(" + y_stmt + ")";
+		var data = await db.all(qStr, qParam);
 
 		ipQueue.tilesInPeriod -= area;
 
