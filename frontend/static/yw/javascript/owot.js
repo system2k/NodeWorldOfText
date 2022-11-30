@@ -1336,7 +1336,7 @@ function getCharBgColor(tileX, tileY, charX, charY) {
 		charY = cursorCoords[3];
 	}
 	var tile = Tile.get(tileX, tileY);
-	if(!tile) return 0;
+	if(!tile) return -1;
 	if(!tile.properties.bgcolor) return -1;
 	return tile.properties.bgcolor[charY * tileC + charX];
 }
@@ -1904,9 +1904,14 @@ function renderCursor(coords) {
 		return false;
 	}
 
+	// remove cursor (visually) from previous tile
 	if(cursorCoords) {
+		var hasBgColor = getCharBgColor() != -1;
 		cursorCoords = null;
 		w.setTileRender(tileX, tileY);
+		if(hasBgColor) {
+			w.setTileRedraw(tileX, tileY);
+		}
 	} else {
 		w.emit("cursorShow", {
 			tileX: coords[0],
@@ -1915,9 +1920,15 @@ function renderCursor(coords) {
 			charY: coords[3]
 		});
 	}
+
+	// render cursor in new tile
 	cursorCoords = coords.slice(0);
-	cursorCoordsCurrent = coords.slice(0);
+	cursorCoordsCurrent = coords.slice(0); // redundant
 	w.setTileRender(coords[0], coords[1]);
+	// force redraw if the cursor is touching a background-colored cell
+	if(getCharBgColor() != -1) {
+		w.setTileRedraw(coords[0], coords[1]);
+	}
 
 	var pixelX = (coords[0] * tileW) + (coords[2] * cellW) + positionX + Math.trunc(owotWidth / 2);
 	var pixelY = (coords[1] * tileH) + (coords[3] * cellH) + positionY + Math.trunc(owotHeight / 2);
@@ -1963,8 +1974,12 @@ function removeCursor() {
 		charX: cursorCoords[2],
 		charY: cursorCoords[3]
 	};
+	var hasBgColor = getCharBgColor() != -1
 	cursorCoords = null;
 	w.setTileRender(remTileX, remTileY);
+	if(hasBgColor) {
+		w.setTileRedraw(remTileX, remTileY);
+	}
 	w.emit("cursorHide", cursorPos);
 }
 
@@ -4330,7 +4345,7 @@ function clearCharTextDecorations(char) {
 	return char;
 }
 
-function renderChar(textRender, x, y, str, tile, writability, props, offsetX, offsetY, charOverflowMode) {
+function renderChar(textRender, x, y, str, tile, writability, props, offsetX, offsetY, charOverflowMode, containsCursor) {
 	var content = tile.content;
 	var colors = tile.properties.color;
 	var bgcolors = tile.properties.bgcolor;
@@ -4359,13 +4374,6 @@ function renderChar(textRender, x, y, str, tile, writability, props, offsetX, of
 	}
 
 	// fill background if defined
-	if(bgcolors && colorsEnabled) {
-		var bgColor = bgcolors[y * tileC + x];
-		if(bgColor != -1) {
-			textRender.fillStyle = `rgb(${bgColor >> 16 & 255},${bgColor >> 8 & 255},${bgColor & 255})`;
-			textRender.fillRect(fontX, fontY, cellW, cellH);
-		}
-	}
 	if(coloredChars[str] && coloredChars[str][y] && coloredChars[str][y][x]) {
 		var color = coloredChars[str][y][x];
 		if(Array.isArray(color)) {
@@ -4374,6 +4382,12 @@ function renderChar(textRender, x, y, str, tile, writability, props, offsetX, of
 		color = colorClasses[color];
 		textRender.fillStyle = color;
 		textRender.fillRect(fontX, fontY, cellW, cellH);
+	} else if(bgcolors && colorsEnabled && !containsCursor) {
+		var bgColor = bgcolors[y * tileC + x];
+		if(bgColor != -1) {
+			textRender.fillStyle = `rgb(${bgColor >> 16 & 255},${bgColor >> 8 & 255},${bgColor & 255})`;
+			textRender.fillRect(fontX, fontY, cellW, cellH);
+		}
 	}
 
 	var color = colors ? colors[y * tileC + x] : 0;
@@ -4663,6 +4677,7 @@ function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY, bounds, ch
 	if(!tile) return;
 	var props = tile.properties.cell_props || {};
 	var writability = tile.writability;
+	var containsCursor = cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY;
 	if(priorityOverwriteChar && tile.properties.char) { // TODO: doesn't work right
 		for(var lev = 0; lev < 3; lev++) {
 			for(var c = 0; c < tileArea; c++) {
@@ -4673,7 +4688,8 @@ function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY, bounds, ch
 				var cX = c % tileC;
 				var cY = Math.floor(c / tileC);
 				textRenderCtx.clearRect(cX * cellW, cY * cellH, cellW, cellH);
-				renderChar(textRenderCtx, cX, cY, str, tile, code, props, offsetX, offsetY);
+				var charContainsCursor = containsCursor && cursorCoords[2] == cX && cursorCoords[3] == cY;
+				renderChar(textRenderCtx, cX, cY, str, tile, code, props, offsetX, offsetY, false, charContainsCursor);
 			}
 		}
 	} else {
@@ -4695,7 +4711,8 @@ function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY, bounds, ch
 				}
 				if(protValue == null) protValue = tile.properties.writability;
 				if(protValue == null) protValue = state.worldModel.writability;
-				renderChar(textRenderCtx, x, y, str, tile, protValue, props, offsetX, offsetY, charOverflowMode);
+				var charContainsCursor = containsCursor && cursorCoords[2] == x && cursorCoords[3] == y;
+				renderChar(textRenderCtx, x, y, str, tile, protValue, props, offsetX, offsetY, charOverflowMode, charContainsCursor);
 			}
 		}
 	}
@@ -6332,6 +6349,57 @@ function makeURLModal() {
 	w.ui.urlModal = modal;
 }
 
+function buildBackgroundColorModal(modal) {
+	modal.addTab("fg", "Text");
+	modal.addTab("bg", "Cell");
+
+	modal.focusTab("bg");
+
+	modal.createForm();
+	modal.setFormTitle("\n");
+	colorInputBg = modal.addEntry("Char color", "color").input;
+	modal.setFooterContentRight(colorShortcutsBg);
+	updateBgColorPicker();
+
+	modal.focusTab("fg");
+	
+	disableBgColorPicker();
+
+	modal.onTabChange(function(evt) {
+		var tab = evt.id;
+		if(tab == "bg") {
+			colorShortcutsBg.style.display = "";
+			colorShortcuts.style.display = "none";
+		} else if(tab == "fg") {
+			colorShortcutsBg.style.display = "none";
+			colorShortcuts.style.display = "";
+		}
+	});
+}
+
+function resetColorModalVisibility() {
+	var pText = Permissions.can_color_text(state.userModel, state.worldModel);
+	var pCell = Permissions.can_color_cell(state.userModel, state.worldModel);
+	if(pCell) {
+		if(!w.ui.colorModal.getTabData("bg")) {
+			buildBackgroundColorModal(w.ui.colorModal);
+		}
+		w.ui.colorModal.showTab("bg");
+	} else {
+		w.ui.colorModal.hideTab("bg");
+		w.ui.colorModal.focusTab("fg");
+	}
+	if(pText) {
+		w.ui.colorModal.showTab("fg");
+	} else {
+		w.ui.colorModal.hideTab("fg");
+		w.ui.colorModal.focusTab("bg");
+	}
+	if(!pCell && !pText) {
+		w.ui.colorModal.close();
+	}
+}
+
 function makeColorModal() {
 	var modal = new Modal();
 	modal.setMinimumSize(290, 128);
@@ -6376,7 +6444,6 @@ function makeColorModal() {
 		var cursorTileY = cursorCoords[1];
 		w.setTileRedraw(cursorTileX, cursorTileY);
 	}, cursorOutlineEnabled);
-	w.ui.colorModal = modal;
 
 	colorShortcuts = document.createElement("div");
 	colorShortcuts.id = "color_shortcuts";
@@ -6386,38 +6453,15 @@ function makeColorModal() {
 	colorShortcutsBg.id = "color_shortcuts_bg";
 	colorShortcutsBg.style.display = "none";
 
+	if(Permissions.can_color_cell(state.userModel, state.worldModel)) {
+		buildBackgroundColorModal(modal);
+	}
+
 	if(!Permissions.can_color_text(state.userModel, state.worldModel)) {
 		modal.focusTab("bg");
-		// TODO
+		modal.hideTab("fg");
 	}
-
-	if(Permissions.can_color_cell(state.userModel, state.worldModel)) {
-		modal.addTab("fg", "Text");
-		modal.addTab("bg", "Cell");
-	
-		modal.focusTab("bg");
-
-		modal.createForm();
-		modal.setFormTitle("\n");
-		colorInputBg = modal.addEntry("Char color", "color").input;
-		modal.setFooterContentRight(colorShortcutsBg);
-		updateBgColorPicker();
-
-		modal.focusTab("fg");
-		
-		disableBgColorPicker();
-
-		modal.onTabChange(function(evt) {
-			var tab = evt.id;
-			if(tab == "bg") {
-				colorShortcutsBg.style.display = "";
-				colorShortcuts.style.display = "none";
-			} else if(tab == "fg") {
-				colorShortcutsBg.style.display = "none";
-				colorShortcuts.style.display = "";
-			}
-		});
-	}
+	w.ui.colorModal = modal;
 }
 
 function makeSelectionModal() {
@@ -6888,9 +6932,11 @@ var ws_functions = {
 					break;
 				case "colorText":
 					state.worldModel.color_text = value;
+					resetColorModalVisibility();
 					break;
 				case "colorCell":
 					state.worldModel.color_cell = value;
+					resetColorModalVisibility();
 					break;
 				case "memberTilesAddRemove":
 					state.worldModel.feature_membertiles_addremove = value;

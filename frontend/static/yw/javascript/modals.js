@@ -655,7 +655,7 @@ Modal.prototype.addTab = function(id, title) {
 
 		tabContext = {
 			id: id,
-			btn: tabBtn,
+			tabButton: tabBtn,
 			client: this.client,
 			inputField: this.inputField,
 			formTitle: this.formTitle,
@@ -691,7 +691,7 @@ Modal.prototype.addTab = function(id, title) {
 
 		tabContext = {
 			id: id,
-			btn: tabBtn,
+			tabButton: tabBtn,
 			client: fClient,
 			inputField: null,
 			formTitle: null,
@@ -741,12 +741,12 @@ Modal.prototype.focusTab = function(id) {
 	this.currentTabCtx = this.tabIndex[id];
 
 	prev.client.style.display = "none";
-	prev.btn.style.height = "18px";
-	prev.btn.style.backgroundColor = "";
+	prev.tabButton.style.height = "18px";
+	prev.tabButton.style.backgroundColor = "";
 
 	curr.client.style.display = "";
-	curr.btn.style.height = "24px";
-	curr.btn.style.backgroundColor = "#E5E5FF";
+	curr.tabButton.style.height = "24px";
+	curr.tabButton.style.backgroundColor = "#E5E5FF";
 
 	// transfer context
 	this.client = curr.client;
@@ -761,12 +761,34 @@ Modal.prototype.focusTab = function(id) {
 }
 
 /*
-	If there are any defined tabs, return the ID of the
-	currently active tab.
+	If there are any defined tabs, return the ID of the currently active tab.
 */
 Modal.prototype.getCurrentTabId = function() {
 	if(!this.currentTabCtx) return null;
 	return this.currentTabCtx.id;
+}
+
+/*
+	Hide tab from the tab bar. This will not bring you to the next available tab.
+*/
+Modal.prototype.hideTab = function(id) {
+	if(!this.tabIndex[id]) return;
+	this.tabIndex[id].tabButton.style.display = "none";
+}
+
+/*
+	Show tab on the tab bar.
+*/
+Modal.prototype.showTab = function(id) {
+	if(!this.tabIndex[id]) return;
+	this.tabIndex[id].tabButton.style.display = "";
+}
+
+/*
+	Return raw tab data.
+*/
+Modal.prototype.getTabData = function(id) {
+	return this.tabIndex[id] || null;
 }
 
 /*
