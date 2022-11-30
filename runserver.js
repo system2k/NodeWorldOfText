@@ -2673,7 +2673,8 @@ async function initialize_server_components() {
 
 	wss = new WebSocket.Server({
 		server,
-		perMessageDeflate: true
+		perMessageDeflate: true,
+		maxPayload: 128000
 	});
 	global_data.wss = wss;
 

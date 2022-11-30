@@ -146,6 +146,9 @@ function generateFullTileUpdate(worldQueue, worldID) {
 		if(!arrayIsEntirely(tile.prop_color, 0)) {
 			properties.color = tile.prop_color;
 		}
+		if(tile.prop_bgcolor !== null) {
+			properties.bgcolor = tile.prop_bgcolor;
+		}
 		if(Object.keys(tile.prop_cell_props).length > 0) {
 			properties.cell_props = tile.prop_cell_props;
 		}
@@ -350,6 +353,7 @@ function normalize_tile(tile_db_data) {
 		content: null,
 		writability: null,
 		prop_color: null,
+		prop_bgcolor: null, // this is nullable - it can only either be null or an array of 128 integers.
 		prop_char: null,
 		prop_cell_props: null,
 
@@ -365,6 +369,9 @@ function normalize_tile(tile_db_data) {
 			data.prop_color = parsed_props.color;
 		} else {
 			data.prop_color = new Array(CONST.tileArea).fill(0);
+		}
+		if(parsed_props.bgcolor) {
+			data.prop_bgcolor = parsed_props.bgcolor;
 		}
 		if(parsed_props.char) {
 			data.prop_char = decodeCharProt(parsed_props.char);
@@ -382,10 +389,11 @@ function normalize_tile(tile_db_data) {
 		data.tile_id = tile_db_data.rowid;
 	} else {
 		data.prop_color = new Array(CONST.tileArea).fill(0);
-		data.prop_char = new Array(CONST.tileArea).fill(null);
+		data.prop_bgcolor = null; // not going to be used often, so we will skimp on memory
+		data.prop_char = new Array(CONST.tileArea).fill(null); // precise protection data
 		data.prop_cell_props = {};
 		data.tile_exists = false;
-		data.content = new Array(CONST.tileArea).fill(" ");
+		data.content = new Array(CONST.tileArea).fill(" "); // text data
 		data.writability = null;
 		data.tile_id = null;
 	}
@@ -472,16 +480,18 @@ function tileWriteEdits(cacheTile, editObj) {
 	var tileX = san_nbr(editArray[1]);
 	var charY = editArray[2];
 	var charX = editArray[3];
-	var time = editArray[4];
+	var time = editArray[4]; // not used
 	var char = editArray[5];
-	var editID = editArray[6];
-	var color = editArray[7];
+	var editID = editArray[6]; // returned to the client in a response
+	var color = editArray[7]; // integer (0 - 16777215 or -1)
+	var bgcolor = editArray[8]; // integer (-1 - 16777215) or null
 
 	var world = data.world;
 	var user = data.user;
 	var public_only = data.public_only;
 	var preserve_links = data.preserve_links;
 	var can_color_text = data.can_color_text;
+	var can_color_cell = data.can_color_cell;
 	var no_log_edits = data.no_log_edits;
 
 	var is_owner = data.is_owner;
@@ -520,10 +530,34 @@ function tileWriteEdits(cacheTile, editObj) {
 	}
 
 	if(!can_color_text) color = 0;
+	if(!can_color_cell) bgcolor = -1;
 	if(color !== -1) {
 		var prevCol = cacheTile.prop_color[index];
 		cacheTile.prop_color[index] = color;
 		if(prevCol != color) {
+			cacheTile.props_updated = true;
+			char_updated = true;
+		}
+	}
+
+	if(bgcolor !== null) {
+		var bdColUpdated = false;
+		if(cacheTile.prop_bgcolor) {
+			var prevBgCol = cacheTile.prop_bgcolor[index];
+			cacheTile.prop_bgcolor[index] = bgcolor;
+			if(is_consistent(cacheTile.prop_bgcolor) && cacheTile.prop_bgcolor[0] == -1) {
+				cacheTile.prop_bgcolor = null;
+				bdColUpdated = true;
+			}
+			if(prevBgCol != bgcolor) {
+				bdColUpdated = true;
+			}
+		} else if(bgcolor != -1) { // -1 : no background color
+			cacheTile.prop_bgcolor = new Array(CONST.tileArea).fill(-1);
+			cacheTile.prop_bgcolor[index] = bgcolor;
+			bdColUpdated = true;
+		}
+		if(bdColUpdated) {
 			cacheTile.props_updated = true;
 			char_updated = true;
 		}
@@ -551,7 +585,7 @@ function tileWriteEdits(cacheTile, editObj) {
 	}
 	if(char_updated && !no_log_edits && sharedObj.editLog) {
 		var ar = [tileY, tileX, charY, charX, Date.now(), char, editID];
-		if(color) ar.push(color);
+		if(color) ar.push(color); // TODO
 		sharedObj.editLog.push(ar);
 	}
 	if(char_updated) {
@@ -779,6 +813,8 @@ function tileWriteClear(cacheTile, editObj) {
 		cacheTile.content[x] = " ";
 		cacheTile.prop_color[x] = 0;
 	}
+	cacheTile.prop_bgcolor = null;
+
 	for(var d in cacheTile.prop_cell_props) {
 		delete cacheTile.prop_cell_props[d];
 	}
@@ -927,6 +963,9 @@ async function iterateDatabaseChanges() {
 						if(!arrayIsEntirely(tile.prop_char, null)) {
 							propObj.char = encodeCharProt(tile.prop_char);
 						}
+						if(tile.prop_bgcolor !== null) {
+							propObj.bgcolor = tile.prop_bgcolor;
+						}
 						if(Object.keys(tile.prop_cell_props).length > 0) {
 							propObj.cell_props = tile.prop_cell_props;
 						}
@@ -950,6 +989,9 @@ async function iterateDatabaseChanges() {
 					}
 					if(!arrayIsEntirely(tile.prop_char, null)) {
 						propObj.char = encodeCharProt(tile.prop_char);
+					}
+					if(tile.prop_bgcolor !== null) {
+						propObj.bgcolor = tile.prop_bgcolor;
 					}
 					if(Object.keys(tile.prop_cell_props).length > 0) {
 						propObj.cell_props = tile.prop_cell_props;
@@ -1296,6 +1338,9 @@ async function beginTileIterationsLoop() {
 						if(cellProt == 0) {
 							dimTile.content[i] = " ";
 							dimTile.prop_color[i] = 0;
+							if(dimTile.prop_bgcolor) {
+								dimTile.prop_bgcolor[i]
+							}
 							dimTile.content_updated = true;
 							dimTile.props_updated = true;
 							if(dimTile.prop_cell_props[charY]) {
@@ -1307,6 +1352,9 @@ async function beginTileIterationsLoop() {
 								}
 							}
 						}
+					}
+					if(dimTile.prop_bgcolor !== null && arrayIsEntirely(dimTile.prop_bgcolor, -1)) {
+						dimTile.prop_bgcolor = null;
 					}
 					dimTile.last_accessed = Date.now();
 				} else {
@@ -1323,6 +1371,9 @@ async function beginTileIterationsLoop() {
 						if(cellProt == 0) {
 							tileObj.content[i] = " ";
 							tileObj.prop_color[i] = 0;
+							if(tileObj.prop_bgcolor) {
+								tileObj.prop_bgcolor[i]
+							}
 							if(tileObj.prop_cell_props[charY]) {
 								if(tileObj.prop_cell_props[charY][charX]) {
 									delete tileObj.prop_cell_props[charY][charX];
@@ -1335,6 +1386,9 @@ async function beginTileIterationsLoop() {
 							tileObj.content_updated = true;
 						}
 					}
+					if(tileObj.prop_bgcolor !== null && arrayIsEntirely(tileObj.prop_bgcolor, -1)) {
+						tileObj.prop_bgcolor = null;
+					}
 					if(tileObj.props_updated) {
 						tileObj.props_updated = false;
 						var propObj = {};
@@ -1343,6 +1397,9 @@ async function beginTileIterationsLoop() {
 						}
 						if(!arrayIsEntirely(tileObj.prop_char, null)) {
 							propObj.char = encodeCharProt(tileObj.prop_char);
+						}
+						if(tileObj.prop_bgcolor !== null) {
+							propObj.bgcolor = tileObj.prop_bgcolor;
 						}
 						if(Object.keys(tileObj.prop_cell_props).length > 0) {
 							propObj.cell_props = tileObj.prop_cell_props;
@@ -1404,7 +1461,13 @@ async function beginTileIterationsLoop() {
 					ctile.content[x] = " ";
 					ctile.prop_char[x] = null;
 					ctile.prop_color[x] = 0;
+					if(ctile.prop_bgcolor !== null) {
+						ctile.prop_bgcolor = -1;
+					}
 					ctile.writability = null;
+				}
+				if(ctile.prop_bgcolor !== null && arrayIsEntirely(ctile.prop_bgcolor, -1)) {
+					ctile.prop_bgcolor = null;
 				}
 				ctile.content_updated = true;
 				ctile.writability_updated = true;

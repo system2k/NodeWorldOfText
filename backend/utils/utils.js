@@ -1128,6 +1128,9 @@ function normalizeCacheTile(ctile) {
 	if(!arrayIsEntirely(ctile.prop_char, null)) {
 		tile.properties.char = encodeCharProt(ctile.prop_char);
 	}
+	if(ctile.prop_bgcolor !== null) {
+		tile.properties.bgcolor = ctile.prop_bgcolor;
+	}
 	if(Object.keys(ctile.prop_cell_props).length > 0) {
 		tile.properties.cell_props = ctile.prop_cell_props;
 	}

@@ -408,6 +408,9 @@ a:visited {
 .color_btn:active {
 	border-color: rgb(165, 107, 0);
 }
+#color_btn_no_cell {
+	background: linear-gradient(to right top, white 47.75%, red 49.5%, red 55%, white 50%);
+}
 .modal_corner_checkbox_label {
 	margin-left: 5px;
 	user-select: none;
@@ -441,6 +444,12 @@ a:visited {
 }
 .modal_client {
 	background-color: #E5E5FF;
+}
+.modal-tab-btn {
+	background-color: rgb(178 178 231);
+}
+.modal-tab-btn:hover {
+	background-color: rgb(212 212 235);
 }
 .chat_emote {
 	background: url(/static/emotes.png);

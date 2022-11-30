@@ -52,10 +52,19 @@ var worldCache = {};
 var worldFetchQueueIndex = {};
 var worldRenameMap = {};
 
+/*
+	To avoid lengthy database migrations, it's advisable to place new prop fields in
+	this object and update accordingly for the rest of this file.
+	Subsequently, you should pay close attention to the frontend/backend of the
+	configure page, yourworld.js, and world_props.js
+
+	These properties are not present by default unless its value deviates from its default value.
+*/
 var world_default_props = {
 	views: 0,
 	chat_permission: 0,
 	show_cursor: -1,
+	color_cell: -1,
 	color_text: 0,
 	custom_menu_color: "",
 	custom_public_text_color: "",
@@ -142,7 +151,7 @@ function getWorldNameFromCacheById(id) {
 }
 
 function makeWorldObject() {
-	// return world object with all values "zeroed"
+	// return world object with all values "zeroed" (not default, i.e. number -> 0, string -> "", boolean -> false)
 	var world = {
 		exists: false,
 		id: null, // integer
@@ -158,7 +167,8 @@ function makeWorldObject() {
 			urlLink: 0,
 			chat: 0,
 			showCursor: 0,
-			colorText: 0
+			colorText: 0,
+			colorCell: 0
 		},
 		theme: {
 			bg: "",
@@ -253,6 +263,7 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.feature.chat = getAndProcWorldProp(wprops, "chat_permission");
 	wobj.feature.showCursor = getAndProcWorldProp(wprops, "show_cursor");
 	wobj.feature.colorText = getAndProcWorldProp(wprops, "color_text");
+	wobj.feature.colorCell = getAndProcWorldProp(wprops, "color_cell");
 
 	wobj.theme.bg = world.custom_bg;
 	wobj.theme.cursor = world.custom_cursor;
@@ -413,6 +424,7 @@ async function commitWorld(world) {
 		"feature/chat",
 		"feature/showCursor",
 		"feature/colorText",
+		"feature/colorCell",
 		"theme/menu",
 		"theme/publicText",
 		"theme/memberText",
@@ -439,6 +451,7 @@ async function commitWorld(world) {
 		chat_permission: world.feature.chat,
 		show_cursor: world.feature.showCursor,
 		color_text: world.feature.colorText,
+		color_cell: world.feature.colorCell,
 		custom_menu_color: world.theme.menu,
 		custom_public_text_color: world.theme.publicText,
 		custom_member_text_color: world.theme.memberText,

@@ -59,6 +59,9 @@ var Permissions = {
 	can_color_text: function(user, world) {
 		return Permissions.user_matches_perm(user, world, world.color_text);
 	},
+	can_color_cell: function(user, world) {
+		return Permissions.user_matches_perm(user, world, world.color_cell);
+	},
 	user_matches_perm: function(user, world, perm) {
 		if(perm == -1) { // no one
 			return false;

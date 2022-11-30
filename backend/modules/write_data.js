@@ -59,6 +59,7 @@ module.exports = async function(data, vars, evars) {
 
 	var no_log_edits = world.opts.noLogEdits;
 	var color_text = world.feature.colorText;
+	var color_cell = world.feature.colorCell;
 
 	var memkeyAccess = world.opts.memKey && world.opts.memKey == evars.keyQuery;
 
@@ -69,6 +70,10 @@ module.exports = async function(data, vars, evars) {
 	var can_color_text = true;
 	if(color_text == 1 && !is_member) can_color_text = false;
 	if(color_text == 2 && !is_owner) can_color_text = false;
+
+	var can_color_cell = color_cell != -1;
+	if(color_cell == 1 && !is_member) can_color_cell = false;
+	if(color_cell == 2 && !is_owner) can_color_cell = false;
 
 	var edits = data.edits;
 	if(!edits) return emptyWriteResponse;
@@ -224,6 +229,17 @@ module.exports = async function(data, vars, evars) {
 				if(!canColor) {
 					editIncome[7] = 0;
 				}
+
+				// validate & normalize the bgColor (no guarantee it will be accepted)
+				var bgColor = editIncome[8];
+				if(bgColor !== null) {
+					if(bgColor === void 0) bgColor = -1;
+					bgColor = san_nbr(bgColor);
+					if(bgColor < -1) bgColor = -1;
+					if(bgColor > 16777215) bgColor = 16777215;
+				}
+				editIncome[8] = bgColor;
+
 				changes.push(editIncome);
 				continue;
 			} else {
@@ -232,6 +248,7 @@ module.exports = async function(data, vars, evars) {
 					char = char.slice(0, 1);
 				}
 			}
+			// TODO: refactor this bit of redundant code
 			for(var i = 0; i < char.length; i++) {
 				var newIdx = charInsIdx + i;
 				if(newIdx > CONST.tileArea - 1) continue; // overflow
@@ -240,6 +257,7 @@ module.exports = async function(data, vars, evars) {
 				var newY = Math.floor(newIdx / CONST.tileCols);
 				var newChar = char[i]; // don't filter the edit yet. that is handled in the database subsystem.
 				var newColor = editIncome[7];
+				var newBgColor = editIncome[8];
 				if(Array.isArray(newColor)) {
 					// color is an array, get individual values
 					newColor = fixColors(newColor[i]);
@@ -251,10 +269,7 @@ module.exports = async function(data, vars, evars) {
 
 				var newAr = [editIncome[0], editIncome[1],
 							newY, newX,
-							editIncome[4], newChar, editIncome[6], newColor];
-				if(editIncome[8]) {
-					newAr.push(editIncome[8]);
-				}
+							editIncome[4], newChar, editIncome[6], newColor, newBgColor];
 				changes.push(newAr);
 			}
 		}
@@ -278,7 +293,8 @@ module.exports = async function(data, vars, evars) {
 		date: currentDate,
 		tile_edits,
 		user, world, is_owner, is_member,
-		can_color_text, public_only, no_log_edits, preserve_links,
+		can_color_text, can_color_cell,
+		public_only, no_log_edits, preserve_links,
 		channel,
 		no_update,
 		rejected

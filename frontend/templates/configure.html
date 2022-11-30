@@ -303,6 +303,20 @@
 						</td>
 					</tr>
 					<tr>
+						<td class="feature_name">Change cell background color</td>
+						<td>
+							<select name="color_cell">
+								<option value="0"{%if color_cell==0%} selected{%endif%}>anyone</option>
+								<option value="1"{%if color_cell==1%} selected{%endif%}>me and members</option>
+								<option value="2"{%if color_cell==2%} selected{%endif%}>only me</option>
+								<option value="-1"{%if color_cell==-1%} selected{%endif%}>disabled</option>
+							</select>
+						</td>
+						<td class="feature_description">
+							Change the background color of a cell.
+						</td>
+					</tr>
+					<tr>
 						<td class="feature_name">Show cursor to everyone</td>
 						<td>
 							<select name="show_cursor">

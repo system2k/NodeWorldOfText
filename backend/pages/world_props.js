@@ -37,7 +37,8 @@ module.exports.GET = async function(req, serve, vars, evars) {
 			urlLink: world.feature.urlLink,
 			chat: world.feature.chat,
 			showCursor: world.feature.showCursor,
-			colorText: world.feature.colorText
+			colorText: world.feature.colorText,
+			colorCell: world.feature.colorCell
 		},
 		theme: {
 			bg: world.theme.bg,

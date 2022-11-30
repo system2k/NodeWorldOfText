@@ -1,12 +1,13 @@
 ﻿var YourWorld = {
 	Color: window.localStorage ? +localStorage.getItem("color") : 0,
+	BgColor: -1,
 	Nickname: state.userModel.username
 };
 
 var owot, owotCtx, textInput;
 var linkElm, linkDiv;
-var colorInput;
-var colorShortcuts;
+var colorInput, colorInputBg;
+var colorShortcuts, colorShortcutsBg;
 function init_dom() {
 	owot = document.getElementById("owot");
 	owot.style.display = "block";
@@ -219,6 +220,10 @@ function setRGBColorPicker(r, g, b) {
 	colorInput.jscolor.fromRGB(r, g, b);
 }
 
+function setRGBBgColorPicker(r, g, b) {
+	colorInputBg.jscolor.fromRGB(r, g, b);
+}
+
 function setColorPickerRandom() {
 	var r = Math.floor(Math.random() * 256);
 	var g = Math.floor(Math.random() * 256);
@@ -231,6 +236,13 @@ function updateColorPicker() {
 	var g = (YourWorld.Color >> 8) & 255;
 	var b = YourWorld.Color & 255;
 	setRGBColorPicker(r, g, b);
+}
+
+function updateBgColorPicker() {
+	var r = (YourWorld.BgColor >> 16) & 255;
+	var g = (YourWorld.BgColor >> 8) & 255;
+	var b = YourWorld.BgColor & 255;
+	setRGBBgColorPicker(r, g, b);
 }
 
 function updateCoordDisplay() {
@@ -271,7 +283,7 @@ elm.coords.onclick = function() {
 	}
 }
 
-function createColorButton(color) {
+function createColorButton(color, isHighlight) {
 	var celm = document.createElement("span");
 	var colorInt = resolveColorValue(color);
 	var colorValues = int_to_rgb(colorInt);
@@ -280,7 +292,12 @@ function createColorButton(color) {
 	celm.style.backgroundColor = hex;
 	celm.title = hex.toUpperCase();
 	celm.onclick = function() {
-		setRGBColorPicker(colorValues[0], colorValues[1], colorValues[2]);
+		if(!isHighlight) {
+			setRGBColorPicker(colorValues[0], colorValues[1], colorValues[2]);
+		} else {
+			enableBgColorPicker();
+			setRGBBgColorPicker(colorValues[0], colorValues[1], colorValues[2]);
+		}
 		w.ui.colorModal.submitForm();
 	}
 	return celm;
@@ -294,9 +311,21 @@ function addColorShortcuts() {
 		"#0000FF",
 		"#FFFFFF"
 	];
+	var colors_highlight = [
+		"#F49446",
+		"#DCE943",
+		"#07D555",
+		"#4194C9",
+		"#7B55C6",
+		"#EA44A5"
+	];
 	for(var i = 0; i < colors.length; i++) {
-		var col = colors[i];
-		colorShortcuts.appendChild(createColorButton(col));
+		var color = colors[i];
+		colorShortcuts.appendChild(createColorButton(color));
+	}
+	for(var i = 0; i < colors_highlight.length; i++) {
+		var color = colors_highlight[i];
+		colorShortcutsBg.appendChild(createColorButton(color, true));
 	}
 	var rand = document.createElement("span");
 	rand.className = "color_btn";
@@ -305,6 +334,18 @@ function addColorShortcuts() {
 	rand.title = "Random color";
 	rand.onclick = setColorPickerRandom;
 	colorShortcuts.appendChild(rand);
+
+	var bgNone = document.createElement("span");
+	bgNone.id = "color_btn_no_cell";
+	bgNone.className = "color_btn";
+	bgNone.style.backgroundColor = "#FFFFFF";
+	bgNone.title = "No background color";
+	bgNone.onclick = function() {
+		w.ui.colorModal.close(true); // close + cancel
+		disableBgColorPicker();
+		YourWorld.BgColor = -1;
+	}
+	colorShortcutsBg.appendChild(bgNone);
 }
 
 init_dom(); // TODO: put this elsewhere
@@ -1286,6 +1327,20 @@ function getCharColor(tileX, tileY, charX, charY) {
 	return tile.properties.color[charY * tileC + charX];
 }
 
+function getCharBgColor(tileX, tileY, charX, charY) {
+	if(tileX == void 0 && tileY == void 0 && charX == void 0 && charY == void 0) {
+		if(!cursorCoords) return -1;
+		tileX = cursorCoords[0];
+		tileY = cursorCoords[1];
+		charX = cursorCoords[2];
+		charY = cursorCoords[3];
+	}
+	var tile = Tile.get(tileX, tileY);
+	if(!tile) return 0;
+	if(!tile.properties.bgcolor) return -1;
+	return tile.properties.bgcolor[charY * tileC + charX];
+}
+
 function getCharProtection(tileX, tileY, charX, charY) {
 	if(tileX == void 0 && tileY == void 0 && charX == void 0 && charY == void 0) {
 		if(!cursorCoords) return -1;
@@ -1333,6 +1388,7 @@ function getCharInfo(tileX, tileY, charX, charY) {
 		loaded: isTileLoaded(tileX, tileY),
 		char: getChar(tileX, tileY, charX, charY),
 		color: getCharColor(tileX, tileY, charX, charY),
+		bgColor: getCharBgColor(tileX, tileY, charX, charY),
 		protection: getCharProtection(tileX, tileY, charX, charY),
 		decoration: getCharDecoration(tileX, tileY, charX, charY)
 	};
@@ -2068,7 +2124,7 @@ function moveCursor(direction, preserveVertPos, amount) {
 }
 
 // place a character
-function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOffset) {
+function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOffset, charBgColor) {
 	if(!Tile.get(tileX, tileY)) {
 		Tile.set(tileX, tileY, blankTile());
 	}
@@ -2077,15 +2133,21 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 	if(isErase) {
 		char = " ";
 		charColor = 0x000000;
+		charBgColor = -1;
+	}
+	if(charBgColor == null) {
+		charBgColor = -1;
 	}
 	
 	var cell_props = tile.properties.cell_props;
 	if(!cell_props) cell_props = {};
 	var color = tile.properties.color;
+	var bgcolor = tile.properties.bgcolor;
 	if(!color) color = new Array(tileArea).fill(0);
 
 	var hasChanged = false;
 	var prevColor = 0;
+	var prevBgColor = -1;
 	var prevChar = "";
 	var prevLink = getLink(tileX, tileY, charX, charY);
 
@@ -2100,10 +2162,26 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 	if(!Permissions.can_color_text(state.userModel, state.worldModel)) {
 		charColor = 0x000000;
 	}
+	if(!Permissions.can_color_cell(state.userModel, state.worldModel)) {
+		charBgColor = -1;
+	}
+
+	// set text color
 	prevColor = color[charY * tileC + charX];
 	color[charY * tileC + charX] = charColor;
 	if(prevColor != charColor) hasChanged = true;
 	tile.properties.color = color; // if the color array doesn't already exist in the tile
+
+	// set cell color
+	if(!bgcolor && charBgColor != -1) {
+		bgcolor = new Array(tileArea).fill(-1);
+		tile.properties.bgcolor = bgcolor;
+	}
+	if(bgcolor) {
+		prevBgColor = bgcolor[charY * tileC + charX];
+		bgcolor[charY * tileC + charX] = charBgColor;
+		if(prevBgColor != charBgColor) hasChanged = true;
+	}
 
 	// update cell properties (link positions)
 	tile.properties.cell_props = cell_props;
@@ -2145,7 +2223,7 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 		if(noUndo != -1) {
 			undoBuffer.trim();
 		}
-		undoBuffer.push([tileX, tileY, charX, charY, prevChar, prevColor, prevLink, undoOffset]);
+		undoBuffer.push([tileX, tileY, charX, charY, prevChar, prevColor, prevLink, prevBgColor, undoOffset]);
 	}
 
 	//TEMP
@@ -2158,9 +2236,19 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 		editArray[0] += tileFetchOffsetY;
 		editArray[1] += tileFetchOffsetX;
 	}
+
+	var charColorAdded = false;
 	if(charColor && Permissions.can_color_text(state.userModel, state.worldModel)) {
 		editArray.push(charColor);
+		charColorAdded = true;
 	}
+	if(charBgColor != null && charBgColor != -1 && Permissions.can_color_cell(state.userModel, state.worldModel)) {
+		if(!charColorAdded) {
+			editArray.push(0);
+		}
+		editArray.push(charBgColor);
+	}
+
 	tellEdit.push(editArray); // track local changes
 	writeBuffer.push(editArray); // send edits to server
 	nextObjId++;
@@ -2176,8 +2264,9 @@ function undoWrite() {
 	var char = edit[4];
 	var color = edit[5];
 	var link = edit[6];
-	var offset = edit[7] || 0;
-	writeCharTo(char, color, tileX, tileY, charX, charY, -1, offset);
+	var bgColor = edit[7];
+	var offset = edit[8] || 0;
+	writeCharTo(char, color, tileX, tileY, charX, charY, -1, offset, bgColor);
 	if(link) {
 		if(link.type == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
 			linkQueue.push(["url", tileX, tileY, charX, charY, link.url]);
@@ -2201,8 +2290,9 @@ function redoWrite() {
 	var char = edit[4];
 	var color = edit[5];
 	var link = edit[6];
-	var offset = edit[7] || 0;
-	writeCharTo(char, color, tileX, tileY, charX, charY, -1, offset);
+	var bgColor = edit[7];
+	var offset = edit[8] || 0;
+	writeCharTo(char, color, tileX, tileY, charX, charY, -1, offset, bgColor);
 	if(link) {
 		if(link) {
 			if(link.type == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
@@ -2225,10 +2315,11 @@ function writeCharToXY(char, charColor, x, y) {
 }
 
 // type a character
-function writeChar(char, doNotMoveCursor, tempColor, noNewline, undoCursorOffset) {
+function writeChar(char, doNotMoveCursor, color, noNewline, undoCursorOffset, bgColor) {
 	char += "";
-	var charColor = tempColor || YourWorld.Color;
-	if(tempColor == 0) charColor = 0;
+	var charColor = color || YourWorld.Color;
+	var charBgColor = bgColor || YourWorld.BgColor;
+	if(color == 0) charColor = 0;
 	var cursor = cursorCoords;
 	if(!cursor && (char == "\n" || char == "\r") && !noNewline) {
 		cursor = cursorCoordsCurrent;
@@ -2271,6 +2362,7 @@ function writeChar(char, doNotMoveCursor, tempColor, noNewline, undoCursorOffset
 		var data = {
 			char: char,
 			color: charColor,
+			bgColor: charBgColor,
 			tileX: tileX,
 			tileY: tileY,
 			charX: charX,
@@ -2278,7 +2370,7 @@ function writeChar(char, doNotMoveCursor, tempColor, noNewline, undoCursorOffset
 		};
 
 		w.emit("writeBefore", data);
-		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, false, undoCursorOffset);
+		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, false, undoCursorOffset, data.bgColor);
 		w.emit("write", data);
 	}
 }
@@ -4238,7 +4330,11 @@ function clearCharTextDecorations(char) {
 	return char;
 }
 
-function renderChar(textRender, x, y, str, content, colors, writability, props, offsetX, offsetY, charOverflowMode) {
+function renderChar(textRender, x, y, str, tile, writability, props, offsetX, offsetY, charOverflowMode) {
+	var content = tile.content;
+	var colors = tile.properties.color;
+	var bgcolors = tile.properties.bgcolor;
+
 	// adjust baseline
 	var textYOffset = cellH - (5 * zoom);
 
@@ -4263,6 +4359,13 @@ function renderChar(textRender, x, y, str, content, colors, writability, props, 
 	}
 
 	// fill background if defined
+	if(bgcolors && colorsEnabled) {
+		var bgColor = bgcolors[y * tileC + x];
+		if(bgColor != -1) {
+			textRender.fillStyle = `rgb(${bgColor >> 16 & 255},${bgColor >> 8 & 255},${bgColor & 255})`;
+			textRender.fillRect(fontX, fontY, cellW, cellH);
+		}
+	}
 	if(coloredChars[str] && coloredChars[str][y] && coloredChars[str][y][x]) {
 		var color = coloredChars[str][y][x];
 		if(Array.isArray(color)) {
@@ -4558,8 +4661,6 @@ function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY, bounds, ch
 	var str = tileY + "," + tileX;
 	var tile = Tile.get(tileX, tileY);
 	if(!tile) return;
-	var content = tile.content;
-	var colors = tile.properties.color;
 	var props = tile.properties.cell_props || {};
 	var writability = tile.writability;
 	if(priorityOverwriteChar && tile.properties.char) { // TODO: doesn't work right
@@ -4572,7 +4673,7 @@ function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY, bounds, ch
 				var cX = c % tileC;
 				var cY = Math.floor(c / tileC);
 				textRenderCtx.clearRect(cX * cellW, cY * cellH, cellW, cellH);
-				renderChar(textRenderCtx, cX, cY, str, content, colors, code, props, offsetX, offsetY);
+				renderChar(textRenderCtx, cX, cY, str, tile, code, props, offsetX, offsetY);
 			}
 		}
 	} else {
@@ -4594,7 +4695,7 @@ function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY, bounds, ch
 				}
 				if(protValue == null) protValue = tile.properties.writability;
 				if(protValue == null) protValue = state.worldModel.writability;
-				renderChar(textRenderCtx, x, y, str, content, colors, protValue, props, offsetX, offsetY, charOverflowMode);
+				renderChar(textRenderCtx, x, y, str, tile, protValue, props, offsetX, offsetY, charOverflowMode);
 			}
 		}
 	}
@@ -5143,12 +5244,13 @@ function buildMenu() {
 
 function updateMenuEntryVisiblity() {
 	var permColorText = Permissions.can_color_text(state.userModel, state.worldModel);
+	var permColorCell = Permissions.can_color_cell(state.userModel, state.worldModel);
 	var permGoToCoord = Permissions.can_go_to_coord(state.userModel, state.worldModel);
 	var permCoordLink = Permissions.can_coordlink(state.userModel, state.worldModel);
 	var permUrlLink = Permissions.can_urllink(state.userModel, state.worldModel);
 	var permOwnerArea = Permissions.can_admin(state.userModel, state.worldModel);
 	var permMemberArea = Permissions.can_protect_tiles(state.userModel, state.worldModel);
-	w.menu.setEntryVisibility(menuOptions.changeColor, permColorText);
+	w.menu.setEntryVisibility(menuOptions.changeColor, permColorText || permColorCell);
 	w.menu.setEntryVisibility(menuOptions.goToCoords, permGoToCoord);
 	w.menu.setEntryVisibility(menuOptions.coordLink, permCoordLink);
 	w.menu.setEntryVisibility(menuOptions.urlLink, permUrlLink);
@@ -5337,7 +5439,6 @@ function sendCursorPosition() {
 	if(!showMyGuestCursor) return;
 	if(!Permissions.can_show_cursor(state.userModel, state.worldModel)) return;
 	if(!w.socket) return;
-	if(w.socket.socket.url.startsWith("wss://www.yourworldoftext.com/")) return;
 	var pos = clientGuestCursorPos;
 	if(!pos.updated) return;
 	pos.updated = false;
@@ -6112,6 +6213,16 @@ Object.assign(w, {
 			w.setTileRedraw(cursorTileX, cursorTileY);
 		}
 	},
+	changeBgColor: function(color) {
+		if(color == -1) {
+			YourWorld.BgColor = -1;
+			return;
+		}
+		color = resolveColorValue(color);
+		YourWorld.BgColor = color;
+		var rgb = int_to_rgb(color);
+		setRGBBgColorPicker(rgb[0], rgb[1], rgb[2]);
+	},
 	fetchUpdates: function(margin) {
 		if(!margin) margin = 0;
 		var vis = getVisibleTileRange(margin);
@@ -6168,6 +6279,21 @@ document.onselectstart = function(e) {
 
 w._state = w.state; // deprecated
 
+function disableBgColorPicker() {
+	if(!colorInputBg.jscolor.refine) return;
+	colorInputBg.jscolor.fromRGB(255, 255, 255);
+	colorInputBg.value = "[ None ]";
+	colorInputBg.jscolor.refine = false;
+	colorInputBg.onclick = enableBgColorPicker;
+}
+
+function enableBgColorPicker() {
+	if(colorInputBg.jscolor.refine) return;
+	colorInputBg.jscolor.refine = true;
+	colorInputBg.onclick = null;
+	colorInputBg.jscolor.fromString("#DCE943");
+}
+
 function makeCoordLinkModal() {
 	var modal = new Modal();
 	modal.createForm();
@@ -6212,9 +6338,16 @@ function makeColorModal() {
 	modal.setMinimumSize(290, 128);
 	modal.createForm();
 	modal.setFormTitle("\n");
-	colorInput = modal.addEntry("Color Code", "color").input;
+	colorInput = modal.addEntry("Text color", "color").input;
 	modal.onSubmit(function() {
-		var color = colorInput.value;
+		var color;
+		var isBg = modal.getCurrentTabId() == "bg";
+		if(!isBg) { // text color
+			color = colorInput.value;
+		} else { // cell color
+			if(!colorInputBg.jscolor.refine) return;
+			color = colorInputBg.value;
+		}
 		var this_color = 0;
 		if(color) {
 			this_color = parseInt(color, 16);
@@ -6222,8 +6355,13 @@ function makeColorModal() {
 		if(!this_color) {
 			this_color = 0;
 		}
-		w.changeColor(this_color);
-		localStorage.setItem("color", this_color);
+		if(!isBg) {
+			w.changeColor(this_color);
+			localStorage.setItem("color", this_color);
+		} else {
+			w.changeBgColor(this_color);
+			// we don't need to save the bg color to localStorage (if enabled for this world)
+		}
 	});
 	modal.onClose(function(canceled) {
 		if(!canceled) {
@@ -6244,6 +6382,43 @@ function makeColorModal() {
 	colorShortcuts = document.createElement("div");
 	colorShortcuts.id = "color_shortcuts";
 	modal.setFooterContentRight(colorShortcuts);
+
+	colorShortcutsBg = document.createElement("div");
+	colorShortcutsBg.id = "color_shortcuts_bg";
+	colorShortcutsBg.style.display = "none";
+
+	if(!Permissions.can_color_text(state.userModel, state.worldModel)) {
+		modal.focusTab("bg");
+		// TODO
+	}
+
+	if(Permissions.can_color_cell(state.userModel, state.worldModel)) {
+		modal.addTab("fg", "Text");
+		modal.addTab("bg", "Cell");
+	
+		modal.focusTab("bg");
+
+		modal.createForm();
+		modal.setFormTitle("\n");
+		colorInputBg = modal.addEntry("Char color", "color").input;
+		modal.setFooterContentRight(colorShortcutsBg);
+		updateBgColorPicker();
+
+		modal.focusTab("fg");
+		
+		disableBgColorPicker();
+
+		modal.onTabChange(function(evt) {
+			var tab = evt.id;
+			if(tab == "bg") {
+				colorShortcutsBg.style.display = "";
+				colorShortcuts.style.display = "none";
+			} else if(tab == "fg") {
+				colorShortcutsBg.style.display = "none";
+				colorShortcuts.style.display = "";
+			}
+		});
+	}
 }
 
 function makeSelectionModal() {
@@ -6512,6 +6687,8 @@ var ws_functions = {
 			if(!data.tiles[tileKey]) {
 				data.tiles[tileKey] = blankTile();
 			}
+			// TODO: untangle this part of the code
+			// processing bgColor is not necessary since it's nullable
 			if(!data.tiles[tileKey].properties.color) {
 				data.tiles[tileKey].properties.color = new Array(tileArea).fill(0);
 			}
@@ -6534,8 +6711,10 @@ var ws_functions = {
 			} else {
 				newContent = new Array(tileArea).fill(" ");
 			}
+			// TODO: find a better way - this is very bad for memory
 			var oldContent = tiles[tileKey].content;
 			var oldColors = tiles[tileKey].properties.color.slice(0);
+			var oldBgColors = tiles[tileKey].properties.bgcolor ? tiles[tileKey].properties.bgcolor.slice(0) : null;
 			var charX = 0;
 			var charY = 0;
 			// compare data
@@ -6544,11 +6723,14 @@ var ws_functions = {
 				var nChar = newContent[g];
 				var oCol = oldColors[g];
 				var nCol = newColors[g];
-				if(oChar != nChar || oCol != nCol) {
+				var oBgCol = oldBgColors ? oldBgColors[g] : -1;
+				var nBgCol = oldBgColors ? oldBgColors[g] : -1;
+				if(oChar != nChar || oCol != nCol || oBgCol != nBgCol) {
 					// don't overwrite local changes until those changes are confirmed
 					if(!searchTellEdit(tileX, tileY, charX, charY)) {
 						oldContent[g] = nChar;
 						oldColors[g] = nCol;
+						if(oldBgColors) oldBgColors[g] = nBgCol;
 					}
 					// briefly highlight these changes (10 at a time)
 					if(useHighlight && Tile.visible(tileX, tileY)) {
@@ -6564,6 +6746,7 @@ var ws_functions = {
 			tiles[tileKey].properties = data.tiles[tileKey].properties; // update tile
 			tiles[tileKey].content = oldContent; // update only necessary character updates
 			tiles[tileKey].properties.color = oldColors; // update only necessary color updates
+			tiles[tileKey].properties.bgcolor = oldBgColors; // update likewise
 			w.setTileRedraw(tileX, tileY);
 			if(bufferLargeChars) {
 				w.setTileRedraw(tileX, tileY - 1);
@@ -6703,6 +6886,9 @@ var ws_functions = {
 					break;
 				case "colorText":
 					state.worldModel.color_text = value;
+					break;
+				case "colorCell":
+					state.worldModel.color_cell = value;
 					break;
 				case "memberTilesAddRemove":
 					state.worldModel.feature_membertiles_addremove = value;

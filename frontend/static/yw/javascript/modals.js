@@ -50,10 +50,15 @@ function Modal() {
 	this.submitFn = null;
 	this.openFn = null;
 	this.closeFn = null;
+	this.tabChangeFn = null;
 
 	this.cbField = null;
 	this.cbList = [];
 	this.cbCallback = null;
+
+	this.tabList = [];
+	this.tabIndex = {};
+	this.currentTabCtx = null;
 
 	var frame = document.createElement("div");
 	frame.className = "modal_frame";
@@ -70,11 +75,22 @@ function Modal() {
 	fClient.style.padding = "12px";
 	fClient.style.position = "relative";
 
+	var tField = document.createElement("div");
+	tField.className = "modal_tab_field";
+	tField.style.display = "none";
+	tField.style.margin = "6px";
+	tField.style.marginBottom = "0px";
+	tField.style.paddingLeft = "4px";
+	tField.style.display = "none"; // TODO
+	tField.style.alignItems = "flex-end";
+
+	frame.appendChild(tField);
 	frame.appendChild(fClient)
 	modalOverlay.appendChild(frame);
 
 	this.frame = frame;
 	this.client = fClient;
+	this.tabField = tField;
 
 	Modal.list.push(this);
 	return this;
@@ -463,6 +479,7 @@ Modal.prototype.removeFooterContentRight = function() {
 	onSubmit: to be called whenever the form is submitted.
 	onOpen: to be called whenever the modal is opened.
 	onClose: to be called whenever the modal is closed.
+	onTabChange: to be called whenever another tab is selected.
 */
 Modal.prototype.onSubmit = function(callback) {
 	this.submitFn = callback;
@@ -475,6 +492,9 @@ Modal.prototype.onClose = function(callback) {
 }
 Modal.prototype.checkboxFieldOnInput = function(callback) {
 	this.cbCallback = callback;
+}
+Modal.prototype.onTabChange = function(callback) {
+	this.tabChangeFn = callback;
 }
 
 /*
@@ -612,6 +632,141 @@ Modal.prototype.addCheckbox = function(label, parent) {
 	updateModalCheckboxField(this.cbList);
 
 	return cbObj;
+}
+
+/*
+	Insert a new tab to the modal along with a new client area.
+	If no tab exists, the current client area becomes part of the first tab.
+*/
+Modal.prototype.addTab = function(id, title) {
+	if(this.tabIndex[id]) {
+		throw "Tab already exists with the same id ('" + id + "')";
+	}
+	var self = this;
+	var tabBtn = document.createElement("div");
+	tabBtn.className = "modal-tab-btn";
+	tabBtn.innerText = title;
+	tabBtn.style.display = "inline-block";
+
+	var tabContext = null;
+	if(this.tabList.length == 0) { // initial tab
+		tabBtn.style.backgroundColor = "#E5E5FF";
+		tabBtn.style.height = "24px";
+
+		tabContext = {
+			id: id,
+			btn: tabBtn,
+			client: this.client,
+			inputField: this.inputField,
+			formTitle: this.formTitle,
+			formField: this.formField,
+			formInputs: this.formInputs,
+			hasSubmitted: this.hasSubmitted,
+			cbField: this.cbField,
+			cbList: this.cbList,
+			cbCallback: this.cbCallback
+		};
+
+		this.currentTabCtx = tabContext;
+	} else { // extra tabs
+		tabBtn.style.height = "18px";
+
+		var fClient = document.createElement("div");
+		fClient.className = "modal_client";
+		fClient.style.flex = "1";
+		fClient.style.margin = "6px";
+		fClient.style.padding = "12px";
+		fClient.style.position = "relative";
+		fClient.style.marginTop = "0px";
+		fClient.style.display = "none";
+
+		if(this.footerField) {
+			fClient.style.marginBottom = "0px";
+			this.frame.removeChild(this.footerField);
+		}
+		this.frame.appendChild(fClient);
+		if(this.footerField) {
+			this.frame.appendChild(this.footerField);
+		}
+
+		tabContext = {
+			id: id,
+			btn: tabBtn,
+			client: fClient,
+			inputField: null,
+			formTitle: null,
+			formField: null,
+			formInputs: [],
+			hasSubmitted: false,
+			cbField: null,
+			cbList: [],
+			cbCallback: null
+		};
+	}
+	tabBtn.style.paddingLeft = "4px";
+	tabBtn.style.paddingRight = "4px";
+	tabBtn.style.paddingTop = "2px";
+	tabBtn.style.paddingBottom = "2px";
+	tabBtn.style.fontSize = "1em";
+	this.tabField.style.display = "flex";
+
+	tabBtn.onclick = function() {
+		self.focusTab(id);
+	}
+
+	this.client.style.marginTop = "0px";
+
+	this.tabField.appendChild(tabBtn);
+
+	this.tabList.push(tabContext);
+	this.tabIndex[id] = tabContext;
+}
+
+/*
+	Make the tab the current visible tab.
+*/
+Modal.prototype.focusTab = function(id) {
+	if(this.currentTabCtx == this.tabIndex[id]) {
+		return;
+	}
+
+	if(this.tabChangeFn) {
+		this.tabChangeFn({
+			id: id
+		});
+	}
+
+	var prev = this.currentTabCtx;
+	var curr = this.tabIndex[id];
+	this.currentTabCtx = this.tabIndex[id];
+
+	prev.client.style.display = "none";
+	prev.btn.style.height = "18px";
+	prev.btn.style.backgroundColor = "";
+
+	curr.client.style.display = "";
+	curr.btn.style.height = "24px";
+	curr.btn.style.backgroundColor = "#E5E5FF";
+
+	// transfer context
+	this.client = curr.client;
+	this.inputField = curr.inputField;
+	this.formTitle = curr.formTitle;
+	this.formField = curr.formField;
+	this.formInputs = curr.formInputs;
+	this.hasSubmitted = curr.hasSubmitted;
+	this.cbField = curr.cbField;
+	this.cbList = curr.cbList;
+	this.cbCallback = curr.cbCallback;
+}
+
+/*
+	If there are any defined tabs, return the ID of the
+	currently active tab.
+*/
+Modal.prototype.getCurrentTabId = function() {
+	if(!this.currentTabCtx) return null;
+	return this.currentTabCtx.id;
 }
 
 /*

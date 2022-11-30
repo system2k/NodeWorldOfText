@@ -189,6 +189,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		membertiles_addremove: world.feature.memberTilesAddRemove,
 		chat_permission: world.feature.chat,
 		color_text: world.feature.colorText,
+		color_cell: world.feature.colorCell,
 		show_cursor: world.feature.showCursor,
 
 		color,
@@ -416,6 +417,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		var chat = validatePerms(post_data.chat, 2, true);
 		var show_cursor = validatePerms(post_data.show_cursor, 2, true);
 		var color_text = validatePerms(post_data.color_text, 2);
+		var color_cell = validatePerms(post_data.color_cell, 2, true);
 		var membertiles_addremove = post_data.membertiles_addremove;
 		if(membertiles_addremove == "false") {
 			membertiles_addremove = 0;
@@ -447,6 +449,9 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		}
 		if(modifyWorldProp(world, "feature/colorText", color_text)) {
 			featureUpdates.push({type: "colorText", value: color_text});
+		}
+		if(modifyWorldProp(world, "feature/colorCell", color_cell)) {
+			featureUpdates.push({type: "colorCell", value: color_cell});
 		}
 		if(modifyWorldProp(world, "feature/memberTilesAddRemove", Boolean(membertiles_addremove))) {
 			featureUpdates.push({type: "memberTilesAddRemove", value: Boolean(membertiles_addremove)});
