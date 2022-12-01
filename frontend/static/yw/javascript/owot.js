@@ -315,9 +315,9 @@ function addColorShortcuts() {
 		"#F49446",
 		"#DCE943",
 		"#07D555",
-		"#4194C9",
-		"#7B55C6",
-		"#EA44A5"
+		"#529DC9",
+		"#9D7DC6",
+		"#EA5BB6"
 	];
 	for(var i = 0; i < colors.length; i++) {
 		var color = colors[i];
@@ -1974,7 +1974,7 @@ function removeCursor() {
 		charX: cursorCoords[2],
 		charY: cursorCoords[3]
 	};
-	var hasBgColor = getCharBgColor() != -1
+	var hasBgColor = getCharBgColor() != -1;
 	cursorCoords = null;
 	w.setTileRender(remTileX, remTileY);
 	if(hasBgColor) {
@@ -2335,6 +2335,7 @@ function writeChar(char, doNotMoveCursor, color, noNewline, undoCursorOffset, bg
 	var charColor = color || YourWorld.Color;
 	var charBgColor = bgColor || YourWorld.BgColor;
 	if(color == 0) charColor = 0;
+	if(bgColor == 0) charBgColor = 0;
 	var cursor = cursorCoords;
 	if(!cursor && (char == "\n" || char == "\r") && !noNewline) {
 		cursor = cursorCoordsCurrent;
@@ -6357,7 +6358,7 @@ function buildBackgroundColorModal(modal) {
 
 	modal.createForm();
 	modal.setFormTitle("\n");
-	colorInputBg = modal.addEntry("Char color", "color").input;
+	colorInputBg = modal.addEntry("Cell color", "color").input;
 	modal.setFooterContentRight(colorShortcutsBg);
 	updateBgColorPicker();
 

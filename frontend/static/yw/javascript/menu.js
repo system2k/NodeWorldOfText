@@ -13,7 +13,7 @@ function Menu(titleEl, menuEl) {
 		var s = document.createElement("div");
 		s.innerText = text;
 		s.onclick = function() {
-			if(text == "Wiper") return; // TEMP
+			if(text.includes("Wiper")) return; // TEMP
 			action();
 			_this.hideNow();
 		}
