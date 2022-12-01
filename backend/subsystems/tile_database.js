@@ -586,6 +586,10 @@ function tileWriteEdits(cacheTile, editObj) {
 	if(char_updated && !no_log_edits && sharedObj.editLog) {
 		var ar = [tileY, tileX, charY, charX, Date.now(), char, editID];
 		if(color) ar.push(color); // TODO
+		if(bgcolor != -1) {
+			if(!color) ar.push(0);
+			ar.push(bgcolor);
+		}
 		sharedObj.editLog.push(ar);
 	}
 	if(char_updated) {

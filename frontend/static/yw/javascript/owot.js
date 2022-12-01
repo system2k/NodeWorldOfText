@@ -522,21 +522,33 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 	var charY = coordA[3];
 	var reg = [];
 	var colors = [];
+	var bgcolors = [];
 	var links = [];
 	var protections = [];
 	var decorations = [];
 	for(var y = 0; y < regHeight; y++) {
+		// rows
 		var r_reg = [];
 		var r_colors = [];
+		var r_bgcolors = [];
 		var r_links = [];
 		var r_protections = [];
 		var r_decorations = [];
+		// contains non-default (not null) value in row?
+		var c_color = false;
+		var c_bgcolor = false;
+		var c_link = false;
+		var c_protection = false;
+		var c_decoration = false;
 		for(var x = 0; x < regWidth; x++) {
 			var charInfo = getCharInfo(tileX, tileY, charX, charY);
 			var char = charInfo.char;
 			char = char.replace(/\r|\n|\x1b/g, " ");
 			r_reg.push(char);
 			r_colors.push(charInfo.color);
+			r_bgcolors.push(charInfo.bgColor);
+			if(charInfo.color) c_color = true;
+			if(charInfo.bgColor != -1) c_bgcolor = true;
 			var tile = Tile.get(tileX, tileY);
 			var containsLink = false;
 			if(tile && tile.properties && tile.properties.cell_props) {
@@ -545,6 +557,7 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 					if(link.link) {
 						link = link.link;
 						containsLink = true;
+						c_link = true;
 						if(link.type == "url") {
 							r_links.push("$u" + "\"" + escapeQuote(link.url) + "\"");
 						} else if(link.type == "coord") {
@@ -554,18 +567,26 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 				}
 			}
 			r_protections.push(charInfo.protection);
+			if(charInfo.protection !== null) c_protection = true;
 			if(!containsLink) {
 				r_links.push(null);
 			}
 			r_decorations.push(charInfo.decoration);
+			if(charInfo.decoration !== null) c_decoration = true;
 			charX++;
 			if(charX >= tileC) {
 				charX = 0;
 				tileX++;
 			}
 		}
+		if(!c_color) r_colors = null;
+		if(!c_link) r_links = null;
+		if(!c_protection) r_protections = null;
+		if(!c_decoration) r_decorations = null;
+		if(!c_bgcolor) r_bgcolors = null;
 		reg.push(r_reg);
 		colors.push(r_colors);
+		bgcolors.push(r_bgcolors);
 		links.push(r_links);
 		protections.push(r_protections);
 		decorations.push(r_decorations);
@@ -577,7 +598,7 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 			tileY++;
 		}
 	}
-	w.ui.selectionModal.open(reg, colors, links, protections, decorations, [coordA, coordB]);
+	w.ui.selectionModal.open(reg, colors, bgcolors, links, protections, decorations, [coordA, coordB]);
 	w.emit("regionSelected", {
 		a: coordA,
 		b: coordB
@@ -2443,11 +2464,13 @@ function propagatePosition(coords, char, noEnter, noVertPos) {
 	return coords;
 }
 
-function textcode_parser(value, coords, defaultColor) {
+function textcode_parser(value, coords, defaultColor, defaultBgColor) {
 	if(typeof value == "string") value = w.split(value);
 	var hex = "ABCDEF";
 	var pasteColor = defaultColor;
 	if(!pasteColor) pasteColor = 0;
+	var pasteBgColor = defaultBgColor;
+	if(pasteBgColor == void 0) pasteBgColor = -1;
 	var index = 0;
 	var off = {
 		tileX: 0, tileY: 0,
@@ -2575,20 +2598,17 @@ function textcode_parser(value, coords, defaultColor) {
 				index++;
 				chr = "";
 				doWriteChar = true;
-			} else if(hCode == "x" || hCode == "X" || (hCode >= "A" && hCode <= "F")) { // colored paste
+			} else if(hCode == "x" || (hCode >= "A" && hCode <= "F")) { // colored paste
 				var cCol = "";
 				if(hCode == "x") {
 					cCol = "000000";
+					pasteBgColor = -1;
 					index += 2;
-				} else if(hCode == "X") {
-					// -1 does not overwrite color
-					cCol = "-1";
-					index += 2;
-				} else {
+				} else { // we use 'F' now, which indicates a length of 6.
 					var code = hex.indexOf(hCode);
 					if(code > -1) {
 						cCol = value.slice(index + 2, index + 2 + code + 1).join("");
-						index += code + 1;
+						index += code + 1; // index 5 plus one.
 					}
 					index += 2;
 				}
@@ -2596,6 +2616,11 @@ function textcode_parser(value, coords, defaultColor) {
 				return {
 					type: "yield"
 				};
+			} else if(hCode == "b") { // background cell color
+				var bCol = value.slice(index + 2, index + 2 + 6).join("");
+				index += 6 + 2;
+				pasteBgColor = parseInt(bCol, 16);
+				if(isNaN(pasteBgColor)) pasteBgColor = -1;
 			} else {
 				index += 2;
 				doWriteChar = true;
@@ -2637,6 +2662,7 @@ function textcode_parser(value, coords, defaultColor) {
 			type: "char",
 			char: chr,
 			color: pasteColor,
+			bgColor: pasteBgColor,
 			writable: doWriteChar,
 			newline: newline, // if false, interpret newline characters as characters
 			tileX: charPos[0],
@@ -2708,7 +2734,7 @@ var char_input_check = setInterval(function() {
 		tileY: cursorCoords[1],
 		charX: cursorCoords[2],
 		charY: cursorCoords[3]
-	}, YourWorld.Color);
+	}, YourWorld.Color, YourWorld.BgColor);
 	elm.textInput.value = "";
 	var item;
 	var charCount = 0;
@@ -2726,7 +2752,7 @@ var char_input_check = setInterval(function() {
 				if(item.char == "\x7F") {
 					return true;
 				}
-				var res = writeChar(item.char, false, item.color, !item.newline);
+				var res = writeChar(item.char, false, item.color, !item.newline, 0, item.bgColor);
 				if(res === null) {
 					// pause until tile loads
 					requestNextItem = false;
@@ -6494,6 +6520,7 @@ function makeSelectionModal() {
 
 	function updateOutput() {
 		var o_color = c_color.cbElm.checked;
+		var o_bgcolor = c_bgcolor.cbElm.checked;
 		var o_link = c_link.cbElm.checked;
 		var o_deco = c_deco.cbElm.checked;
 		var o_prot = c_prot.cbElm.checked;
@@ -6507,16 +6534,18 @@ function makeSelectionModal() {
 		var o_rcomb = r_comb.cbElm.checked;
 		var text = s_str;
 		var currentCol = -1;
+		var currentBgCol = -1;
 		var resText = [];
 		for(var y = 0; y < text.length; y++) {
 			var textRow = text[y].slice(0);
 			filterAdvancedChars(textRow, o_rsurrog, o_rcomb);
-			var colRow = o_color && s_colors[y].slice(0);
-			var linkRow = o_link && s_links[y].slice(0);
-			var protRow = o_prot && s_prots[y].slice(0);
-			var decoRow = o_deco && s_decos[y].slice(0);
+			var colRow = o_color && s_colors[y] && s_colors[y].slice(0);
+			var bgColRow = o_bgcolor && s_bgcolors[y] && s_bgcolors[y].slice(0);
+			var linkRow = o_link && s_links[y] && s_links[y].slice(0);
+			var protRow = o_prot && s_prots[y] && s_prots[y].slice(0);
+			var decoRow = o_deco && s_decos[y] && s_decos[y].slice(0);
 			if(o_tleft || o_tright || o_rgap) spaceTrim(textRow, o_tleft, o_tright, o_rgap, [colRow, linkRow, protRow, decoRow]);
-			if(o_deco) {
+			if(o_deco && decoRow) {
 				for(var x = 0; x < textRow.length; x++) {
 					var chr = textRow[x];
 					var deco = decoRow[x];
@@ -6526,28 +6555,49 @@ function makeSelectionModal() {
 					}
 				}
 			}
-			if(o_color) {
+			if(o_color || o_bgcolor) {
 				for(var x = 0; x < textRow.length; x++) {
-					var col = colRow[x];
-					if(col == currentCol) continue;
-					currentCol = col;
-					var chr = "\x1b";
-					if(col == 0) {
-						chr += "x";
-					} else {
-						chr += "F" + col.toString(16).padStart(6, 0);
+					var col = 0;
+					var bgCol = -1;
+					if(colRow) col = colRow[x];
+					if(bgColRow) bgCol = bgColRow[x];
+
+					if(col == currentCol && bgCol == currentBgCol) continue;
+
+					var chr = "";
+					if(bgCol != currentBgCol && o_bgcolor) { // cell color
+						chr += "\x1b";
+						if(bgCol == -1) {
+							chr += "x";
+							currentCol = -1; // this also resets text color, so re-add it right after bgcolor definition
+						} else {
+							chr += "b" + bgCol.toString(16).padStart(6, 0);
+						}
 					}
+					if(col != currentCol && o_color) { // text color
+						chr += "\x1b";
+						if(col == 0) {
+							chr += "x";
+							if(o_bgcolor && bgCol != -1) { // re-add cell color if applicable
+								chr += "\x1b" + "b" + bgCol.toString(16).padStart(6, 0);
+							}
+						} else {
+							chr += "F" + col.toString(16).padStart(6, 0);
+						}
+					}
+					currentCol = col;
+					currentBgCol = bgCol;
 					textRow[x] = chr + textRow[x];
 				}
 			}
-			if(o_link) {
+			if(o_link && linkRow) {
 				for(var x = 0; x < textRow.length; x++) {
 					var link = linkRow[x];
 					if(!link) continue;
 					textRow[x] = "\x1b" + link + textRow[x];
 				}
 			}
-			if(o_prot) {
+			if(o_prot && protRow) {
 				for(var x = 0; x < textRow.length; x++) {
 					var prot = protRow[x];
 					if(prot == 0 && !o_protpub) continue;
@@ -6570,6 +6620,7 @@ function makeSelectionModal() {
 
 	var s_str;
 	var s_colors;
+	var s_bgcolors;
 	var s_links
 	var s_prots;
 	var s_decos;
@@ -6581,6 +6632,7 @@ function makeSelectionModal() {
 	modal.createCheckboxField();
 	modal.createClose();
 	var c_color = modal.addCheckbox("Copy colors");
+	var c_bgcolor = modal.addCheckbox("Copy cell colors", c_color);
 	var c_link = modal.addCheckbox("Copy links");
 	var c_prot = modal.addCheckbox("Copy protections");
 	var c_pprot = modal.addCheckbox("Copy public protections", c_prot);
@@ -6592,15 +6644,28 @@ function makeSelectionModal() {
 	var r_br = modal.addCheckbox("Remove line breaks");
 	var r_surr = modal.addCheckbox("Remove surrogates");
 	var r_comb = modal.addCheckbox("Remove combining chars");
+	c_bgcolor.elm.style.display = "none"; // keep bg color option hidden unless there exist colored cells
 	modal.checkboxFieldOnInput(function(obj, checked) {
 		updateOutput();
 	});
-	modal.onOpen(function(str, colors, links, protections, decorations, coords) {
+	modal.onOpen(function(str, colors, bgcolors, links, protections, decorations, coords) {
 		s_str = str;
 		s_colors = colors;
+		s_bgcolors = bgcolors;
 		s_links = links;
 		s_prots = protections;
 		s_decos = decorations;
+		var bgColorsFound = false;
+		for(var i = 0; i < bgcolors.length; i++) {
+			if(bgcolors[i]) {
+				c_bgcolor.elm.style.display = "";
+				bgColorsFound = true;
+				break;
+			}
+		}
+		if(!bgColorsFound) {
+			c_bgcolor.elm.style.display = "none";
+		}
 		if(!showCursorCoordinates) {
 			region_bounds.style.display = "none";
 		} else {
