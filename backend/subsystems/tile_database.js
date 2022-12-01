@@ -1343,7 +1343,7 @@ async function beginTileIterationsLoop() {
 							dimTile.content[i] = " ";
 							dimTile.prop_color[i] = 0;
 							if(dimTile.prop_bgcolor) {
-								dimTile.prop_bgcolor[i]
+								dimTile.prop_bgcolor[i] = -1;
 							}
 							dimTile.content_updated = true;
 							dimTile.props_updated = true;
@@ -1376,7 +1376,7 @@ async function beginTileIterationsLoop() {
 							tileObj.content[i] = " ";
 							tileObj.prop_color[i] = 0;
 							if(tileObj.prop_bgcolor) {
-								tileObj.prop_bgcolor[i]
+								tileObj.prop_bgcolor[i] = -1;
 							}
 							if(tileObj.prop_cell_props[charY]) {
 								if(tileObj.prop_cell_props[charY][charX]) {
