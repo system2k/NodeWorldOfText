@@ -107,27 +107,6 @@ function keyup_admclr(e) {
 }
 document.body.addEventListener("keyup", keyup_admclr);
 
-function enableServerPasting() {
-	clearInterval(char_input_check);
-	char_input_check = setInterval(function() {
-		if(write_busy) return;
-		var value = textInput.value;
-		if(value == "") return;
-		value = value.replace(/\r\n/g, "\n");
-		value = value.replace(/\r/g, "\n");
-		value = w.split(value);
-		w.socket.send(JSON.stringify({
-			kind: "paste",
-			tileX: cursorCoords[0],
-			tileY: cursorCoords[1],
-			charX: cursorCoords[2],
-			charY: cursorCoords[3],
-			data: textInput.value
-		}));
-		textInput.value = "";
-	}, 10);
-}
-
 client_commands.search = function(args) {
 	var phrase = args.join(" ");
 	if(!phrase) return;

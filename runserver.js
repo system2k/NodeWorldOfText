@@ -860,7 +860,6 @@ var websockets = {
 	cursor: require("./backend/websockets/cursor.js"),
 	fetch: require("./backend/websockets/fetch.js"),
 	link: require("./backend/websockets/link.js"),
-	paste: require("./backend/websockets/paste.js"),
 	protect: require("./backend/websockets/protect.js"),
 	write: require("./backend/websockets/write.js"),
 	config: require("./backend/websockets/config.js")
@@ -2845,7 +2844,6 @@ var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	link:			[400, 1000, 0], // TODO: fix link limits
 	protect:		[400, 1000, 0],
 	write:			[256, 1000, 0], // rate-limiting handled separately
-	paste:			[10, 500, 0],
 	cursor:			[70, 1000, 0]
 };
 

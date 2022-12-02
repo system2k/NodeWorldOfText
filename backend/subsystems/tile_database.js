@@ -1582,148 +1582,7 @@ function coordinateAdd(tileX1, tileY1, charX1, charY1, tileX2, tileY2, charX2, c
 
 function processComplexRequest(call_id, type, data) {
 	switch(type) {
-		case types.paste:
-			var world = data.world;
-			var user = data.user;
-
-			var is_owner = data.is_owner;
-			var is_member = data.is_member;
-			var tileX = data.tileX;
-			var tileY = data.tileY;
-			var charX = data.charX;
-			var charY = data.charY;
-			var can_color_text = data.can_color_text;
-			var text = data.text;
-
-			var parsed_text = parseTextcode(text);
-			var promiseList = [];
-			var modifiedTiles = {};
-
-			var editList = [];
-			var len = parsed_text.text.length;
-			var text = parsed_text.text;
-			var color = parsed_text.color;
-			var cur_tileX = tileX;
-			var cur_tileY = tileY;
-			var cur_charX = charX;
-			var cur_charY = charY;
-			var date = Date.now();
-			var editIdx = 1;
-			for(var x = 0; x < len; x++) {
-				var chr = text[x];
-				var col = color[x];
-				if(chr != "\n" && chr != "\r") {
-					if(chr.length > 0) {
-						modifiedTiles[cur_tileY + "," + cur_tileX] = 1;
-						editList.push([cur_tileY, cur_tileX, cur_charY, cur_charX, date, chr, editIdx++, col]);
-					}
-					cur_charX++;
-					if(cur_charX >= CONST.tileCols) {
-						cur_charX = 0;
-						cur_tileX++;
-					}
-				} else {
-					cur_tileX = tileX;
-					cur_charX = charX;
-					cur_charY++;
-					if(cur_charY >= CONST.tileRows) {
-						cur_charY = 0;
-						cur_tileY++;
-					}
-				}
-			}
-
-			var writeCallID = module.exports.newCallId();
-			module.exports.reserveCallId(writeCallID);
-			module.exports.write(writeCallID, types.write, {
-				date,
-				tile_edits: editList,
-				user, world, is_owner, is_member,
-				can_color_text,
-				public_only: false,
-				no_log_edits: false,
-				preserve_links: false,
-				channel: "00000000000000",
-				no_update: true
-			});
-			promiseList.push(module.exports.editResponse(writeCallID));
-
-			for(var i = 0; i < parsed_text.prot.length; i++) {
-				var prot = parsed_text.prot[i];
-				var pcid = module.exports.newCallId();
-				module.exports.reserveCallId(pcid);
-				modifiedTiles[prot[2] + "," + prot[1]] = 1;
-				var pos = coordinateAdd(tileX, tileY, charX, charY, prot[1], prot[2], prot[3], prot[4]);
-				module.exports.write(pcid, types.protect, {
-					tileX: san_nbr(pos[0]),
-					tileY: san_nbr(pos[1]),
-					charX: pos[2],
-					charY: pos[3],
-					user, world, is_member, is_owner,
-					precise: true,
-					protect_type: prot[0],
-					channel: "00000000000000",
-					no_log_edits: false,
-					no_update: true
-				});
-				promiseList.push(module.exports.editResponse(pcid));
-			}
-
-			for(var i = 0; i < parsed_text.link.length; i++) {
-				var link = parsed_text.link[i];
-				var pcid = module.exports.newCallId();
-				module.exports.reserveCallId(pcid);
-				modifiedTiles[link[2] + "," + link[1]] = 1;
-				var pos = coordinateAdd(tileX, tileY, charX, charY, link[1], link[2], link[3], link[4]);
-				var l_type = link[0];
-				var l_url = void 0;
-				var l_link_tileX = void 0;
-				var l_link_tileY = void 0;
-				if(l_type == "url") {
-					l_url = link[5];
-				} else if(l_type == "coord") {
-					l_link_tileX = link[5];
-					l_link_tileY = link[6];
-				}
-				module.exports.write(pcid, types.link, {
-					tileX: san_nbr(pos[0]),
-					tileY: san_nbr(pos[1]),
-					charX: pos[2],
-					charY: pos[3],
-					user, world, is_member, is_owner,
-					type: l_type,
-					url: l_url,
-					link_tileX: l_link_tileX,
-					link_tileY: l_link_tileY,
-					channel: "00000000000000",
-					no_log_edits: false,
-					no_update: true
-				});
-				promiseList.push(module.exports.editResponse(pcid));
-			}
-
-			Promise.all(promiseList).then(function(e) {
-				var updatedTiles = [];
-				for(var coord in modifiedTiles) {
-					var pos = coord.split(",");
-					var tileY = parseInt(pos[0]);
-					var tileX = parseInt(pos[1]);
-					var dimTile = isTileDIM(world.id, tileX, tileY);
-					if(!dimTile) continue;
-					updatedTiles.push({
-						tileX,
-						tileY,
-						tile: dimTile
-					});
-				}
-				if(updatedTiles.length > 0) {
-					prepareTileUpdateMessage(updatedTiles, world, "00000000000000");
-				}
-				IOProgress(call_id);
-			}).catch(function(e) {
-				handle_error(e);
-				IOProgress(call_id);
-			});
+		// vacant
 	}
 }
 
@@ -1763,9 +1622,6 @@ module.exports.write = function(call_id, type, data) {
 		case types.eraseworld:
 			processTileIteration(call_id, type, data);
 			break;
-		case types.paste:
-			processComplexRequest(call_id, type, data);
-			break;
 		default:
 			break;
 	}
@@ -1791,7 +1647,6 @@ var types = {
 	protect: types_enum++,
 	clear: types_enum++,
 	publicclear: types_enum++,
-	paste: types_enum++,
 	eraseworld: types_enum++
 };
 
