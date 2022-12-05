@@ -2995,6 +2995,7 @@ async function manageWebsocketConnection(ws, req) {
 		var cookies = parseCookie(req.headers.cookie);
 		var user = await get_user_info(cookies, true);
 		if(!user.superuser) {
+			remove_ip_address_connection(ws.sdata.ipAddress);
 			return ws.close();
 		}
 		sendMonitorEvents(ws);
