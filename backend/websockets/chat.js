@@ -1,3 +1,9 @@
+var utils = require("../utils/utils.js");
+var html_tag_esc = utils.html_tag_esc;
+var san_nbr = utils.san_nbr;
+var uptime = utils.uptime;
+var create_date = utils.create_date;
+
 function sanitizeColor(col) {
 	var masks = ["#XXXXXX", "#XXX"];
 
@@ -39,19 +45,16 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	var db = vars.db;
 	var db_ch = vars.db_ch;
-	var san_nbr = vars.san_nbr;
 	var ws_broadcast = vars.ws_broadcast; // site-wide broadcast
 	var chat_mgr = vars.chat_mgr;
-	var html_tag_esc = vars.html_tag_esc;
 	var topActiveWorlds = vars.topActiveWorlds;
 	var wss = vars.wss;
-	var uptime = vars.uptime;
 	var ranks_cache = vars.ranks_cache;
 	var accountSystem = vars.accountSystem;
-	var create_date = vars.create_date;
 	var client_ips = vars.client_ips;
 	var wsSend = vars.wsSend;
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
+	var loadPlugin = vars.loadPlugin;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
 	var remove_from_chatlog = chat_mgr.remove_from_chatlog;
@@ -671,6 +674,33 @@ module.exports = async function(ws, data, send, vars, evars) {
 			}
 		} else {
 			cil.chatsSentInSecond++;
+		}
+	}
+
+	// chat proxy
+	var chatPlugin = loadPlugin();
+	if(chatPlugin && chatPlugin.chat) {
+		var check = false;
+		try {
+			check = chatPlugin.chat({
+				ip: ipHeaderAddr,
+				isOwner: is_owner,
+				isMember: is_member,
+				isOperator: user.operator,
+				isSuperuser: user.superuser,
+				isStaff: user.staff,
+				isAuth: user.authenticated,
+				worldName: world.name,
+				location: location,
+				nickname: nick,
+				message: msg
+			});
+		} catch(e) {
+			check = false;
+		}
+		if(check === true) {
+			serverChatResponse("Message dropped.", location);
+			return;
 		}
 	}
 

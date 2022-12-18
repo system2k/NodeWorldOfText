@@ -130,3 +130,6 @@ function queueFetch(ip, worldID, range, socket) { // TODO: what if client closes
 }
 
 module.exports.fetch = queueFetch;
+module.exports.getDebugInfo = function() {
+	return { ipAddrQueue, fetchesByIp };
+}

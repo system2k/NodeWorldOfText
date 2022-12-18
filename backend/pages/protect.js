@@ -1,12 +1,14 @@
+var world_mgr = require("../subsystems/world_mgr.js");
+var releaseWorld = world_mgr.releaseWorld;
+var getOrCreateWorld = world_mgr.getOrCreateWorld;
+var canViewWorld = world_mgr.canViewWorld;
+
 module.exports.POST = async function(req, serve, vars, evars, params) {
 	var post_data = evars.post_data;
 	var user = evars.user;
 	var setCallback = evars.setCallback;
 
-	var getOrCreateWorld = vars.getOrCreateWorld;
-	var canViewWorld = vars.canViewWorld;
 	var modules = vars.modules;
-	var releaseWorld = vars.releaseWorld;
 
 	var world = await getOrCreateWorld(post_data.world);
 	if(!world) {

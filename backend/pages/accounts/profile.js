@@ -1,6 +1,13 @@
+var world_mgr = require("../../subsystems/world_mgr.js");
+var releaseWorld = world_mgr.releaseWorld;
+var fetchWorldMembershipsByUserId = world_mgr.fetchWorldMembershipsByUserId;
+var fetchOwnedWorldsByUserId = world_mgr.fetchOwnedWorldsByUserId;
+var claimWorldByName = world_mgr.claimWorldByName;
+var revokeMembershipByWorldName = world_mgr.revokeMembershipByWorldName;
+
 var wss;
 var wsSend;
-module.exports.startup_internal = function(vars) {
+module.exports.initialize = function(vars) {
 	wss = vars.wss;
 	wsSend = vars.wsSend;
 }
@@ -41,8 +48,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var db = vars.db;
 	var plural = vars.plural;
-	var fetchWorldMembershipsByUserId = vars.fetchWorldMembershipsByUserId;
-	var fetchOwnedWorldsByUserId = vars.fetchOwnedWorldsByUserId;
 	var createCSRF = vars.createCSRF;
 
 	if(!user.authenticated) {
@@ -136,11 +141,8 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var db = vars.db;
 	var dispage = vars.dispage;
-	var claimWorldByName = vars.claimWorldByName;
-	var revokeMembershipByWorldName = vars.revokeMembershipByWorldName;
 	var wss = vars.wss;
 	var checkCSRF = vars.checkCSRF;
-	var releaseWorld = vars.releaseWorld;
 
 	if(!user.authenticated) {
 		return serve(null, 403);

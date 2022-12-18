@@ -1,6 +1,19 @@
+var utils = require("../../utils/utils.js");
+var checkURLParam = utils.checkURLParam;
+var san_nbr = utils.san_nbr;
+var san_dp = utils.san_dp;
+
+var world_mgr = require("../../subsystems/world_mgr.js");
+var modifyWorldProp = world_mgr.modifyWorldProp;
+var releaseWorld = world_mgr.releaseWorld;
+var getOrCreateWorld = world_mgr.getOrCreateWorld;
+var promoteMembershipByWorldName = world_mgr.promoteMembershipByWorldName;
+var revokeMembershipByWorldName = world_mgr.revokeMembershipByWorldName;
+var renameWorld = world_mgr.renameWorld;
+
 var wss;
 var wsSend;
-module.exports.startup_internal = function(vars) {
+module.exports.initialize = function(vars) {
 	wss = vars.wss;
 	wsSend = vars.wsSend;
 }
@@ -52,13 +65,10 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var setCallback = evars.setCallback;
 
 	var url = vars.url;
-	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var dispage = vars.dispage;
-	var getOrCreateWorld = vars.getOrCreateWorld;
 	var uvias = vars.uvias;
 	var accountSystem = vars.accountSystem;
-	var releaseWorld = vars.releaseWorld;
 	var createCSRF = vars.createCSRF;
 
 	if(!user.authenticated) {
@@ -238,23 +248,14 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var setCallback = evars.setCallback;
 
 	var db = vars.db;
-	var checkURLParam = vars.checkURLParam;
 	var dispage = vars.dispage;
 	var url = vars.url;
-	var getOrCreateWorld = vars.getOrCreateWorld;
 	var ws_broadcast = vars.ws_broadcast;
 	var chat_mgr = vars.chat_mgr;
 	var tile_database = vars.tile_database;
 	var uvias = vars.uvias;
 	var accountSystem = vars.accountSystem;
 	var wss = vars.wss;
-	var san_nbr = vars.san_nbr;
-	var san_dp = vars.san_dp;
-	var modifyWorldProp = vars.modifyWorldProp;
-	var promoteMembershipByWorldName = vars.promoteMembershipByWorldName;
-	var revokeMembershipByWorldName = vars.revokeMembershipByWorldName;
-	var renameWorld = vars.renameWorld;
-	var releaseWorld = vars.releaseWorld;
 	var checkCSRF = vars.checkCSRF;
 
 	var clearChatlog = chat_mgr.clearChatlog;
@@ -772,20 +773,13 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				redirect: "/accounts/profile/"
 			});
 		} else if("clear_public" in post_data) {
-			// TODO: dynamically update
-			var tileCount = await db.get("SELECT COUNT(id) AS cnt FROM tile WHERE world_id=?", world.id);
-			if(!tileCount) return;
-			tileCount = tileCount.cnt;
-			// tile limit of 2000000
-			if(tileCount <= 2000000) {
-				var call_id = tile_database.newCallId();
-				tile_database.reserveCallId(call_id);
-				tile_database.write(call_id, tile_database.types.publicclear, {
-					date: Date.now(),
-					world,
-					user
-				});
-			}
+			var call_id = tile_database.newCallId();
+			tile_database.reserveCallId(call_id);
+			tile_database.write(call_id, tile_database.types.publicclear, {
+				date: Date.now(),
+				world,
+				user
+			});
 		} else if("clear_all" in post_data) {
 			var call_id = tile_database.newCallId();
 			tile_database.reserveCallId(call_id);

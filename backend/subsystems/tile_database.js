@@ -1,16 +1,19 @@
+var utils = require("../utils/utils.js");
+var arrayIsEntirely = utils.arrayIsEntirely;
+var advancedSplit = utils.advancedSplit;
+var encodeCharProt = utils.encodeCharProt;
+var decodeCharProt = utils.decodeCharProt;
+var san_nbr = utils.san_nbr;
+var change_char_in_array = utils.change_char_in_array;
+
+var WebSocket = require("ws");
+
 var db;
 var db_edits;
-var decodeCharProt;
 var handle_error;
 var intv;
 var wss;
-var WebSocket;
-var san_nbr;
-var encodeCharProt;
-var advancedSplit;
-var change_char_in_array;
 var memTileCache;
-var parseTextcode;
 var broadcastMonitorEvent;
 var wsSend;
 
@@ -21,17 +24,10 @@ var send_microedits = false;
 module.exports.main = function(vars) {
 	db = vars.db;
 	db_edits = vars.db_edits;
-	decodeCharProt = vars.decodeCharProt;
 	handle_error = vars.handle_error;
 	intv = vars.intv;
 	wss = vars.wss;
-	WebSocket = vars.WebSocket;
-	san_nbr = vars.san_nbr;
-	encodeCharProt = vars.encodeCharProt;
-	advancedSplit = vars.advancedSplit;
-	change_char_in_array = vars.change_char_in_array;
 	memTileCache = vars.memTileCache;
-	parseTextcode = vars.parseTextcode;
 	broadcastMonitorEvent = vars.broadcastMonitorEvent;
 	wsSend = vars.wsSend;
 

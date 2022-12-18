@@ -1,7 +1,10 @@
 var url = require("url");
+var mime = require("../utils/mime.js");
+
 var utils = require("../utils/utils.js");
 var removeLastSlash = utils.removeLastSlash;
-var mime = require("../utils/mime.js");
+var http_time = utils.http_time;
+var filename_sanitize = utils.filename_sanitize;
 
 function parseRange(range) {
 	if(!range) return false;
@@ -27,8 +30,6 @@ module.exports.GET = async function(req, serve, vars, evars) {
 
 	var static_data = vars.static_data;
 	var static_retrieve = vars.static_retrieve;
-	var filename_sanitize = vars.filename_sanitize;
-	var http_time = vars.http_time;
 
 	var file = query_data.file;
 	if(file) {

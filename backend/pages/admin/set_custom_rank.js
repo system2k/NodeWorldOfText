@@ -1,9 +1,12 @@
+var utils = require("../../utils/utils.js");
+var checkURLParam = utils.checkURLParam;
+var san_nbr = utils.san_nbr;
+
 module.exports.GET = async function(req, serve, vars, evars, params) {
 	var path = evars.path;
 	var HTML = evars.HTML;
 	var user = evars.user;
 
-	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var dispage = vars.dispage;
 	var ranks_cache = vars.ranks_cache;
@@ -68,11 +71,9 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var user = evars.user;
 
 	var db = vars.db;
-	var checkURLParam = vars.checkURLParam;
 	var dispage = vars.dispage;
 	var url = vars.url;
 	var ranks_cache = vars.ranks_cache;
-	var san_nbr = vars.san_nbr;
 	var db_misc = vars.db_misc;
 	var uvias = vars.uvias;
 	var accountSystem = vars.accountSystem;

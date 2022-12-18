@@ -6,7 +6,6 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	var data_rec = data.data;
 	var wss = vars.wss;
-	var NCaseCompare = vars.NCaseCompare;
 	var accountSystem = vars.accountSystem;
 	var wsSend = vars.wsSend;
 

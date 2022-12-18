@@ -1,3 +1,8 @@
+var utils = require("../utils/utils.js");
+var fixColors = utils.fixColors;
+var advancedSplit = utils.advancedSplit;
+var san_nbr = utils.san_nbr;
+
 var emptyWriteResponse = { accepted: [], rejected: {} };
 
 function isMainPage(name) {
@@ -23,11 +28,8 @@ module.exports = async function(data, vars, evars) {
 		ipAddressFam = evars.ipAddressFam;
 	}
 	
-	var san_nbr = vars.san_nbr;
-	var advancedSplit = vars.advancedSplit;
 	var get_bypass_key = vars.get_bypass_key;
 	var tile_database = vars.tile_database;
-	var fixColors = vars.fixColors;
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 	var getRestrictions = vars.getRestrictions;
 	var checkCoalition = vars.checkCoalition;

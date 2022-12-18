@@ -1,12 +1,14 @@
+var utils = require("../../utils/utils.js");
+var checkDuplicateCookie = utils.checkDuplicateCookie;
+var http_time = utils.http_time;
+
 module.exports.GET = async function(req, serve, vars, evars) {
 	var cookies = evars.cookies;
 	var query_data = evars.query_data;
 
 	var db = vars.db;
-	var http_time = vars.http_time;
 	var accountSystem = vars.accountSystem;
 	var uvias = vars.uvias;
-	var checkDuplicateCookie = vars.checkDuplicateCookie;
 	
 	var logoutReturn = query_data.return;
 	if(accountSystem == "uvias") {

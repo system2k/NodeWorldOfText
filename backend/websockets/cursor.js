@@ -1,5 +1,7 @@
+var utils = require("../utils/utils.js");
+var san_nbr = utils.san_nbr;
+
 module.exports = async function(ws, data, send, vars, evars) {
-	var san_nbr = vars.san_nbr;
 	var client_cursor_pos = vars.client_cursor_pos;
 	var wss = vars.wss;
 	var WebSocket = vars.WebSocket;

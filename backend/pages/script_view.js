@@ -1,10 +1,12 @@
+var utils = require("../utils/utils.js");
+var checkURLParam = utils.checkURLParam;
+
 module.exports.GET = async function(req, serve, vars, evars) {
 	var path = evars.path;
 	var user = evars.user;
 
 	var dispage = vars.dispage;
 	var db = vars.db;
-	var checkURLParam = vars.checkURLParam;
 
 	// not staff
 	if(!user.staff) {

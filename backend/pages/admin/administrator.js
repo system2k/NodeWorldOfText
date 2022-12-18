@@ -1,3 +1,6 @@
+var utils = require("../../utils/utils.js");
+var uptime = utils.uptime;
+
 module.exports.GET = async function(req, serve, vars, evars, params) {
 	var HTML = evars.HTML;
 	var user = evars.user;
@@ -5,7 +8,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var dispage = vars.dispage;
 	var db = vars.db;
 	var announcement = vars.announcement;
-	var uptime = vars.uptime;
 	var wss = vars.wss;
 	var get_bypass_key = vars.get_bypass_key;
 	var ranks_cache = vars.ranks_cache;

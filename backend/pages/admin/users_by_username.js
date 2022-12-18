@@ -1,9 +1,11 @@
+var utils = require("../../utils/utils.js");
+var checkURLParam = utils.checkURLParam;
+
 module.exports.GET = async function(req, serve, vars, evars, params) {
 	var path = evars.path;
 	var HTML = evars.HTML;
 	var user = evars.user;
 
-	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var dispage = vars.dispage;
 	var uvias = vars.uvias;

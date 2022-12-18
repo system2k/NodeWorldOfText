@@ -1,10 +1,12 @@
+var utils = require("../utils/utils.js");
+var san_nbr = utils.san_nbr;
+
 module.exports = async function(ws, data, send, vars, evars) {
 	var broadcast = evars.broadcast;
 	var user = evars.user;
 	var world = evars.world;
 
 	var db = vars.db;
-	var san_nbr = vars.san_nbr;
 	var tile_database = vars.tile_database;
 
 	if(!user.superuser) return;

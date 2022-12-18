@@ -1,10 +1,12 @@
+var utils = require("../../utils/utils.js");
+var create_date = utils.create_date;
+
 module.exports.GET = async function(req, serve, vars, evars, params) {
 	var HTML = evars.HTML;
 	var user = evars.user;
 
 	var db = vars.db;
 	var dispage = vars.dispage;
-	var create_date = vars.create_date;
 	var uvias = vars.uvias;
 	var db_misc = vars.db_misc;
 	var accountSystem = vars.accountSystem;

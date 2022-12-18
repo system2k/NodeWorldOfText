@@ -33,6 +33,7 @@ const bin_packet   = require("./backend/utils/bin_packet.js");
 const utils        = require("./backend/utils/utils.js");
 const templates    = require("./backend/utils/templates.js");
 const rate_limiter = require("./backend/utils/rate_limiter.js");
+const ipaddress    = require("./backend/utils/ipaddress.js");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -66,10 +67,19 @@ var parseAcceptEncoding  = utils.parseAcceptEncoding;
 var dump_dir             = utils.dump_dir;
 var arrayIsEntirely      = utils.arrayIsEntirely;
 var normalizeCacheTile   = utils.normalizeCacheTile;
-var parseTextcode        = utils.parseTextcode;
 var checkDuplicateCookie = utils.checkDuplicateCookie;
 var advancedSplit        = utils.advancedSplit;
 var filterEdit           = utils.filterEdit;
+
+var normalize_ipv6 = ipaddress.normalize_ipv6;
+var ipv4_to_int    = ipaddress.ipv4_to_int;
+var ipv6_to_int    = ipaddress.ipv6_to_int;
+var ipv4_to_range  = ipaddress.ipv4_to_range;
+var ipv6_to_range  = ipaddress.ipv6_to_range;
+var is_cf_ipv4_int = ipaddress.is_cf_ipv4_int;
+var is_cf_ipv6_int = ipaddress.is_cf_ipv6_int;
+
+var pluginMgr = null;
 
 var gzipEnabled = false;
 var shellEnabled = true;
@@ -109,7 +119,23 @@ function initializeDirectoryStruct() {
 		process.exit();
 	}
 }
-initializeDirectoryStruct();
+
+function loadPlugin(reload) {
+	if(!reload) {
+		if(pluginMgr !== null) {
+			return pluginMgr;
+		}
+	}
+	try {
+		var pluginPath = DATA_PATH + "plugin.js";
+		var modPath = require.resolve(pluginPath);
+		delete require.cache[modPath];
+		pluginMgr = require(pluginPath);
+	} catch(e) {
+		pluginMgr = {};
+	}
+	return pluginMgr;
+}
 
 function loadShellFile() {
 	var file = null;
@@ -147,165 +173,6 @@ function checkCSRF(token, userid, kclass) {
 	if(typeof token != "string" || !token) return false;
 	return token.toLowerCase() == createCSRF(userid, kclass);
 }
-
-function normalize_ipv6(ip) {
-	ip = ip.replace(/^:|:$/g, "");
-	ip = ip.split(":");
-	
-	for(var i = 0; i < ip.length; i++) {
-		var seg = ip[i];
-		if(seg) {
-			ip[i] = seg.padStart(4, "0");
-		} else {
-			seg = [];
-			for(var a = ip.length; a <= 8; a++) {
-				seg.push("0000");
-			}
-			ip[i] = seg.join(":");
-		}
-	}
-	return ip.join(":");
-}
-
-var cloudflare_ipv4_txt,
-	cloudflare_ipv6_txt;
-function loadCloudflareIpRanges() {
-	cloudflare_ipv4_txt = fs.readFileSync("./backend/cloudflare_ipv4.txt").toString();
-	cloudflare_ipv6_txt = fs.readFileSync("./backend/cloudflare_ipv6.txt").toString();
-}
-loadCloudflareIpRanges();
-
-var cloudflare_ipv4_int = [];
-var cloudflare_ipv6_int = [];
-
-function ipv4_to_int(str) {
-	str = str.split(".").map(function(e) {
-		return parseInt(e, 10);
-	});
-	return str[0] * 16777216 + str[1] * 65536 + str[2] * 256 + str[3];
-}
-
-// ipv6 must be normalized
-function ipv6_to_int(str) {
-	str = str.split(":").map(function(e) {
-		return BigInt(parseInt(e, 16));
-	});
-	return str[7] | str[6] << 16n | str[5] << 32n | str[4] << 48n | str[3] << 64n | str[2] << 80n | str[1] << 96n | str[0] << 112n;
-}
-
-function ipv4_txt_to_int() {
-	var txt = cloudflare_ipv4_txt;
-	txt = txt.replace(/\r\n/g, "\n");
-	txt = txt.split("\n");
-	for(var i = 0; i < txt.length; i++) {
-		var ip = txt[i];
-		if(!ip) continue;
-		ip = ip.trim();
-		if(ip == "") continue;
-		ip = ip.split("/");
-		var addr = ip[0];
-		var sub = parseInt(ip[1]);
-		var num = ipv4_to_int(addr);
-
-		var ip_start = unsigned_u32_and(num, subnetMask_ipv4(sub));
-		var ip_end = unsigned_u32_or(num, subnetOr_ipv4(sub));
-
-		cloudflare_ipv4_int.push([ip_start, ip_end]);
-	}
-}
-
-function ipv6_txt_to_int() {
-	var txt = cloudflare_ipv6_txt;
-	txt = txt.replace(/\r\n/g, "\n");
-	txt = txt.split("\n");
-	for(var i = 0; i < txt.length; i++) {
-		var ip = txt[i];
-		if(!ip) continue;
-		ip = ip.trim();
-		if(ip == "") continue;
-		ip = ip.split("/");
-		var addr = ip[0];
-		var sub = parseInt(ip[1]);
-		addr = normalize_ipv6(addr);
-		var num = ipv6_to_int(addr);
-
-		var ip_start = num & subnetMask_ipv6(sub);
-		var ip_end = num | subnetOr_ipv6(sub);
-
-		cloudflare_ipv6_int.push([ip_start, ip_end]);
-	}
-}
-
-function ipv4_to_range(ip) {
-	ip = ip.trim();
-	ip = ip.split("/");
-	var addr = ip[0];
-	var sub = parseInt(ip[1]);
-	if(isNaN(sub)) sub = 32;
-	var num = ipv4_to_int(addr);
-	var ip_start = unsigned_u32_and(num, subnetMask_ipv4(sub));
-	var ip_end = unsigned_u32_or(num, subnetOr_ipv4(sub));
-	return [ip_start, ip_end];
-}
-function ipv6_to_range(ip) {
-	ip = ip.split("/");
-	var addr = ip[0];
-	var sub = parseInt(ip[1]);
-	if(isNaN(sub)) sub = 128;
-	addr = normalize_ipv6(addr);
-	var num = ipv6_to_int(addr);
-	var ip_start = num & subnetMask_ipv6(sub);
-	var ip_end = num | subnetOr_ipv6(sub);
-	return [ip_start, ip_end];
-}
-
-var u32Byte = new Uint32Array(1);
-function unsigned_u32_and(x, y) {
-	u32Byte[0] = x;
-	u32Byte[0] &= y;
-	return u32Byte[0];
-}
-
-function unsigned_u32_or(x, y) {
-	u32Byte[0] = x;
-	u32Byte[0] |= y;
-	return u32Byte[0];
-}
-
-function subnetMask_ipv4(num) {
-	return ((1 << 32) - 2 >>> 0) - (2 ** (32 - num) - 1);
-}
-
-function subnetOr_ipv4(num) {
-	return 2 ** (32 - num) - 1;
-}
-
-function subnetMask_ipv6(num) {
-	return ((1n << 128n) - 1n) - (1n << (128n - BigInt(num))) + 1n;
-}
-
-function subnetOr_ipv6(num) {
-	return ((1n << (128n - BigInt(num))) - 1n);
-}
-
-function is_cf_ipv4_int(num) {
-	for(var i = 0; i < cloudflare_ipv4_int.length; i++) {
-		var ip = cloudflare_ipv4_int[i];
-		if(num >= ip[0] && num <= ip[1]) return true;
-	}
-	return false;
-}
-
-function is_cf_ipv6_int(num) {
-	for(var i = 0; i < cloudflare_ipv6_int.length; i++) {
-		var ip = cloudflare_ipv6_int[i];
-		if(num >= ip[0] && num <= ip[1]) return true;
-	}
-	return false;
-}
-
-ipv4_txt_to_int();
-ipv6_txt_to_int();
 
 function handle_error(e, doLog) {
 	var str = JSON.stringify(process_error_arg(e));
@@ -352,7 +219,6 @@ function processArgs() {
 		}
 	});
 }
-processArgs();
 
 // console function
 function run(path) {
@@ -561,7 +427,6 @@ function initializeStaticSys() {
 	staticRaw_size = fs.statSync(staticFilesRaw).size;
 	staticIdx_size = fs.statSync(staticFilesIdx).size;
 }
-initializeStaticSys();
 
 async function staticRaw_append(data) {
 	return new Promise(function(res) {
@@ -731,7 +596,6 @@ function setupDatabases() {
 	image_db = new sql.Database(imageDB);
 	misc_db = new sql.Database(miscDB);
 }
-setupDatabases();
 
 var static_path = "./frontend/static/";
 var static_path_web = "static/";
@@ -763,7 +627,6 @@ function load_static() {
 		template_data[i] = swig.compileFile(template_data[i]);
 	}
 }
-load_static();
 
 var sql_table_init = "./backend/default.sql";
 var sql_indexes_init = "./backend/indexes.sql";
@@ -787,7 +650,6 @@ function setupZipLog() {
 	}
 	zip_file.writeZip(settings.ZIP_LOG_PATH);
 }
-setupZipLog();
 
 console.log("Loading page files");
 
@@ -1003,7 +865,6 @@ function loadDbSystems() {
 	db_img = asyncDbSystem(image_db);
 	db_misc = asyncDbSystem(misc_db);
 }
-loadDbSystems();
 
 var transporter;
 var email_available = true;
@@ -1101,9 +962,26 @@ var bypass_key_cache = "";
 async function initialize_server() {
 	console.log("Starting server...");
 
+	initializeDirectoryStruct();
+	processArgs();
+	initializeStaticSys();
+	setupDatabases();
+	load_static();
+	setupZipLog();
+	loadDbSystems();
+	manage_https();
+	setupHTTPServer();
+
 	await initialize_misc_db();
 	await initialize_ranks_db();
 	await initialize_edits_db();
+	await initialize_image_db();
+
+	global_data.db = db;
+	global_data.db_img = db_img;
+	global_data.db_misc = db_misc;
+	global_data.db_edits = db_edits;
+	global_data.db_ch = db_ch;
 	
 	if(accountSystem == "uvias") {
 		await uvias_init();
@@ -1112,7 +990,7 @@ async function initialize_server() {
 	if(accountSystem == "local") {
 		await loadEmail();
 	}
-	await initialize_image_db();
+	
 	if(!await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='server_info'")) {
 		// table to inform that the server is initialized
 		await db.run("CREATE TABLE 'server_info' (name TEXT, value TEXT)");
@@ -1805,7 +1683,6 @@ function manage_https() {
 		};
 	}
 }
-manage_https();
 
 // parse Uvias account token
 function parseToken(token) {
@@ -2062,7 +1939,6 @@ function setupHTTPServer() {
 		});
 	});
 }
-setupHTTPServer();
 
 function parseHostname(hostname) {
 	if(!hostname) hostname = "ourworldoftext.com";
@@ -2366,7 +2242,7 @@ async function process_request(req, res, compCallbacks) {
 	res.end();
 }
 
-async function MODIFY_ANNOUNCEMENT(text) {
+async function modifyAnnouncement(text) {
 	if(!text) text = "";
 	text += "";
 	announcement_cache = text;
@@ -2383,20 +2259,12 @@ async function MODIFY_ANNOUNCEMENT(text) {
 	});
 }
 
-function modify_bypass_key(key) {
+function modifyBypassKey(key) {
 	key += "";
 	if(bypass_key_cache === key) return false;
 	fs.writeFileSync(settings.bypass_key, key);
 	bypass_key_cache = key;
 	return true;
-}
-
-// command-line only
-function announce(text) {
-	(async function() {
-		await MODIFY_ANNOUNCEMENT(text);
-		console.log("Updated announcement");
-	})();
 }
 
 var worldData = {};
@@ -2726,7 +2594,7 @@ async function initialize_server_components() {
 	await sysLoad();
 
 	// initialize variables in page handlers
-	await sintLoad(pages);
+	await initPages(pages);
 
 	// ping clients at a regular interval to ensure they dont disconnect constantly
 	initPingAuto();
@@ -2735,6 +2603,8 @@ async function initialize_server_components() {
 	for(var i = 0; i < serverLoadWaitQueue.length; i++) {
 		serverLoadWaitQueue[i]();
 	}
+
+	loadPlugin(true);
 }
 
 var serverLoadWaitQueue = [];
@@ -3280,59 +3150,36 @@ var global_data = {
 	shellEnabled,
 	announcement: function() { return announcement_cache },
 	get_bypass_key: function() { return bypass_key_cache },
-	add_background_cache: pages.other.load_backgrounds.add_cache, // TODO: move 'add_cache' somewhere else
 	template_data,
 	uvias,
 	accountSystem,
-	db,
-	db_img,
-	db_misc,
-	db_edits,
-	db_ch,
+	db: null,
+	db_img: null,
+	db_misc: null,
+	db_edits: null,
+	db_ch: null,
 	dispage,
 	ms,
-	http_time,
 	checkHash,
 	encryptHash,
 	new_token,
 	querystring,
 	url,
-	split_limit,
 	website: settings.website,
 	send_email,
-	filename_sanitize,
-	checkURLParam,
-	create_date,
 	get_user_info,
-	getOrCreateWorld,
-	canViewWorld,
-	san_nbr,
-	san_dp,
-	tile_coord,
 	modules,
 	plural,
-	announce: MODIFY_ANNOUNCEMENT,
-	uptime,
-	encodeCharProt,
-	decodeCharProt,
-	advancedSplit,
-	filterEdit,
-	change_char_in_array,
-	html_tag_esc,
+	announce: modifyAnnouncement,
 	wss, // this is undefined by default, but will get a value once wss is initialized
 	topActiveWorlds,
-	NCaseCompare,
 	handle_error,
 	client_ips,
-	modify_bypass_key,
-	trimHTML,
+	modify_bypass_key: modifyBypassKey,
 	tile_database: subsystems.tile_database,
 	tile_fetcher: subsystems.tile_fetcher,
 	chat_mgr: subsystems.chat_mgr,
 	intv,
-	WebSocket,
-	fixColors,
-	sanitize_color,
 	ranks_cache,
 	static_data,
 	staticRaw_append,
@@ -3345,9 +3192,6 @@ var global_data = {
 	static_retrieve_raw_header,
 	broadcastMonitorEvent,
 	monitorEventSockets,
-	arrayIsEntirely,
-	normalizeCacheTile,
-	parseTextcode,
 	acme,
 	uviasSendIdentifier,
 	client_cursor_pos,
@@ -3355,21 +3199,9 @@ var global_data = {
 	getRestrictions,
 	setCoalition,
 	checkCoalition,
-	modifyWorldProp,
-	sanitizeWorldname,
-	fetchWorldMembershipsByUserId,
-	claimWorldByName,
-	revokeMembershipByWorldName,
-	fetchOwnedWorldsByUserId,
-	promoteMembershipByWorldName,
-	renameWorld,
-	ipv4_to_range,
-	ipv6_to_range,
-	checkDuplicateCookie,
-	releaseWorld,
 	loadShellFile,
-	process_error_arg,
 	runShellScript,
+	loadPlugin,
 	rate_limiter,
 	getClientVersion,
 	setClientVersion
@@ -3383,17 +3215,17 @@ async function sysLoad() {
 	}
 }
 
-async function sintLoad(obj) {
+async function initPages(obj) {
 	// if page modules contain a startup function, run it
 	for(var i in obj) {
 		var mod = obj[i];
 		var isPage = mod.GET || mod.POST; // XXX
 		if(isPage) {
-			if(mod.startup_internal) {
-				await mod.startup_internal(global_data);
+			if(mod.initialize) {
+				await mod.initialize(global_data);
 			}
 		} else {
-			await sintLoad(mod);
+			await initPages(mod);
 		}
 	}
 }

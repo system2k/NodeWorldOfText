@@ -1,11 +1,12 @@
+var world_mgr = require("../subsystems/world_mgr.js");
+var releaseWorld = world_mgr.releaseWorld;
+var getOrCreateWorld = world_mgr.getOrCreateWorld;
+var canViewWorld = world_mgr.canViewWorld;
+
 module.exports.GET = async function(req, serve, vars, evars) {
 	var query_data = evars.query_data;
 	var user = evars.user;
 	var setCallback = evars.setCallback;
-
-	var getOrCreateWorld = vars.getOrCreateWorld;
-	var canViewWorld = vars.canViewWorld;
-	var releaseWorld = vars.releaseWorld;
 	
 	if(typeof query_data.world != "string") return serve(null, 400);
 	var world = await getOrCreateWorld(query_data.world);
@@ -27,6 +28,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		pathname = "/" + pathname;
 	}
 
+	// not all props are included for security reasons
 	var props = {
 		name: world.name,
 		feature: {

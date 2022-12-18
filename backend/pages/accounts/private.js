@@ -1,7 +1,8 @@
+var utils = require("../../utils/utils.js");
+var http_time = utils.http_time;
+
 module.exports.GET = async function(req, serve, vars, evars) {
 	var cookies = evars.cookies;
-
-	var http_time = vars.http_time;
 
 	var cookieRes = [];
 	if("privateworldmsg" in cookies) {

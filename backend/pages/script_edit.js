@@ -1,3 +1,6 @@
+var utils = require("../utils/utils.js");
+var checkURLParam = utils.checkURLParam;
+
 module.exports.GET = async function(req, serve, vars, evars, params) {
 	var path = evars.path;
 	var HTML = evars.HTML;
@@ -5,7 +8,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var dispage = vars.dispage;
 	var db = vars.db;
-	var checkURLParam = vars.checkURLParam;
 	var createCSRF = vars.createCSRF;
 
 	// not staff
@@ -42,7 +44,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var db = vars.db;
 	var dispage = vars.dispage;
-	var checkURLParam = vars.checkURLParam;
 	var checkCSRF = vars.checkCSRF;
 
 	if(!user.staff) {

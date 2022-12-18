@@ -1,4 +1,8 @@
 var WebSocket = require("ws");
+var utils = require("../utils/utils.js");
+var normalizeCacheTile = utils.normalizeCacheTile;
+var advancedSplit = utils.advancedSplit;
+var san_nbr = utils.san_nbr;
 
 function partitionRectangle(rect) {
 	var minY = rect.minY;
@@ -45,11 +49,7 @@ module.exports = async function(data, vars, evars) {
 	var world = evars.world;
 
 	var db = vars.db;
-	var san_nbr = vars.san_nbr;
-	var advancedSplit = vars.advancedSplit;
 	var memTileCache = vars.memTileCache;
-	var encodeCharProt = vars.encodeCharProt;
-	var normalizeCacheTile = vars.normalizeCacheTile;
 	var monitorEventSockets = vars.monitorEventSockets;
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 	var tile_fetcher = vars.tile_fetcher;

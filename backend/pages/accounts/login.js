@@ -1,3 +1,6 @@
+var utils = require("../../utils/utils.js");
+var http_time = utils.http_time;
+
 module.exports.GET = async function(req, serve, vars, evars, params) {
 	var cookies = evars.cookies;
 	var HTML = evars.HTML;
@@ -31,7 +34,6 @@ module.exports.POST = async function(req, serve, vars, evars, params) {
 	var db = vars.db;
 	var checkHash = vars.checkHash;
 	var new_token = vars.new_token;
-	var http_time = vars.http_time;
 	var ms = vars.ms;
 	var querystring = vars.querystring;
 	var url = vars.url;

@@ -1,9 +1,11 @@
+var utils = require("../../utils/utils.js");
+var checkURLParam = utils.checkURLParam;
+
 module.exports.GET = async function(req, serve, vars, evars, params) {
 	var path = evars.path;
 	var HTML = evars.HTML;
 	var user = evars.user;
 
-	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
 	var dispage = vars.dispage;
 	var db_misc = vars.db_misc;
@@ -60,7 +62,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var db = vars.db;
 	var db_edits = vars.db_edits;
-	var checkURLParam = vars.checkURLParam;
 	var dispage = vars.dispage;
 	var url = vars.url;
 	var uvias = vars.uvias;

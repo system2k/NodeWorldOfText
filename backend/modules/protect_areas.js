@@ -1,3 +1,6 @@
+var utils = require("../utils/utils.js");
+var san_nbr = utils.san_nbr;
+
 function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
@@ -7,7 +10,6 @@ module.exports = async function(data, vars, evars) {
 	var channel = evars.channel;
 	var world = evars.world;
 
-	var san_nbr = vars.san_nbr;
 	var tile_database = vars.tile_database;
 	var monitorEventSockets = vars.monitorEventSockets;
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;

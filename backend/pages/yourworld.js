@@ -1,3 +1,10 @@
+var utils = require("../utils/utils.js");
+var world_mgr = require("../subsystems/world_mgr.js");
+var getOrCreateWorld = world_mgr.getOrCreateWorld;
+var modifyWorldProp = world_mgr.modifyWorldProp;
+var releaseWorld = world_mgr.releaseWorld;
+var canViewWorld = world_mgr.canViewWorld;
+
 function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
@@ -11,16 +18,10 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var dispage = vars.dispage;
 	var db = vars.db;
-	var getOrCreateWorld = vars.getOrCreateWorld;
-	var canViewWorld = vars.canViewWorld;
 	var modules = vars.modules;
 	var announcement = vars.announcement();
-	var san_nbr = vars.san_nbr;
 	var accountSystem = vars.accountSystem;
-	var releaseWorld = vars.releaseWorld;
-	var modifyWorldProp = vars.modifyWorldProp;
 	var createCSRF = vars.createCSRF;
-	var http_time = vars.http_time;
 
 	var world_name = path;
 
@@ -191,9 +192,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var db = vars.db;
 	var modules = vars.modules;
-	var getOrCreateWorld = vars.getOrCreateWorld;
-	var canViewWorld = vars.canViewWorld;
-	var releaseWorld = vars.releaseWorld;
 
 	var world = await getOrCreateWorld(path);
 	if(!world) return serve(null, 404);

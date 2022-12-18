@@ -1,3 +1,11 @@
+var utils = require("../../utils/utils.js");
+var checkURLParam = utils.checkURLParam;
+var filename_sanitize = utils.filename_sanitize;
+
+var world_mgr = require("../../subsystems/world_mgr.js");
+var releaseWorld = world_mgr.releaseWorld;
+var getOrCreateWorld = world_mgr.getOrCreateWorld;
+
 async function iterateWorld(db, worldId, onTile) {
 	var groupSize = 512;
 	var initPos = await db.get("SELECT tileX, tileY FROM tile WHERE world_id=? LIMIT 1", [worldId]);
@@ -25,11 +33,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var setCallback = evars.setCallback;
 
 	var dispage = vars.dispage;
-	var checkURLParam = vars.checkURLParam;
 	var db = vars.db;
-	var filename_sanitize = vars.filename_sanitize;
-	var getOrCreateWorld = vars.getOrCreateWorld;
-	var releaseWorld = vars.releaseWorld;
 
 	var world_name = checkURLParam("/accounts/download/*world", path).world;
 

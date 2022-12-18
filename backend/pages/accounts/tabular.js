@@ -1,9 +1,10 @@
+var world_mgr = require("../../subsystems/world_mgr.js");
+var fetchOwnedWorldsByUserId = world_mgr.fetchOwnedWorldsByUserId;
+
 module.exports.GET = async function(req, serve, vars, evars, params) {
 	var cookies = evars.cookies;
 	var user = evars.user;
 	var HTML = evars.HTML;
-
-	var fetchOwnedWorldsByUserId = vars.fetchOwnedWorldsByUserId;
 
 	if(!user.authenticated) {
 		return serve(null, null, {

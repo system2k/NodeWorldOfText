@@ -839,6 +839,7 @@ var mime = {
 	"application/wasm": ["wasm"]
 };
 
+// TODO: make slightly more efficient
 module.exports = function(ext) {
 	for(var i in mime) {
 		var ref = mime[i];

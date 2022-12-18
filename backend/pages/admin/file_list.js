@@ -1,9 +1,11 @@
+var utils = require("../../utils/utils.js");
+var create_date = utils.create_date;
+
 module.exports.GET = async function(req, serve, vars, evars, params) {
 	var HTML = evars.HTML;
 	var user = evars.user;
 
 	var dispage = vars.dispage;
-	var create_date = vars.create_date;
 	var staticIdx_full_buffer = vars.staticIdx_full_buffer;
 	var static_retrieve_raw_header = vars.static_retrieve_raw_header;
 

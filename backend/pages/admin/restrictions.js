@@ -1,12 +1,12 @@
+var ipaddress = require("../../utils/ipaddress.js");
+var ipv4_to_range = ipaddress.ipv4_to_range;
+var ipv6_to_range = ipaddress.ipv6_to_range;
+
 var setRestrictions;
 var setCoalition;
-var ipv4_to_range;
-var ipv6_to_range;
-module.exports.startup_internal = function(vars) {
+module.exports.initialize = function(vars) {
 	setRestrictions = vars.setRestrictions;
 	setCoalition = vars.setCoalition;
-	ipv4_to_range = vars.ipv4_to_range;
-	ipv6_to_range = vars.ipv6_to_range;
 }
 
 var restrictions_string = "";
