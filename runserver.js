@@ -19,7 +19,6 @@ const isIP        = require("net").isIP;
 const nodemailer  = require("nodemailer");
 const path        = require("path");
 const pg          = require("pg");
-const prompt      = require("./lib/prompt/prompt.js");
 const querystring = require("querystring");
 const sql         = require("sqlite3");
 const swig        = require("./lib/swig/swig.js");
@@ -34,6 +33,7 @@ const utils        = require("./backend/utils/utils.js");
 const templates    = require("./backend/utils/templates.js");
 const rate_limiter = require("./backend/utils/rate_limiter.js");
 const ipaddress    = require("./backend/utils/ipaddress.js");
+const prompt       = require("./backend/utils/prompt.js");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -1082,10 +1082,6 @@ async function initialize_ranks_db() {
 	}
 }
 
-prompt.message = ""; // do not display "prompt" before each question
-prompt.delimiter = ""; // do not display ":" after "prompt"
-prompt.colors = false; // disable dark gray color in a black console
-
 var pw_encryption = "sha512WithRSAEncryption";
 const encryptHash = function(pass, salt) {
 	if(!salt) {
@@ -1104,236 +1100,108 @@ const checkHash = function(hash, pass) {
 	return encryptHash(pass, hash[1]) === hash.join("$");
 }
 
-// console function
-function add(username, level) {
-	level = parseInt(level);
-	if(!level) level = 0;
-	level = Math.trunc(level);
-	if(level < 0) level = 0;
-	if(level >= 3) level = 3;
-	if(accountSystem != "local") {
-		console.log("Cannot register " + username + ":" + level + " because the account system is not local");
-		return;
-	}
-	var Date_ = Date.now();
-	ask_password = true;
-	account_to_create = username;
-	(async function() {
-		try {
-			await db.run("INSERT INTO auth_user VALUES(null, ?, '', ?, 1, ?, ?, ?)",
-				[username, "", level, Date_, Date_]);
-		} catch(e) {
-			console.log(e);
-		}
-	})();
-}
-
-var prompt_account_yesno = {
-	properties: {
-		yes_no_account: {
-			message: "You just installed the server,\nwhich means you don\'t have any superusers defined.\nWould you like to create one now? (yes/no):"
-		}
-	}
-};
-
-function account_prompt() {
-	var prompt_account_properties = {
-		properties: {
-			username: {
-				message: "Username: "
-			},
-			password: {
-				description: "Password: ",
-				replace: "*",
-				hidden: true
-			},
-			confirmpw: {
-				description: "Password (again): ",
-				replace: "*",
-				hidden: true
+async function account_prompt(isUvias) {
+	var question = "You've just installed the server,\nwhich means you don\'t have any superusers defined.\nWould you like to create one now? (yes/no): ";
+	var resp = await prompt.ask(question);
+	if(resp.toLowerCase() == "yes") {
+		if(!isUvias) {
+			var user = await prompt.ask("Username: ");
+			user = user.trim();
+			if(!user.length) {
+				console.log("Username is too short.");
+				return account_prompt(isUvias);
 			}
-		}
-	};
-
-	var passFunc = function(err, result) {
-		var err = false;
-		if(result["password"] !== result["confirmpw"]) {
-			console.log("Error: Your passwords didn't match.");
-			err = true;
-			prompt.get(prompt_account_properties, passFunc);
-		} else if(result.password.length > 128) {
-			console.log("The password is too long. It must be 128 characters or less.");
-			err = true;
-			prompt.get(prompt_account_properties, passFunc);
-		}
-		
-		if(!err) {
-			var Date_ = Date.now();
-			var passHash = encryptHash(result["password"]);
-
-			db.run("INSERT INTO auth_user VALUES(null, ?, '', ?, 1, 3, ?, ?)",
-				[result["username"], passHash, Date_, Date_]);
-
+			var pass1 = (await prompt.ask("Password: ", true)).trim();
+			var pass2 = (await prompt.ask("Password (again): ", true)).trim();
+			if(pass1 != pass2) {
+				console.log("Your passwords didn't match.");
+				return account_prompt(isUvias);
+			}
+			if(!pass1) {
+				console.log("Your password is too short.");
+				return account_prompt(isUvias);
+			}
+			var date = Date.now();
+			var passHash = encryptHash(pass1);
+			db.run("INSERT INTO auth_user VALUES(null, ?, '', ?, 1, 3, ?, ?)", [user, passHash, date, date]);
 			console.log("Superuser created successfully.\n");
-			start_server();
-		}
-	}
-	yesNoAccount = function(err, result) {
-		var re = result["yes_no_account"];
-		if(toUpper(re) === "YES") {
-			prompt.get(prompt_account_properties, passFunc);
-		}
-		if(toUpper(re) === "NO") {
-			start_server();
-		}
-		if(toUpper(re) !== "YES" && toUpper(re) !== "NO") {
-			console.log("Please enter either \"yes\" or \"no\" (not case sensitive):");
-			prompt.get(prompt_account_yesno, yesNoAccount);
-		}
-	}
-	prompt.start();
-	prompt.get(prompt_account_yesno, yesNoAccount);
-}
-
-function account_prompt_uvias() {
-	var prompt_account_properties = {
-		properties: {
-			username: {
-				message: "Uvias Display Name: "
+		} else {
+			var user = await prompt.ask("Uvias Display Name: ");
+			user = user.trim();
+			if(!user.length) {
+				console.log("Username is too short.");
+				return account_prompt(isUvias);
 			}
+			var db_user = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", user);
+			if(!db_user) {
+				console.log("User not found.");
+				return account_prompt(isUvias);
+			}
+			var uid = "x" + db_user.uid;
+			await db_misc.run("INSERT INTO admin_ranks VALUES(?, ?)", [uid, 3]);
+			console.log("Account successfully set as superuser.\n");
 		}
-	};
-	var uvAccountFunc = async function(err, result) {
-		var username = result["username"];
-		var db_user = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
-		if(!db_user) {
-			console.log("User not found.");
-			prompt.get(prompt_account_properties, uvAccountFunc);
-			return;
-		}
-		var uid = "x" + db_user.uid;
-		await db_misc.run("INSERT INTO admin_ranks VALUES(?, ?)", [uid, 3]);
-
-		console.log("Account successfully set as superuser.\n");
 		start_server();
+	} else if(resp.toLowerCase() == "no") {
+		start_server();
+		return;
+	} else {
+		console.log("Please enter either \"yes\" or \"no\" (not case sensitive).");
+		return account_prompt(isUvias);
 	}
-	yesNoAccount = function(err, result) {
-		var re = result["yes_no_account"];
-		if(toUpper(re) === "YES") {
-			prompt.get(prompt_account_properties, uvAccountFunc);
-		}
-		if(toUpper(re) === "NO") {
-			start_server();
-		}
-		if(toUpper(re) !== "YES" && toUpper(re) !== "NO") {
-			console.log("Please enter either \"yes\" or \"no\" (not case sensitive):");
-			prompt.get(prompt_account_yesno, yesNoAccount);
-		}
-	}
-	prompt.start();
-	prompt.get(prompt_account_yesno, yesNoAccount);
 }
 
-var prompt_command_input = {
-	properties: {
-		input: {
-			message: ">>"
-		}
-	}
-};
-
-var prompt_password_new_account = {
-	properties: {
-		password: {
-			message: "Enter password for this account: ",
-			replace: "*",
-			hidden: true
-		}
-	}
-};
-
-var ask_password = false;
-var account_to_create = "";
 var prompt_stopped = false;
-var prompt_await = false;
-
-function command_prompt() {
-	async function on_input(err, input) {
-		if(err) return console.log(err);
-		var code = input.input;
-		if(code == "stop") {
-			return stopServer();
-		}
-		if(code == "res") {
-			return stopServer(true);
-		}
-		if(code == "maint") {
-			return stopServer(false, true);
-		}
-		if(code == "sta") {
-			load_static();
-			command_prompt();
-			return;
-		}
-		if(code == "help") {
-			console.log("stop: close server\nres: restart\nmaint: maintenance mode\nsta: reload templates and static files");
-			command_prompt();
-			return;
-		}
-		if(code.startsWith("acme")) {
-			var args = code.split(" ");
-			var action = args[1];
-			var pass = args[2];
-			if(action == "on") {
-				var goodPass = true;
-				if(!pass || pass.length < 8) goodPass = false;
-				if(goodPass) {
-					acme.pass = pass;
-					acme.enabled = true;
-					console.log("Enabled acme with password: " + acmePass);
-				} else {
-					console.log("Bad acme password");
-				}
-			} else if(action == "off") {
-				acme.enabled = false;
-				acme.pass = null;
-				console.log("Disabled acme");
-			} else {
-				console.log("acme command usage:\nacme on <password>: enable acme challenge\nacme off: disable acme challenge");
-			}
-			command_prompt();
-			return;
-		}
-		// REPL
-		try {
-			if(prompt_await) {
-				eval("var afnc = async function() {return " + code + "};");
-				console.dir(await afnc(), { colors: true });
-			} else {
-				console.dir(eval(code), { colors: true });
-			}
-		} catch(e) {
-			console.dir(e, { colors: true });
-		}
-		command_prompt();
+async function command_prompt() {
+	var input = await prompt.ask(">> ");
+	if(input == "stop") {
+		return stopServer();
 	}
-	function on_password_input(err, input) {
-		if(err) return console.log(err);
-		if(account_to_create == void 0) return;
-		var pass = input.password;
-		db.run("UPDATE auth_user SET password=? WHERE username=? COLLATE NOCASE",
-			[encryptHash(pass), account_to_create]);
-		account_to_create = void 0;
-		command_prompt();
+	if(input == "res") {
+		return stopServer(true);
+	}
+	if(input == "maint") {
+		return stopServer(false, true);
+	}
+	if(input == "sta") {
+		load_static();
+		return command_prompt();
+	}
+	if(input == "help") {
+		console.log("stop: close server\nres: restart\nmaint: maintenance mode\nsta: reload templates and static files");
+		return command_prompt();
+	}
+	if(input.startsWith("acme")) {
+		var args = input.split(" ");
+		var action = args[1];
+		var pass = args[2];
+		if(action == "on") {
+			var goodPass = true;
+			if(!pass || pass.length < 8) goodPass = false;
+			if(goodPass) {
+				acme.pass = pass;
+				acme.enabled = true;
+				console.log("Enabled acme with password: " + acmePass);
+			} else {
+				console.log("Bad acme password");
+			}
+		} else if(action == "off") {
+			acme.enabled = false;
+			acme.pass = null;
+			console.log("Disabled acme");
+		} else {
+			console.log("acme command usage:\nacme on <password>: enable acme challenge\nacme off: disable acme challenge");
+		}
+		return command_prompt();
+	}
+	// REPL
+	try {
+		console.dir(eval(input), { colors: true });
+	} catch(e) {
+		console.dir(e, { colors: true });
 	}
 	if(prompt_stopped) return;
-	prompt.start();
-	if(!ask_password) {
-		prompt.get(prompt_command_input, on_input);
-	} else {
-		ask_password = false;
-		prompt.get(prompt_password_new_account, on_password_input);
-	}
+	command_prompt();
 }
 
 //Time in milliseconds
@@ -3265,29 +3133,31 @@ function stopServer(restart, maintenance) {
 				await clear_expired_sessions(true);
 			}
 
-			for(var i in pages) {
-				var mod = pages[i];
-				if(mod.server_exit) {
-					await mod.server_exit();
+			if(serverLoaded) {
+				for(var i in pages) {
+					var mod = pages[i];
+					if(mod.server_exit) {
+						await mod.server_exit();
+					}
 				}
-			}
 
-			for(var i in subsystems) {
-				var sys = subsystems[i];
-				if(sys.server_exit) {
-					await sys.server_exit();
+				for(var i in subsystems) {
+					var sys = subsystems[i];
+					if(sys.server_exit) {
+						await sys.server_exit();
+					}
 				}
-			}
 
-			server.close();
-			wss.close();
+				server.close();
+				wss.close();
 
-			for(var id in HTTPSockets) {
-				HTTPSockets[id].destroy();
-			}
+				for(var id in HTTPSockets) {
+					HTTPSockets[id].destroy();
+				}
 
-			if(accountSystem == "uvias") {
-				pgConn.end();
+				if(accountSystem == "uvias") {
+					pgConn.end();
+				}
 			}
 		} catch(e) {
 			handle_error(e);
