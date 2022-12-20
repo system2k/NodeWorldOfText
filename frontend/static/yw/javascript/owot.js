@@ -2621,6 +2621,9 @@ function textcode_parser(value, coords, defaultColor, defaultBgColor) {
 				index += 6 + 2;
 				pasteBgColor = parseInt(bCol, 16);
 				if(isNaN(pasteBgColor)) pasteBgColor = -1;
+				return {
+					type: "yield"
+				};
 			} else {
 				index += 2;
 				doWriteChar = true;
@@ -6555,7 +6558,7 @@ function makeSelectionModal() {
 					}
 				}
 			}
-			if(o_color || o_bgcolor) {
+			if(o_color || (o_color && o_bgcolor)) {
 				for(var x = 0; x < textRow.length; x++) {
 					var col = 0;
 					var bgCol = -1;
