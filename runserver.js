@@ -21,7 +21,6 @@ const path        = require("path");
 const pg          = require("pg");
 const querystring = require("querystring");
 const sql         = require("sqlite3");
-const swig        = require("./lib/swig/swig.js");
 const url         = require("url");
 const util        = require("util");
 const WebSocket   = require("ws");
