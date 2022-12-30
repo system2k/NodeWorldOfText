@@ -36,14 +36,10 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var read_permission = await canViewWorld(world, user, { memkeyAccess });
 	if(!read_permission) {
-		var privCookie = [];
-		if(world.opts.privNote) {
-			privCookie.push("privateworldmsg=" + encodeURIComponent(world.opts.privNote) + "; path=/;");
-		}
-		return serve(null, null, {
-			cookie: privCookie,
-			redirect: "/accounts/private/"
-		});
+		var privNote = world.opts.privNote;
+		return await dispage("accounts/private", {
+			privateWorldMsg: privNote
+		}, req, serve, vars, evars);
 	}
 
 	if(query_data.fetch == 1) { // fetch request
