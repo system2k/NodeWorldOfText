@@ -2435,7 +2435,7 @@ function propagatePosition(coords, char, noEnter, noVertPos) {
 		} else {
 			coords.charY--;
 			if(coords.charY < 0) {
-				coords.charY = tileY - 1;
+				coords.charY = tileR - 1;
 				coords.tileY--;
 			}
 		}

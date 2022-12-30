@@ -617,14 +617,12 @@ function load_static() {
 	dump_dir(static_data, static_path, static_path_web, false, null, true);
 
 	console.log("Loading HTML templates...");
-	dump_dir(template_data, templates_path, "", true, null, true);
-
-	// clear swig's cache
-	swig.invalidateCache();
+	dump_dir(template_data, templates_path, "", false, null, true);
 
 	console.log("Compiling HTML templates...");
 	for(var i in template_data) {
-		template_data[i] = swig.compileFile(template_data[i]);
+		template_data[i] = templates.compile(template_data[i]);
+		templates.addFile(i, template_data[i]);
 	}
 }
 
@@ -1181,7 +1179,7 @@ async function command_prompt() {
 			if(goodPass) {
 				acme.pass = pass;
 				acme.enabled = true;
-				console.log("Enabled acme with password: " + acmePass);
+				console.log("Enabled acme with password: " + acme.pass);
 			} else {
 				console.log("Bad acme password");
 			}
@@ -1778,7 +1776,7 @@ function setupHTTPServer() {
 			res.statusCode = 500;
 			var err500Temp = "";
 			try {
-				err500Temp = template_data["500.html"]();
+				err500Temp = templates.execute(templates.getFile("500.html"));
 				if(cbExecuted) {
 					console.log("An error has occurred while executing request callbacks");
 				} else {
@@ -1982,7 +1980,7 @@ async function process_request(req, res, compCallbacks) {
 			deny_notes = deniedPages.siteAccessNote;
 		}
 		res.writeHead(403);
-		return res.end(template_data["denied.html"]({
+		return res.end(templates.execute(templates.getFile("denied.html"), {
 			deny_notes
 		}));
 	}
@@ -2050,7 +2048,8 @@ async function process_request(req, res, compCallbacks) {
 				}
 				// return compiled HTML pages
 				function HTML(path, data) {
-					if(!template_data[path]) { // template not found
+					var template = templates.getFile(path);
+					if(!template) { // template not found
 						return "An unexpected error occurred while generating this page";
 					}
 					if(!data) {
@@ -2067,7 +2066,7 @@ async function process_request(req, res, compCallbacks) {
 						staticVersion = "?v=" + staticVersion;
 					}
 					data.staticVersion = staticVersion;
-					return template_data[path](data);
+					return templates.execute(template, data);
 				}
 				var evars = { // request-specific variables
 					cookies,
@@ -3018,7 +3017,6 @@ var global_data = {
 	shellEnabled,
 	announcement: function() { return announcement_cache },
 	get_bypass_key: function() { return bypass_key_cache },
-	template_data,
 	uvias,
 	accountSystem,
 	db: null,

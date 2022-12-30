@@ -1,5 +1,6 @@
 var utils = require("../../utils/utils.js");
 var checkURLParam = utils.checkURLParam;
+var templates = require("../../utils/templates.js");
 
 module.exports.GET = async function(req, serve, vars, evars) {
 	var path = evars.path;
@@ -8,7 +9,6 @@ module.exports.GET = async function(req, serve, vars, evars) {
 
 	var website = vars.website;
 	var send_email = vars.send_email;
-	var template_data = vars.template_data;
 	var handle_error = vars.handle_error;
 	var db = vars.db;
 	var new_token = vars.new_token;
@@ -41,9 +41,9 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var token = new_token(20);
 	var tokenSendFailed = false;
 
-	var subject = template_data["registration/verification_email_subject.txt"]();
+	var subject = templates.execute(templates.getFile("registration/verification_email_subject.txt"));
 	try {
-		var email_send = await send_email(user.email, subject, template_data["registration/verification_email.txt"]({
+		var email_send = await send_email(user.email, subject, templates.execute(templates.getFile("registration/verification_email.txt"), {
 			website,
 			reg_key: "accounts/verify/" + token + "/"
 		}));

@@ -1,730 +1,54 @@
 /*
-	Template compiler & executer
-	Pre-alpha stage
+	HTML Templating Engine
 */
 
+var set_num = "0123456789";
+var set_fnum = set_num + ".-";
+var set_var = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
+var set_fvar = set_var + set_num;
+var set_space = ["\u0009", "\u000A", "\u000D", "\u0020", "\u00A0"];
+var set_sym1 = "<>=|&!";
+var set_sym2 = "[],.";
 
-
-/*
-	Template compilation
-*/
-
-var whitespaces = [
-	"\u0009", "\u000A", "\u000B", "\u000C", "\u000D", "\u0020", "\u00A0", "\u1680",
-	"\u2000", "\u2001", "\u2002", "\u2003", "\u2004", "\u2005", "\u2006", "\u2007",
-	"\u2008", "\u2009", "\u200A", "\u2028", "\u2029", "\u202F", "\u205F", "\u3000",
-	"\uFEFF"
-];
-function isWhitespace(code) {
-	return whitespaces.indexOf(code) > -1;
+function isNumChar(chr) {
+	return set_num.includes(chr);
 }
 
-function processAccessor(path) {
-	var res = [];
-	var respath = [res];
-	var parobjmap = [];
-	for(var i = 0; i < path.length; i++) {
-		if(path[i] == ".") continue;
-		if(path[i] == "[") {
-			var ar = [];
-			respath[respath.length - 1].push(ar);
-			respath.push(ar);
-			continue;
-		}
-		if(path[i] == "]") {
-			var rem = respath[respath.length - 1];
-			var par = respath[respath.length - 2];
-			if(rem.length == 1) {
-				var idx = par.indexOf(rem);
-				if(idx > -1) {
-					par[idx] = rem[0];
-				} else {
-					throw "idxerr";
-				}
-			}
-			respath.pop();
-			continue;
-		}
-		respath[respath.length - 1].push(path[i]);
-	}
-	return res;
+function isFullNumChar(chr) {
+	return set_fnum.includes(chr);
 }
 
-function isIncompleteBool(ar) {
-	if(!Array.isArray(ar)) return false;
-	for(var i = 0; i < ar.length; i++) {
-		if(ar[i] == "&&" || ar[i] == "||") return true;
-	}
-	return false;
+function isFullVarChar(chr) {
+	return set_fvar.includes(chr);
 }
 
-function isValidAccessor(ar) {
-	if(!Array.isArray(ar)) return false;
-	for(var i = 0; i < ar.length; i++) {
-		if(typeof ar[i] == "object") return false;
-	}
-	return true;
+function isVarChar(chr) {
+	return set_var.includes(chr);
 }
 
-var controlChars = "[]\"\\.|!&{}()%=<>";
-
-function compileTemplate(htmldoc) {
-	var parts = [];
-	var buffer = "";
-	var commentMode = false;
-	for(var i = 0; i < htmldoc.length; i++) {
-		if(htmldoc[i] == "#" && htmldoc[i + 1] == "}") {
-			commentMode = false;
-			i++;
-			continue;
-		}
-		if(commentMode) continue;
-		if(htmldoc[i] == "{" && htmldoc[i + 1] == "%") {
-			if(buffer) {
-				parts.push(buffer);
-				buffer = "";
-			}
-			parts.push("{%");
-			i++;
-			continue;
-		}
-		if(htmldoc[i] == "%" && htmldoc[i + 1] == "}") {
-			if(buffer) {
-				parts.push(buffer);
-				buffer = "";
-			}
-			parts.push("%}");
-			i++;
-			continue;
-		}
-		if(htmldoc[i] == "{" && htmldoc[i + 1] == "{") {
-			if(buffer) {
-				parts.push(buffer);
-				buffer = "";
-			}
-			parts.push("{{");
-			i++;
-			continue;
-		}
-		if(htmldoc[i] == "}" && htmldoc[i + 1] == "}") {
-			if(buffer) {
-				parts.push(buffer);
-				buffer = "";
-			}
-			parts.push("}}");
-			i++;
-			continue;
-		}
-		if(htmldoc[i] == "{" && htmldoc[i + 1] == "#") {
-			commentMode = true;
-			i++;
-			continue;
-		}
-		buffer += htmldoc[i];
-	}
-	if(buffer) {
-		parts.push(buffer);
-	}
-	
-	
-	
-	var tokens = [];
-	for(var i = 0; i < parts.length; i++) {
-		if(parts[i] == "{%" && parts[i + 2] == "%}") {
-			tokens.push({
-				type: "control",
-				value: parts[i + 1]
-			});
-			i += 2;
-			continue;
-		}
-		if(parts[i] == "{{" && parts[i + 2] == "}}") {
-			tokens.push({
-				type: "variable",
-				value: parts[i + 1]
-			});
-			i += 2;
-			continue;
-		}
-		tokens.push({
-			type: "text",
-			value: parts[i]
-		});
-	}
-	
-	
-	
-	for(var i = 0; i < tokens.length; i++) {
-		if(tokens[i].type == "control" || tokens[i].type == "variable") {
-			var val = tokens[i].value;
-			var subtokens = [];
-			var x = 0;
-			var tokbuffer = "";
-			var negate = 0;
-			var modifier = false;
-			while(true) {
-				if(isWhitespace(val[x])) {
-					if(tokbuffer) {
-						subtokens.push(tokbuffer);
-						tokbuffer = "";
-					}
-					x++;
-					if(x >= val.length) break;
-					continue;
-				}
-				if(val[x] == "\"") { // string
-					if(tokbuffer) {
-						subtokens.push(tokbuffer);
-						tokbuffer = "";
-					}
-					x++;
-					var strbuf = "";
-					while(true) {
-						if(val[x] == "\"") {
-							break;
-						}
-						if(val[x] == "\\") {
-							x++;
-							strbuf += val[x];
-						}
-						strbuf += val[x];
-						x++;
-						if(x >= val.length) throw "oob";
-					}
-					subtokens.push({
-						type: "string",
-						value: strbuf
-					});
-				} else if(controlChars.indexOf(val[x]) > -1) {
-					if(tokbuffer) {
-						subtokens.push(tokbuffer);
-						tokbuffer = "";
-					}
-					if(val[x] == "=" && val[x + 1] == "=") {
-						subtokens.push("==");
-						x++;
-					} else if(val[x] == "&" && val[x + 1] == "&") {
-						subtokens.push("&&");
-						x++;
-					} else if(val[x] == "|" && val[x + 1] == "|") {
-						subtokens.push("||");
-						x++;
-					} else if(val[x] == "!" && val[x + 1] == "=") {
-						subtokens.push("!=");
-						x++;
-					} else if(val[x] == ">" && val[x + 1] == "=") {
-						subtokens.push(">=");
-						x++;
-					} else if(val[x] == "<" && val[x + 1] == "=") {
-						subtokens.push("<=");
-						x++;
-					} else if(val[x] == "!") {
-						negate++;
-					} else {
-						subtokens.push(val[x]);
-					}
-				} else {
-					if(negate > 0) {
-						negate = 0;
-						if(negate % 2) {
-							tokbuffer += "!";
-						} else {
-							tokbuffer += "!!";
-						}
-					}
-					tokbuffer += val[x];
-				}
-				x++;
-				if(x >= val.length) break;
-			}
-			if(tokbuffer) {
-				subtokens.push(tokbuffer);
-			}
-			for(var g = 0; g < subtokens.length; g++) {
-				if(subtokens[g] == "|") {
-					var t1 = subtokens[g - 1];
-					var t2 = subtokens[g + 1];
-					subtokens.splice(g - 1, 3);
-					subtokens.splice(g - 1, 0, t1 + "|" + t2);
-				}
-			}
-			tokens[i].value = subtokens;
-		}
-	}
-	
-	
-	
-	for(var i = 0; i < tokens.length; i++) {
-		if(tokens[i].type == "control") {
-			if(tokens[i].value.length) {
-				if(tokens[i].value[0] == "block") {
-					tokens[i] = {
-						type: "block",
-						name: tokens[i].value[1]
-					};
-				} else if(tokens[i].value[0] == "endblock") {
-					tokens[i] = {
-						type: "endblock"
-					};
-				} else if(tokens[i].value[0] == "extends") {
-					tokens[i] = {
-						type: "extends",
-						page: tokens[i].value[1]
-					};
-				} else if(tokens[i].value[0] == "if") {
-					tokens[i] = {
-						type: "if",
-						stmt: tokens[i].value.slice(1)
-					};
-				} else if(tokens[i].value[0] == "else" && tokens[i].value[1] == "if") {
-					tokens[i] = {
-						type: "else_if",
-						stmt: tokens[i].value.slice(2)
-					};
-				} else if(tokens[i].value[0] == "else") {
-					tokens[i] = {
-						type: "else"
-					};
-				} else if(tokens[i].value[0] == "endif") {
-					tokens[i] = {
-						type: "endif"
-					};
-				} else if(tokens[i].value[0] == "endfor") {
-					tokens[i] = {
-						type: "endfor"
-					};
-				} else if(tokens[i].value[0] == "for") {
-					if(tokens[i].value[2] != "in") throw "forloop err";
-					tokens[i] = {
-						type: "for",
-						key: tokens[i].value[1],
-						obj: processAccessor(tokens[i].value.slice(3))
-					}
-				}
-			}
-		} else if(tokens[i].type == "variable") {
-			tokens[i].value = processAccessor(tokens[i].value);
-		}
-	}
-	
-	
-	
-	for(var i = 0; i < tokens.length; i++) {
-		if(tokens[i].type == "if" || tokens[i].type == "else_if") {
-			var stmt = tokens[i].stmt;
-			var groups = [];
-			var levels = [groups]; // current path stack
-
-			for(var x = 0; x < stmt.length; x++) {
-				if(stmt[x] == "(") {
-					var ar = [];
-					levels[levels.length - 1].push(ar);
-					levels.push(ar);
-					continue;
-				}
-				if(stmt[x] == ")") {
-					levels.pop();
-					continue;
-				}
-				levels[levels.length - 1].push(stmt[x]);
-			}
-			
-			function processComparators(groupObj) {
-				var joinedGroups = [];
-				var token1 = [];
-				var token2 = [];
-				var comparator = "";
-				var secondPos = false;
-				for(var x = 0; x < groupObj.length; x++) {
-					var incompleteCompGroup = false;
-					if(typeof groupObj[x] == "object" && !groupObj[x].type) {
-						incompleteCompGroup = true;
-						groupObj[x] = processComparators(groupObj[x]);
-					}
-					if(!secondPos && (groupObj[x] == "!=" || groupObj[x] == "==" || groupObj[x] == "<=" || groupObj[x] == ">=" || groupObj[x] == "<" || groupObj[x] == ">")) {
-						comparator = groupObj[x];
-						secondPos = true;
-						continue;
-					}
-					if(groupObj[x] == "&&" || groupObj[x] == "||") {
-						if(token1.length == 1 && typeof token1[0] == "object" && token1[0].type == "string") token1 = token1[0];
-						if(token2.length == 1 && typeof token2[0] == "object" && token2[0].type == "string") token2 = token2[0];
-						if(isValidAccessor(token1)) token1 = processAccessor(token1);
-						if(isValidAccessor(token2)) token2 = processAccessor(token2);
-						if(secondPos) {
-							joinedGroups.push({
-								compare: comparator,
-								a: token1,
-								b: token2
-							}, groupObj[x]);
-						} else {
-							joinedGroups.push({
-								compare: "==",
-								a: token1,
-								b: true
-							}, groupObj[x]);
-						}
-						secondPos = false;
-						comparator = "";
-						token1 = [];
-						token2 = [];
-						continue;
-					}
-					if(!secondPos) {
-						if(incompleteCompGroup) {
-							token1 = groupObj[x];
-						} else {
-							token1.push(groupObj[x]);
-						}
-						continue;
-					}
-					if(secondPos) {
-						if(incompleteCompGroup) {
-							token2 = groupObj[x];
-						} else {
-							token2.push(groupObj[x]);
-						}
-						continue;
-					}
-				}
-				if(token1.length) {
-					if(token1.length == 1 && typeof token1[0] == "object" && token1[0].type == "string") token1 = token1[0];
-					if(token2.length == 1 && typeof token2[0] == "object" && token2[0].type == "string") token2 = token2[0];
-					if(isValidAccessor(token1)) token1 = processAccessor(token1);
-					if(isValidAccessor(token2)) token2 = processAccessor(token2);
-					if(secondPos) {
-						joinedGroups.push({
-							compare: comparator,
-							a: token1,
-							b: token2
-						});
-					} else {
-						joinedGroups.push({
-							compare: "==",
-							a: token1,
-							b: true
-						});
-					}
-				}
-				return joinedGroups;
-			}
-			var joinedGroups = processComparators(groups);
-			
-			function processComparisons(groups) {
-				if(groups.length == 1) {
-					return groups[0];
-				}
-				for(var g = 0; g < groups.length; g++) {
-					for(var z = 0; z < groups.length; z++) {
-						if(groups[z] == "&&") {
-							var ca = groups[z - 1];
-							var cb = groups[z + 1];
-							if(isIncompleteBool(ca.a)) ca.a = processComparisons(ca.a)[0];
-							if(isIncompleteBool(ca.b)) ca.b = processComparisons(ca.b)[0];
-							if(isIncompleteBool(cb.a)) cb.a = processComparisons(cb.a)[0];
-							if(isIncompleteBool(cb.b)) cb.b = processComparisons(cb.b)[0];
-							groups.splice(z - 1, 3);
-							groups.splice(z - 1, 0, {
-								compare: "&&",
-								a: ca,
-								b: cb
-							});
-							break;
-						}
-						if(groups[z] == "||") {
-							var ca = groups[z - 1];
-							var cb = groups[z + 1];
-							if(isIncompleteBool(ca.a)) ca.a = processComparisons(ca.a)[0];
-							if(isIncompleteBool(ca.b)) ca.b = processComparisons(ca.b)[0];
-							if(isIncompleteBool(cb.a)) cb.a = processComparisons(cb.a)[0];
-							if(isIncompleteBool(cb.b)) cb.b = processComparisons(cb.b)[0];
-							groups.splice(z - 1, 3);
-							groups.splice(z - 1, 0, {
-								compare: "||",
-								a: ca,
-								b: cb
-							});
-							break;
-						}
-					}
-				}
-				return groups;
-			}
-			tokens[i].stmt = processComparisons(joinedGroups);
-			if(Array.isArray(tokens[i].stmt)) {
-				if(tokens[i].stmt.length != 1) throw "inv ar size";
-				tokens[i].stmt = tokens[i].stmt[0];
-			}
-		}
-	}
-	
-	
-	
-	var commands = {
-		type: "main",
-		extends: null,
-		exec: []
-	};
-	var stackflow = [commands];
-	for(var i = 0; i < tokens.length; i++) {
-		var cmd = tokens[i];
-		if(cmd.type == "extends") {
-			commands.extends = cmd.page;
-			continue;
-		}
-		if(cmd.type == "text") {
-			stackflow[stackflow.length - 1].exec.push(cmd);
-			continue;
-		}
-		if(cmd.type == "variable") {
-			stackflow[stackflow.length - 1].exec.push(cmd);
-			continue;
-		}
-		if(cmd.type == "for") {
-			var obj = {
-				type: "for",
-				key: cmd.key,
-				obj: cmd.obj,
-				exec: []
-			};
-			stackflow[stackflow.length - 1].exec.push(obj);
-			stackflow.push(obj);
-			continue;
-		}
-		if(cmd.type == "endfor") {
-			var lb = stackflow[stackflow.length - 1];
-			if(lb.type != "for") throw "non-match err";
-			stackflow.pop();
-			continue;
-		}
-		if(cmd.type == "block") {
-			var obj = {
-				type: "block",
-				name: cmd.name,
-				exec: []
-			};
-			stackflow[stackflow.length - 1].exec.push(obj);
-			stackflow.push(obj);
-			continue;
-		}
-		if(cmd.type == "endblock") {
-			var lb = stackflow[stackflow.length - 1];
-			if(lb.type != "block") throw "non-match err";
-			stackflow.pop();
-			continue;
-		}
-		if(cmd.type == "if") {
-			var obj = {
-				type: "if",
-				stmt: cmd.stmt,
-				exec: [],
-				elif_chain: [],
-				else_exec: []
-			};
-			stackflow[stackflow.length - 1].exec.push(obj);
-			stackflow.push(obj);
-			continue;
-		}
-		if(cmd.type == "else_if") {
-			var ifs = stackflow[stackflow.length - 1];
-			var obj;
-			if(ifs.type == "if") {
-				obj = {
-					type: "else_if",
-					ifobj: ifs,
-					stmt: cmd.stmt,
-					exec: []
-				};
-				ifs.elif_chain.push(obj);
-				stackflow.push(obj);
-			} else if(ifs.type == "else_if") {
-				obj = {
-					type: "else_if",
-					ifobj: ifs.ifobj,
-					stmt: cmd.stmt,
-					exec: []
-				};
-				ifs.ifobj.elif_chain.push(obj);
-				stackflow.pop();
-				stackflow.push(obj);
-			} else {
-				throw "elif statement outside of if statement";
-			}
-			continue;
-		}
-		if(cmd.type == "else") {
-			var ifs = stackflow[stackflow.length - 1];
-			var obj;
-			if(ifs.type == "if") {
-				obj = {
-					type: "else",
-					ifobj: ifs,
-					exec: []
-				};
-				ifs.else_exec.push(obj);
-				if(ifs.else_exec.length != 1) throw "else err";
-				stackflow.push(obj);
-			} else if(ifs.type == "else_if") {
-				obj = {
-					type: "else",
-					ifobj: ifs.ifobj,
-					exec: []
-				};
-				ifs.ifobj.else_exec.push(obj);
-				if(ifs.ifobj.else_exec.length != 1) throw "else err";
-				stackflow.pop();
-				stackflow.push(obj);
-			} else {
-				throw "else statement in wrong pos";
-			}
-			continue;
-		}
-		if(cmd.type == "endif") {
-			var ifs = stackflow[stackflow.length - 1];
-			if(ifs.type == "if") {
-				// cleanup circular "ifobj"
-				for(var r = 0; r < ifs.elif_chain.length; r++) delete ifs.elif_chain[r].ifobj;
-				for(var r = 0; r < ifs.else_exec.length; r++) delete ifs.else_exec[r].ifobj;
-				stackflow.pop();
-			} else if(ifs.type == "else_if" || ifs.type == "else") {
-				stackflow.pop();
-				ifs = stackflow[stackflow.length - 1];
-				if(ifs.type != "if") throw "if err";
-				for(var r = 0; r < ifs.elif_chain.length; r++) delete ifs.elif_chain[r].ifobj;
-				for(var r = 0; r < ifs.else_exec.length; r++) delete ifs.else_exec[r].ifobj;
-				stackflow.pop();
-			} else {
-				throw "non-match err";
-			}
-			continue;
-		}
-	}
-	if(stackflow.length != 1) throw "stack did not terminate properly";
-	
-	return commands;
+function isCmpChar(chr) {
+	return set_sym1.includes(chr);
 }
 
-module.exports.compile = compileTemplate;
-
-/*
-	Template execution
-*/
-
-function processStr(obj) {
-	if(typeof obj == "string") return obj;
-	if(typeof obj == "object" && obj.type == "string") return obj.value;
-	return obj;
+function isSymChar(chr) {
+	return set_sym2.includes(chr);
 }
 
-function variableMods(vb) {
-	vb = vb.split("|");
-	var name = "";
-	var modifier = "";
-	if(vb.length == 2) {
-		modifier = vb[1];
-	}
-	name = vb[0];
-	var negation = "";
-	if(name[0] == "!" && name[1] == "!") {
-		negation = "!!";
-	} else if(name[0] == "!") {
-		negation = "!";
-	}
-	return {
-		name,
-		modifier,
-		negation
-	}
+function isSpaceChar(chr) {
+	return set_space.includes(chr);
 }
 
-function resolvePath(path, obj) {
-	var ref = obj;
-	var modifier = "";
-	var negation = "";
-	for(var i = 0; i < path.length; i++) {
-		var seg = path[i];
-		if(Array.isArray(seg)) seg = resolvePath(seg, obj).result;
-		if(typeof ref != "object" || seg == void 0) return "";
-		var vm = variableMods(seg);
-		modifier = vm.modifier;
-		negation = vm.negation;
-		ref = ref[vm.name];
-	}
-	if(negation == "!") {
-		ref = !ref;
-	} else if(negation == "!!") {
-		ref = !!ref;
-	}
-	if(ref === null || ref === undefined) ref = "";
-	return {
-		result: ref,
-		modifier
-	};
-}
-
-var digits = "0123456789";
-function isDigit(x) {
-	return digits.indexOf(x) > -1;
-}
-
-function processNumber(x) {
-	if(typeof x == "number") return x;
-	if(Array.isArray(x)) {
-		if(!x.length) return x;
-		if(isDigit(x[0][0])) {
-			if(x.length == 1) {
-				return parseInt(x[0]);
-			} else if(x.length == 2) {
-				return parseFloat(x[0] + "." + x[1]);
-			} else {
-				throw "runtime - invalid decimal number";
-			}
+function checkNotChain(str) {
+	var count = 0;
+	if(!str.length) return null;
+	for(var i = 0; i < str.length; i++) {
+		if(str[i] == "!") {
+			count++;
+		} else {
+			return null;
 		}
 	}
-	return x;
-}
-
-function resolveIfStmt(stmt, obj) {
-	var cmp = stmt.compare;
-	var a = stmt.a;
-	var b = stmt.b;
-	
-	a = processNumber(a);
-	b = processNumber(b);
-	
-	if(Array.isArray(a)) a = resolvePath(a, obj).result;
-	if(Array.isArray(b)) b = resolvePath(b, obj).result;
-	if(typeof a == "object" && a.compare) a = resolveIfStmt(a, obj);
-	if(typeof b == "object" && b.compare) b = resolveIfStmt(b, obj);
-	
-	a = processStr(a);
-	b = processStr(b);
-
-	if(typeof a != "boolean" && typeof b == "boolean") {
-		a = !!a;
-	} else if(typeof b != "boolean" && typeof a == "boolean") {
-		b = !!b;
-	}
-	
-	if(cmp == "==") {
-		return a == b;
-	} else if(cmp == "!=") {
-		return a != b;
-	} else if(cmp == ">=") {
-		return a >= b;
-	} else if(cmp == "<=") {
-		return a <= b;
-	} else if(cmp == ">") {
-		return a > b;
-	} else if(cmp == "<") {
-		return a < b;
-	} else if(cmp == "&&") {
-		return a && b;
-	} else if(cmp == "||") {
-		return a || b;
-	} else {
-		throw "runtime - invalid comparator";
-	}
+	return count;
 }
 
 function escapeHTML(h) {
@@ -736,172 +60,1223 @@ function escapeHTML(h) {
 	h = h.replace(/\"/g, "&quot;");
 	h = h.replace(/\'/g, "&#39;");
 	h = h.replace(/\`/g, "&#96;");
-	h = h.replace(/\//g, "&#x2F;");
 	h = h.replace(/\\/g, "&#x5C;");
 	h = h.replace(/\=/g, "&#61;");
 	return h;
 }
 
-function executeTemplate(code, vars, currentpath, filesystem) {
-	var page = "";
-	
-	var blockNames = {};
-	var isExtended = false;
-	if(code.extends) {
-		isExtended = true;
-		var path = processStr(code.extends);
-		var template = filesystem(path, currentpath);
-		if(!template) throw "Extended template not found";
-		for(var i = 0; i < code.exec.length; i++) {
-			var part = code.exec[i];
-			if(part.type == "block") {
-				blockNames[part.name] = part.exec;
-			}
-		}
-		code = template;
-	}
-	
-	// codes, position, local variables
-	var stack = [[code.exec, 0]];
-	
-	var lc = 0;
-	while(true) {
-		lc++;
-		if(lc >= 100000) {
-			return "runtime - possible infinite loop detected";
-		}
-		if(!stack.length) break;
-		var ctx = stack[stack.length - 1];
-		var exec = ctx[0];
-		var pc = ctx[1];
-		var local = ctx[2];
-		var code = exec[pc];
-		
-		if(!local) local = {};
-		for(var i in vars) {
-			if(!local[i]) local[i] = vars[i];
-		}
-		
-		if(ctx[1] >= exec.length) {
-			stack.pop();
-			continue;
-		}
-		if(code.type == "text") {
-			page += code.value;
-		} else if(code.type == "variable") {
-			var val = resolvePath(code.value, local);
-			if(val.modifier == "safe") {
-				val = val.result;
-			} else {
-				val = escapeHTML(val.result);
-			}
-			page += val;
-		} else if(code.type == "if") {
-			var stmt = code.stmt;
-			var ifexec = code.exec;
-			var elif_chain = code.elif_chain;
-			var else_exec = code.else_exec;
-			
-			if(!code.stage) {
-				code.stage = 1;
-				code.eif = false;
-				if(resolveIfStmt(stmt, local)) {
-					stack.push([ifexec, 0, local]);
-					delete code.stage;
-					delete code.eif;
-				} else {
-					if(elif_chain) {
-						stack.push([elif_chain, 0, local]);
-						continue;
-					}
-				}
-			} else if(code.stage == 1) {
-				code.stage = 2;
-				if(!code.eif) {
-					// all else-if statements are false, execute else statement
-					if(else_exec.length) {
-						stack.push([else_exec[0].exec, 0, local]);
-						continue;
-					} else {
-						delete code.stage;
-						delete code.eif;
-					}
-				} else {
-					delete code.stage;
-					delete code.eif;
-				}
-			} else {
-				delete code.stage;
-				delete code.eif;
-			}
-		} else if(code.type == "else_if") {
-			var stmt = code.stmt;
-			var ifexec = code.exec;
-			if(resolveIfStmt(stmt, local)) {
-				stack.pop(); // exit out of else-if chain
-				var end = stack[stack.length - 1];
-				var ifobj = end[0][end[1]];
-				ifobj.eif = true;
-				stack.push([ifexec, 0, local]);
-				continue;
-			}
-		} else if(code.type == "else") {
-			stack.push([code.exec, 0, local]);
-			continue;
-		} else if(code.type == "for") {
-			var key = code.key;
-			var loopexec = code.exec;
-			
-			if(!code.loop) code.loop = 0;
-			if(!code.init) {
-				code.init = true;
-				code.obj = resolvePath(code.obj, local).result;
-				if(typeof code.obj == "object") {
-					if(Array.isArray(code.obj)) {
-						code.array = true;
-						code.keys = null;
-						code.len = code.obj.length;
-					} else {
-						code.array = false;
-						code.keys = Object.keys(code.obj);
-						code.len = code.keys.length;
-					}
-				} else {
-					code.len = 0; // terminate loop
-				}
-			}
-			
-			if(code.loop < code.len) {
-				var item;
-				var localvars = {};
-				for(var i in local) localvars[i] = local[i];
-				if(code.array) {
-					localvars.key = code.loop;
-					localvars[key] = code.obj[code.loop];
-				} else {
-					localvars.key = code.keys[code.loop];
-					localvars[key] = code.obj[localvars.key];
-				}
-				code.loop++;
-				stack.push([loopexec, 0, localvars]);
-				continue;
-			} else {
-				// loop is reusable, so reset when done
-				code.loop = 0;
-			}
-		} else if(code.type == "block") {
-			var name = code.name;
-			if(isExtended && blockNames[name]) {
-				stack.push([blockNames[name], 0, local]);
-			}
-		}
-		ctx[1]++;
-		if(ctx[1] >= exec.length) {
-			stack.pop();
-		}
-	}
-	
-	return page;
+function SyntaxError(row, col) {
+    return Error("Unexpected token at row " + (row + 1) + ", column " + (col + 1));
 }
 
-module.exports.execute = executeTemplate;
+function tokenizeControl(input, row, col) {
+	var chr;
+	var idx = 0;
+	row = row || 0;
+	col = col || 0;
+	var prevPos = [idx, row, col];
+	function next() {
+		prevPos[0] = idx;
+		prevPos[1] = row;
+		prevPos[2] = col;
+		var nc = input[idx++];
+		col++;
+		if(nc == "\n") {
+			row++;
+			col = 0;
+		}
+		return nc;
+	}
+	function back() {
+		idx = prevPos[0];
+		row = prevPos[1];
+		col = prevPos[2];
+		chr = input[idx];
+	}
+	function peek() {
+		return input[idx];
+	}
+	function getPos() {
+		return [row, col];
+	}
+	function consumeText() {
+		var res = "";
+		while(true) {
+			chr = next();
+			if(!chr) break;
+			if(!isFullVarChar(chr)) {
+				back();
+				break;
+			}
+			res += chr;
+		}
+		return res;
+	}
+	function consumeSymCmp() {
+		var res = "";
+		while(true) {
+			chr = next();
+			if(!chr) break;
+			if(!isCmpChar(chr)) {
+				back();
+				break;
+			}
+			res += chr;
+		}
+		return res;
+	}
+	function consumeNumber() {
+		var intval = "";
+		var decval = "";
+		var negative = false;
+		var number = false;
+		var decimal = false;
+		while(true) {
+			chr = next();
+			if(!chr) break;
+			if(!isFullNumChar(chr)) {
+				back();
+				break;
+			}
+			if(chr == "-") {
+				if(number || decimal || negative) {
+					throw SyntaxError(row, col);
+				}
+				negative = true;
+				continue;
+			}
+			if(chr == ".") {
+				if(negative || decimal) {
+					throw SyntaxError(row, col);
+				}
+				decimal = true;
+				continue;
+			}
+			if(decimal) {
+				decval += chr;
+			} else {
+				intval += chr;
+				number = true;
+			}
+		}
+		if(!intval && !decval) {
+			return null;
+		}
+		var num = Number(intval + "." + decval);
+		if(negative) num = -num;
+		return num;
+	}
+	function consumeString(quoteMarker) {
+		var res = "";
+		while(true) {
+			chr = next();
+			if(!chr) break;
+			if(chr == quoteMarker) {
+				break;
+			}
+			if(chr == "\\") {
+				chr = next();
+				if(chr == "r") {
+					res += "\r";
+				} else if(chr == "n") {
+					res += "\n";
+				} else if(chr == "t") {
+					res += "\t";
+				} else {
+					res += chr;
+				}
+				continue;
+			}
+			res += chr;
+		}
+		return res;
+	}
+	function consumeGroup() {
+		var str = "";
+		var level = 1;
+		while(true) {
+			chr = next();
+			if(!chr) {
+				// mismatched parenthesis
+				throw SyntaxError(row, col);
+			}
+			if(chr == ")") {
+				level--;
+				if(level <= 0) {
+					break;
+				}
+			} else if(chr == "(") {
+				level++;
+			}
+			str += chr;
+		}
+		return str;
+	}
+	var tokens = [];
+	while(true) {
+		chr = next();
+		if(!chr) break;
+		if(isSpaceChar(chr)) continue;
+		if(isVarChar(chr)) {
+			back();
+			var pos = getPos();
+			var text = consumeText();
+			tokens.push({
+				type: "text",
+				pos: pos,
+				value: text
+			});
+			continue;
+		}
+		if(chr == ".") {
+			var numNext = isNumChar(peek());
+			if(numNext) {
+				back();
+				var num = consumeNumber();
+				tokens.push({
+					type: "num",
+					pos: pos,
+					value: num
+				});
+			} else {
+				tokens.push({
+					type: "sym",
+					pos: pos,
+					value: "."
+				});
+			}
+			continue;
+		}
+		if(isFullNumChar(chr)) {
+			back();
+			var pos = getPos();
+			var num = consumeNumber();
+			tokens.push({
+				type: "num",
+				pos: pos,
+				value: num
+			});
+			continue;
+		}
+		if(isCmpChar(chr)) {
+			back();
+			var pos = getPos();
+			var sym = consumeSymCmp();
+			var type = "";
+			if(sym == "<") {
+				type = "lt";
+			} else if(sym == ">") {
+				type = "gt";
+			} else if(sym == "<=") {
+				type = "lte";
+			} else if(sym == ">=") {
+				type = "gte";
+			} else if(sym == "==") {
+				type = "eq";
+			} else if(sym == "!=") {
+				type = "neq";
+			} else if(sym == "&&") {
+				type = "and";
+			} else if(sym == "||") {
+				type = "or";
+			} else if(sym == "|") {
+				type = "filter";
+			} else {
+				var not = checkNotChain(sym);
+				if(not) {
+					tokens.push({
+						type: "not",
+						pos: pos,
+						count: not
+					});
+					continue;
+				}
+				throw SyntaxError(row, col);
+			}
+			tokens.push({
+				type: type,
+				pos: pos
+			});
+			continue;
+		}
+		if(isSymChar(chr)) {
+			var pos = getPos();
+			tokens.push({
+				type: "sym",
+				pos: pos,
+				value: chr
+			});
+			continue;
+		}
+		if(chr == "\"" || chr == "'") {
+			var pos = getPos();
+			var str = consumeString(chr);
+			tokens.push({
+				type: "str",
+				pos: pos,
+				value: str
+			});
+			continue;
+		}
+		if(chr == "(") {
+			var pos = getPos();
+			var group = consumeGroup();
+			tokens.push({
+				type: "group",
+				pos: pos,
+				value: tokenizeControl(group)
+			});
+			continue;
+		}
+		// unrecognized symbol
+		throw SyntaxError(row, col);
+	}
+	return tokens;
+}
+
+function sharedConsumeVariablePath(next, back) {
+	var path = [];
+	var stack = [];
+	var head = path;
+	var varModeType = {
+		none: 0,
+		variable: 1,
+		dot: 2,
+		startbracket: 3
+	};
+	var mode = varModeType.none;
+	while(true) {
+		part = next();
+		if(!part) break;
+		if(part.type == "text") {
+			if(mode == varModeType.none || mode == varModeType.dot || mode == varModeType.startbracket) {
+				mode = varModeType.variable;
+				head.push(part.value);
+				continue;
+			}
+			throw "Invalid token";
+		}
+		if(part.type == "sym" && part.value == ".") {
+			if(mode == varModeType.variable) {
+				mode = varModeType.dot;
+				continue;
+			}
+			throw "Invalid token";
+		}
+		// square bracket accessor
+		// if a string is contained within square brackets, it's a property accessor
+		// otherwise, it's a sub-query for a value
+		if(part.type == "sym" && part.value == "[") {
+			if(mode != varModeType.variable) {
+				throw "Invalid token";
+			}
+			part = next(true);
+			if(part.type == "str" || part.type == "num") {
+				var prop = part.value;
+				part = next(true);
+				if(part.type == "sym" && part.value == "]") {
+					head.push(prop);
+					continue;
+				}
+				throw "Unexpected token";
+			}
+			back();
+			var container = [];
+			head.push(container);
+			stack.push(head);
+			head = container;
+			mode = varModeType.startbracket;
+			continue;
+		}
+		if(part.type == "sym" && part.value == "]") {
+			head = stack.pop();
+			continue;
+		}
+		// unrecognized token - stop there
+		back();
+		break;
+	}
+	if(mode == varModeType.dot || mode == varModeType.startbracket) {
+		throw "Unexpected token";
+	}
+	return path;
+}
+
+function organizeIfStmt(tokens) {
+	// the main goal of this function is to validate an if-statement
+	var result = [];
+	var part;
+	var idx = 0;
+	var row = 0;
+	var col = 0;
+	var prevPos = [0, 0, 0];
+	function next(assertNonempty) {
+		prevPos[0] = idx;
+		prevPos[1] = row;
+		prevPos[2] = col;
+		var nc = tokens[idx++];
+		if(assertNonempty) {
+			if(!nc) {
+				throw "Missing token";
+			}
+		}
+		return nc;
+	}
+	function back() {
+		idx = prevPos[0];
+		row = prevPos[1];
+		col = prevPos[2];
+		part = tokens[idx];
+	}
+	
+	var modeType = {
+		none: 0,
+		object: 1,
+		compare: 2,
+		not: 3
+	};
+	var mode = modeType.none;
+	
+	while(true) {
+		part = next();
+		if(!part) break;
+		if(part.type == "text") {
+			if(mode == modeType.object) {
+				throw "Unexpected token";
+			}
+			back();
+			var variable = sharedConsumeVariablePath(next, back);
+			result.push({
+				type: "variable",
+				value: variable
+			});
+			mode = modeType.object;
+			continue;
+		}
+		if(part.type == "num") {
+			if(mode == modeType.object) {
+				throw "Unexpected token";
+			}
+			result.push({
+				type: "num",
+				value: part.value
+			});
+			mode = modeType.object;
+			continue;
+		}
+		if(part.type == "str") {
+			if(mode == modeType.object) {
+				throw "Unexpected token";
+			}
+			result.push({
+				type: "str",
+				value: part.value
+			});
+			mode = modeType.object;
+			continue;
+		}
+		if(part.type == "not") {
+			if(mode == modeType.object || mode == modeType.not) {
+				throw "Unexpected token";
+			}
+			result.push({
+				type: "not",
+				count: part.count
+			});
+			mode = modeType.not;
+			continue;
+		}
+		switch(part.type) {
+			case "lt":
+			case "gt":
+			case "lte":
+			case "gte":
+			case "eq":
+			case "neq":
+			case "and":
+			case "or":
+				if(mode != modeType.object) {
+					throw "Unexpected token";
+				}
+				result.push({
+					type: part.type
+				});
+				mode = modeType.compare;
+				continue;
+		}
+		if(part.type == "group") {
+			if(mode == modeType.object) {
+				throw "Unexpected token";
+			}
+			var subtokens = part.value;
+			result.push({
+				type: "exec",
+				exec: organizeIfStmt(subtokens)
+			});
+			mode = modeType.object;
+			continue;
+		}
+		throw "Unexpected token";
+	}
+	return result;
+}
+
+function combineIfStmt(tokens) {
+	// guarantee: there is a token before and after a comparison operator
+	// combine all NOT statements
+	for(var i = 0; i < tokens.length; i++) {
+		var part = tokens[i];
+		if(part.type == "not") {
+			var t2 = tokens[i + 1];
+			tokens[i] = {
+				type: "not",
+				count: part.count,
+				x: t2
+			};
+			tokens.splice(i + 1, 1);
+			// ensure that we do not go over the same 'not' operator again
+		}
+	}
+	// process all sub-groups
+	for(var i = 0; i < tokens.length; i++) {
+		var part = tokens[i];
+		if(part.type == "exec") {
+			part.exec = combineIfStmt(part.exec);
+		}
+	}
+	// combine in order: comparisons, AND, OR
+	for(var i = 0; i < 3; i++) {
+		for(var j = 0; j < tokens.length; j++) {
+			var part = tokens[j];
+			var type = part.type;
+			var check = false;
+			switch(i) {
+				case 0:
+					switch(type) {
+						case "eq":
+						case "neq":
+						case "lt":
+						case "gt":
+						case "lte":
+						case "gte":
+							check = true;
+					}
+					break;
+				case 1:
+					check = (type == "and");
+					break;
+				case 2:
+					check = (type == "or");
+					break;
+			}
+			if(check) {
+				var t1 = tokens[j - 1];
+				var t2 = tokens[j + 1];
+				tokens[j - 1] = {
+					type: type,
+					x: t1,
+					y: t2
+				};
+				tokens.splice(j, 2);
+				j--;
+			}
+		}
+	}
+	return tokens;
+}
+
+function organizeForStmt(tokens) {
+	var part;
+	var idx = 0;
+	var row = 0;
+	var col = 0;
+	var prevPos = [0, 0, 0];
+	function next(assertNonempty) {
+		prevPos[0] = idx;
+		prevPos[1] = row;
+		prevPos[2] = col;
+		var nc = tokens[idx++];
+		if(assertNonempty) {
+			if(!nc) {
+				throw "Missing token";
+			}
+		}
+		return nc;
+	}
+	function back() {
+		idx = prevPos[0];
+		row = prevPos[1];
+		col = prevPos[2];
+		part = tokens[idx];
+	}
+	var modeType = {
+		none: 0,
+		variable: 1,
+		comma: 2,
+		inliteral: 3,
+		righthand: 4
+	};
+	var mode = modeType.none;
+	var varList = [];
+	var destPath = null;
+	while(true) {
+		part = next();
+		if(!part) {
+			if(mode != modeType.righthand) {
+				throw "Missing token";
+			}
+			break;
+		}
+		if(mode == modeType.righthand) {
+			throw "Unexpected token";
+		}
+		if(part.type == "text") {
+			if(part.value == "in") {
+				if(mode != modeType.variable) {
+					throw "Unexpected token";
+				}
+				mode = modeType.inliteral;
+				continue;
+			}
+			if(mode == modeType.none || mode == modeType.comma) {
+				varList.push(part.value);
+				mode = modeType.variable;
+				continue;
+			} else if(mode == modeType.inliteral) {
+				back();
+				destPath = sharedConsumeVariablePath(next, back);
+				mode = modeType.righthand;
+				continue;
+			}
+			throw "Unexpected token";
+		}
+		if(part.type == "sym" && part.value == ",") {
+			if(mode != modeType.variable) {
+				throw "Unexpected token";
+			}
+			mode = modeType.comma;
+			continue;
+		}
+	}
+	return {
+		iterators: varList,
+		destination: destPath
+	};
+}
+
+function scanControlBlock(tokens) {
+	var part;
+	var idx = 0;
+	var row = 0;
+	var col = 0;
+	var prevPos = [0, 0, 0];
+	function next() {
+		prevPos[0] = idx;
+		prevPos[1] = row;
+		prevPos[2] = col;
+		var nc = tokens[idx++];
+		return nc;
+	}
+	function back() {
+		idx = prevPos[0];
+		row = prevPos[1];
+		col = prevPos[2];
+		part = tokens[idx];
+	}
+	part = next();
+	var blockType = null;
+	if(part.type == "text") {
+		if(part.value == "else") {
+			part = next();
+			if(!part) {
+				blockType = "else";
+			} else {
+				if(part.type == "text" && part.value == "if") {
+					blockType = "elseif";
+				}
+			}
+		} else {
+			blockType = part.value;
+		}
+	} else {
+		throw "Unexpected token";
+	}
+	if(blockType == "if") {
+		tokens.splice(0, 1);
+		var cond = combineIfStmt(organizeIfStmt(tokens));
+		if(!cond.length) {
+			throw "Empty If block";
+		} else if(cond.length == 1) {
+			cond = cond[0];
+		} else {
+			throw "Unexpected token";
+		}
+		return {
+			type: "if",
+			cond: cond
+		};
+	} else if(blockType == "elseif") {
+		tokens.splice(0, 2);
+		var cond = combineIfStmt(organizeIfStmt(tokens));
+		if(!cond.length) {
+			throw "Empty ElseIf block";
+		} else if(cond.length == 1) {
+			cond = cond[0];
+		} else {
+			throw "Unexpected token";
+		}
+		return {
+			type: "elseif",
+			cond: cond
+		};
+	} else if(blockType == "for") {
+		tokens.splice(0, 1);
+		var forStmt = organizeForStmt(tokens);
+		return {
+			type: "for",
+			iterators: forStmt.iterators,
+			destination: forStmt.destination
+		};
+	} else if(blockType == "block") {
+		part = next();
+		if(!part) {
+			throw "Missing token";
+		}
+		var blockname = null;
+		if(part.type == "text" || part.type == "str") {
+			blockname = part.value;
+		} else {
+			throw "Unexpected token";
+		}
+		return {
+			type: "block",
+			name: blockname
+		}
+	} else if(blockType == "extends") {
+		part = next();
+		if(!part) {
+			throw "Missing token";
+		}
+		var pathname = null;
+		if(part.type == "str") {
+			pathname = part.value;
+		} else {
+			throw "Unexpected token";
+		}
+		return {
+			type: "extends",
+			path: pathname
+		};
+	} else if(blockType == "endif" || blockType == "else" || blockType == "endfor" || blockType == "endblock") {
+		if(next()) {
+			throw "Unexpected token";
+		}
+		return {
+			type: blockType
+		};
+	} else {
+		throw "Unrecognized block type";
+	}
+}
+
+function scanVariableBlock(tokens) {
+	var part;
+	var idx = 0;
+	var row = 0;
+	var col = 0;
+	var prevPos = [0, 0, 0];
+	function next() {
+		prevPos[0] = idx;
+		prevPos[1] = row;
+		prevPos[2] = col;
+		var nc = tokens[idx++];
+		return nc;
+	}
+	function back() {
+		idx = prevPos[0];
+		row = prevPos[1];
+		col = prevPos[2];
+		part = tokens[idx];
+	}
+	var path = null;
+	var filter = null;
+	part = next();
+	if(!part) {
+		throw "Missing token";
+	}
+	if(part.type == "text") {
+		back();
+		path = sharedConsumeVariablePath(next, back);
+	} else {
+		throw "Unexpected token";
+	}
+	
+	part = next();
+	if(part) {
+		if(part.type == "filter") {
+			part = next();
+			if(!part) {
+				throw "Missing token";
+			}
+			if(part.type == "text") {
+				filter = part.value;
+			} else {
+				throw "Unexpected token";
+			}
+			if(next()) {
+				throw "Unexpected token";
+			}
+		} else {
+			throw "Unexpected token";
+		}
+	}
+	return {
+		type: "variable",
+		path: path,
+		filter: filter
+	};
+}
+
+function parseTemplate(input) {
+	var tokens = [];
+	var chr;
+	var idx = 0;
+	var row = 0;
+	var col = 0;
+	var prevPos = [idx, row, col];
+	var prevCtx = [0, 0, 0];
+	function next() {
+		prevPos[0] = idx;
+		prevPos[1] = row;
+		prevPos[2] = col;
+		var nc = input[idx++];
+		return nc;
+	}
+	function back() {
+		idx = prevPos[0];
+		row = prevPos[1];
+		col = prevPos[2];
+		chr = input[idx];
+	}
+	function peek() {
+		return input[idx];
+	}
+	function consumeGeneralBlock(term) {
+		var str = "";
+		while(true) {
+			chr = next();
+			if(!chr) throw "Invalid termination";
+			if(chr == term) {
+				chr = next();
+				if(chr == "}") break;
+				back();
+			}
+			str += chr;
+		}
+		return str;
+	}
+	function consumeRawText() {
+		var str = "";
+		while(true) {
+			chr = next();
+			if(!chr) break;
+			if(chr == "{") {
+				var testchr = peek();
+				if(testchr == "{" || testchr == "%" || testchr == "#") {
+					back();
+					break;
+				}
+			}
+			str += chr;
+		}
+		return str;
+	}
+	function back() {
+		idx = prevPos[0];
+		row = prevPos[1];
+		col = prevPos[2];
+		chr = input[idx];
+	}
+	while(true) {
+		chr = next();
+		if(!chr) break;
+		if(chr == "{") {
+			var nextchar = peek();
+			if(nextchar == "{") {
+				next();
+				var subtokens = tokenizeControl(consumeGeneralBlock("}"))
+				tokens.push(scanVariableBlock(subtokens));
+				continue;
+			} else if(nextchar == "%") {
+				next();
+				var subtokens = tokenizeControl(consumeGeneralBlock("%"))
+				tokens.push(scanControlBlock(subtokens));
+				continue;
+			} else if(nextchar == "#") {
+				next();
+				consumeGeneralBlock("#"); // do nothing with it
+				continue;
+			}
+			// fall-through
+		}
+		back();
+		var text = consumeRawText();
+		tokens.push({
+			type: "raw",
+			value: text
+		});
+	}
+	return tokens;
+}
+
+function organizeTemplate(input) {
+	var tokens = [];
+	var parentPath = null;
+	var part;
+	var idx = 0;
+	var row = 0;
+	var col = 0;
+	var prevPos = [idx, row, col];
+	var prevCtx = [0, 0, 0];
+	function next() {
+		prevPos[0] = idx;
+		prevPos[1] = row;
+		prevPos[2] = col;
+		var nc = input[idx++];
+		return nc;
+	}
+	function back() {
+		idx = prevPos[0];
+		row = prevPos[1];
+		col = prevPos[2];
+		part = input[idx];
+	}
+	
+	function consumeIfBlock() {
+		var if_tokens = [];
+		var mid_tokens = [];
+		var else_tokens = [];
+		var stage = 0; // [if, elseif, else]
+		var level = 1;
+		while(true) {
+			part = next();
+			if(!part) {
+				throw "Mismatched 'if' block";
+			}
+
+			if(part.type == "if") {
+				level++;
+			} else if(part.type == "else") {
+				if(level == 1) {
+					if(stage == 0 || stage == 1) {
+						stage = 2;
+						continue;
+					}
+					throw "Unexpected 'else' block";
+				}
+			} else if(part.type == "elseif") {
+				if(level == 1) {
+					if(stage == 0 || stage == 1) {
+						mid_tokens.push([part.cond, []]);
+						stage = 1;
+						continue;
+					}
+					throw "Unexpected 'else if' block";
+				}
+			} else if(part.type == "endif") {
+				level--;
+				if(level <= 0) {
+					break;
+				}
+			}
+			switch(stage) {
+				case 0: if_tokens.push(part); break;
+				case 1: mid_tokens.at(-1)[1].push(part); break;
+				case 2: else_tokens.push(part); break;
+			}
+		}
+		return {
+			main: if_tokens,
+			mid: mid_tokens,
+			end: else_tokens
+		};
+	}
+	function consumeSimpleBlock(starter, terminator) {
+		var tokens = [];
+		var level = 1;
+		while(true) {
+			part = next();
+			if(!part) {
+				throw "Mismatched '" + starter + "' block";
+			}
+			if(part.type == starter) {
+				level++;
+			} else if(part.type == terminator) {
+				level--;
+				if(level <= 0) {
+					break;
+				}
+			}
+			tokens.push(part);
+		}
+		return tokens;
+	}
+	
+	while(true) {
+		part = next();
+		if(!part) break;
+		if(part.type == "if") {
+			var mainCond = part.cond;
+			var ctokens = consumeIfBlock();
+			var elseifBlocks = [];
+			for(var i = 0; i < ctokens.mid.length; i++) {
+				var elseif = ctokens.mid[i];
+				elseifBlocks.push({
+					cond: elseif[0],
+					exec: organizeTemplate(elseif[1]).exec
+				});
+			}
+			tokens.push({
+				type: "if",
+				mainBlock: {
+					cond: mainCond,
+					exec: organizeTemplate(ctokens.main).exec
+				},
+				elseifBlocks: elseifBlocks,
+				elseBlock: {
+					exec: organizeTemplate(ctokens.end).exec
+				}
+			});
+		} else if(part.type == "for") {
+			var iterators = part.iterators;
+			var destination = part.destination;
+			var ctokens = consumeSimpleBlock("for", "endfor");
+			tokens.push({
+				type: "for",
+				iterators: iterators,
+				destination: destination,
+				exec: organizeTemplate(ctokens).exec
+			});
+		} else if(part.type == "block") {
+			var name = part.name;
+			var ctokens = consumeSimpleBlock("block", "endblock");
+			tokens.push({
+				type: "block",
+				name: name,
+				exec: organizeTemplate(ctokens).exec
+			});
+		} else if(part.type == "extends") {
+			parentPath = part.path;
+		} else {
+			if(part.type == "endfor" || part.type == "endblock" || part.type == "endif") {
+				throw "Unexpected token";
+			}
+			tokens.push(part);
+		}
+	}
+	return {
+		parentPath: parentPath,
+		exec: tokens
+	}
+}
+
+function compileTemplate(input) {
+	input = input.toString();
+	input = input.replace(/\r\n/g, "\n");
+	var template = parseTemplate(input);
+	template = organizeTemplate(template);
+	return template;
+}
+
+// Execution engine
+
+function resolvePath(path, container) {
+	if(!path.length) return null;
+	var res = container;
+	for(var i = 0; i < path.length; i++) {
+		var segment = path[i];
+		if(Array.isArray(segment)) {
+			segment = resolvePath(segment, container);
+			if(segment == null) return null;
+		}
+		if(res == null || !res.hasOwnProperty(segment)) return null;
+		res = res[segment];
+	}
+	return res;
+}
+
+function executeCond(cond, container) {
+	var x, y;
+	if(cond.type == "str" || cond.type == "num") {
+		return cond.value;
+	}
+	if(cond.type == "exec") {
+		return exec(cond.exec, container);
+	}
+	if(cond.type == "variable") {
+		return resolvePath(cond.value, container);
+	}
+	if(cond.type == "not") {
+		x = cond.x;
+		var count = (cond.count - 1 % 2) + 1;
+		if(count == 1) {
+			return !executeCond(x, container);
+		} else if(count == 2) {
+			return !!executeCond(x, container);
+		}
+	}
+	x = cond.x;
+	y = cond.y;
+	if(cond.type == "eq") {
+		return executeCond(x, container) == executeCond(y, container);
+	}
+	if(cond.type == "neq") {
+		return executeCond(x, container) != executeCond(y, container);
+	}
+	if(cond.type == "and") {
+		return executeCond(x, container) && executeCond(y, container);
+	}
+	if(cond.type == "or") {
+		return executeCond(x, container) || executeCond(y, container);
+	}
+	if(cond.type == "lt") {
+		return executeCond(x, container) < executeCond(y, container);
+	}
+	if(cond.type == "lte") {
+		return executeCond(x, container) <= executeCond(y, container);
+	}
+	if(cond.type == "gt") {
+		return executeCond(x, container) > executeCond(y, container);
+	}
+	if(cond.type == "gte") {
+		return executeCond(x, container) >= executeCond(y, container);
+	}
+}
+
+function executeBlock(exec, params, blockPresets) {
+	var str = "";
+	for(var i = 0; i < exec.length; i++) {
+		var token = exec[i];
+		if(token.type == "raw") {
+			str += token.value;
+		}
+		if(token.type == "variable") {
+			var filter = token.filter;
+			var value = resolvePath(token.path, params);
+			if(typeof value == "string" || typeof value == "number" || typeof value == "bigint") {
+				value = value.toString();
+			} else {
+				value = "";
+			}
+			if(filter != "safe") {
+				value = escapeHTML(value);
+			}
+			str += value;
+		}
+		if(token.type == "if") {
+			var ifBlock = token.mainBlock;
+			var elifChain = token.elseifBlocks;
+			var elseBlock = token.elseBlock;
+			if(executeCond(ifBlock.cond, params)) {
+				str += executeBlock(ifBlock.exec, params, blockPresets);
+			} else {
+				var elifSuccess = false;
+				for(var e = 0; e < elifChain.length; e++) {
+					var elifBlock = elifChain[e];
+					if(executeCond(elifBlock.cond, params)) {
+						elifSuccess = true;
+						str += executeBlock(elifBlock.exec, params, blockPresets);
+						break;
+					}
+				}
+				if(!elifSuccess) {
+					str += executeBlock(elseBlock.exec, params, blockPresets);
+				}
+			}
+		}
+		if(token.type == "for") {
+			var container = resolvePath(token.destination, params);
+			var iterators = token.iterators;
+			if(typeof container != "object" || container == null) continue;
+			if(iterators.length > 1) {
+				if(!Array.isArray(container)) {
+					continue;
+				}
+				for(var c = 0; c < container.length; c++) {
+					var cValue = container[c];
+					for(var t = 0; t < iterators.length; t++) {
+						var vName = iterators[t];
+						params[vName] = cValue[t];
+					}
+					str += executeBlock(token.exec, params, blockPresets);
+				}
+			}
+			for(var c in container) {
+				var vName = iterators[0];
+				var cValue = container[c];
+				params[vName] = cValue;
+				str += executeBlock(token.exec, params, blockPresets);
+			}
+		}
+		if(token.type == "block") {
+			var name = token.name;
+			var blkexec = token.exec;
+			if(blockPresets && blockPresets[name]) {
+				blkexec = blockPresets[name];
+			}
+			str += executeBlock(blkexec, params, blockPresets);
+		}
+	}
+	return str;
+}
+
+function executeTemplate(template, parameters) {
+	if(!parameters) parameters = {};
+	var extended = template.parentPath;
+	var exec = template.exec;
+	if(extended) {
+		var blocks = {};
+		for(var i = 0; i < exec.length; i++) {
+			var part = exec[i];
+			if(part.type == "block") {
+				var name = part.name;
+				blocks[name] = part.exec;
+			}
+		}
+		var parentTemplate = vfsGetFile(extended);
+		return executeBlock(parentTemplate.exec, parameters, blocks);
+	}
+	return executeBlock(exec, parameters, null);
+}
+
+// Virtual File System
+
+var vfsData = {};
+
+function vfsNormalizePath(path) {
+	path = path.replace(/\\/g, "/");
+	if(path.at(0) == "/") path = path.slice(1);
+	if(path.at(-1) == "/") path = path.slice(0, -1);
+	return path;
+}
+
+function vfsGetFile(path) {
+	var rawpath = path;
+	path = vfsNormalizePath(path);
+	if(!vfsData.hasOwnProperty(path)) {
+		throw "File '" + rawpath + "' not found";
+	}
+	return vfsData[path];
+}
+
+function vfsSetFile(path, data) {
+	path = vfsNormalizePath(path);
+	vfsData[path] = data;
+}
+
+module.exports = {
+	compile: compileTemplate,
+	execute: executeTemplate,
+	addFile: vfsSetFile,
+	getFile: vfsGetFile
+};
