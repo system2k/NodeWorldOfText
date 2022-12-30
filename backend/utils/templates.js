@@ -800,6 +800,7 @@ function scanVariableBlock(tokens) {
 	}
 	var path = null;
 	var filter = null;
+	var filterArg = null;
 	part = next();
 	if(!part) {
 		throw "Missing token";
@@ -823,6 +824,24 @@ function scanVariableBlock(tokens) {
 			} else {
 				throw "Unexpected token";
 			}
+			part = next();
+			if(part) { // argument modifier
+				if(part.type == "group") {
+					var args = part.value;
+					if(args.length == 1) {
+						var arg = args[0];
+						if(arg.type == "str" || arg.type == "num") {
+							filterArg = arg.value;
+						} else {
+							throw "Unexpected token";
+						}
+					} else if(args.length > 1) {
+						throw "Too many arguments";
+					}
+				} else {
+					throw "Unexpected token";
+				}
+			}
 			if(next()) {
 				throw "Unexpected token";
 			}
@@ -833,7 +852,8 @@ function scanVariableBlock(tokens) {
 	return {
 		type: "variable",
 		path: path,
-		filter: filter
+		filter: filter,
+		filterArg: filterArg
 	};
 }
 
@@ -1162,11 +1182,15 @@ function executeBlock(exec, params, blockPresets) {
 		}
 		if(token.type == "variable") {
 			var filter = token.filter;
+			var arg = token.filterArg;
 			var value = resolvePath(token.path, params);
-			if(typeof value == "string" || typeof value == "number" || typeof value == "bigint") {
+			if(typeof value == "string" || typeof value == "number" || typeof value == "bigint" || typeof value == "boolean") {
 				value = value.toString();
 			} else {
 				value = "";
+			}
+			if(customFilters.hasOwnProperty(filter)) {
+				value = customFilters[filter](value, arg);
 			}
 			if(filter != "safe") {
 				value = escapeHTML(value);
@@ -1249,6 +1273,14 @@ function executeTemplate(template, parameters) {
 	return executeBlock(exec, parameters, null);
 }
 
+// Custom filter
+
+var customFilters = {};
+
+function registerFilter(name, func) {
+	customFilters[name] = func;
+}
+
 // Virtual File System
 
 var vfsData = {};
@@ -1278,5 +1310,6 @@ module.exports = {
 	compile: compileTemplate,
 	execute: executeTemplate,
 	addFile: vfsSetFile,
-	getFile: vfsGetFile
+	getFile: vfsGetFile,
+	registerFilter
 };

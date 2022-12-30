@@ -47,7 +47,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var HTML = evars.HTML;
 
 	var db = vars.db;
-	var plural = vars.plural;
 	var createCSRF = vars.createCSRF;
 
 	if(!user.authenticated) {
@@ -75,8 +74,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			conf_url: "/accounts/configure/" + owned.name + "/",
 			get_absolute_url: "/" + owned.name,
 			url: world_url,
-			member_plural: plural(member_total),
-			views_plural: plural(views),
+			member_count: member_total,
+			views_count: views,
 			views,
 			name: owned.name,
 			mem_key: owned.opts.memKey

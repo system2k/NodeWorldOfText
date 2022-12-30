@@ -49,8 +49,8 @@
 								not publicly visible,
 							{% endif %}
 						{% endif %}
-						{{ world.whitelist_set_count }} member{{ world.member_plural }}.
-						{{ world.views }} view{{ world.views_plural }}.
+						{{ world.whitelist_set_count }} {{ world.member_count|plural("member") }}.
+						{{ world.views }} {{ world.views_count|plural("view") }}.
 						{% if world.mem_key %}
 						<span style="color: red; font-weight: bold;">(Key)</span>
 						{% endif %}

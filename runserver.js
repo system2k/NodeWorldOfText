@@ -604,6 +604,20 @@ var templates_path = "./frontend/templates/";
 
 var static_data = {}; // return static server files
 
+templates.registerFilter("plural", function(count, string) {
+	if(!string) return "";
+	if(count != 1) {
+		if(string.endsWith("s")) {
+			return string + "es";
+		} else if(string.endsWith("y")) {
+			return string.slice(0, -1) + "ies";
+		} else {
+			return string + "s";
+		}
+	}
+	return string;
+});
+
 function load_static() {
 	for(var i in template_data) {
 		delete template_data[i];
@@ -1695,15 +1709,6 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 		}*/
 	}
 	return user;
-}
-
-// return "s" or not depending on the quantity
-function plural(int, plEnding) {
-	var p = "";
-	if(int != 1) {
-		p = !plEnding ? "s" : plEnding;
-	}
-	return p;
 }
 
 function checkHTTPRestr(list, ipVal, ipFam) {
@@ -3034,7 +3039,6 @@ var global_data = {
 	send_email,
 	get_user_info,
 	modules,
-	plural,
 	announce: modifyAnnouncement,
 	wss, // this is undefined by default, but will get a value once wss is initialized
 	topActiveWorlds,
