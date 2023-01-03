@@ -91,6 +91,7 @@ var fontTemplate           = "$px 'Courier New', monospace";
 var specialFontTemplate    = "$px consolas, monospace";
 var fontOrder              = ["Courier New", "monospace"];
 var specialFontOrder       = ["consolas", "monospace"];
+var initiallyFetched       = false;
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -3782,7 +3783,21 @@ function getAndFetchTiles() {
 		}
 	}
 	if(toFetch.length > 0) {
-		network.fetch(toFetch);
+		if(!initiallyFetched) {
+			initiallyFetched = true;
+			var bound = toFetch[0];
+			networkHTTP.fetch(bound.minX, bound.minY, bound.maxX, bound.maxY, function(tiles) {
+				if(tiles == null) { // initial HTTP request failed
+					network.fetch(toFetch);
+					return;
+				}
+				ws_functions.fetch({
+					tiles: tiles
+				});
+			});
+		} else {
+			network.fetch(toFetch);
+		}
 	}
 }
 

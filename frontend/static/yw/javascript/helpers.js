@@ -713,6 +713,12 @@ function filterAdvancedChars(array, noSurrogates, noCombining) {
 	return array;
 }
 
+if(!HTMLElement.prototype.append) {
+	HTMLElement.prototype.append = function(string) {
+		this.appendChild(document.createTextNode(string));
+	}
+}
+
 var w = {
 	loadScript: function(url, callback) {
 		var script = document.createElement("script");

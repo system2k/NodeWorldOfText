@@ -1057,6 +1057,11 @@ async function initialize_image_db() {
 var ranks_cache = {
 	users: {}
 };
+/*
+	TODO: scrap this & rename to 'chat tag'
+	proposed change:
+	- global tags; world tags
+*/
 async function initialize_ranks_db() {
 	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='ranks'")) {
 		await db_misc.run("CREATE TABLE 'ranks' (id INTEGER, level INTEGER, name TEXT, props TEXT)");
@@ -1094,16 +1099,16 @@ async function initialize_ranks_db() {
 }
 
 var pw_encryption = "sha512WithRSAEncryption";
-const encryptHash = function(pass, salt) {
+function encryptHash(pass, salt) {
 	if(!salt) {
-		var salt = crypto.randomBytes(10).toString("hex");
+		salt = crypto.randomBytes(10).toString("hex");
 	}
 	var hsh = crypto.createHmac(pw_encryption, salt).update(pass).digest("hex");
 	var hash = pw_encryption + "$" + salt + "$" + hsh;
 	return hash;
 }
 
-const checkHash = function(hash, pass) {
+function checkHash(hash, pass) {
 	if(typeof pass !== "string") return false;
 	if(typeof hash !== "string") return false;
 	hash = hash.split("$");
@@ -1530,8 +1535,8 @@ function new_token(len) {
 }
 
 var https_reference = https;
-var prev_cS = http.createServer; // previous reference to http.createServer
-var https_disabled;
+var createHTTPServer = http.createServer;
+var https_disabled = false;
 
 var options = {};
 
@@ -1550,7 +1555,7 @@ function manage_https() {
 	if(https_disabled) {
 		console.log("\x1b[31;1mRunning server in HTTP mode\x1b[0m");
 		http.createServer = function(opt, func) {
-			return prev_cS(func);
+			return createHTTPServer(func);
 		}
 		https_reference = http;
 	} else {
