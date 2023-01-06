@@ -204,6 +204,7 @@ defineElements({ // elm[<name>]
 	cursor_off: byId("cursor_off"),
 	chat_window: byId("chat_window"),
 	confirm_js: byId("confirm_js"),
+	confirm_js_msg: byId("confirm_js_msg"),
 	confirm_js_code: byId("confirm_js_code"),
 	main_view: byId("main_view"),
 	usr_online: byId("usr_online"),
@@ -3105,16 +3106,27 @@ function isMainPage() {
 	return state.worldModel.name == "" || state.worldModel.name.toLowerCase() == "main" || state.worldModel.name.toLowerCase() == "owot";
 }
 
-function alertJS(data) {
+function alertJS(data, restrict) {
 	js_alert_active = true;
 	elm.confirm_js.style.display = "";
 	elm.confirm_js_code.innerText = data;
-	run_js_confirm.onclick = function() {
-		confirmRunJSLink(data);
-		return false;
+	if(restrict) {
+		elm.confirm_js_msg.innerText = "This is a snippet of untrusted JavaScript code.";
+		run_js_confirm.innerText = "Copy & Close";
+		run_js_confirm.onclick = function() {
+			w.clipboard.copy(data);
+			closeJSAlert();
+			return false;
+		}
+	} else {
+		elm.confirm_js_msg.innerHTML = "Are you sure you want to run this javascript link?<br>Press Close to <i>not</i> run it.";
+		run_js_confirm.onclick = function() {
+			confirmRunJSLink(data);
+			return false;
+		}
+		confirm_js_cancel.onclick = closeJSAlert;
+		confirm_js_cancel_x.onclick = closeJSAlert;
 	}
-	confirm_js_cancel.onclick = closeJSAlert;
-	confirm_js_cancel_x.onclick = closeJSAlert;
 }
 
 function closeJSAlert() {
@@ -3139,9 +3151,9 @@ function confirmRunJSLink(data) {
 	closeJSAlert();
 }
 
-function runJSLink(data) {
+function runJSLink(data, restrict) {
 	if(secureJSLink) {
-		alertJS(data);
+		alertJS(data, restrict);
 	} else {
 		executeJS(data);
 	}
@@ -3165,11 +3177,18 @@ linkElm.onclick = function(e) {
 		coord_link_click(e);
 		return;
 	}
+	var lTileX = currentSelectedLinkCoords[0];
+	var lTileY = currentSelectedLinkCoords[1];
+	var lCharX = currentSelectedLinkCoords[2];
+	var lCharY = currentSelectedLinkCoords[3];
+	var charInfo = getCharInfo(lTileX, lTileY, lCharX, lCharY);
+
 	var linkEvent = url_link_click(e);
 	var prot = linkParams.protocol;
 	var url = linkParams.url;
+
 	if(prot == "javascript") {
-		runJSLink(url);
+		runJSLink(url, isMainPage() && charInfo.protection == 0);
 		return false;
 	} else if(prot == "com") {
 		w.broadcastCommand(url);
@@ -3179,11 +3198,6 @@ linkElm.onclick = function(e) {
 		return false;
 	}
 	if(secureLink && !e.ctrlKey) {
-		var lTileX = currentSelectedLinkCoords[0];
-		var lTileY = currentSelectedLinkCoords[1];
-		var lCharX = currentSelectedLinkCoords[2];
-		var lCharY = currentSelectedLinkCoords[3];
-		var charInfo = getCharInfo(lTileX, lTileY, lCharX, lCharY);
 		if((isMainPage() && charInfo.protection == 0) && !isSafeHostname(linkParams.host)) {
 			var acpt = confirm("Are you sure you want to visit this link?\n" + url);
 			if(!acpt) {

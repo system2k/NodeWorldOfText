@@ -312,7 +312,7 @@ a:visited {
 #confirm_js_cancel {
 	position: absolute;
 	font-family: Helvetica;
-	background-color: green;
+	background-color: #7c7c7c;
 	border-style: solid;
 	width: 80px;
 	height: 17px;
@@ -350,7 +350,7 @@ a:visited {
 	top: 40px;
 }
 #confirm_js_cancel:hover {
-	background-color: #00AE00;
+	background-color: #979797;
 }
 #run_js_confirm {
 	position: absolute;

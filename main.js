@@ -26,6 +26,15 @@ if(fs.existsSync(SETTINGS_PATH)) {
 	}
 }
 
+function listenForExitCommand() {
+	process.stdin.resume();
+	process.stdin.on("data", function(e) {
+		if(e.length && e[0] == "0x03") {
+			process.exit();
+		}
+	});
+}
+
 function runServer() {
 	var owot = fork(serverPath, args);
 	var gracefulStop = false;
@@ -35,6 +44,7 @@ function runServer() {
 	owot.on("close", function(code) {
 		code += "";
 		console.log("Process exited. [" + code + "; 0x" + code.toString(16).toUpperCase().padStart(8, 0) + "]");
+		listenForExitCommand();
 		if(!gracefulStop) {
 			console.log("Restarting server...");
 			if(immediateRestart) {
@@ -60,13 +70,7 @@ function runServer() {
 		if(msg == "MAINT") {
 			gracefulStop = true;
 			maintenance = true;
-
-			process.stdin.resume();
-			process.stdin.on("data", function(e) {
-				if(e.length && e[0] == "0x03") {
-					process.exit();
-				}
-			});
+			listenForExitCommand();
 		}
 	});
 }
@@ -85,7 +89,7 @@ function maintenanceMode() {
 			var text = "<html>" +
 				"<head><title>Maintenance</title></head>" +
 				"<span>Our World Of Text is currently down for maintenance.</span><br>" +
-				"<span>Maintenance has been started on " + timeStr + "</span>" +
+				"<span>Maintenance began on " + timeStr + "</span>" +
 			"</html>";
 			res.write(text);
 			res.end();
