@@ -5684,6 +5684,14 @@ var network = {
 	latestID: 1,
 	callbacks: {},
 	http: networkHTTP,
+	transmit: function(data) {
+		data = JSON.stringify(data);
+		try {
+			w.socket.send(data);
+		} catch(e) {
+			console.warn("Transmission error");
+		}
+	},
 	protect: function(position, type) {
 		// position: {tileX, tileY, [charX, charY]}
 		// type: <unprotect, public, member-only, owner-only>
@@ -5709,7 +5717,7 @@ var network = {
 			data: data,
 			action: type == "unprotect" ? type : "protect"
 		};
-		w.socket.send(JSON.stringify(protReq));
+		network.transmit(protReq);
 	},
 	link: function(position, type, args) {
 		// position: {tileX, tileY, charX, charY}
@@ -5733,23 +5741,23 @@ var network = {
 			data.link_tileX = args.x;
 			data.link_tileY = args.y;
 		}
-		w.socket.send(JSON.stringify({
+		network.transmit({
 			kind: "link",
 			data: data,
 			type: type
-		}));
+		});
 	},
 	cmd: function(data, include_username) {
-		w.socket.send(JSON.stringify({
+		network.transmit({
 			kind: "cmd",
 			data: data, // maximum length of 2048
 			include_username: include_username
-		}));
+		});
 	},
 	cmd_opt: function() {
-		w.socket.send(JSON.stringify({
+		network.transmit({
 			kind: "cmd_opt"
-		}));
+		});
 	},
 	write: function(edits, opts, callback) {
 		if(!opts) opts = {};
@@ -5764,12 +5772,12 @@ var network = {
 			writeReq.request = id;
 			network.callbacks[id] = callback;
 		}
-		w.socket.send(JSON.stringify(writeReq));
+		network.transmit(writeReq);
 	},
 	chathistory: function() {
-		w.socket.send(JSON.stringify({
+		network.transmit({
 			kind: "chathistory"
-		}));
+		});
 	},
 	fetch: function(fetches, opts, callback) {
 		// fetches: [{minX: <x1>, minY: <y1>, maxX: <x2>, maxY: <y2>}...]
@@ -5788,16 +5796,16 @@ var network = {
 			fetchReq.request = id;
 			network.callbacks[id] = callback;
 		}
-		w.socket.send(JSON.stringify(fetchReq));
+		network.transmit(fetchReq);
 	},
 	chat: function(message, location, nickname, color) {
-		w.socket.send(JSON.stringify({
+		network.transmit({
 			kind: "chat",
 			nickname: nickname,
 			message: message,
 			location: location,
 			color: color
-		}));
+		});
 	},
 	ping: function(callback) {
 		var cb_id = void 0;
@@ -5805,17 +5813,17 @@ var network = {
 			cb_id = network.latestID++;
 			network.callbacks[cb_id] = callback;
 		}
-		w.socket.send(JSON.stringify({
+		network.transmit({
 			kind: "ping",
 			id: cb_id // optional: number
-		}));
+		});
 	},
 	clear_tile: function(x, y) {
-		w.socket.send(JSON.stringify({
+		network.transmit({
 			kind: "clear_tile",
 			tileX: x,
 			tileY: y
-		}));
+		});
 	},
 	cursor: function(tileX, tileY, charX, charY, hidden) {
 		var data = {
@@ -5831,7 +5839,7 @@ var network = {
 				charY: charY
 			}
 		}
-		w.socket.send(JSON.stringify(data));
+		network.transmit(data);
 	}
 };
 
@@ -7214,6 +7222,7 @@ function begin() {
 	w.protectSelect.tiled = true;
 	w.protectSelect.init();
 
+	w.fetchUnloadedTiles();
 	w.fixFonts("legacycomputing");
 
 	manageCoordHash();
