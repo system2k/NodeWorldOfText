@@ -4,4 +4,9 @@ module.exports = async function(ws, data, send, vars, evars) {
 	} else if(data.updates === false) {
 		ws.sdata.receiveContentUpdates = false;
 	}
+	if(data.descriptiveCmd === true) {
+		ws.sdata.descriptiveCmd = true;
+	} else if(data.descriptiveCmd === false) {
+		ws.sdata.descriptiveCmd = false;
+	}
 }

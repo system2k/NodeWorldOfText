@@ -2668,6 +2668,7 @@ async function manageWebsocketConnection(ws, req) {
 		cursorPositionHidden: false,
 		messageBackpressure: 0,
 		receiveContentUpdates: true,
+		descriptiveCmd: false,
 		origin: req.headers["origin"],
 		passiveCmd: false
 	};
