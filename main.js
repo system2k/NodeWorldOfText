@@ -41,11 +41,14 @@ function runServer() {
 	var immediateRestart = false;
 	var maintenance = false;
 
+	process.stdin.pause();
 	owot.on("close", function(code) {
 		code += "";
 		console.log("Process exited. [" + code + "; 0x" + code.toString(16).toUpperCase().padStart(8, 0) + "]");
-		listenForExitCommand();
 		if(!gracefulStop) {
+			if(!immediateRestart) {
+				listenForExitCommand();
+			}
 			console.log("Restarting server...");
 			if(immediateRestart) {
 				runServer();

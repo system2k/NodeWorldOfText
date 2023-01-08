@@ -59,7 +59,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 			} else {
 				wsSend(client, JSON.stringify(Object.assign(cdata, {
 					username: accountSystem == "uvias" ? user.display_username : user.username,
-					id: accountSystem == "uvias" ? user.id : user.id.substr(1).toUpperCase().padStart(16, "0")
+					id: accountSystem == "uvias" ? user.id.substr(1).toUpperCase().padStart(16, "0") : user.id
 				})));
 			}
 		}
