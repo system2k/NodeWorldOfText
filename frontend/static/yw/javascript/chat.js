@@ -5,8 +5,10 @@ var chatGlobalUnread     = 0;
 var initPageTabOpen      = false;
 var initGlobalTabOpen    = false;
 var chatWriteHistory     = []; // history of user's chats
-var chatRecords          = [];
+var chatRecordsPage      = [];
+var chatRecordsGlobal    = [];
 var chatWriteHistoryMax  = 100; // maximum size of chat write history length
+var chatHistoryLimit     = 3500;
 var chatWriteHistoryIdx  = -1; // location in chat write history
 var chatLimitCombChars   = true;
 var chatWriteTmpBuffer   = "";
@@ -757,19 +759,38 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 	if(doScrollBottom) {
 		field.scrollTop = maxScroll;
 	}
-	chatRecords.push({
-		id: id, date: date, field: field,
+
+	var chatRec = {
+		id: id, date: date,
+		field: field,
 		element: chatGroup
-	});
+	};
+	if(field == elm.page_chatfield) {
+		chatRecordsPage.push(chatRec);
+	} else if(field == elm.global_chatfield) {
+		chatRecordsGlobal.push(chatRec);
+	}
+	if(chatRecordsPage.length > chatHistoryLimit) { // overflow on current page
+		var rec = chatRecordsPage.shift();
+		rec.element.remove();
+	}
+	if(chatRecordsGlobal.length > chatHistoryLimit) { // overflow on global
+		var rec = chatRecordsGlobal.shift();
+		rec.element.remove();
+	}
 }
 
 function removeChatByIdAndDate(id, date) {
 	if(!acceptChatDeletions) return;
-	for(var i = 0; i < chatRecords.length; i++) {
-		var r = chatRecords[i];
-		if(r.id == id && r.date == date) {
-			var elm = r.element;
-			elm.remove();
+	var records = [chatRecordsPage, chatRecordsGlobal];
+	for(var r = 0; r < records.length; r++) {
+		var recList = records[r];
+		for(var i = 0; i < recList.length; i++) {
+			var currentRec = recList[i];
+			if(currentRec.id == id && currentRec.date == date) {
+				var elm = currentRec.element;
+				elm.remove();
+			}
 		}
 	}
 }
