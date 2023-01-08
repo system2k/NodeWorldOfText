@@ -191,33 +191,30 @@ var acme = {
 	pass: null
 };
 
-function processArgs() {
-	var args = process.argv;
-	args.forEach(function(a) {
-		if(a == "--test-server") {
-			if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
-			isTestServer = true;
-		}
-		if(a == "--log") {
-			if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
-			debugLogging = true;
-		}
-		if(a == "--main-dirs") {
-			testServerMainDirs = true;
-		}
-		if(a == "--uvias-test-info") {
-			testUviasIds = true;
-		}
-		if(a == "--lt") {
-			if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
-			isTestServer = true;
-			if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
-			debugLogging = true;
-			testServerMainDirs = true;
-			testUviasIds = true;
-		}
-	});
-}
+process.argv.forEach(function(a) {
+	if(a == "--test-server") {
+		if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
+		isTestServer = true;
+	}
+	if(a == "--log") {
+		if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
+		debugLogging = true;
+	}
+	if(a == "--main-dirs") {
+		testServerMainDirs = true;
+	}
+	if(a == "--uvias-test-info") {
+		testUviasIds = true;
+	}
+	if(a == "--lt") {
+		if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
+		isTestServer = true;
+		if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
+		debugLogging = true;
+		testServerMainDirs = true;
+		testUviasIds = true;
+	}
+});
 
 // console function
 function run(path) {
@@ -974,7 +971,6 @@ async function initialize_server() {
 	console.log("Starting server...");
 
 	initializeDirectoryStruct();
-	processArgs();
 	initializeStaticSys();
 	setupDatabases();
 	load_static();
