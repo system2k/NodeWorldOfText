@@ -3120,13 +3120,14 @@ function alertJS(data, restrict) {
 		}
 	} else {
 		elm.confirm_js_msg.innerHTML = "Are you sure you want to run this javascript link?<br>Press Close to <i>not</i> run it.";
+		run_js_confirm.innerText = "run";
 		run_js_confirm.onclick = function() {
 			confirmRunJSLink(data);
 			return false;
 		}
-		confirm_js_cancel.onclick = closeJSAlert;
-		confirm_js_cancel_x.onclick = closeJSAlert;
 	}
+	confirm_js_cancel.onclick = closeJSAlert;
+	confirm_js_cancel_x.onclick = closeJSAlert;
 }
 
 function closeJSAlert() {
