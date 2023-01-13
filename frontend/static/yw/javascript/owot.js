@@ -1611,7 +1611,7 @@ function checkTextColorOverride() {
 		textColorOverride &= textColorOverride ^ owner;
 	}
 }
-var styles = null;
+var styles = defaultStyles();
 
 var menuStyle;
 function menu_color(color) {
@@ -7230,7 +7230,6 @@ function begin() {
 	getWorldProps(state.worldModel.name, "style", function(style, error) {
 		if(error) {
 			console.warn("An error occurred while loading the world style");
-			styles = defaultStyles();
 		} else {
 			styles = style;
 		}

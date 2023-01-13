@@ -945,56 +945,100 @@ function bulkWriteEdits(edits) {
 }
 
 async function iterateDatabaseChanges() {
-	var writeQueue = [];
-	var modTileCount = 0;
-	for(var worldID in memTileCache) {
-		for(var tileY in memTileCache[worldID]) {
-			for(var tileX in memTileCache[worldID][tileY]) {
+	let writeQueue = [];
+	let modTileCount = 0;
+	for(let worldID in memTileCache) {
+		for(let tileY in memTileCache[worldID]) {
+			for(let tileX in memTileCache[worldID][tileY]) {
 				let tile = memTileCache[worldID][tileY][tileX];
 				if(!tile.props_updated && !tile.content_updated && !tile.writability_updated) continue;
 				modTileCount++;
+				let empty_content = false;
+				let empty_color = false;
+				let empty_bgcolor = false;
+				let empty_props = false;
+				let empty_char = false;
 				if(tile.tile_exists) {
+					let writeQueuePending = [];
+					if(arrayIsEntirely(tile.prop_color, 0)) {
+						empty_color = true;
+					}
+					if(arrayIsEntirely(tile.prop_char, null)) {
+						empty_char = true;
+					}
+					if(tile.prop_bgcolor === null) {
+						empty_bgcolor = true;
+					}
+					if(Object.keys(tile.prop_cell_props).length == 0) {
+						empty_props = true;
+					}
+					if(arrayIsEntirely(tile.content, " ")) {
+						empty_content = true;
+					}
 					if(tile.props_updated) {
 						tile.props_updated = false;
-						var propObj = {};
-						if(!arrayIsEntirely(tile.prop_color, 0)) {
+						let propObj = {};
+						if(!empty_color) {
 							propObj.color = tile.prop_color;
 						}
-						if(!arrayIsEntirely(tile.prop_char, null)) {
+						if(!empty_char) {
 							propObj.char = encodeCharProt(tile.prop_char);
 						}
-						if(tile.prop_bgcolor !== null) {
+						if(!empty_bgcolor) {
 							propObj.bgcolor = tile.prop_bgcolor;
 						}
-						if(Object.keys(tile.prop_cell_props).length > 0) {
+						if(!empty_props) {
 							propObj.cell_props = tile.prop_cell_props;
 						}
-						writeQueue.push(["UPDATE tile SET properties=? WHERE rowid=?", [JSON.stringify(propObj), tile.tile_id]]);
+						writeQueuePending.push(["UPDATE tile SET properties=? WHERE rowid=?", [JSON.stringify(propObj), tile.tile_id]]);
 					}
 					if(tile.content_updated) {
 						tile.content_updated = false;
-						writeQueue.push(["UPDATE tile SET content=? WHERE rowid=?", [tile.content.join(""), tile.tile_id]]);
+						writeQueuePending.push(["UPDATE tile SET content=? WHERE rowid=?", [tile.content.join(""), tile.tile_id]]);
 					}
 					if(tile.writability_updated) {
 						tile.writability_updated = false;
-						writeQueue.push(["UPDATE tile SET writability=? WHERE rowid=?", [tile.writability, tile.tile_id]]);
+						writeQueuePending.push(["UPDATE tile SET writability=? WHERE rowid=?", [tile.writability, tile.tile_id]]);
 					}
+					// this is an empty tile - we can just remove it from the database
+					if(empty_content && empty_color && empty_bgcolor && empty_char && empty_props && tile.writability === null) {
+						writeQueuePending.splice(0);
+						writeQueuePending.push(["DELETE FROM tile WHERE rowid=?", tile.tile_id, function() {
+							tile.tile_exists = false;
+							tile.tile_id = null;
+						}]);
+					}
+					writeQueue.push(...writeQueuePending);
 				} else {
 					tile.props_updated = false;
 					tile.content_updated = false;
 					tile.writability_updated = false;
-					var propObj = {};
+					let propObj = {};
 					if(!arrayIsEntirely(tile.prop_color, 0)) {
 						propObj.color = tile.prop_color;
+					} else {
+						empty_color = true;
 					}
 					if(!arrayIsEntirely(tile.prop_char, null)) {
 						propObj.char = encodeCharProt(tile.prop_char);
+					} else {
+						empty_char = true;
 					}
 					if(tile.prop_bgcolor !== null) {
 						propObj.bgcolor = tile.prop_bgcolor;
+					} else {
+						empty_bgcolor = true;
 					}
 					if(Object.keys(tile.prop_cell_props).length > 0) {
 						propObj.cell_props = tile.prop_cell_props;
+					} else {
+						empty_props = true;
+					}
+					if(arrayIsEntirely(tile.content, " ")) {
+						empty_content = true;
+					}
+					if(empty_content && empty_color && empty_bgcolor && empty_char && empty_props && tile.writability === null) {
+						continue; // do not insert empty tile
 					}
 					tile.inserting = true; // don't cache invalidate tile as it's being inserted
 					writeQueue.push(["INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?, ?)",
