@@ -1489,7 +1489,6 @@ async function beginTileIterationsLoop() {
 					continue;
 				}
 				localTiles[tileY + "," + tileX] = 1;
-				writeQueue.push(["DELETE FROM tile WHERE world_id=? AND tileX=? and tileY=?", [context.world.id, tileX, tileY]]);
 			}
 			// begin to delete tiles from memory
 			for(var i in localTiles) {
@@ -1497,9 +1496,10 @@ async function beginTileIterationsLoop() {
 				var tileX = parseInt(pos[1]);
 				var tileY = parseInt(pos[0]);
 				var ctile = isTileDIM(context.world.id, tileX, tileY);
-				if(!ctile) continue;
-				ctile.tile_exists = false;
-				ctile.tile_id = null;
+				if(!ctile) {
+					writeQueue.push(["DELETE FROM tile WHERE world_id=? AND tileX=? and tileY=?", [context.world.id, tileX, tileY]]);
+					continue;
+				}
 				ctile.prop_cell_props = {};
 				for(var x = 0; x < CONST.tileArea; x++) {
 					ctile.content[x] = " ";
@@ -1618,12 +1618,6 @@ function coordinateAdd(tileX1, tileY1, charX1, charY1, tileX2, tileY2, charX2, c
 		(charX1 + charX2) % 16,
 		(charY1 + charY2) % 8
 	];
-}
-
-function processComplexRequest(call_id, type, data) {
-	switch(type) {
-		// vacant
-	}
 }
 
 module.exports.editResponse = async function(id) {
