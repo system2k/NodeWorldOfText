@@ -9,6 +9,19 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var HTML = evars.HTML;
 
 	var static_data = vars.static_data;
+	var staticShortcuts = vars.staticShortcuts;
+
+	var file = query_data.file;
+	if(file) {
+		file = parseFloat(file, 10);
+		if(isNaN(file) || !Number.isInteger(file)) return serve(null, 404);
+		if(staticShortcuts.hasOwnProperty(file)) {
+			return serve(null, null, {
+				redirect: "/static/files/" + staticShortcuts[file]
+			});
+		}
+		return serve(null, 404);
+	}
 
 	var parse = url.parse(req.url).pathname.substr(1);
 	var segmentCount = parse.split("/").length;

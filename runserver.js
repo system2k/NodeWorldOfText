@@ -259,9 +259,7 @@ var editsDB        = settings.EDITS_PATH;
 var chatDB         = settings.CHAT_HISTORY_PATH;
 var imageDB        = settings.IMAGES_PATH;
 var miscDB         = settings.MISC_PATH;
-var filesPath      = settings.FILES_PATH;
-var staticFilesRaw = settings.STATIC_FILES_RAW;
-var staticFilesIdx = settings.STATIC_FILES_IDX;
+var staticNumsPath = settings.STATIC_SHORTCUTS_PATH;
 var accountSystem  = settings.accountSystem; // "uvias" or "local"
 
 var loginPath = "/accounts/login/";
@@ -406,6 +404,28 @@ function setupDatabases() {
 	chat_history = new sql.Database(chatDB);
 	image_db = new sql.Database(imageDB);
 	misc_db = new sql.Database(miscDB);
+}
+
+var staticShortcuts = {};
+function setupStaticShortcuts() {
+	if(!staticNumsPath) return;
+	var data;
+	try {
+		data = fs.readFileSync(staticNumsPath);
+	} catch(e) {
+		// static shortcuts don't exist
+		return;
+	}
+	data = data.toString("utf8").replace(/\r\n/g, "\n").split("\n");
+	for(var i = 0; i < data.length; i++) {
+		var row = data[i].split("\t");
+		var num = row[0];
+		var path = row[1];
+		if(!num || !path) continue;
+		num = num.trim();
+		path = path.trim();
+		staticShortcuts[num] = path;
+	}
 }
 
 var static_path = "./frontend/static/";
@@ -785,6 +805,7 @@ async function initialize_server() {
 
 	initializeDirectoryStruct();
 	setupDatabases();
+	setupStaticShortcuts();
 	load_static();
 	setupZipLog();
 	loadDbSystems();
@@ -2879,7 +2900,8 @@ var global_data = {
 	loadPlugin,
 	rate_limiter,
 	getClientVersion,
-	setClientVersion
+	setClientVersion,
+	staticShortcuts
 };
 
 async function sysLoad() {

@@ -23,9 +23,7 @@
 
 	"error_log": true,
 
-	"FILES_PATH": "../data/files",
-	"STATIC_FILES_RAW": "../data/static_files_raw.dat",
-	"STATIC_FILES_IDX": "../data/static_files_idx.dat",
+	"STATIC_SHORTCUTS_PATH": "../data/static_shortcuts.txt",
 
 	"DATABASE_PATH": "../data/nwot.sqlite",
 	"TEST_DATABASE_PATH": "../data/test/nwot_test.sqlite",
