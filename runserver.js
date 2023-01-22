@@ -395,191 +395,6 @@ const log_error = function(err) {
 	}
 }
 
-var read_staticRaw,
-	write_staticRaw,
-	read_staticIdx,
-	write_staticIdx,
-	staticRaw_size,
-	staticIdx_size;
-function initializeStaticSys() {
-	if(!fs.existsSync(settings.bypass_key)) {
-		var rand = "";
-		var key = "0123456789ABCDEF";
-		for(var i = 0; i < 50; i++) {
-			rand += key[Math.floor(Math.random() * 16)];
-		}
-		fs.writeFileSync(settings.bypass_key, rand);
-	}
-	
-	if(!fs.existsSync(filesPath)) fs.mkdirSync(filesPath, 0o777);
-	if(!fs.existsSync(staticFilesRaw)) fs.writeFileSync(staticFilesRaw, "");
-	if(!fs.existsSync(staticFilesIdx)) fs.writeFileSync(staticFilesIdx, "");
-	
-	read_staticRaw = fs.openSync(staticFilesRaw, "r");
-	write_staticRaw = fs.createWriteStream(staticFilesRaw, { flags: "a" });
-	read_staticIdx = fs.openSync(staticFilesIdx, "r");
-	write_staticIdx = fs.createWriteStream(staticFilesIdx, { flags: "a" });
-	
-	staticRaw_size = fs.statSync(staticFilesRaw).size;
-	staticIdx_size = fs.statSync(staticFilesIdx).size;
-}
-
-async function staticRaw_append(data) {
-	return new Promise(function(res) {
-		write_staticRaw.write(data, function() {
-			var start = staticRaw_size;
-			staticRaw_size += data.length;
-			res(start);
-		});
-	});
-}
-
-async function staticIdx_append(data) {
-	return new Promise(function(res) {
-		write_staticIdx.write(data, function() {
-			var index = staticIdx_size / 9;
-			staticIdx_size += 9;
-			res(index + 1);
-		});
-	});
-}
-
-async function static_retrieve(id, range) {
-	id--;
-	if(id < 0 || id >= staticIdx_size / 9) return null;
-	
-	var pos = Buffer.alloc(9);
-	await asyncFsRead(read_staticIdx, pos, 0, 9, id * 9);
-
-	var accessible = pos[8];
-	if(!accessible) return 0;
-	var start = pos[0] + pos[1] * 256 + pos[2] * 65536 + pos[3] * 16777216;
-	var len = pos[4] + pos[5] * 256 + pos[6] * 65536 + pos[7] * 16777216;
-	var totalLen = len;
-	var headerPrepend = null;
-	if(range) {
-		var headLenBuff = Buffer.alloc(2);
-		// get the size of the header
-		await asyncFsRead(read_staticRaw, headLenBuff, 0, 2, start);
-		var headLen = headLenBuff[0] + headLenBuff[1] * 256;
-		var dataLen = len - headLen;
-		var headerPrepend = Buffer.alloc(headLen);
-		headerPrepend[0] = headLenBuff[0];
-		headerPrepend[1] = headLenBuff[1];
-		// read the header data to prepend later
-		await asyncFsRead(read_staticRaw, headerPrepend, 2, headLen - 2, start + 2);
-
-		var rangeLen, rangeOffset;
-		// validate and change the range
-		if(range[0] < 0) range[0] = 0;
-		if(range[1] == "") {
-			range[1] = dataLen - 1;
-		} else {
-			if(range[1] >= dataLen) range[1] = dataLen - 1;
-		}
-		if(range[0] > range[1]) {
-			var tmp = range[0];
-			range[0] = range[1];
-			range[1] = tmp;
-		}
-		rangeLen = range[1] - range[0] + 1;
-		rangeOffset = range[0];
-
-		len = rangeLen;
-		start = start + headLen + rangeOffset;
-	}
-	var data = Buffer.alloc(len);
-	await asyncFsRead(read_staticRaw, data, 0, len, start);
-	if(headerPrepend) {
-		data = Buffer.concat([headerPrepend, data]);
-	}
-
-	return {
-		data,
-		len: totalLen
-	};
-}
-
-function asyncFsRead(fd, buff, offset, len, start) {
-	return new Promise(function(res, rej) {
-		fs.read(fd, buff, offset, len, start, function(err) {
-			if(err) return rej(err);
-			res();
-		});
-	});
-}
-
-function static_retrieve_raw_header(startOffset) {
-	return new Promise(function(res) {
-		var size = Buffer.alloc(2);
-		fs.read(read_staticRaw, size, 0, size.length, startOffset, function() {
-			var headLen = (size[0] + size[1] * 256) - 2;
-			var head = Buffer.alloc(headLen);
-			fs.read(read_staticRaw, head, 0, headLen, startOffset + size.length, function() {
-				res(head);
-			});
-		});
-	});
-}
-
-function staticIdx_full_buffer() {
-	return new Promise(function(res, rej) {
-		var file = Buffer.alloc(staticIdx_size);
-		fs.read(read_staticIdx, file, 0, file.length, 0, function(err) {
-			if(err) return rej(err);
-			res(file);
-		});
-	});
-}
-
-var static_fileData_queue = [];
-var static_fileData_busy = false;
-function static_fileData_flush(forced) {
-	if(static_fileData_busy && !forced) return;
-	static_fileData_busy = true;
-	(async function() {
-		var queueSize = static_fileData_queue.length;
-		try {
-			for(var i = 0; i < queueSize; i++) {
-				var ar = static_fileData_queue[0];
-				static_fileData_queue.shift();
-				var data = ar[0];
-				var res = ar[1];
-
-				var fdLen = data.length;
-				var ptr = await staticRaw_append(data);
-
-				var index = await staticIdx_append(Buffer.from([
-					ptr & 255,
-					ptr >> 8 & 255,
-					ptr >> 16 & 255,
-					ptr >> 24 & 255,
-					fdLen & 255,
-					fdLen >> 8 & 255,
-					fdLen >> 16 & 255,
-					fdLen >> 24 & 255,
-					1]));
-				// [uint32, uint32, uint8] -> [offset, size, publicly accessible]
-				res(index);
-			}
-		} catch(e) {
-			handle_error(e);
-		}
-		if(static_fileData_queue.length) {
-			static_fileData_flush(true);
-		} else {
-			static_fileData_busy = false;
-		}
-	}());
-}
-
-function static_fileData_append(data) {
-	return new Promise(function(res) {
-		static_fileData_queue.push([data, res]);
-		static_fileData_flush();
-	});
-}
-
 var database,
 	edits_db,
 	chat_history,
@@ -683,8 +498,6 @@ var pages = {
 	admin: {
 		administrator: require("./backend/pages/admin/administrator.js"),
 		backgrounds: require("./backend/pages/admin/backgrounds.js"),
-		file_list: require("./backend/pages/admin/file_list.js"),
-		files: require("./backend/pages/admin/files.js"),
 		manage_ranks: require("./backend/pages/admin/manage_ranks.js"),
 		monitor: require("./backend/pages/admin/monitor.js"),
 		set_custom_rank: require("./backend/pages/admin/set_custom_rank.js"),
@@ -971,7 +784,6 @@ async function initialize_server() {
 	console.log("Starting server...");
 
 	initializeDirectoryStruct();
-	initializeStaticSys();
 	setupDatabases();
 	load_static();
 	setupZipLog();
@@ -1352,11 +1164,9 @@ var url_regexp = [ // regexp ; function/redirection ; options
 	[/^administrator\/users\/by_username\/(.*)[\/]?$/g, pages.admin.users_by_username],
 	[/^administrator\/users\/by_id\/(.*)[\/]?$/g, pages.admin.users_by_id],
 	[/^administrator\/backgrounds[\/]?$/g, pages.admin.backgrounds, { binary_post_data: true }],
-	[/^administrator\/files[\/]?$/g, pages.admin.files, { binary_post_data: true }],
 	[/^administrator\/manage_ranks[\/]?$/g, pages.admin.manage_ranks],
 	[/^administrator\/set_custom_rank\/(.*)\/$/g, pages.admin.set_custom_rank],
 	[/^administrator\/user_list[\/]?$/g, pages.admin.user_list],
-	[/^administrator\/file_list[\/]?$/g, pages.admin.file_list],
 	[/^administrator\/monitor[\/]?$/g, pages.admin.monitor],
 	[/^administrator\/shell[\/]?$/g, pages.admin.shell],
 	[/^administrator\/restrictions[\/]?$/g, pages.admin.restrictions, { binary_post_data: true }],
@@ -3053,14 +2863,8 @@ var global_data = {
 	intv,
 	ranks_cache,
 	static_data,
-	staticRaw_append,
-	staticIdx_append,
-	static_retrieve,
-	static_fileData_append,
 	stopServer,
 	testEmailAddress,
-	staticIdx_full_buffer,
-	static_retrieve_raw_header,
 	broadcastMonitorEvent,
 	monitorEventSockets,
 	acme,
