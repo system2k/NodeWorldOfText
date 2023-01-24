@@ -244,6 +244,10 @@
 		doSort("views");
 	}
 
+	sort_created.onclick = function() {
+		doSort("created");
+	}
+
 	{% for world in worlds_owned %}addRow("{{world.name}}", {{world.writability}}, {{world.readability}}, {{world.members}}, {{world.views}}, {{world.created}});
 	{% endfor %}
 </script>
