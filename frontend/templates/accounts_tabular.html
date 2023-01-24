@@ -19,9 +19,11 @@
 		#world_table th {
 			background-color: #323498;
 			color: #ffffff;
+			white-space: nowrap;
 		}
 		#world_table td {
 			background-color: #a8bbf1;
+			white-space: nowrap;
 		}
 		.table_sort_arrows {
 			cursor: pointer;
@@ -38,11 +40,11 @@
 					<img src="/static/sort_arrows.png" class="table_sort_arrows" id="sort_name">
 				</th>
 				<th>
-					Write&nbsp;state
+					Write state
 					<img src="/static/sort_arrows.png" class="table_sort_arrows" id="sort_write">
 				</th>
 				<th>
-					Read&nbsp;state
+					Read state
 					<img src="/static/sort_arrows.png" class="table_sort_arrows" id="sort_read">
 				</th>
 				<th>
@@ -52,6 +54,10 @@
 				<th>
 					Views
 					<img src="/static/sort_arrows.png" class="table_sort_arrows" id="sort_views">
+				</th>
+				<th>
+					Creation Date
+					<img src="/static/sort_arrows.png" class="table_sort_arrows" id="sort_created">
 				</th>
 			</tr>
 		</tbody>
@@ -64,18 +70,20 @@
 	var rowNum = 0;
 	var rows = {};
 	var sortData = [];
-	function addRow(name, write, read, members, views) {
+	function addRow(name, write, read, members, views, created) {
 		var row = document.createElement("tr");
 		var col_name = document.createElement("td");
 		var col_write = document.createElement("td");
 		var col_read = document.createElement("td");
 		var col_members = document.createElement("td");
 		var col_views = document.createElement("td");
+		var col_created = document.createElement("td");
 		col_name.innerText = name;
 		col_write.innerText = write;
 		col_read.innerText = read;
 		col_members.innerText = members;
 		col_views.innerText = views;
+		col_created.innerText = format_date(created);
 		col_name.className = "table_worldname";
 		row.id = "row_num_" + rowNum;
 		rows[rowNum] = {
@@ -84,7 +92,8 @@
 			write: write,
 			read: read,
 			members: members,
-			views: views
+			views: views,
+			created: created
 		};
 		sortData.push(rows[rowNum]);
 		rowNum++;
@@ -93,6 +102,7 @@
 		row.appendChild(col_read);
 		row.appendChild(col_members);
 		row.appendChild(col_views);
+		row.appendChild(col_created);
 		worlds.appendChild(row);
 	}
 
@@ -101,7 +111,8 @@
 		write: 0,
 		read: 0,
 		members: 0,
-		views: 0
+		views: 0,
+		created: 0
 	};
 
 	function doSort(mode) {
@@ -159,11 +170,58 @@
 					}
 				});
 				break;
+			case "created":
+				sortData.sort(function(a, b) {
+					if(dir) {
+						return b.created - a.created;
+					} else {
+						return a.created - b.created;
+					}
+				});
+				break;
 		}
 		for(var i = 0; i < sortData.length; i++) {
 			var row = sortData[i];
 			worlds.appendChild(row.row);
 		}
+	}
+
+	var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+	function format_date(time) {
+		var date = new Date(time);
+		var str = "(GMT+" + date.getTimezoneOffset() / 60 + ") ";
+
+		var month = date.getMonth();
+		str += months[month] + " ";
+		
+		var day = date.getDate();
+		str += day + ", ";
+		
+		var year = date.getFullYear();
+		str += year + " ";
+		
+		var hour = date.getHours();
+		var ampm = " AM";
+		if(hour >= 12) {
+			ampm = " PM";
+		}
+		if(hour > 12) {
+			hour = hour - 12;
+		}
+		if(hour === 0) {
+			hour = 12;
+		}
+		str += hour;
+		
+		var minute = date.getMinutes();
+		minute = ("0" + minute).slice(-2);
+		str += ":" + minute;
+		
+		var second = date.getSeconds();
+		second = ("0" + second).slice(-2);
+		str += ":" + second + ampm;
+		
+		return str;
 	}
 
 	sort_name.onclick = function() {
@@ -186,7 +244,7 @@
 		doSort("views");
 	}
 
-	{% for world in worlds_owned %}addRow("{{world.name}}", {{world.writability}}, {{world.readability}}, {{world.members}}, {{world.views}});
+	{% for world in worlds_owned %}addRow("{{world.name}}", {{world.writability}}, {{world.readability}}, {{world.members}}, {{world.views}}, {{world.created}});
 	{% endfor %}
 </script>
 {% endblock %}

@@ -30,7 +30,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			readability: world.readability,
 			members: member_total,
 			name: world.name,
-			views
+			views,
+			created: world.creationDate
 		});
 	}
 
