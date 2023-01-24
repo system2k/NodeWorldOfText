@@ -763,6 +763,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	} else if(post_data.form == "action") {
 		if("unclaim" in post_data) {
 			if(modifyWorldProp(world, "ownerId", null)) {
+				modifyWorldProp(world, "ownershipChangeDate", Date.now());
 				sendWorldStatusUpdate(world.id, user.id, "isOwner", false);
 				var isMember = Boolean(world.members.map[user.id]);
 				if(!isMember) {

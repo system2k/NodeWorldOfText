@@ -85,7 +85,8 @@ var world_default_props = {
 	background_alpha: 1,
 	meta_desc: "",
 	priv_note: "",
-	write_int: -1
+	write_int: -1,
+	ownership_change_date: 0
 };
 
 function validateWorldname(name) {
@@ -158,6 +159,7 @@ function makeWorldObject() {
 		name: "", // raw db name
 		ownerId: null, // integer (classic account system); string (uvias account system)
 		creationDate: 0,
+		ownershipChangeDate: 0,
 		views: 0,
 		feature: {
 			goToCoord: 0,
@@ -254,6 +256,8 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.readability = world.readability;
 
 	var wprops = JSON.parse(world.properties);
+
+	wobj.ownershipChangeDate = getAndProcWorldProp(wprops, "ownership_change_date");
 
 	wobj.feature.goToCoord = world.feature_go_to_coord;
 	wobj.feature.memberTilesAddRemove = Boolean(world.feature_membertiles_addremove);
@@ -444,7 +448,8 @@ async function commitWorld(world) {
 		"background/h",
 		"background/rmod",
 		"background/alpha",
-		"views"
+		"views",
+		"ownershipChangeDate"
 	];
 
 	var properties = {
@@ -472,7 +477,8 @@ async function commitWorld(world) {
 		background_h: world.background.h,
 		background_rmod: world.background.rmod,
 		background_alpha: world.background.alpha,
-		views: world.views
+		views: world.views,
+		ownership_change_date: world.ownershipChangeDate
 	};
 
 	// if a property is a default value, delete it from the world's config object
@@ -742,6 +748,7 @@ async function claimWorldByName(worldName, user) {
 	}
 	var world = validation.world;
 	modifyWorldProp(world, "ownerId", user.id);
+	modifyWorldProp(world, "ownershipChangeDate", Date.now());
 	return {
 		success: true,
 		world: world, // must be released later
