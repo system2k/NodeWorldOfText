@@ -13,8 +13,8 @@ module.exports = async function(data, vars, evars) {
 	var user = evars.user;
 	var channel = evars.channel;
 	var world = evars.world;
-	
 	var isHTTP = evars.isHTTP;
+	
 	var ipAddress;
 	var ipAddressVal;
 	var ipAddressFam;
@@ -28,34 +28,25 @@ module.exports = async function(data, vars, evars) {
 		ipAddressFam = evars.ipAddressFam;
 	}
 	
-	var get_bypass_key = vars.get_bypass_key;
 	var tile_database = vars.tile_database;
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
 	var getRestrictions = vars.getRestrictions;
 	var checkCoalition = vars.checkCoalition;
 	var rate_limiter = vars.rate_limiter;
+	var monitorEventSockets = vars.monitorEventSockets;
 
 	var editReqLimit = 512;
-	var superuserEditReqLimit = 1280;
 	var defaultCharRatePerSecond = 20480;
 	var tileRatePerSecond = 256;
 
 	var restr = getRestrictions();
 	var isGrouped = checkCoalition(ipAddressVal, ipAddressFam);
 
-	var bypass_key = get_bypass_key();
-	if(!bypass_key) {
-		bypass_key = NaN;
-	}
-
 	var public_only = !!data.public_only;
 	var no_update = !!data.no_update;
 	var preserve_links = !!data.preserve_links;
 
 	var editLimit = editReqLimit;
-	if(user.superuser) {
-		editLimit = superuserEditReqLimit;
-	}
 
 	var world_id = world.id;
 
@@ -166,7 +157,7 @@ module.exports = async function(data, vars, evars) {
 		tiles[tileStr].push(segment);
 	}
 
-	if(evars && vars.monitorEventSockets.length) {
+	if(evars && monitorEventSockets.length) {
 		var ip = "", cliId = "", chan = "";
 		if(evars.ws) {
 			ip = evars.ws.sdata.ipAddress;
@@ -246,7 +237,7 @@ module.exports = async function(data, vars, evars) {
 				continue;
 			} else {
 				// only password holders, superusers, owners, or members can use multiple characters per edit
-				if(!user.superuser && !(is_owner || is_member) && data.bypass != bypass_key) {
+				if(!user.superuser && !(is_owner || is_member)) {
 					char = char.slice(0, 1);
 				}
 			}

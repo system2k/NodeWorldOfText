@@ -798,7 +798,6 @@ function valid_method(mtd) {
 }
 
 var announcement_cache = "";
-var bypass_key_cache = "";
 
 async function initialize_server() {
 	console.log("Starting server...");
@@ -1962,14 +1961,6 @@ async function modifyAnnouncement(text) {
 	});
 }
 
-function modifyBypassKey(key) {
-	key += "";
-	if(bypass_key_cache === key) return false;
-	fs.writeFileSync(settings.bypass_key, key);
-	bypass_key_cache = key;
-	return true;
-}
-
 var worldData = {};
 function getWorldData(worldId) {
 	if(worldData[worldId]) return worldData[worldId];
@@ -2109,7 +2100,13 @@ async function uvias_init() {
 	makePgClient();
 
 	console.log("Connecting to account database...");
-	await pgConn.connect();
+	try {
+		await pgConn.connect();
+	} catch(e) {
+		handle_error(e);
+		// the connection failed - stop right there and wait for the connection to reload
+		return;
+	}
 	await uviasSendIdentifier();
 
 	await uvias.run("LISTEN uv_kick");
@@ -2190,8 +2187,6 @@ function wsSend(socket, data) {
 var wss;
 async function initialize_server_components() {
 	await loadAnnouncement();
-
-	bypass_key_cache = fs.readFileSync(settings.bypass_key).toString("utf8");
 
 	intv.userCount = setInterval(function() {
 		broadcastUserCount();
@@ -2477,8 +2472,9 @@ function invalidateWebsocketSession(session_token) {
 		if(!ws.sdata) return;
 		if(ws.sdata.monitorSocket) return;
 		if(ws.sdata.terminated) return;
-		if(!ws.sdata.session_key) return; // safety layer: don't process unauthenticated clients
-		if(ws.sdata.session_key != session_token) return;
+		if(!ws.sdata.user) return;
+		if(!ws.sdata.user.session_key) return; // safety layer: don't process unauthenticated clients
+		if(ws.sdata.user.session_key != session_token) return;
 		ws.sdata.terminated = true;
 		ws.close();
 	});
@@ -2488,16 +2484,29 @@ async function manageWebsocketConnection(ws, req) {
 	if(!serverLoaded) await waitForServerLoad();
 	if(isStopping) return;
 	ws.sdata = {
+		terminated: false,
+		ipAddress: null,
+		ipAddressFam: null,
+		ipAddressVal: null,
+		origin: req.headers["origin"],
 		userClient: false,
 		monitorSocket: false,
-		terminated: false,
+		world: null,
+		user: null,
+		channel: null,
+		clientId: null,
+		keyQuery: null,
 		hasBroadcastedCursorPosition: false,
 		cursorPositionHidden: false,
 		messageBackpressure: 0,
 		receiveContentUpdates: true,
 		descriptiveCmd: false,
-		origin: req.headers["origin"],
-		passiveCmd: false
+		passiveCmd: false,
+		handleCmdSockets: false,
+		cmdsSentInSecond: 0,
+		lastCmdSecond: 0,
+		hide_user_count: false,
+		chat_blocks: null
 	};
 
 	var bytesWritten = 0;
@@ -2650,7 +2659,8 @@ async function manageWebsocketConnection(ws, req) {
 	var vars = global_data;
 	var evars = {
 		user, channel,
-		keyQuery: search.key
+		keyQuery: search.key,
+		world: null
 	};
 
 	if(search.hide == "1") {
@@ -2742,7 +2752,7 @@ async function manageWebsocketConnection(ws, req) {
 			}));
 		}
 	}
-	// Log all ws and http requests (incl. duration) to analyze attacks
+
 	ws.off("message", pre_message);
 	ws.on("message", handle_message);
 	async function handle_message(msg) {
@@ -2756,18 +2766,7 @@ async function manageWebsocketConnection(ws, req) {
 			if(!msg) return; // malformed packet*/
 			return;
 		}
-		if(msg.startsWith("2::")) { // TODO: remove this (obsolete ping)
-			var args = msg.substr(3);
-			var res = {
-				kind: "ping",
-				result: "pong"
-			}
-			if(args == "@") {
-				res.time = true;
-			}
-			return send_ws(JSON.stringify(res));
-		}
-		// Parse request
+		// Parse JSON message
 		try {
 			if(typeof msg == "string") msg = JSON.parse(msg);
 		} catch(e) {
@@ -2794,38 +2793,38 @@ async function manageWebsocketConnection(ws, req) {
 			return send_ws(JSON.stringify(res)); 
 		}
 		// Begin calling a websocket function for the necessary request
-		if(websockets.hasOwnProperty(kind)) {
-			if(!can_process_req_kind(kindLimits, kind)) return;
-			function send(msg) {
-				msg.kind = kind;
-				if(requestID !== null) msg.request = requestID;
-				send_ws(JSON.stringify(msg));
+		if(!websockets.hasOwnProperty(kind)) {
+			return;
+		}
+		if(!can_process_req_kind(kindLimits, kind)) return;
+		function send(msg) {
+			msg.kind = kind;
+			if(requestID !== null) msg.request = requestID;
+			send_ws(JSON.stringify(msg));
+		}
+		function broadcast(data, opts) {
+			if(data.kind && data.kind != kind) {
+				data.source = kind;
 			}
-			function broadcast(data, opts) {
-				if(data.kind && data.kind != kind) {
-					data.source = kind;
-				}
-				global_data.ws_broadcast(data, world.id, opts);
-			}
-			var res;
-			var resError = false;
-			try {
-				res = await websockets[kind](ws, msg, send, vars, objIncludes(evars, {
-					broadcast,
-					clientId: ws.sdata.clientId, // TODO: does all this need to be joined in with evars?
-					ws // to be passed on to modules
-				}));
-			} catch(e) {
-				resError = true;
-				handle_error(e);
-			}
-			if(!resError && typeof res == "string") {
-				send_ws(JSON.stringify({
-					kind: "error",
-					code: "PARAM",
-					message: res
-				}));
-			}
+			global_data.ws_broadcast(data, world.id, opts);
+		}
+		var res;
+		var resError = false;
+		try {
+			res = await websockets[kind](ws, msg, send, vars, objIncludes(evars, {
+				broadcast,
+				ws // to be passed on to modules
+			}));
+		} catch(e) {
+			resError = true;
+			handle_error(e);
+		}
+		if(!resError && typeof res == "string") {
+			send_ws(JSON.stringify({
+				kind: "error",
+				code: "PARAM",
+				message: res
+			}));
 		}
 	}
 	// Some messages might have been received before the socket finished opening
@@ -2845,7 +2844,14 @@ function start_server() {
 	});
 }
 
+// the server context
 var global_data = {
+	website: settings.website,
+	db: null,
+	db_img: null,
+	db_misc: null,
+	db_edits: null,
+	db_ch: null,
 	wsSend,
 	createCSRF,
 	checkCSRF,
@@ -2853,14 +2859,8 @@ var global_data = {
 	isTestServer,
 	shellEnabled,
 	announcement: function() { return announcement_cache },
-	get_bypass_key: function() { return bypass_key_cache },
 	uvias,
 	accountSystem,
-	db: null,
-	db_img: null,
-	db_misc: null,
-	db_edits: null,
-	db_ch: null,
 	dispage,
 	ms,
 	checkHash,
@@ -2868,7 +2868,6 @@ var global_data = {
 	new_token,
 	querystring,
 	url,
-	website: settings.website,
 	send_email,
 	get_user_info,
 	modules,
@@ -2877,7 +2876,6 @@ var global_data = {
 	topActiveWorlds,
 	handle_error,
 	client_ips,
-	modify_bypass_key: modifyBypassKey,
 	tile_database: subsystems.tile_database,
 	tile_fetcher: subsystems.tile_fetcher,
 	chat_mgr: subsystems.chat_mgr,

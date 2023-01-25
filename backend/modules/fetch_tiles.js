@@ -45,10 +45,8 @@ function partitionRectangle(rect) {
 }
 
 module.exports = async function(data, vars, evars) {
-	var user = evars.user;
 	var world = evars.world;
 
-	var db = vars.db;
 	var memTileCache = vars.memTileCache;
 	var monitorEventSockets = vars.monitorEventSockets;
 	var broadcastMonitorEvent = vars.broadcastMonitorEvent;

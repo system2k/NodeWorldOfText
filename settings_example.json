@@ -52,8 +52,6 @@
 	"CHAT_HISTORY_PATH": "../data/chat_history.sqlite",
 	"TEST_CHAT_HISTORY_PATH": "../data/test/test_chat_history.sqlite",
 
-	"bypass_key": "../data/bypass_key.txt",
-
 	"email": {
 		"enabled": false,
 		"username": "email@site.com",

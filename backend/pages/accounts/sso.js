@@ -18,25 +18,6 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	}
 
 	var cookieResponse = [];
-	var hostnameAvailable = false;
-
-	// uvias redirects you to ourworldoftext.com, preventing users from being able
-	// to access their accounts on www.ourworldoftext.com
-	var host = req.headers.host;
-	if(typeof host == "string") {
-		if(host[0] == ".") host = host.substr(1);
-		if(host[host.length - 1] == ".") host = host.slice(0, -1);
-		host = host.toLowerCase().split(".");
-		// ".ourworldoftext.com"
-		var wildcardHost = "." + host.join(".");
-		// there are duplicate cookie instances from the botched July 2021 deployment
-		var tokenCorrupted = checkDuplicateCookie(req.headers.cookie, "token");
-		// delete cookie for ".ourworldoftext.com"
-		if(tokenCorrupted) {
-			cookieResponse.push("token=; expires=" + http_time(0) + "; path=/; domain=" + wildcardHost + "; HttpOnly;");
-		}
-		hostnameAvailable = true;
-	}
 
 	if(token.length > 1000) {
 		return serve("Token is too long.");
@@ -58,9 +39,6 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var expires = session.expires.getTime();
 	
 	cookieResponse.push("token=" + token + "; expires=" + http_time(expires + ms.year) + "; path=/; HttpOnly;");
-	if(hostnameAvailable && host.length == 2 && host[0] == "ourworldoftext") {
-		cookieResponse.push("token=" + token + "; expires=" + http_time(expires + ms.year) + "; path=/; domain=www.ourworldoftext.com; HttpOnly;");
-	}
 	serve(null, null, {
 		cookie: cookieResponse,
 		redirect: "/accounts/profile/"

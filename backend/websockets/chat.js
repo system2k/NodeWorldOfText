@@ -38,7 +38,6 @@ var blocked_ips_by_world_id = {}; // id 0 = global
 
 module.exports = async function(ws, data, send, vars, evars) {
 	var broadcast = evars.broadcast; // broadcast to current world
-	var clientId = evars.clientId;
 	var channel = evars.channel;
 	var user = evars.user;
 	var world = evars.world;
@@ -60,6 +59,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 	var remove_from_chatlog = chat_mgr.remove_from_chatlog;
 
 	var ipHeaderAddr = ws.sdata.ipAddress;
+	var clientId = ws.sdata.clientId;
 
 	var chat_perm = world.feature.chat;
 	var is_owner = world.ownerId == user.id;

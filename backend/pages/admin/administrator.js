@@ -9,7 +9,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	var db = vars.db;
 	var announcement = vars.announcement;
 	var wss = vars.wss;
-	var get_bypass_key = vars.get_bypass_key;
 	var ranks_cache = vars.ranks_cache;
 	var db_misc = vars.db_misc;
 	var uvias = vars.uvias;
@@ -85,7 +84,6 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		uptime: uptime(),
 		machine_uptime: uptime(process.hrtime()[0] * 1000),
 		client_num,
-		bypass_key: get_bypass_key(),
 		custom_ranks,
 		acme_enabled: acme.enabled,
 		acme_pass: acme.enabled ? (acme.pass ? acme.pass : "") : "",
@@ -105,7 +103,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var db = vars.db;
 	var db_misc = vars.db_misc;
 	var db_edits = vars.db_edits;
-	var modify_bypass_key = vars.modify_bypass_key;
 	var stopServer = vars.stopServer;
 	var acme = vars.acme;
 	var checkCSRF = vars.checkCSRF;
@@ -139,14 +136,6 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		return await dispage("admin/administrator", {
 			acme_update_msg
 		}, req, serve, vars, evars);
-	}
-	if("set_bypass_key" in post_data) {
-		var new_bypass_key = post_data.set_bypass_key;
-		if(modify_bypass_key(new_bypass_key)) {
-			return await dispage("admin/administrator", {
-				cons_update_msg: "Bypass key updated successfully"
-			}, req, serve, vars, evars);
-		}
 	}
 	if("set_cli_version" in post_data) {
 		var new_cli_version = post_data.set_cli_version;
