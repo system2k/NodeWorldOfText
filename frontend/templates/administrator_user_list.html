@@ -69,11 +69,11 @@
 							{{user.rank_name}}
 						</td>
 						{% endif %}
-						<td>
-							{{user.last_login|safe}}
+						<td style="white-space: nowrap;">
+							{{user.last_login}}
 						</td>
-						<td>
-							{{user.date_joined|safe}}
+						<td style="white-space: nowrap;">
+							{{user.date_joined}}
 						</td>
 					</tr>
 					{% endfor %}

@@ -67,8 +67,8 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	}
 
 	for(var i = 0; i < users.length; i++) {
-		users[i].last_login = create_date(users[i].last_login).replace(/ /g, "&nbsp");
-		users[i].date_joined = create_date(users[i].date_joined).replace(/ /g, "&nbsp");
+		users[i].last_login = create_date(users[i].last_login);
+		users[i].date_joined = create_date(users[i].date_joined);
 	}
 
 	var data = {

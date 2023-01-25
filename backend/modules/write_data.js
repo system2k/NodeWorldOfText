@@ -9,6 +9,13 @@ function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
 
+/*
+REFACTOR:
+The job of this module should be to take a properly-sanitized array of edits
+and send it off to the tile database module to be written.
+TODO: Split off client-side validation from the rest of this module.
+*/
+
 module.exports = async function(data, vars, evars) {
 	var user = evars.user;
 	var channel = evars.channel;

@@ -1910,7 +1910,6 @@ async function process_request(req, res, compCallbacks) {
 					path: URL_mod,
 					user,
 					referer: req.headers.referer,
-					broadcast: global_data.ws_broadcast,
 					HTML,
 					ipAddress,
 					ipAddressFam,
@@ -1955,7 +1954,7 @@ async function modifyAnnouncement(text) {
 	} else {
 		await db.run("UPDATE server_info SET value=? WHERE name='announcement'", text);
 	}
-	global_data.ws_broadcast({
+	ws_broadcast({
 		kind: "announcement",
 		text: text
 	});
@@ -2021,14 +2020,13 @@ function topActiveWorlds(number) {
 }
 
 function broadcastUserCount() {
-	if(!global_data.ws_broadcast) return;
 	for(var id in worldData) {
 		var worldObj = worldData[id];
 		var current_count = worldObj.display_user_count;
 		var new_count = worldObj.user_count;
 		if(current_count != new_count) {
 			worldObj.display_user_count = new_count;
-			global_data.ws_broadcast({
+			ws_broadcast({
 				source: "signal",
 				kind: "user_count",
 				count: new_count
@@ -2185,6 +2183,41 @@ function wsSend(socket, data) {
 }
 
 var wss;
+function ws_broadcast(data, world_id, opts) {
+	if(!wss) return; // this can only happen pre-initialization
+	if(!opts) opts = {};
+	data = JSON.stringify(data);
+	wss.clients.forEach(function each(client) {
+		if(!client.sdata) return;
+		if(!client.sdata.userClient) return;
+		if(client.readyState != WebSocket.OPEN) return;
+		try {
+			// world_id is optional - setting it to undefined will broadcast to all clients
+			if(world_id == void 0 || client.sdata.world.id == world_id) {
+				if(opts.isChat) {
+					var isOwner = client.sdata.world.ownerId == client.sdata.user.id;
+					var isMember = !!client.sdata.world.members.map[client.sdata.user.id];
+					var chatPerm = client.sdata.world.feature.chat;
+
+					// 1: members only
+					if(chatPerm == 1) if(!(isMember || isOwner)) return;
+					// 2: owner only
+					if(chatPerm == 2) if(!isOwner) return;
+					// -1: unavailable to all
+					if(chatPerm == -1) return;
+					// check if user has blocked this client
+					if ((client.sdata.chat_blocks.block_all && opts.clientId != 0) ||
+						client.sdata.chat_blocks.id.includes(opts.clientId) ||
+						(opts.username && client.sdata.chat_blocks.user.includes(opts.username))) return;
+				}
+				wsSend(client, data);
+			}
+		} catch(e) {
+			handle_error(e);
+		}
+	});
+}
+
 async function initialize_server_components() {
 	await loadAnnouncement();
 
@@ -2242,42 +2275,6 @@ async function initialize_server_components() {
 		maxPayload: 128000
 	});
 	global_data.wss = wss;
-
-	var ws_broadcast = function(data, world_id, opts) {
-		if(!opts) opts = {};
-		data = JSON.stringify(data);
-		wss.clients.forEach(function each(client) {
-			if(!client.sdata) return;
-			if(!client.sdata.userClient) return;
-			if(client.readyState != WebSocket.OPEN) return;
-			try {
-				// world_id is optional - setting it to undefined will broadcast to all clients
-				if(world_id == void 0 || client.sdata.world.id == world_id) {
-					if(opts.isChat) {
-						var isOwner = client.sdata.world.ownerId == client.sdata.user.id;
-						var isMember = !!client.sdata.world.members.map[client.sdata.user.id];
-						var chatPerm = client.sdata.world.feature.chat;
-
-						// 1: members only
-						if(chatPerm == 1) if(!(isMember || isOwner)) return;
-						// 2: owner only
-						if(chatPerm == 2) if(!isOwner) return;
-						// -1: unavailable to all
-						if(chatPerm == -1) return;
-						// check if user has blocked this client
-						if ((client.sdata.chat_blocks.block_all && opts.clientId != 0) ||
-							client.sdata.chat_blocks.id.includes(opts.clientId) ||
-							(opts.username && client.sdata.chat_blocks.user.includes(opts.username))) return;
-					}
-					wsSend(client, data);
-				}
-			} catch(e) {
-				handle_error(e);
-			}
-		});
-	}
-
-	global_data.ws_broadcast = ws_broadcast;
 
 	wss.on("connection", async function(ws, req) {
 		try {
@@ -2625,7 +2622,7 @@ async function manageWebsocketConnection(ws, req) {
 			worldObj.user_count--;
 		}
 		if(world && ws.sdata.hasBroadcastedCursorPosition && !ws.sdata.cursorPositionHidden && ws.sdata.channel) {
-			global_data.ws_broadcast({
+			ws_broadcast({
 				kind: "cursor",
 				hidden: true,
 				channel: ws.sdata.channel
@@ -2806,7 +2803,7 @@ async function manageWebsocketConnection(ws, req) {
 			if(data.kind && data.kind != kind) {
 				data.source = kind;
 			}
-			global_data.ws_broadcast(data, world.id, opts);
+			ws_broadcast(data, world.id, opts);
 		}
 		var res;
 		var resError = false;
