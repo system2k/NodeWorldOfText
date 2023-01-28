@@ -5,10 +5,10 @@ function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
 
-module.exports = async function(data, vars, evars) {
-	var user = evars.user;
-	var channel = evars.channel;
-	var world = evars.world;
+module.exports = async function(data, vars, params) {
+	var user = params.user;
+	var channel = params.channel;
+	var world = params.world;
 
 	var tile_database = vars.tile_database;
 	var monitorEventSockets = vars.monitorEventSockets;
@@ -16,7 +16,7 @@ module.exports = async function(data, vars, evars) {
 	var checkCoalition = vars.checkCoalition;
 	var rate_limiter = vars.rate_limiter;
 
-	var memkeyAccess = world.opts.memKey && world.opts.memKey == evars.keyQuery;
+	var memkeyAccess = world.opts.memKey && world.opts.memKey == params.keyQuery;
 
 	var is_owner = user.id == world.ownerId || (user.superuser && isMainPage(world.name));
 	var is_member = !!world.members.map[user.id] || memkeyAccess || (user.superuser && isMainPage(world.name));
@@ -32,14 +32,14 @@ module.exports = async function(data, vars, evars) {
 	var ipAddress;
 	var ipAddressVal;
 	var ipAddressFam;
-	if(evars.ws && evars.ws.sdata) {
-		ipAddress = evars.ws.sdata.ipAddress;
-		ipAddressVal = evars.ws.sdata.ipAddressVal;
-		ipAddressFam = evars.ws.sdata.ipAddressFam;
+	if(params.ws && params.ws.sdata) {
+		ipAddress = params.ws.sdata.ipAddress;
+		ipAddressVal = params.ws.sdata.ipAddressVal;
+		ipAddressFam = params.ws.sdata.ipAddressFam;
 	} else {
-		ipAddress = evars.ipAddress;
-		ipAddressVal = evars.ipAddressVal;
-		ipAddressFam = evars.ipAddressFam;
+		ipAddress = params.ipAddress;
+		ipAddressVal = params.ipAddressVal;
+		ipAddressFam = params.ipAddressFam;
 	}
 
 	var isGrouped = checkCoalition(ipAddressVal, ipAddressFam);

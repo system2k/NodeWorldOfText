@@ -5,14 +5,9 @@ var fetchOwnedWorldsByUserId = world_mgr.fetchOwnedWorldsByUserId;
 var claimWorldByName = world_mgr.claimWorldByName;
 var revokeMembershipByWorldName = world_mgr.revokeMembershipByWorldName;
 
-var wss;
-var wsSend;
-module.exports.initialize = function(vars) {
-	wss = vars.wss;
-	wsSend = vars.wsSend;
-}
-
-function sendWorldStatusUpdate(worldId, userId) {
+function sendWorldStatusUpdate(server, worldId, userId) {
+	var wss = server.wss;
+	var wsSend = server.wsSend;
 	wss.clients.forEach(function(client) {
 		if(!client.sdata) return;
 		if(!client.sdata.userClient) return;
@@ -167,7 +162,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				message = status.message;
 				// TODO: what about isMember?
 				if(status.success) {
-					sendWorldStatusUpdate(status.world.id, user.id);
+					sendWorldStatusUpdate(vars, status.world.id, user.id);
 					releaseWorld(status.world);
 				}
 			}
@@ -178,7 +173,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				var worldName = key.substr("leave_".length);
 				var revoke = await revokeMembershipByWorldName(worldName, user.id);
 				if(revoke && revoke[0]) {
-					sendWorldStatusUpdate(revoke[1], user.id);
+					sendWorldStatusUpdate(vars, revoke[1], user.id);
 				}
 				break;
 			}

@@ -864,7 +864,7 @@ async function canViewWorld(world, user, opts) {
 	
 	var is_member = Boolean(memberList[userId]);
 	if(opts) {
-		if(opts.memkeyAccess) {
+		if(opts.memKey && opts.memKey == world.opts.memKey) {
 			is_member = true;
 		}
 	}

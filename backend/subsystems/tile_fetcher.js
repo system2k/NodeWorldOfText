@@ -54,7 +54,7 @@ async function fetchNext() {
 		var x2 = range[2];
 		var y2 = range[3];
 		var area = (y2 - y1 + 1) * (x2 - x1 + 1);
-		if(socket && socket.readyState != 1) {
+		if(socket && socket.readyState != 1) { // socket disconnected - cancel
 			queue.shift();
 			if(queue.length) {
 				ipAddrQueue.push(nextIp);
@@ -124,7 +124,7 @@ function queueFetch(ip, worldID, range, socket) { // TODO: what if client closes
 			range,
 			worldID,
 			promise: res,
-			socket
+			socket // TODO: remove the need for this
 		});
 	});
 }

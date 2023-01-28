@@ -16,23 +16,23 @@ and send it off to the tile database module to be written.
 TODO: Split off client-side validation from the rest of this module.
 */
 
-module.exports = async function(data, vars, evars) {
-	var user = evars.user;
-	var channel = evars.channel;
-	var world = evars.world;
-	var isHTTP = evars.isHTTP;
+module.exports = async function(data, vars, params) {
+	var user = params.user;
+	var channel = params.channel;
+	var world = params.world;
+	var isHTTP = params.isHTTP;
 	
 	var ipAddress;
 	var ipAddressVal;
 	var ipAddressFam;
-	if(evars.ws && evars.ws.sdata) {
-		ipAddress = evars.ws.sdata.ipAddress;
-		ipAddressVal = evars.ws.sdata.ipAddressVal;
-		ipAddressFam = evars.ws.sdata.ipAddressFam;
+	if(params.ws && params.ws.sdata) {
+		ipAddress = params.ws.sdata.ipAddress;
+		ipAddressVal = params.ws.sdata.ipAddressVal;
+		ipAddressFam = params.ws.sdata.ipAddressFam;
 	} else {
-		ipAddress = evars.ipAddress;
-		ipAddressVal = evars.ipAddressVal;
-		ipAddressFam = evars.ipAddressFam;
+		ipAddress = params.ipAddress;
+		ipAddressVal = params.ipAddressVal;
+		ipAddressFam = params.ipAddressFam;
 	}
 	
 	var tile_database = vars.tile_database;
@@ -61,7 +61,7 @@ module.exports = async function(data, vars, evars) {
 	var color_text = world.feature.colorText;
 	var color_cell = world.feature.colorCell;
 
-	var memkeyAccess = world.opts.memKey && world.opts.memKey == evars.keyQuery;
+	var memkeyAccess = world.opts.memKey && world.opts.memKey == params.keyQuery;
 
 	var is_owner = user.id == world.ownerId;
 	is_owner = is_owner || (user.superuser && isMainPage(world.name));
@@ -164,11 +164,11 @@ module.exports = async function(data, vars, evars) {
 		tiles[tileStr].push(segment);
 	}
 
-	if(evars && monitorEventSockets.length) {
+	if(params && monitorEventSockets.length) {
 		var ip = "", cliId = "", chan = "";
-		if(evars.ws) {
-			ip = evars.ws.sdata.ipAddress;
-			cliId = evars.ws.sdata.clientId;
+		if(params.ws) {
+			ip = params.ws.sdata.ipAddress;
+			cliId = params.ws.sdata.clientId;
 			chan = channel;
 		} else {
 			ip = ipAddress;

@@ -11,13 +11,6 @@ var promoteMembershipByWorldName = world_mgr.promoteMembershipByWorldName;
 var revokeMembershipByWorldName = world_mgr.revokeMembershipByWorldName;
 var renameWorld = world_mgr.renameWorld;
 
-var wss;
-var wsSend;
-module.exports.initialize = function(vars) {
-	wss = vars.wss;
-	wsSend = vars.wsSend;
-}
-
 function validateCSS(c) {
 	if(c == "default") return "";
 	if(typeof c !== "string") return "";
@@ -40,7 +33,9 @@ function validatePerms(p, max, allowNeg) {
 	return num;
 }
 
-function sendWorldStatusUpdate(worldId, userId, type, val) {
+function sendWorldStatusUpdate(server, worldId, userId, type, val) {
+	var wss = server.wss;
+	var wsSend = server.wsSend;
 	wss.clients.forEach(function(client) {
 		if(!client.sdata) return;
 		if(!client.sdata.userClient) return;
@@ -323,7 +318,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		}
 
 		if(await promoteMembershipByWorldName(world.name, user_id)) {
-			sendWorldStatusUpdate(world.id, user_id, "isMember", true);
+			sendWorldStatusUpdate(vars, world.id, user_id, "isMember", true);
 		}
 
 		return await dispage("accounts/configure", {
@@ -408,7 +403,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			}
 		}
 		if(revocationStatus && revocationStatus[0]) {
-			sendWorldStatusUpdate(world.id, revokedId, "isMember", false);
+			sendWorldStatusUpdate(vars, world.id, revokedId, "isMember", false);
 		}
 	} else if(post_data.form == "features") {
 		var go_to_coord = validatePerms(post_data.go_to_coord, 2);
@@ -764,10 +759,10 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		if("unclaim" in post_data) {
 			if(modifyWorldProp(world, "ownerId", null)) {
 				modifyWorldProp(world, "ownershipChangeDate", Date.now());
-				sendWorldStatusUpdate(world.id, user.id, "isOwner", false);
+				sendWorldStatusUpdate(vars, world.id, user.id, "isOwner", false);
 				var isMember = Boolean(world.members.map[user.id]);
 				if(!isMember) {
-					sendWorldStatusUpdate(world.id, user.id, "isMember", false);
+					sendWorldStatusUpdate(vars, world.id, user.id, "isMember", false);
 				}
 			}
 			return serve(null, null, {

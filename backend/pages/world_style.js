@@ -7,8 +7,6 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	var query_data = evars.query_data;
 	var user = evars.user;
 	var setCallback = evars.setCallback;
-
-	var db = vars.db;
 	
 	if(typeof query_data.world != "string") return serve(null, 400);
 	var world = await getOrCreateWorld(query_data.world);
@@ -20,9 +18,9 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		releaseWorld(world);
 	});
 
-	var memkeyAccess = (query_data.key && query_data.key == world.opts.memKey);
-
-	var perm = await canViewWorld(world, user, { memkeyAccess });
+	var perm = await canViewWorld(world, user, {
+		memKey: query_data.key
+	});
 	if(!perm) {
 		return serve(null, 403);
 	}

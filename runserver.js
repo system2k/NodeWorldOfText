@@ -2670,9 +2670,9 @@ async function manageWebsocketConnection(ws, req) {
 		return error_ws("NO_EXIST", "World does not exist");
 	}
 
-	var memkeyAccess = search.key && search.key == world.opts.memKey;
-
-	var permission = await canViewWorld(world, user, { memkeyAccess });
+	var permission = await canViewWorld(world, user, {
+		memKey: search.key
+	});
 	if(ws.sdata.terminated) return;
 	if(!permission) {
 		return error_ws("NO_PERM", "No permission");
@@ -2850,6 +2850,7 @@ var global_data = {
 	db_edits: null,
 	db_ch: null,
 	wsSend,
+	ws_broadcast,
 	createCSRF,
 	checkCSRF,
 	memTileCache,
@@ -2911,12 +2912,16 @@ async function initPages(obj) {
 	// if page modules contain a startup function, run it
 	for(var i in obj) {
 		var mod = obj[i];
-		var isPage = mod.GET || mod.POST; // XXX
-		if(isPage) {
-			if(mod.initialize) {
-				await mod.initialize(global_data);
+		var isPage = false;
+		// is this a page, or an object containing keys to pages?
+		for(var x = 0; x < valid_methods.length; x++) {
+			var method = valid_methods[x];
+			if(mod[method]) {
+				isPage = true;
+				break;
 			}
-		} else {
+		}
+		if(!isPage) {
 			await initPages(mod);
 		}
 	}

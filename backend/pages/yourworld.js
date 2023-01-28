@@ -32,9 +32,9 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		releaseWorld(world);
 	});
 
-	var memkeyAccess = (query_data.key && query_data.key == world.opts.memKey);
-
-	var read_permission = await canViewWorld(world, user, { memkeyAccess });
+	var read_permission = await canViewWorld(world, user, {
+		memKey: query_data.key
+	});
 	if(!read_permission) {
 		var privNote = world.opts.privNote;
 		return await dispage("accounts/private", {

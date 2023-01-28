@@ -2,13 +2,6 @@ var ipaddress = require("../../utils/ipaddress.js");
 var ipv4_to_range = ipaddress.ipv4_to_range;
 var ipv6_to_range = ipaddress.ipv6_to_range;
 
-var setRestrictions;
-var setCoalition;
-module.exports.initialize = function(vars) {
-	setRestrictions = vars.setRestrictions;
-	setCoalition = vars.setCoalition;
-}
-
 var restrictions_string = "";
 var coalition_group = "";
 
@@ -264,7 +257,7 @@ function procRest(list) {
 	}
 
 	restrictions_string = rstr;
-	setRestrictions(restrictions);
+	return restrictions;
 }
 
 function procCoal(list) {
@@ -299,10 +292,10 @@ function procCoal(list) {
 	ranges4 = removeOverlaps(ranges4); // must be done after list reconstruction
 	ranges6 = removeOverlaps(ranges6);
 	coalition_group = cstr;
-	setCoalition({
+	return {
 		v4: ranges4,
 		v6: ranges6
-	});
+	};
 }
 
 module.exports.GET = async function(req, serve, vars, evars) {
@@ -327,6 +320,8 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var user = evars.user;
 	var query_data = evars.query_data;
 	var checkCSRF = vars.checkCSRF;
+	var setRestrictions;
+	var setCoalition;
 
 	if(!user.superuser) return;
 
@@ -342,9 +337,9 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	list = list.split("\n");
 
 	if(type == "1") { // restrictions
-		procRest(list);
+		setRestrictions(procRest(list));
 	} else if(type == "2") { // coalesce
-		procCoal(list);
+		setCoalition(procCoal(list));
 	}
 
 	serve("SUCCESS");

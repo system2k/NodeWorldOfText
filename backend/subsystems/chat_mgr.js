@@ -38,6 +38,13 @@ async function init_chat_history() {
 		await db_ch.run("CREATE TABLE default_channels (channel_id integer, world_id integer)");
 		await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
 			["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0]);
+		// TODO: we must add the following indices:
+		/*
+		CREATE INDEX "def_idx" ON default_channels (world_id, channel_id);
+		CREATE INDEX "chn_idx" ON channels (world_id, id);
+		CREATE INDEX "ent_idx" ON entries (channel, id DESC);
+		CREATE INDEX "ent_all_chan" ON entries (channel);
+		*/
 	}
 	chatDatabaseClock();
 }
@@ -76,7 +83,6 @@ function invalidate_chat_cache(world_id) {
 
 // Retrieves the chat history of a specific channel instead of loading the entire database into memory
 // The global channel is retrieved by using world id 0
-// includes a race condition resolving system
 async function retrieveChatHistory(world_id) {
 	// no cache has been started
 	if(!(world_id in chat_cache)) {
@@ -112,7 +118,8 @@ async function retrieveChatHistory(world_id) {
 			// the channel is being cleared. return a blank history
 			world_chats = [];
 		} else {
-			world_chats = await db_ch.all("SELECT * FROM (SELECT * FROM entries WHERE channel=? ORDER BY id DESC LIMIT 100) ORDER BY id ASC", default_channel);
+			world_chats = await db_ch.all("SELECT * FROM entries WHERE channel=? ORDER BY id DESC LIMIT 100", default_channel);
+			world_chats.reverse();
 		}
 		for(var a = 0; a < world_chats.length; a++) {
 			var row = JSON.parse(world_chats[a].data);
@@ -164,6 +171,7 @@ async function remove_from_chatlog(world_id, chat_id, chat_date) {
 	var cache_rem = 0;
 	var add_rem = 0;
 
+	console.log(history, obj)// xxx
 	// remove from the cache
 	for(var i = 0; i < history.length; i++) {
 		var msg = history[i];
@@ -227,17 +235,12 @@ async function doUpdateChatLogData() {
 		var chatData = row[0];
 		var worldId = row[1];
 		var date = row[2];
-		var worldName = await db.get("SELECT name FROM world WHERE id=?", worldId);
-		if(!worldName) continue;
-		worldName = worldName.name;
+		var channelName = "wid_" + worldId;
 		var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId);
 		if(!def_channel) {
-			var channelDesc = "Channel - \"" + worldName + "\"";
-			if(!worldName) { // "" = front page
-				channelDesc = "Front page channel";
-			}
+			var channelDesc = "Channel - \"" + channelName + "\"";
 			var world_channel = await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
-				["_" + worldName, "{}", channelDesc, Date.now(), worldId]);
+				["_" + channelName, "{}", channelDesc, Date.now(), worldId]);
 			var new_def_channel = await db_ch.run("INSERT INTO default_channels VALUES(?, ?)",
 				[world_channel.lastID, worldId]);
 			def_channel = world_channel.lastID;

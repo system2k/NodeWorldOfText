@@ -44,8 +44,8 @@ function partitionRectangle(rect) {
 	return res;
 }
 
-module.exports = async function(data, vars, evars) {
-	var world = evars.world;
+module.exports = async function(data, vars, params) {
+	var world = params.world;
 
 	var memTileCache = vars.memTileCache;
 	var monitorEventSockets = vars.monitorEventSockets;
@@ -57,10 +57,10 @@ module.exports = async function(data, vars, evars) {
 	var totalAreaLimit = 5000;
 
 	var ipAddress;
-	if(evars.ws && evars.ws.sdata) {
-		ipAddress = evars.ws.sdata.ipAddress;
+	if(params.ws && params.ws.sdata) {
+		ipAddress = params.ws.sdata.ipAddress;
 	} else {
-		ipAddress = evars.ipAddress;
+		ipAddress = params.ipAddress;
 	}
 
 	if(!Array.isArray(data.fetchRectangles)) return "Invalid parameters";
@@ -134,8 +134,8 @@ module.exports = async function(data, vars, evars) {
 				}
 			}
 
-			var tileData = await tile_fetcher.fetch(ipAddress, world.id, subRect, evars.ws);
-			if(evars.ws && evars.ws.readyState !== WebSocket.OPEN) {
+			var tileData = await tile_fetcher.fetch(ipAddress, world.id, subRect, params.ws);
+			if(params.ws && params.ws.readyState !== WebSocket.OPEN) {
 				return "Socket error";
 			}
 			// merge our fetched tiles together
@@ -147,6 +147,8 @@ module.exports = async function(data, vars, evars) {
 		}
 	}
 
+	// normalize the retrieved tiles
+	// first - we must check the cache for more up-to-date tile data
 	for(var i in tiles) {
 		var pos = i.split(",");
 		var tileX = parseInt(pos[1]);
