@@ -134,9 +134,10 @@ module.exports = async function(data, vars, params) {
 				}
 			}
 
-			var tileData = await tile_fetcher.fetch(ipAddress, world.id, subRect, params.ws);
+			var tileData = await tile_fetcher.fetch(ipAddress, world.id, subRect, params.channel);
 			if(params.ws && params.ws.readyState !== WebSocket.OPEN) {
-				return "Socket error";
+				tile_fetcher.cancel(params.channel);
+				return null;
 			}
 			// merge our fetched tiles together
 			for(var t = 0; t < tileData.length; t++) {

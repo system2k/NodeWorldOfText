@@ -38,76 +38,57 @@ async function fetchNext() {
 	}
 	var queue = ipQueue.queue;
 
-	var rangesPeriod = [];
-
 	ipAddrQueue.shift();
 	if(!queue.length) {
+		// queue for this IP is empty - don't push it back to the end of line
 		delete fetchesByIp[nextIp];
-	} else {
-		var current = queue[0];
-		var range = current.range;
-		var worldID = current.worldID;
-		var resolve = current.promise;
-		var socket = current.socket;
-		var x1 = range[0];
-		var y1 = range[1];
-		var x2 = range[2];
-		var y2 = range[3];
-		var area = (y2 - y1 + 1) * (x2 - x1 + 1);
-		if(socket && socket.readyState != 1) { // socket disconnected - cancel
-			queue.shift();
-			if(queue.length) {
-				ipAddrQueue.push(nextIp);
-			}
-			return true;
-		}
-		if(ipQueue.tilesInPeriod + area > 100) {
-			ipAddrQueue.push(nextIp);
-			return true;
-		}
-		ipQueue.tilesInPeriod += area;
-		rangesPeriod.push(current);
-		queue.shift();
-		if(queue.length) {
-			ipAddrQueue.push(nextIp);
-		}
+		return true;
 	}
 
-	for(var i = 0; i < rangesPeriod.length; i++) {
-		var queueObj = rangesPeriod[i];
-		var range = queueObj.range;
-		var worldID = queueObj.worldID;
-		var resolve = queueObj.promise;
-		var x1 = range[0];
-		var y1 = range[1];
-		var x2 = range[2];
-		var y2 = range[3];
-		var area = (y2 - y1 + 1) * (x2 - x1 + 1);
+	var current = queue[0];
+	var range = current.range;
+	var worldID = current.worldID;
+	var resolve = current.promise;
 
-		// ~~/~~/~~/~~/ !SECURITY ADVISORY! ~~/~~/~~/~~/
-		// We are going to be performing string-building (oh no!) which carries
-		// a risk of SQL injection if not properly done. In our case, this
-		// should not be a remote possibility.
-		var qParam = [worldID, x1, x2];
-		var height = y2 - y1 + 1;
-		var y_stmt = "";
-		for(var i = 0; i < height; i++) {
-			if(i != 0) y_stmt += ",";
-			y_stmt += "?";
-			qParam.push(y1 + i);
-		}
-		var qStr = "SELECT * FROM tile WHERE world_id=? AND tileX >= ? AND tileX <= ? AND tileY IN" + "(" + y_stmt + ")";
-		var data = await db.all(qStr, qParam);
+	var x1 = range[0];
+	var y1 = range[1];
+	var x2 = range[2];
+	var y2 = range[3];
+	var area = (y2 - y1 + 1) * (x2 - x1 + 1);
 
-		ipQueue.tilesInPeriod -= area;
-
-		resolve(data);
+	if(ipQueue.tilesInPeriod + area > 100) {
+		ipAddrQueue.push(nextIp);
+		return true;
+	}
+	ipQueue.tilesInPeriod += area;
+	queue.shift(); // it's important that we remove the item from queue before running the DB query
+	// append it right back to the end of the line
+	if(queue.length) {
+		ipAddrQueue.push(nextIp);
 	}
 
+	// ~~/~~/~~/~~/ !SECURITY ADVISORY! ~~/~~/~~/~~/
+	// We are going to be performing string-building (oh no!) which carries
+	// a risk of SQL injection if not properly done. In our case, this
+	// should not be a remote possibility.
+	var qParam = [worldID, x1, x2];
+	var height = y2 - y1 + 1;
+	var y_stmt = "";
+	for(var i = 0; i < height; i++) {
+		if(i != 0) y_stmt += ",";
+		y_stmt += "?";
+		qParam.push(y1 + i);
+	}
+	var qStr = "SELECT * FROM tile WHERE world_id=? AND tileX >= ? AND tileX <= ? AND tileY IN" + " (" + y_stmt + ")";
+	var data = await db.all(qStr, qParam);
+
+	ipQueue.tilesInPeriod -= area;
+
+	resolve(data);
 	return true;
 }
 
-function queueFetch(ip, worldID, range, socket) { // TODO: what if client closes in the middle of fetching multiple ranges?
+function queueFetch(ip, worldID, range, channel) { // TODO: what if client closes in the middle of fetching multiple ranges?
 	if(!ipAddrQueue.includes(ip)) {
 		ipAddrQueue.push(ip);
 		if(!fetchesByIp[ip]) {
@@ -124,12 +105,27 @@ function queueFetch(ip, worldID, range, socket) { // TODO: what if client closes
 			range,
 			worldID,
 			promise: res,
-			socket // TODO: remove the need for this
+			channel
 		});
 	});
 }
 
+function cancelFetch(channel) {
+	if(!channel) return;
+	for(var ip in fetchesByIp) {
+		var queue = fetchesByIp[ip].queue;
+		for(var q = 0; q < queue.length; q++) {
+			if(queue[q].channel == channel) {
+				queue[q].promise(null);
+				queue.splice(q, 1);
+				q--;
+			}
+		}
+	}
+}
+
 module.exports.fetch = queueFetch;
+module.exports.cancel = cancelFetch;
 module.exports.getDebugInfo = function() {
 	return { ipAddrQueue, fetchesByIp };
 }
