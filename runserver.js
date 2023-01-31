@@ -8,9 +8,6 @@
 
 console.log("Starting up...");
 
-var serverLoaded = false;
-var isStopping = false;
-
 const crypto      = require("crypto");
 const fs          = require("fs");
 const http        = require("http");
@@ -78,24 +75,6 @@ var ipv6_to_range  = ipaddress.ipv6_to_range;
 var is_cf_ipv4_int = ipaddress.is_cf_ipv4_int;
 var is_cf_ipv6_int = ipaddress.is_cf_ipv6_int;
 
-var pluginMgr = null;
-
-var gzipEnabled = false;
-var shellEnabled = true;
-var clientVersion = "";
-
-// Global
-CONST = {};
-CONST.tileCols = 16;
-CONST.tileRows = 8;
-CONST.tileArea = CONST.tileCols * CONST.tileRows;
-
-// tile cache for fetching and updating
-// 3 levels: world_id -> tile_y -> tile_x
-var memTileCache = {};
-
-console.log("Loaded libs");
-
 var DATA_PATH = "../data/";
 var DATA_PATH_TEST = DATA_PATH + "test/";
 var SETTINGS_PATH = DATA_PATH + "settings.json";
@@ -118,6 +97,61 @@ function initializeDirectoryStruct() {
 		process.exit();
 	}
 }
+initializeDirectoryStruct();
+
+const settings = require(SETTINGS_PATH);
+
+var serverPort     = settings.port;
+var serverDB       = settings.DATABASE_PATH;
+var editsDB        = settings.EDITS_PATH;
+var chatDB         = settings.CHAT_HISTORY_PATH;
+var imageDB        = settings.IMAGES_PATH;
+var miscDB         = settings.MISC_PATH;
+var staticNumsPath = settings.STATIC_SHORTCUTS_PATH;
+var accountSystem  = settings.accountSystem; // "uvias" or "local"
+
+var loginPath = "/accounts/login/";
+var logoutPath = "/accounts/logout/";
+var registerPath = "/accounts/register/";
+var profilePath = "/accounts/profile/";
+
+if(accountSystem != "uvias" && accountSystem != "local") {
+	console.log("ERROR: Invalid account system: " + accountSystem);
+	sendProcMsg("EXIT");
+	process.exit();
+}
+
+Error.stackTraceLimit = 1024;
+var gzipEnabled = false;
+var shellEnabled = true;
+var clientVersion = "";
+
+var isTestServer = false;
+var debugLogging = false;
+var testServerMainDirs = false;
+var testUviasIds = false;
+var serverLoaded = false;
+var isStopping = false;
+
+var acme = {
+	enabled: false,
+	pass: null
+};
+
+var intv = {}; // intervals and timeouts
+var pluginMgr = null;
+
+// Global
+CONST = {};
+CONST.tileCols = 16;
+CONST.tileRows = 8;
+CONST.tileArea = CONST.tileCols * CONST.tileRows;
+
+// tile cache for fetching and updating
+// 3 levels: world_id -> tile_y -> tile_x
+var memTileCache = {};
+
+console.log("Loaded libs");
 
 function loadPlugin(reload) {
 	if(!reload) {
@@ -181,16 +215,6 @@ function handle_error(e, doLog) {
 	}
 }
 
-var isTestServer = false;
-var debugLogging = false;
-var testServerMainDirs = false;
-var testUviasIds = false;
-
-var acme = {
-	enabled: false,
-	pass: null
-};
-
 process.argv.forEach(function(a) {
 	if(a == "--test-server") {
 		if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
@@ -215,11 +239,6 @@ process.argv.forEach(function(a) {
 		testUviasIds = true;
 	}
 });
-
-// console function
-function run(path) {
-	eval(fs.readFileSync(path).toString("utf8"));
-}
 
 async function runShellScript(includeColors) {
 	var shellFile = loadShellFile();
@@ -249,28 +268,6 @@ async function runShellScript(includeColors) {
 		resp += "";
 	}
 	return resp;
-}
-
-const settings = require(SETTINGS_PATH);
-
-var serverPort     = settings.port;
-var serverDB       = settings.DATABASE_PATH;
-var editsDB        = settings.EDITS_PATH;
-var chatDB         = settings.CHAT_HISTORY_PATH;
-var imageDB        = settings.IMAGES_PATH;
-var miscDB         = settings.MISC_PATH;
-var staticNumsPath = settings.STATIC_SHORTCUTS_PATH;
-var accountSystem  = settings.accountSystem; // "uvias" or "local"
-
-var loginPath = "/accounts/login/";
-var logoutPath = "/accounts/logout/";
-var registerPath = "/accounts/register/";
-var profilePath = "/accounts/profile/";
-
-if(accountSystem != "uvias" && accountSystem != "local") {
-	console.log("ERROR: Invalid account system: " + accountSystem);
-	sendProcMsg("EXIT");
-	process.exit();
 }
 
 var pgClient = pg.Client;
@@ -362,10 +359,6 @@ function toInt64(n) {
 	return a[0];
 }
 
-Error.stackTraceLimit = 1024;
-
-var intv = {}; // intervals and timeouts
-
 if(isTestServer) {
 	serverPort = settings.test_port;
 	if(!testServerMainDirs) {
@@ -381,7 +374,7 @@ if(isTestServer) {
 	}
 }
 
-const log_error = function(err) {
+function log_error(err) {
 	if(settings.error_log) {
 		try {
 			err = JSON.stringify(err);
@@ -459,10 +452,10 @@ function load_static() {
 	}
 	
 	console.log("Loading static files...");
-	dump_dir(static_data, static_path, static_path_web, false, null, true);
+	dump_dir(static_data, static_path, static_path_web, false, true);
 
 	console.log("Loading HTML templates...");
-	dump_dir(template_data, templates_path, "", false, null, true);
+	dump_dir(template_data, templates_path, "", false, true);
 
 	console.log("Compiling HTML templates...");
 	for(var i in template_data) {
@@ -600,7 +593,7 @@ function asyncDbSystem(database) {
 	const db = {
 		// gets data from the database (only 1 row at a time)
 		get: function(command, args) {
-			if(args == void 0 || args == null) args = []
+			if(args == void 0 || args == null) args = [];
 			return new Promise(function(r, rej) {
 				database.get(command, args, function(err, res) {
 					if(err) {
@@ -797,12 +790,9 @@ function valid_method(mtd) {
 	return valid_methods.indexOf(mtd) > -1;
 }
 
-var announcement_cache = "";
-
 async function initialize_server() {
 	console.log("Starting server...");
 
-	initializeDirectoryStruct();
 	setupDatabases();
 	setupStaticShortcuts();
 	load_static();
@@ -1943,6 +1933,17 @@ async function process_request(req, res, compCallbacks) {
 	res.end();
 }
 
+var announcement_cache = "";
+
+async function loadAnnouncement() {
+	announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
+	if(!announcement_cache) {
+		announcement_cache = "";
+	} else {
+		announcement_cache = announcement_cache.value;
+	}
+}
+
 async function modifyAnnouncement(text) {
 	if(!text) text = "";
 	text += "";
@@ -2152,15 +2153,6 @@ async function uvias_init() {
 				break;
 		}
 	});
-}
-
-async function loadAnnouncement() {
-	announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
-	if(!announcement_cache) {
-		announcement_cache = "";
-	} else {
-		announcement_cache = announcement_cache.value;
-	}
 }
 
 function wsSend(socket, data) {

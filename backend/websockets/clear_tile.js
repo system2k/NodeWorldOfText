@@ -16,10 +16,7 @@ module.exports = async function(ws, data, send, vars, evars) {
 
 	var no_log_edits = world.opts.noLogEdits;
 
-	var call_id = tile_database.newCallId();
-	tile_database.reserveCallId(call_id);
-
-	tile_database.write(call_id, tile_database.types.clear, {
+	await tile_database.write(tile_database.types.clear, {
 		tileX, tileY, user, world,
 		date: Date.now(), no_log_edits
 	});

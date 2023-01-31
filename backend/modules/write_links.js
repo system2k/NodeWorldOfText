@@ -108,10 +108,7 @@ module.exports = async function(data, vars, params) {
 		return [true, "RATE"];
 	}
 
-	var call_id = tile_database.newCallId();
-	tile_database.reserveCallId(call_id);
-
-	tile_database.write(call_id, tile_database.types.link, {
+	var resp = await tile_database.write(tile_database.types.link, {
 		tileX, tileY, charX, charY,
 		user, world, is_member, is_owner,
 		type, url, link_tileX, link_tileY,
@@ -120,8 +117,6 @@ module.exports = async function(data, vars, params) {
 	});
 
 	rate_limiter.releaseHold(idLabel, tileX, tileY);
-
-	var resp = await tile_database.editResponse(call_id);
 
 	return resp;
 }

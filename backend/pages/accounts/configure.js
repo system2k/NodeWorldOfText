@@ -769,9 +769,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				redirect: "/accounts/profile/"
 			});
 		} else if("clear_public" in post_data) {
-			var call_id = tile_database.newCallId();
-			tile_database.reserveCallId(call_id);
-			tile_database.write(call_id, tile_database.types.publicclear, {
+			tile_database.write(tile_database.types.publicclear, {
 				date: Date.now(),
 				world,
 				user
@@ -779,7 +777,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		} else if("clear_all" in post_data) {
 			var call_id = tile_database.newCallId();
 			tile_database.reserveCallId(call_id);
-			tile_database.write(call_id, tile_database.types.eraseworld, {
+			tile_database.write(tile_database.types.eraseworld, {
 				date: Date.now(),
 				world,
 				user

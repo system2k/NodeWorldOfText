@@ -40,10 +40,11 @@ async function init_chat_history() {
 			["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0]);
 		// TODO: we must add the following indices:
 		/*
-		CREATE INDEX "def_idx" ON default_channels (world_id, channel_id);
-		CREATE INDEX "chn_idx" ON channels (world_id, id);
-		CREATE INDEX "ent_idx" ON entries (channel, id DESC);
-		CREATE INDEX "ent_all_chan" ON entries (channel);
+		CREATE INDEX "chan_default" ON default_channels (world_id, channel_id);
+		CREATE INDEX "chan_id" ON channels (world_id, id);
+		CREATE INDEX "ent_id" ON entries (channel, id DESC);
+		CREATE INDEX "ent_date" ON entries (channel, date);
+		CREATE INDEX "ent_channel" ON entries (channel);
 		*/
 	}
 	chatDatabaseClock();
@@ -171,7 +172,6 @@ async function remove_from_chatlog(world_id, chat_id, chat_date) {
 	var cache_rem = 0;
 	var add_rem = 0;
 
-	console.log(history, obj)// xxx
 	// remove from the cache
 	for(var i = 0; i < history.length; i++) {
 		var msg = history[i];
@@ -192,14 +192,21 @@ async function remove_from_chatlog(world_id, chat_id, chat_date) {
 		}
 	}
 
+	var deletions = chatMsgDeletions[world_id];
+	if(!deletions) {
+		deletions = [];
+		chatMsgDeletions[world_id] = deletions;
+	}
+	deletions.push([chat_date, chat_id]);
+
 	return Math.max(cache_rem, add_rem);
 }
 
 var chatIsCleared = {};
+var chatMsgDeletions = {};
 
 var global_chat_additions = [];
 var world_chat_additions = [];
-var chat_removals = [];
 
 function clearChatlog(world_id) {
 	// clear from cache if it exists
@@ -211,25 +218,42 @@ function clearChatlog(world_id) {
 }
 
 async function doUpdateChatLogData() {
+	// TODO: eliminate the need to clone all the objects.
+	// the challenge here is that we also need to fetch some data as well.
 	var copy_global_chat_additions = global_chat_additions.slice(0);
 	var copy_world_chat_additions = world_chat_additions.slice(0);
 	var copy_chatIsCleared = Object.assign(chatIsCleared, {});
+	var copy_chatMsgDeletions = Object.assign(chatMsgDeletions, {});
 
 	global_chat_additions = [];
 	world_chat_additions = [];
 	chatIsCleared = {};
+	chatMsgDeletions = {};
 
 	await db_ch.run("BEGIN");
 
 	for(var i in copy_chatIsCleared) {
-		var worldId = i;
+		var worldId = parseInt(wid);
 		var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId);
 		if(!def_channel) continue;
 		def_channel = def_channel.channel_id;
 		await db_ch.run("DELETE FROM entries WHERE channel=?", def_channel);
 	}
 
-	// TODO: refactor this and simplify
+	for(var wid in copy_chatMsgDeletions) {
+		var worldId = parseInt(wid);
+		var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId);
+		if(!def_channel) continue;
+		def_channel = def_channel.channel_id;
+		var list = copy_chatMsgDeletions[wid];
+		for(var x = 0; x < list.length; x++) {
+			var del = list[x];
+			var chatDate = del[0];
+			var chatId = del[1];
+			await db_ch.run("DELETE FROM entries WHERE channel=? AND date=? AND json_extract(data, '$.id')=?", [def_channel, chatDate, chatId]);
+		}
+	}
+
 	for(var i = 0; i < copy_world_chat_additions.length; i++) {
 		var row = copy_world_chat_additions[i];
 		var chatData = row[0];
@@ -271,7 +295,8 @@ async function chatDatabaseClock(serverExit) {
 		var gc_len = global_chat_additions.length;
 		var wc_len = world_chat_additions.length;
 		var cc_len = Object.keys(chatIsCleared).length;
-		if(gc_len > 0 || wc_len > 0 || cc_len > 0) {
+		var cd_len = Object.keys(chatMsgDeletions).length;
+		if(gc_len > 0 || wc_len > 0 || cc_len > 0 || cd_len > 0) {
 			await doUpdateChatLogData();
 		}
 		broadcastMonitorEvent("Chat", "Clock cycle executed");

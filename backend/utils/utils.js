@@ -358,25 +358,20 @@ function uptime(custom_ms_ago) {
 }
 
 // recursive directory dumper
-function dump_dir(addr, MP, dsu, po, opt, lc) { // object, file path, web path, path only, options, lower case
-	if(!opt) opt = {};
-	var con = fs.readdirSync(MP);
-	for(var i in con) {
-		var currentPath = MP + con[i];
+function dump_dir(dest, fs_path, virt_path, only_pathname, path_lower) {
+	var directory = fs.readdirSync(fs_path);
+	for(var i in directory) {
+		var currentPath = fs_path + directory[i];
 		if(!fs.lstatSync(currentPath).isDirectory()) {
-			var pname = dsu + con[i];
-			if(lc) pname = pname.toLowerCase();
-			if(!po) {
-				addr[pname] = fs.readFileSync(currentPath);
+			var pathname = virt_path + directory[i];
+			if(path_lower) pathname = pathname.toLowerCase();
+			if(!only_pathname) {
+				dest[pathname] = fs.readFileSync(currentPath);
 			} else {
-				addr[pname] = currentPath;
+				dest[pathname] = currentPath;
 			}
 		} else {
-			// Omitted folder? Cancel scanning folder
-			if(con[i] == opt.omit_folder) {
-				return;
-			}
-			dump_dir(addr, MP + con[i] + "/", dsu + con[i] + "/", po);
+			dump_dir(dest, fs_path + directory[i] + "/", virt_path + directory[i] + "/", only_pathname);
 		}
 	}
 }

@@ -4,7 +4,6 @@ var intv;
 var handle_error;
 var db;
 var broadcastMonitorEvent;
-var bulkWriteEdits;
 
 var server_exiting = false;
 
@@ -13,7 +12,6 @@ module.exports.main = async function(vars) {
 	handle_error = vars.handle_error;
 	db = vars.db;
 	broadcastMonitorEvent = vars.broadcastMonitorEvent;
-	bulkWriteEdits = vars.bulkWriteEdits;
 
 	intv.worldCacheInvalidation = setInterval(function() {
 		invalidateWorldCache();

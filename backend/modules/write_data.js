@@ -179,9 +179,6 @@ module.exports = async function(data, vars, params) {
 		broadcastMonitorEvent("Write", textLog);
 	}
 
-	var call_id = tile_database.newCallId();
-	tile_database.reserveCallId(call_id);
-
 	var currentDate = Date.now();
 	var tile_edits = [];
 
@@ -296,7 +293,7 @@ module.exports = async function(data, vars, params) {
 	}
 
 	// send to tile database manager
-	tile_database.write(call_id, tile_database.types.write, {
+	var resp = await tile_database.write(tile_database.types.write, {
 		date: currentDate,
 		tile_edits,
 		user, world, is_owner, is_member,
@@ -306,8 +303,6 @@ module.exports = async function(data, vars, params) {
 		no_update,
 		rejected
 	});
-
-	var resp = await tile_database.editResponse(call_id);
 
 	rate_limiter.clearHolds(idLabel, tiles);
 

@@ -21,6 +21,25 @@ var server_exiting = false;
 var editlog_cell_props = false;
 var send_microedits = false;
 
+var fetch_tile_queue = [];
+var totalTilesCached = 0;
+var tileCacheLimit = 4000;
+
+// caller ids. this returns information to a request that uploaded the edits to the server
+// [response_callback, response_data, completion_callback, total_units, current_units]
+// total_units must be >0
+var cids = {};
+
+var ratelimits = {};
+
+// This object contains all tiles that are currently loaded during the iteration
+// of all tiles in a world. If an edit has been made to a loaded tile, it gets
+// added to the central tile cache.
+// Unique tile id tuple: "world_id,tile_y,_tile_x"
+var tileIterationTempMem = {};
+
+var tileCacheTimeLimit = 1000 * 60 * 1;
+
 module.exports.main = function(vars) {
 	db = vars.db;
 	db_edits = vars.db_edits;
@@ -303,12 +322,6 @@ function sendTileUpdatesToClients() {
 	intv.client_update_clock = setTimeout(sendTileUpdatesToClients, 1000 / 30);
 }
 
-// caller ids. this returns information to a request that uploaded the edits to the server
-// [response_callback, response_data, completion_callback, total_units, current_units]
-// total_units must be >0
-var cids = {};
-
-var ratelimits = {};
 function set_ratelimit(type, key, duration) {
 	if(!ratelimits[type]) ratelimits[type] = {};
 	var now = Date.now();
@@ -401,17 +414,6 @@ async function loadTileCacheData(world_id, tileX, tileY) {
 	return normalize_tile(tile);
 }
 
-var fetch_tile_queue = [];
-var totalTilesCached = 0;
-var tileCacheLimit = 4000;
-
-// This object contains all tiles that are currently loaded during the iteration
-// of all tiles in a world. If an edit has been made to a loaded tile, it gets
-// added to the central tile cache.
-// Unique tile id tuple: "world_id,tile_y,_tile_x"
-var tileIterationTempMem = {};
-
-var tileCacheTimeLimit = 1000 * 60 * 1;
 // free all in-memory tiles if they haven't been written to in a while
 function performCacheInvalidation() {
 	var date = Date.now();
@@ -581,12 +583,12 @@ function tileWriteEdits(cacheTile, editObj) {
 	}
 	if(char_updated && !no_log_edits && sharedObj.editLog) {
 		var ar = [tileY, tileX, charY, charX, Date.now(), char, editID];
-		if(color) ar.push(color); // TODO
+		if(color) ar.push(color);
 		if(bgcolor != -1) {
 			if(!color) ar.push(0);
 			ar.push(bgcolor);
 		}
-		sharedObj.editLog.push(ar);
+		sharedObj.editLog.push(ar); // TODO: remove need for shared objects
 	}
 	if(char_updated) {
 		cacheTile.last_accessed = Date.now();
@@ -1620,7 +1622,16 @@ function coordinateAdd(tileX1, tileY1, charX1, charY1, tileX2, tileY2, charX2, c
 	];
 }
 
-module.exports.editResponse = async function(id) {
+function reserveCallId(id) {
+	if(!cids[id]) cids[id] = [null, null, null, 0, 0];
+}
+
+var current_call_id = 0;
+function newCallId() {
+	return current_call_id++;
+}
+
+async function editResponse(id) {
 	return new Promise(function(res) {
 		if(!cids[id]) {
 			return console.log("An error occurred while sending back an edit response");
@@ -1642,7 +1653,9 @@ module.exports.editResponse = async function(id) {
 	});
 }
 
-module.exports.write = function(call_id, type, data) {
+module.exports.write = function(type, data) {
+	var call_id = newCallId();
+	reserveCallId(call_id);
 	switch(type) {
 		case types.none:
 			break;
@@ -1659,18 +1672,7 @@ module.exports.write = function(call_id, type, data) {
 		default:
 			break;
 	}
-}
-
-// specifically for the worlds subsystem as it shares the same database as the tiles
-module.exports.bulkWriteEdits = bulkWriteEdits;
-
-module.exports.reserveCallId = function(id) {
-	if(!cids[id]) cids[id] = [null, null, null, 0, 0];
-}
-
-var current_call_id = 0;
-module.exports.newCallId = function() {
-	return current_call_id++;
+	return editResponse(call_id);
 }
 
 var types_enum = 0;
