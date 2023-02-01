@@ -1,4 +1,4 @@
-module.exports.GET = async function(req, serve, vars, evars) {
-	var HTML = evars.HTML;
-	serve(HTML("404.html"), 404);
+module.exports.GET = async function(req, write, server, ctx) {
+	var HTML = ctx.HTML;
+	write(HTML("404.html"), 404);
 }

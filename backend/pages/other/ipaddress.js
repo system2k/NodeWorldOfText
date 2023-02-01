@@ -1,3 +1,3 @@
-module.exports.GET = async function(req, serve, vars, evars) {
-	serve(evars.ipAddress);
+module.exports.GET = async function(req, write, server, ctx) {
+	write(ctx.ipAddress);
 }

@@ -1,25 +1,25 @@
 var utils = require("../../utils/utils.js");
 var uptime = utils.uptime;
 
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var HTML = evars.HTML;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var HTML = ctx.HTML;
+	var user = ctx.user;
 
-	var dispage = vars.dispage;
-	var db = vars.db;
-	var announcement = vars.announcement;
-	var wss = vars.wss;
-	var ranks_cache = vars.ranks_cache;
-	var db_misc = vars.db_misc;
-	var uvias = vars.uvias;
-	var accountSystem = vars.accountSystem;
-	var acme = vars.acme;
-	var createCSRF = vars.createCSRF;
-	var getClientVersion = vars.getClientVersion;
+	var dispage = server.dispage;
+	var db = server.db;
+	var announcement = server.announcement;
+	var wss = server.wss;
+	var ranks_cache = server.ranks_cache;
+	var db_misc = server.db_misc;
+	var uvias = server.uvias;
+	var accountSystem = server.accountSystem;
+	var acme = server.acme;
+	var createCSRF = server.createCSRF;
+	var getClientVersion = server.getClientVersion;
 
 	// not a superuser...
 	if(!user.superuser) {
-		return await dispage("404", null, req, serve, vars, evars);
+		return await dispage("404", null, req, write, server, ctx);
 	}
 
 	var client_num = 0;
@@ -91,30 +91,30 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		csrftoken
 	};
 
-	serve(HTML("administrator.html", data));
+	write(HTML("administrator.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var user = evars.user;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var user = ctx.user;
 
-	var dispage = vars.dispage;
-	var announce = vars.announce;
-	var db = vars.db;
-	var db_misc = vars.db_misc;
-	var db_edits = vars.db_edits;
-	var stopServer = vars.stopServer;
-	var acme = vars.acme;
-	var checkCSRF = vars.checkCSRF;
-	var setClientVersion = vars.setClientVersion;
+	var dispage = server.dispage;
+	var announce = server.announce;
+	var db = server.db;
+	var db_misc = server.db_misc;
+	var db_edits = server.db_edits;
+	var stopServer = server.stopServer;
+	var acme = server.acme;
+	var checkCSRF = server.checkCSRF;
+	var setClientVersion = server.setClientVersion;
 
 	if(!user.superuser) {
-		return await dispage("404", null, req, serve, vars, evars);
+		return await dispage("404", null, req, write, server, ctx);
 	}
 
 	var csrftoken = post_data.csrfmiddlewaretoken;
 	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
-		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
+		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	if("set_acme_pass" in post_data) {
@@ -135,14 +135,14 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		}
 		return await dispage("admin/administrator", {
 			acme_update_msg
-		}, req, serve, vars, evars);
+		}, req, write, server, ctx);
 	}
 	if("set_cli_version" in post_data) {
 		var new_cli_version = post_data.set_cli_version;
 		if(setClientVersion(new_cli_version)) {
 			return await dispage("admin/administrator", {
 				cons_update_msg: "Client version updated successfully"
-			}, req, serve, vars, evars);
+			}, req, write, server, ctx);
 		}
 	}
 	if("announcement" in post_data) {
@@ -163,21 +163,21 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	
 		return await dispage("admin/administrator", {
 			announcement_update_msg: "Announcement updated"
-		}, req, serve, vars, evars);
+		}, req, write, server, ctx);
 	}
 	if("manage_server" in post_data) {
 		if(!user.operator) return;
 		var cmd = post_data.manage_server;
 		if(cmd == "restart") {
-			serve("SUCCESS");
+			write("SUCCESS");
 			stopServer(true);
 		}
 		if(cmd == "close") {
-			serve("SUCCESS");
+			write("SUCCESS");
 			stopServer();
 		}
 		if(cmd == "maintenance") {
-			serve("SUCCESS");
+			write("SUCCESS");
 			stopServer(false, true);
 		}
 		return;

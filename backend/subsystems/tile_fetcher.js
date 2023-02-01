@@ -1,8 +1,8 @@
 var db;
 var intv;
-module.exports.main = function(vars) {
-	db = vars.db;
-	intv = vars.intv;
+module.exports.main = function(server) {
+	db = server.db;
+	intv = server.intv;
 
 	fetchTimer();
 }

@@ -1,13 +1,13 @@
-module.exports = async function(ws, data, send, vars, evars) {
-	var broadcast = evars.broadcast; // broadcast to current world
-	var user = evars.user;
-	var channel = evars.channel;
-	var world = evars.world;
+module.exports = async function(ws, data, send, server, ctx) {
+	var broadcast = ctx.broadcast; // broadcast to current world
+	var user = ctx.user;
+	var channel = ctx.channel;
+	var world = ctx.world;
 
 	var data_rec = data.data;
-	var wss = vars.wss;
-	var accountSystem = vars.accountSystem;
-	var wsSend = vars.wsSend;
+	var wss = server.wss;
+	var accountSystem = server.accountSystem;
+	var wsSend = server.wsSend;
 
 	// rate limit commands
 	var msNow = Date.now();

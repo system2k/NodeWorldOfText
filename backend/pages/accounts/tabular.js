@@ -1,13 +1,13 @@
 var world_mgr = require("../../subsystems/world_mgr.js");
 var fetchOwnedWorldsByUserId = world_mgr.fetchOwnedWorldsByUserId;
 
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var cookies = evars.cookies;
-	var user = evars.user;
-	var HTML = evars.HTML;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var cookies = ctx.cookies;
+	var user = ctx.user;
+	var HTML = ctx.HTML;
 
 	if(!user.authenticated) {
-		return serve(null, null, {
+		return write(null, null, {
 			// TODO: don't browsers have the ability to do this client-side?
 			redirect: "/accounts/login/?next=/accounts/tabular/"
 		});
@@ -46,5 +46,5 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		worlds_owned: world_list
 	};
 
-	serve(HTML("accounts_tabular.html", data));
+	write(HTML("accounts_tabular.html", data));
 }

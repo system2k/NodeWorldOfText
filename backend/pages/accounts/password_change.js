@@ -1,10 +1,10 @@
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var cookies = evars.cookies;
-	var HTML = evars.HTML;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var cookies = ctx.cookies;
+	var HTML = ctx.HTML;
+	var user = ctx.user;
 
 	if(!user.authenticated) {
-		return serve(null, null, {
+		return write(null, null, {
 			redirect: "/accounts/login/?next=/accounts/password_change/"
 		});
 	}
@@ -14,17 +14,17 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		error: params.error
 	};
 
-	serve(HTML("password_change.html", data));
+	write(HTML("password_change.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var user = evars.user;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var user = ctx.user;
 
-	var db = vars.db;
-	var dispage = vars.dispage;
-	var checkHash = vars.checkHash;
-	var encryptHash = vars.encryptHash;
+	var db = server.db;
+	var dispage = server.dispage;
+	var checkHash = server.checkHash;
+	var encryptHash = server.encryptHash;
 
 	if(!user.authenticated) return;
 
@@ -39,26 +39,26 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	if(!valid) {
 		return await dispage("accounts/password_change", {
 			error: "Your old password was entered incorrectly. Please enter it again."
-		}, req, serve, vars, evars);
+		}, req, write, server, ctx);
 	}
 
 	if(confirm_pass_1 != confirm_pass_2) {
 		return await dispage("accounts/password_change", {
 			error: "The passwords do not match."
-		}, req, serve, vars, evars);
+		}, req, write, server, ctx);
 	}
 
 	if(confirm_pass_1.length < 3 || confirm_pass_1.length > 128) {
 		return await dispage("accounts/password_change", {
 			error: "The new password must be 3 - 128 characters."
-		}, req, serve, vars, evars);
+		}, req, write, server, ctx);
 	}
 
 	var new_hash = encryptHash(confirm_pass_1);
 
 	await db.run("UPDATE auth_user SET password=? WHERE id=?", [new_hash, user.id]);
 
-	serve(null, null, {
+	write(null, null, {
 		redirect: "/accounts/password_change/done/"
 	});
 }

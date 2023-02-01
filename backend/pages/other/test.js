@@ -1,3 +1,3 @@
-module.exports.GET = function(req, serve, vars, evars) {
-	serve("OWOT subdomain test");
+module.exports.GET = function(req, write, server, ctx) {
+	write("OWOT subdomain test");
 }

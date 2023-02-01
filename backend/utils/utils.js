@@ -231,30 +231,6 @@ function ar_str_decodeURI(ar) {
 	return ar;
 }
 
-// make sure filenames don't contain invalid sequences
-var filename_sanitize = (function() {
-	var illegalRe = /[\/\?<>\\:\*\|":]/g;
-	var controlRe = /[\x00-\x1f\x80-\x9f]/g;
-	var reservedRe = /^\.+$/;
-	var windowsReservedRe = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
-	var windowsTrailingRe = /[\. ]+$/;
-
-	function sanitize(input, replacement) {
-		var sanitized = input
-			.replace(illegalRe, replacement)
-			.replace(controlRe, replacement)
-			.replace(reservedRe, replacement)
-			.replace(windowsReservedRe, replacement)
-			.replace(windowsTrailingRe, replacement);
-		return sanitized;
-	}
-
-	return function(input) {
-		var replacement = "_";
-		return sanitize(input, replacement);
-	}
-})();
-
 // generate an expire string for cookies
 var dayWeekList = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 var monthList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -1007,7 +983,6 @@ module.exports = {
 	parseCookie,
 	ar_str_trim,
 	ar_str_decodeURI,
-	filename_sanitize,
 	http_time,
 	encode_base64,
 	decode_base64,

@@ -2,17 +2,17 @@ var utils = require("../../utils/utils.js");
 var checkURLParam = utils.checkURLParam;
 var templates = require("../../utils/templates.js");
 
-module.exports.GET = async function(req, serve, vars, evars) {
-	var path = evars.path;
-	var user = evars.user;
-	var HTML = evars.HTML;
+module.exports.GET = async function(req, write, server, ctx) {
+	var path = ctx.path;
+	var user = ctx.user;
+	var HTML = ctx.HTML;
 
-	var website = vars.website;
-	var send_email = vars.send_email;
-	var handle_error = vars.handle_error;
-	var db = vars.db;
-	var new_token = vars.new_token;
-	var accountSystem = vars.accountSystem;
+	var website = server.website;
+	var send_email = server.send_email;
+	var handle_error = server.handle_error;
+	var db = server.db;
+	var new_token = server.new_token;
+	var accountSystem = server.accountSystem;
 
 	if(accountSystem == "uvias") {
 		return;
@@ -26,7 +26,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	}
 	var ver_count = (await db.get("SELECT COUNT(*) AS cnt FROM registration_registrationprofile WHERE user_id=?", user.id)).cnt;
 	if(ver_count >= 1) {
-		return serve(HTML("registration/verify_email.html", {
+		return write(HTML("registration/verify_email.html", {
 			verified: true
 		}));
 	}
@@ -59,5 +59,5 @@ module.exports.GET = async function(req, serve, vars, evars) {
 			[user.id, token]);
 	}
 
-	serve(HTML("registration/verify_email.html"));
+	write(HTML("registration/verify_email.html"));
 }

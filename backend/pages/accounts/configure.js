@@ -53,21 +53,21 @@ function sendWorldStatusUpdate(server, worldId, userId, type, val) {
 	});
 }
 
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var path = evars.path;
-	var HTML = evars.HTML;
-	var user = evars.user;
-	var setCallback = evars.setCallback;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var path = ctx.path;
+	var HTML = ctx.HTML;
+	var user = ctx.user;
+	var setCallback = ctx.setCallback;
 
-	var url = vars.url;
-	var db = vars.db;
-	var dispage = vars.dispage;
-	var uvias = vars.uvias;
-	var accountSystem = vars.accountSystem;
-	var createCSRF = vars.createCSRF;
+	var url = server.url;
+	var db = server.db;
+	var dispage = server.dispage;
+	var uvias = server.uvias;
+	var accountSystem = server.accountSystem;
+	var createCSRF = server.createCSRF;
 
 	if(!user.authenticated) {
-		return serve(null, null, {
+		return write(null, null, {
 			redirect: "/accounts/login/?next=" + url.parse(req.url).pathname
 		});
 	}
@@ -77,7 +77,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 
 	var world = await getOrCreateWorld(world_name);
 	if(!world) {
-		return await dispage("404", null, req, serve, vars, evars);
+		return await dispage("404", null, req, write, server, ctx);
 	}
 
 	setCallback(function() {
@@ -85,7 +85,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	});
 
 	if(world.ownerId != user.id && !user.superuser) {
-		return serve("Access denied", 403);
+		return write("Access denied", 403);
 	}
 
 	world_name = world.name;
@@ -233,37 +233,37 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		meta_desc: world.opts.desc
 	};
 
-	serve(HTML("configure.html", data));
+	write(HTML("configure.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var path = evars.path;
-	var user = evars.user;
-	var setCallback = evars.setCallback;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var path = ctx.path;
+	var user = ctx.user;
+	var setCallback = ctx.setCallback;
 
-	var db = vars.db;
-	var dispage = vars.dispage;
-	var url = vars.url;
-	var ws_broadcast = vars.ws_broadcast;
-	var chat_mgr = vars.chat_mgr;
-	var tile_database = vars.tile_database;
-	var uvias = vars.uvias;
-	var accountSystem = vars.accountSystem;
-	var wss = vars.wss;
-	var checkCSRF = vars.checkCSRF;
+	var db = server.db;
+	var dispage = server.dispage;
+	var url = server.url;
+	var ws_broadcast = server.ws_broadcast;
+	var chat_mgr = server.chat_mgr;
+	var tile_database = server.tile_database;
+	var uvias = server.uvias;
+	var accountSystem = server.accountSystem;
+	var wss = server.wss;
+	var checkCSRF = server.checkCSRF;
 
 	var clearChatlog = chat_mgr.clearChatlog;
 
 	if(!user.authenticated) {
-		return serve();
+		return write();
 	}
 
 	var world_name = checkURLParam("/accounts/configure/*world", path).world;
 
 	var world = await getOrCreateWorld(world_name);
 	if(!world) {
-		return await dispage("404", null, req, serve, vars, evars);
+		return await dispage("404", null, req, write, server, ctx);
 	}
 
 	setCallback(function() {
@@ -273,14 +273,14 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	world_name = world.name;
 
 	if(world.ownerId != user.id && !user.superuser) {
-		return serve("Access denied", 403);
+		return write("Access denied", 403);
 	}
 
 	var new_world_name = null;
 
 	var csrftoken = post_data.csrfmiddlewaretoken;
 	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
-		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
+		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	if(post_data.form == "add_member") {
@@ -295,7 +295,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		}
 
 		if(!adduser) {
-			return await dispage("accounts/configure", { message: "User not found" }, req, serve, vars, evars);
+			return await dispage("accounts/configure", { message: "User not found" }, req, write, server, ctx);
 		}
 
 		if(accountSystem == "uvias") {
@@ -307,23 +307,23 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		if(user_id == world.ownerId) {
 			return await dispage("accounts/configure", {
 				message: "User is already the owner of \"" + world_name + "\""
-			}, req, serve, vars, evars);
+			}, req, write, server, ctx);
 		}
 
 		var isWhitelisted = world.members.map[user_id];
 		if(isWhitelisted) {
 			return await dispage("accounts/configure", {
 				message: "User is already part of this world"
-			}, req, serve, vars, evars);
+			}, req, write, server, ctx);
 		}
 
 		if(await promoteMembershipByWorldName(world.name, user_id)) {
-			sendWorldStatusUpdate(vars, world.id, user_id, "isMember", true);
+			sendWorldStatusUpdate(server, world.id, user_id, "isMember", true);
 		}
 
 		return await dispage("accounts/configure", {
 			message: adduser.username + " is now a member of the \"" + world_name + "\" world"
-		}, req, serve, vars, evars);
+		}, req, write, server, ctx);
 	} else if(post_data.form == "access_perm") {
 		var readability = validatePerms(post_data.readability, 2);
 		var writability = validatePerms(post_data.writability, 2);
@@ -403,7 +403,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			}
 		}
 		if(revocationStatus && revocationStatus[0]) {
-			sendWorldStatusUpdate(vars, world.id, revokedId, "isMember", false);
+			sendWorldStatusUpdate(server, world.id, revokedId, "isMember", false);
 		}
 	} else if(post_data.form == "features") {
 		var go_to_coord = validatePerms(post_data.go_to_coord, 2);
@@ -730,7 +730,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			if(stat.error) {
 				return await dispage("accounts/configure", {
 					misc_message: stat.message
-				}, req, serve, vars, evars);
+				}, req, write, server, ctx);
 			} else if(stat.success) {
 				new_world_name = new_name;
 				var idUpdList = stat.list;
@@ -753,19 +753,19 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		if(msgResponseMisc.length) {
 			return await dispage("accounts/configure", {
 				misc_message: msgResponseMisc.join("<br>")
-			}, req, serve, vars, evars);
+			}, req, write, server, ctx);
 		}
 	} else if(post_data.form == "action") {
 		if("unclaim" in post_data) {
 			if(modifyWorldProp(world, "ownerId", null)) {
 				modifyWorldProp(world, "ownershipChangeDate", Date.now());
-				sendWorldStatusUpdate(vars, world.id, user.id, "isOwner", false);
+				sendWorldStatusUpdate(server, world.id, user.id, "isOwner", false);
 				var isMember = Boolean(world.members.map[user.id]);
 				if(!isMember) {
-					sendWorldStatusUpdate(vars, world.id, user.id, "isMember", false);
+					sendWorldStatusUpdate(server, world.id, user.id, "isMember", false);
 				}
 			}
-			return serve(null, null, {
+			return write(null, null, {
 				redirect: "/accounts/profile/"
 			});
 		} else if("clear_public" in post_data) {
@@ -788,11 +788,11 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	}
 
 	if(new_world_name == null) {
-		serve(null, null, {
+		write(null, null, {
 			redirect: url.parse(req.url).pathname
 		});
 	} else { // world name changed, redirect to new name
-		serve(null, null, {
+		write(null, null, {
 			redirect: "/accounts/configure/" + new_world_name + "/"
 		});
 	}

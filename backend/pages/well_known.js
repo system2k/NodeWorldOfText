@@ -12,16 +12,16 @@ function processPath(path) {
 	path = path.split("/");
 	for(var i = 0; i < path.length; i++) {
 		path[i] = path[i].trim();
-		if(path[i] == "") return serve("Invalid pathname", 400);
+		if(path[i] == "") return write("Invalid pathname", 400);
 	}
 	path.shift(); // remove ".well-known"
 
 	return path;
 }
 
-module.exports.GET = async function(req, serve, vars, evars) {
-	var path = evars.path;
-	var acme = vars.acme;
+module.exports.GET = async function(req, write, server, ctx) {
+	var path = ctx.path;
+	var acme = server.acme;
 
 	if(!acme.enabled) return -1;
 
@@ -32,23 +32,24 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	for(var i = 0; i < procPath.length; i++) {
 		var exist = currentObject.hasOwnProperty(procPath[i]);
 		if(!exist) {
-			return serve("File cannot be found", 404);
+			return write("File cannot be found", 404);
 		}
 		currentObject = currentObject[procPath[i]];
 	}
 
 	if(typeof currentObject != "string") {
-		return serve("Unknown object type", 400);
+		return write("Unknown object type", 400);
 	}
 
-	return serve(currentObject);
+	return write(currentObject);
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var cookies = evars.cookies;
-	var post_data = evars.post_data;
-	var path = evars.path;
-	var acme = vars.acme;
+module.exports.POST = async function(req, write, server, ctx) {
+	var cookies = ctx.cookies;
+	var post_data = ctx.post_data;
+	var path = ctx.path;
+
+	var acme = server.acme;
 
 	if(!acme.enabled) return;
 
@@ -64,13 +65,13 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	for(var i = 0; i < procPath.length; i++) {
 		var part = procPath[i];
 		if(currentObject[part] != void 0 && !currentObject.hasOwnProperty(part)) {
-			return serve("Invalid pathname", 400);
+			return write("Invalid pathname", 400);
 		}
 		var exist = currentObject.hasOwnProperty(part);
 		if(exist) {
 			if(typeof currentObject[part] != "object") {
 				// path segment is a file
-				return serve("Invalid pathname", 400);
+				return write("Invalid pathname", 400);
 			}
 			currentObject = currentObject[part];
 		} else {
@@ -79,14 +80,14 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	}
 
 	if(typeof currentObject != "object") {
-		return serve("Unknown object type", 400);
+		return write("Unknown object type", 400);
 	}
 	if(typeof currentObject[newFileName] == "object") {
-		return serve("Cannot overwrite directory", 400);
+		return write("Cannot overwrite directory", 400);
 	}
 
 	// add or overwrite file
 	currentObject[newFileName] = post_data.toString();
 
-	return serve("Added");
+	return write("Added");
 }

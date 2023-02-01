@@ -43,7 +43,6 @@ var removeLastSlash      = utils.removeLastSlash;
 var parseCookie          = utils.parseCookie;
 var ar_str_trim          = utils.ar_str_trim;
 var ar_str_decodeURI     = utils.ar_str_decodeURI;
-var filename_sanitize    = utils.filename_sanitize;
 var http_time            = utils.http_time;
 var encode_base64        = utils.encode_base64;
 var decode_base64        = utils.decode_base64;
@@ -1205,11 +1204,11 @@ var url_regexp = [ // regexp ; function/redirection ; options
 	dispatch page
 	usage: this is to be used in the page modules when
 	the module wants to dispatch a different page module.
-	EG: return dispage("404", { extra parameters for page }, req, serve, vars, evars, "POST")
-	EG: return dispage("accounts/login", { extra parameters for page }, req, serve, vars, evars)
-	(req, serve, and vars should already be defined by the parameters)
+	EG: return dispage("404", { extra parameters for page }, req, write, server, ctx, "POST")
+	EG: return dispage("accounts/login", { extra parameters for page }, req, write, server, ctx)
+	(req, write, and server should already be defined by the parameters)
 */
-async function dispage(page, params, req, serve, vars, evars, method) {
+async function dispage(page, params, req, write, server, ctx, method) {
 	if(!method || !valid_method(method)) {
 		method = "GET";
 	}
@@ -1217,15 +1216,15 @@ async function dispage(page, params, req, serve, vars, evars, method) {
 	if(!params) {
 		params = {};
 	}
-	if(!vars) {
-		vars = {};
+	if(!server) {
+		server = {};
 	}
 	var pageObj = pages;
 	page = page.split("/");
 	for(var i = 0; i < page.length; i++) {
 		pageObj = pageObj[page[i]];
 	}
-	await pageObj[method](req, serve, vars, evars, params);
+	await pageObj[method](req, write, server, ctx, params);
 }
 
 // transfer all values from one object to a main object containing all imports
@@ -1893,7 +1892,7 @@ async function process_request(req, res, compCallbacks) {
 					data.staticVersion = staticVersion;
 					return templates.execute(template, data);
 				}
-				var evars = { // request-specific variables
+				var ctx = { // request-specific variables
 					cookies,
 					post_data,
 					query_data,
@@ -1911,7 +1910,7 @@ async function process_request(req, res, compCallbacks) {
 				var pageStat;
 				if(pageRes[method] && valid_method(method)) {
 					// Return the page
-					pageStat = await pageRes[method](req, dispatch, global_data, evars, {});
+					pageStat = await pageRes[method](req, dispatch, global_data, ctx, {});
 				} else {
 					dispatch("Method " + method + " not allowed.", 405);
 				}
@@ -2280,9 +2279,6 @@ async function initialize_server_components() {
 	// initialize the subsystems (tile database; chat manager)
 	await sysLoad();
 
-	// initialize variables in page handlers
-	await initPages(pages);
-
 	// ping clients at a regular interval to ensure they dont disconnect constantly
 	initPingAuto();
 
@@ -2645,8 +2641,8 @@ async function manageWebsocketConnection(ws, req) {
 	var channel = new_token(7);
 	ws.sdata.channel = channel;
 
-	var vars = global_data;
-	var evars = {
+	var server = global_data;
+	var ctx = {
 		user, channel,
 		keyQuery: search.key,
 		world: null
@@ -2673,7 +2669,7 @@ async function manageWebsocketConnection(ws, req) {
 	ws.sdata.userClient = true; // client connection is now initialized
 	ws.sdata.keyQuery = search.key;
 	
-	evars.world = world;
+	ctx.world = world;
 
 	ws.sdata.world = world;
 	ws.sdata.user = user;
@@ -2800,7 +2796,7 @@ async function manageWebsocketConnection(ws, req) {
 		var res;
 		var resError = false;
 		try {
-			res = await websockets[kind](ws, msg, send, vars, objIncludes(evars, {
+			res = await websockets[kind](ws, msg, send, server, objIncludes(ctx, {
 				broadcast,
 				ws // to be passed on to modules
 			}));
@@ -2897,25 +2893,6 @@ async function sysLoad() {
 	for(var i in subsystems) {
 		var sys = subsystems[i];
 		await sys.main(global_data);
-	}
-}
-
-async function initPages(obj) {
-	// if page modules contain a startup function, run it
-	for(var i in obj) {
-		var mod = obj[i];
-		var isPage = false;
-		// is this a page, or an object containing keys to pages?
-		for(var x = 0; x < valid_methods.length; x++) {
-			var method = valid_methods[x];
-			if(mod[method]) {
-				isPage = true;
-				break;
-			}
-		}
-		if(!isPage) {
-			await initPages(mod);
-		}
 	}
 }
 

@@ -44,13 +44,13 @@ function partitionRectangle(rect) {
 	return res;
 }
 
-module.exports = async function(data, vars, params) {
+module.exports = async function(data, server, params) {
 	var world = params.world;
 
-	var memTileCache = vars.memTileCache;
-	var monitorEventSockets = vars.monitorEventSockets;
-	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
-	var tile_fetcher = vars.tile_fetcher;
+	var memTileCache = server.memTileCache;
+	var monitorEventSockets = server.monitorEventSockets;
+	var broadcastMonitorEvent = server.broadcastMonitorEvent;
+	var tile_fetcher = server.tile_fetcher;
 
 	var tiles = {};
 	var fetchRectLimit = 50;

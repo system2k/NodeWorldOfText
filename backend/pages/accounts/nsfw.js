@@ -1,9 +1,9 @@
 var utils = require("../../utils/utils.js");
 var checkURLParam = utils.checkURLParam;
 
-module.exports.GET = async function(req, serve, vars, evars) {
-	var path = evars.path;
-	var HTML = evars.HTML;
+module.exports.GET = async function(req, write, server, ctx) {
+	var path = ctx.path;
+	var HTML = ctx.HTML;
 
 
 	var world_name = checkURLParam("/accounts/nsfw/*world", path).world;
@@ -11,5 +11,5 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		world_name
 	};
 
-	serve(HTML("accounts_nsfw.html", data));
+	write(HTML("accounts_nsfw.html", data));
 }

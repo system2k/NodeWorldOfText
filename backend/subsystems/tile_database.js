@@ -40,15 +40,15 @@ var tileIterationTempMem = {};
 
 var tileCacheTimeLimit = 1000 * 60 * 1;
 
-module.exports.main = function(vars) {
-	db = vars.db;
-	db_edits = vars.db_edits;
-	handle_error = vars.handle_error;
-	intv = vars.intv;
-	wss = vars.wss;
-	memTileCache = vars.memTileCache;
-	broadcastMonitorEvent = vars.broadcastMonitorEvent;
-	wsSend = vars.wsSend;
+module.exports.main = function(server) {
+	db = server.db;
+	db_edits = server.db_edits;
+	handle_error = server.handle_error;
+	intv = server.intv;
+	wss = server.wss;
+	memTileCache = server.memTileCache;
+	broadcastMonitorEvent = server.broadcastMonitorEvent;
+	wsSend = server.wsSend;
 
 	databaseClock();
 	editLogClock();

@@ -36,24 +36,24 @@ var chat_ip_limits = {};
 var tell_blocks = {};
 var blocked_ips_by_world_id = {}; // id 0 = global
 
-module.exports = async function(ws, data, send, vars, evars) {
-	var broadcast = evars.broadcast; // broadcast to current world
-	var channel = evars.channel;
-	var user = evars.user;
-	var world = evars.world;
+module.exports = async function(ws, data, send, server, ctx) {
+	var broadcast = ctx.broadcast; // broadcast to current world
+	var channel = ctx.channel;
+	var user = ctx.user;
+	var world = ctx.world;
 
-	var db = vars.db;
-	var db_ch = vars.db_ch;
-	var ws_broadcast = vars.ws_broadcast; // site-wide broadcast
-	var chat_mgr = vars.chat_mgr;
-	var topActiveWorlds = vars.topActiveWorlds;
-	var wss = vars.wss;
-	var ranks_cache = vars.ranks_cache;
-	var accountSystem = vars.accountSystem;
-	var client_ips = vars.client_ips;
-	var wsSend = vars.wsSend;
-	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
-	var loadPlugin = vars.loadPlugin;
+	var db = server.db;
+	var db_ch = server.db_ch;
+	var ws_broadcast = server.ws_broadcast; // site-wide broadcast
+	var chat_mgr = server.chat_mgr;
+	var topActiveWorlds = server.topActiveWorlds;
+	var wss = server.wss;
+	var ranks_cache = server.ranks_cache;
+	var accountSystem = server.accountSystem;
+	var client_ips = server.client_ips;
+	var wsSend = server.wsSend;
+	var broadcastMonitorEvent = server.broadcastMonitorEvent;
+	var loadPlugin = server.loadPlugin;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
 	var remove_from_chatlog = chat_mgr.remove_from_chatlog;

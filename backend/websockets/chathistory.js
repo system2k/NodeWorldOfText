@@ -1,8 +1,8 @@
-module.exports = async function(ws, data, send, vars, evars) {
-	var user = evars.user;
-	var world = evars.world;
+module.exports = async function(ws, data, send, server, ctx) {
+	var user = ctx.user;
+	var world = ctx.world;
 
-	var chat_mgr = vars.chat_mgr;
+	var chat_mgr = server.chat_mgr;
 
 	var retrieveChatHistory = chat_mgr.retrieveChatHistory;
 

@@ -7,11 +7,11 @@ var broadcastMonitorEvent;
 
 var server_exiting = false;
 
-module.exports.main = async function(vars) {
-	intv = vars.intv;
-	handle_error = vars.handle_error;
-	db = vars.db;
-	broadcastMonitorEvent = vars.broadcastMonitorEvent;
+module.exports.main = async function(server) {
+	intv = server.intv;
+	handle_error = server.handle_error;
+	db = server.db;
+	broadcastMonitorEvent = server.broadcastMonitorEvent;
 
 	intv.worldCacheInvalidation = setInterval(function() {
 		invalidateWorldCache();

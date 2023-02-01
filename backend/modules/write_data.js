@@ -16,7 +16,7 @@ and send it off to the tile database module to be written.
 TODO: Split off client-side validation from the rest of this module.
 */
 
-module.exports = async function(data, vars, params) {
+module.exports = async function(data, server, params) {
 	var user = params.user;
 	var channel = params.channel;
 	var world = params.world;
@@ -35,12 +35,12 @@ module.exports = async function(data, vars, params) {
 		ipAddressFam = params.ipAddressFam;
 	}
 	
-	var tile_database = vars.tile_database;
-	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
-	var getRestrictions = vars.getRestrictions;
-	var checkCoalition = vars.checkCoalition;
-	var rate_limiter = vars.rate_limiter;
-	var monitorEventSockets = vars.monitorEventSockets;
+	var tile_database = server.tile_database;
+	var broadcastMonitorEvent = server.broadcastMonitorEvent;
+	var getRestrictions = server.getRestrictions;
+	var checkCoalition = server.checkCoalition;
+	var rate_limiter = server.rate_limiter;
+	var monitorEventSockets = server.monitorEventSockets;
 
 	var editReqLimit = 512;
 	var defaultCharRatePerSecond = 20480;

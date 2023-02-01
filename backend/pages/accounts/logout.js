@@ -2,13 +2,13 @@ var utils = require("../../utils/utils.js");
 var checkDuplicateCookie = utils.checkDuplicateCookie;
 var http_time = utils.http_time;
 
-module.exports.GET = async function(req, serve, vars, evars) {
-	var cookies = evars.cookies;
-	var query_data = evars.query_data;
+module.exports.GET = async function(req, write, server, ctx) {
+	var cookies = ctx.cookies;
+	var query_data = ctx.query_data;
 
-	var db = vars.db;
-	var accountSystem = vars.accountSystem;
-	var uvias = vars.uvias;
+	var db = server.db;
+	var accountSystem = server.accountSystem;
+	var uvias = server.uvias;
 	
 	var logoutReturn = query_data.return;
 	if(accountSystem == "uvias") {
@@ -37,12 +37,12 @@ module.exports.GET = async function(req, serve, vars, evars) {
 				logoutCookies.push("token=; expires=" + http_time(0) + "; path=/; domain=www.ourworldoftext.com; HttpOnly;");
 			}
 
-			return serve(null, null, {
+			return write(null, null, {
 				cookie: logoutCookies,
 				redirect: logoutReturn
 			});
 		}
-		return serve(null, null, {
+		return write(null, null, {
 			redirect: uvias.logoutPath
 		});
 	}
@@ -51,7 +51,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		await db.run("DELETE FROM auth_session WHERE session_key=?", cookies.sessionid);
 	}
 
-	serve(null, null, {
+	write(null, null, {
 		cookie: "sessionid=; expires=" + http_time(0) + "; path=/",
 		redirect: "/home/"
 	});

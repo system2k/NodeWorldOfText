@@ -1,10 +1,10 @@
-module.exports.GET = async function(req, serve, vars, evars) {
-	var HTML = evars.HTML;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx) {
+	var HTML = ctx.HTML;
+	var user = ctx.user;
 
 	if(!user.superuser) return;
 
-	var memTileCache = vars.memTileCache;
+	var memTileCache = server.memTileCache;
 
 	var tc_worlds = 0;
 	var tc_tiles = 0;
@@ -18,7 +18,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		}
 	}
 
-	serve(HTML("monitor.html", {
+	write(HTML("monitor.html", {
 		tc_worlds,
 		tc_tiles
 	}));

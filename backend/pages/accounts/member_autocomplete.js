@@ -6,23 +6,23 @@ function escape_control(str) {
 	return str;
 }
 
-module.exports.GET = async function(req, serve, vars, evars) {
-	var query_data = evars.query_data;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx) {
+	var query_data = ctx.query_data;
+	var user = ctx.user;
 
-	var db = vars.db;
-	var uvias = vars.uvias;
-	var accountSystem = vars.accountSystem;
+	var db = server.db;
+	var uvias = server.uvias;
+	var accountSystem = server.accountSystem;
 
-	if(!user.authenticated) return serve(null, 403);
+	if(!user.authenticated) return write(null, 403);
 
 	var input = query_data.q;
 
 	if(!input) input = "";
 	input += "";
 	input = input.trim();
-	if(!input) return serve("");
-	if(input.length < 4) return serve("");
+	if(!input) return write("");
+	if(input.length < 4) return write("");
 
 	var list;
 	if(accountSystem == "uvias") {
@@ -35,5 +35,5 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	for(var i = 0; i < list.length; i++){
 		users.push(list[i].username);
 	}
-	serve(users.join("\n"));
+	write(users.join("\n"));
 }

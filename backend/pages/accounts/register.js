@@ -1,14 +1,14 @@
 var emailFormatRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var HTML = evars.HTML;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var HTML = ctx.HTML;
+	var user = ctx.user;
 
-	var accountSystem = vars.accountSystem;
-	var uvias = vars.uvias;
+	var accountSystem = server.accountSystem;
+	var uvias = server.uvias;
 	
 	if(accountSystem == "uvias") {
-		return serve(null, null, {
+		return write(null, null, {
 			redirect: uvias.registerPath
 		});
 	}
@@ -26,25 +26,25 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		password1: params.password
 	};
 
-	serve(HTML("registration/registration_form.html", data));
+	write(HTML("registration/registration_form.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var user = evars.user;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var user = ctx.user;
 
-	var db = vars.db;
-	var dispage = vars.dispage;
-	var encryptHash = vars.encryptHash;
-	var testEmailAddress = vars.testEmailAddress;
-	var accountSystem = vars.accountSystem;
+	var db = server.db;
+	var dispage = server.dispage;
+	var encryptHash = server.encryptHash;
+	var testEmailAddress = server.testEmailAddress;
+	var accountSystem = server.accountSystem;
 	
 	if(accountSystem == "uvias") {
 		return;
 	}
 
 	if(post_data.csrfmiddlewaretoken != user.csrftoken) { // csrftokens not matching?
-		return serve();
+		return write();
 	}
 
 	if(typeof post_data.username != "string") post_data.username = "";
@@ -112,7 +112,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			 username: form_username_errors.length > 0 ? "" : username,
 			 email: form_email_errors.length > 0 ? "" : email,
 			 password: form_password1_errors.length > 0 ? "" : password1
-		 }, req, serve, vars, evars);
+		 }, req, write, server, ctx);
 	}
 
 	var date = Date.now();
@@ -128,5 +128,5 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		username: username,
 		password: password1,
 		registered: true
-	}, req, serve, vars, evars, "POST");
+	}, req, write, server, ctx, "POST");
 }

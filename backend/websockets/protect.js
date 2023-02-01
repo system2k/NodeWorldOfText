@@ -1,5 +1,5 @@
-module.exports = async function(ws, data, send, vars, evars) {
-	var modules = vars.modules;
+module.exports = async function(ws, data, send, server, ctx) {
+	var modules = server.modules;
 
 	var sData = data.data;
 	if(!sData) return;
@@ -18,5 +18,5 @@ module.exports = async function(ws, data, send, vars, evars) {
 		charX, charY,
 		precise,
 		type
-	}, vars, evars);
+	}, server, ctx);
 }

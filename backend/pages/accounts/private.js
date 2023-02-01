@@ -1,6 +1,6 @@
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var HTML = evars.HTML;
-	serve(HTML("private.html", {
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var HTML = ctx.HTML;
+	write(HTML("private.html", {
 		privateWorldMsg: params.privateWorldMsg
 	}), 403);
 }

@@ -4,16 +4,16 @@ var getOrCreateWorld = world_mgr.getOrCreateWorld;
 var canViewWorld = world_mgr.canViewWorld;
 
 // both url links and coordinate links
-module.exports.POST = async function(req, serve, vars, evars, params) {
-	var post_data = evars.post_data;
-	var user = evars.user;
-	var setCallback = evars.setCallback;
+module.exports.POST = async function(req, write, server, ctx, params) {
+	var post_data = ctx.post_data;
+	var user = ctx.user;
+	var setCallback = ctx.setCallback;
 
-	var modules = vars.modules;
+	var modules = server.modules;
 
 	var world = await getOrCreateWorld(post_data.world);
 	if(!world) {
-		return serve(null, 404);
+		return write(null, 404);
 	}
 
 	setCallback(function() {
@@ -22,7 +22,7 @@ module.exports.POST = async function(req, serve, vars, evars, params) {
 
 	var can_read = await canViewWorld(world, user);
 	if(!can_read) {
-		return serve(null, 403);
+		return write(null, 403);
 	}
 
 	var type = "url";
@@ -30,7 +30,7 @@ module.exports.POST = async function(req, serve, vars, evars, params) {
 		type = "coord";
 	}
 
-	evars.world = world;
+	ctx.world = world;
 
 	var do_link = await modules.write_links({
 		type: type,
@@ -41,19 +41,19 @@ module.exports.POST = async function(req, serve, vars, evars, params) {
 		url: post_data.url,
 		link_tileX: post_data.link_tileX,
 		link_tileY: post_data.link_tileY
-	}, vars, evars);
+	}, server, ctx);
 
 	if(do_link[0]) {
 		var msg = do_link[1];
 		if(msg == "PERM") {
-			return serve("No permission", 403);
+			return write("No permission", 403);
 		} else if(msg == "PARAM") {
-			return serve("Invalid parameters", 400);
+			return write("Invalid parameters", 400);
 		} else {
-			return serve("Undefined error", 400);
+			return write("Undefined error", 400);
 		}
 	} else {
-		serve(null, null, {
+		write(null, null, {
 			mime: "text/html; charset=utf-8"
 		});
 	}

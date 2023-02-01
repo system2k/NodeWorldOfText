@@ -1,6 +1,5 @@
 var utils = require("../../utils/utils.js");
 var checkURLParam = utils.checkURLParam;
-var filename_sanitize = utils.filename_sanitize;
 
 var world_mgr = require("../../subsystems/world_mgr.js");
 var releaseWorld = world_mgr.releaseWorld;
@@ -27,19 +26,26 @@ async function iterateWorld(db, worldId, onTile) {
 	}
 }
 
-module.exports.GET = async function(req, serve, vars, evars) {
-	var path = evars.path;
-	var user = evars.user;
-	var setCallback = evars.setCallback;
+function sanitize_world_filename(input) {
+	var rSlash = /\\/g;
+	var rIllegal = /[\/\?<>\\:\*\|":]/g;
+	var rControl = /[\x00-\x1f\x80-\x9f]/g;
+	return input.replace(rSlash, "$").replace(rIllegal, "_").replace(rControl, "_");
+}
 
-	var dispage = vars.dispage;
-	var db = vars.db;
+module.exports.GET = async function(req, write, server, ctx) {
+	var path = ctx.path;
+	var user = ctx.user;
+	var setCallback = ctx.setCallback;
+
+	var dispage = server.dispage;
+	var db = server.db;
 
 	var world_name = checkURLParam("/accounts/download/*world", path).world;
 
 	var world = await getOrCreateWorld(world_name);
 	if(!world) {
-		return await dispage("404", null, req, serve, vars, evars);
+		return await dispage("404", null, req, write, server, ctx);
 	}
 
 	setCallback(function() {
@@ -49,15 +55,15 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	// not a superuser nor owner
 	var is_owner = world.ownerId == user.id;
 	if(!(user.superuser || is_owner)) {
-		return await dispage("404", null, req, serve, vars, evars);
+		return await dispage("404", null, req, write, server, ctx);
 	}
 
-	serve.startStream();
+	write.startStream();
 
 	// set up headers
-	serve(null, null, {
-		mime: "application/force-download; charset=utf-8",
-		download_file: filename_sanitize("World_" + world_name + ".json")
+	write(null, null, {
+		mime: "application/json; charset=utf-8",
+		download_file: "World_" + sanitize_world_filename(world_name) + ".json"
 	});
 
 	var firstTile = true;
@@ -72,12 +78,12 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		});
 		if(!firstTile) data = "," + data;
 		firstTile = false;
-		if(await serve.writeStream(data)) return -1; // aborted
+		if(await write.writeStream(data)) return -1; // aborted
 	}
 
-	if(await serve.writeStream("[")) return;
+	if(await write.writeStream("[")) return;
 	await iterateWorld(db, world.id, procTile);
-	if(await serve.writeStream("]")) return;
+	if(await write.writeStream("]")) return;
 
-	serve.endStream();
+	write.endStream();
 }

@@ -4,23 +4,23 @@ var mime = require("../utils/mime.js");
 var utils = require("../utils/utils.js");
 var removeLastSlash = utils.removeLastSlash;
 
-module.exports.GET = async function(req, serve, vars, evars) {
-	var query_data = evars.query_data;
-	var HTML = evars.HTML;
+module.exports.GET = async function(req, write, server, ctx) {
+	var query_data = ctx.query_data;
+	var HTML = ctx.HTML;
 
-	var static_data = vars.static_data;
-	var staticShortcuts = vars.staticShortcuts;
+	var static_data = server.static_data;
+	var staticShortcuts = server.staticShortcuts;
 
 	var file = query_data.file;
 	if(file) {
 		file = parseFloat(file, 10);
-		if(isNaN(file) || !Number.isInteger(file)) return serve(null, 404);
+		if(isNaN(file) || !Number.isInteger(file)) return write(null, 404);
 		if(staticShortcuts.hasOwnProperty(file)) {
-			return serve(null, null, {
+			return write(null, null, {
 				redirect: "/static/files/" + staticShortcuts[file]
 			});
 		}
-		return serve(null, 404);
+		return write(null, 404);
 	}
 
 	var parse = url.parse(req.url).pathname.substr(1);
@@ -31,7 +31,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	parse = removeLastSlash(parse).toLowerCase();
 	var mime_type = mime(parse.replace(/.*[\.\/\\]/, "").toLowerCase());
 	if(static_data.hasOwnProperty(parse)) {
-		serve(static_data[parse], 200, { mime: mime_type });
+		write(static_data[parse], 200, { mime: mime_type });
 	} else {
 		return;
 	}

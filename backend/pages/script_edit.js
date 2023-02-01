@@ -1,18 +1,18 @@
 var utils = require("../utils/utils.js");
 var checkURLParam = utils.checkURLParam;
 
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var path = evars.path;
-	var HTML = evars.HTML;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var path = ctx.path;
+	var HTML = ctx.HTML;
+	var user = ctx.user;
 
-	var dispage = vars.dispage;
-	var db = vars.db;
-	var createCSRF = vars.createCSRF;
+	var dispage = server.dispage;
+	var db = server.db;
+	var createCSRF = server.createCSRF;
 
 	// not staff
 	if(!user.staff) {
-		return await dispage("404", null, req, serve, vars, evars);
+		return await dispage("404", null, req, write, server, ctx);
 	}
 
 	var script_name = checkURLParam("/script_manager/edit/:script", path).script;
@@ -34,17 +34,17 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		csrftoken
 	};
 
-	serve(HTML("script_edit.html", data));
+	write(HTML("script_edit.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var path = evars.path;
-	var user = evars.user;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var path = ctx.path;
+	var user = ctx.user;
 
-	var db = vars.db;
-	var dispage = vars.dispage;
-	var checkCSRF = vars.checkCSRF;
+	var db = server.db;
+	var dispage = server.dispage;
+	var checkCSRF = server.checkCSRF;
 
 	if(!user.staff) {
 		return;
@@ -52,7 +52,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var csrftoken = post_data.csrfmiddlewaretoken;
 	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
-		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
+		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	var script_name = checkURLParam("/script_manager/edit/:script", path).script;
@@ -91,11 +91,11 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			[!!post_data.enabled, user.id, script_name]);
 	}
 	if(title_changed) {
-		serve(null, null, {
+		write(null, null, {
 			redirect: "/script_manager/edit/" + new_title + "/"
 		});
 	}
 	return await dispage("script_edit", {
 		message
-	}, req, serve, vars, evars);
+	}, req, write, server, ctx);
 }

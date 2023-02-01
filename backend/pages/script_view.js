@@ -1,16 +1,16 @@
 var utils = require("../utils/utils.js");
 var checkURLParam = utils.checkURLParam;
 
-module.exports.GET = async function(req, serve, vars, evars) {
-	var path = evars.path;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx) {
+	var path = ctx.path;
+	var user = ctx.user;
 
-	var dispage = vars.dispage;
-	var db = vars.db;
+	var dispage = server.dispage;
+	var db = server.db;
 
 	// not staff
 	if(!user.staff) {
-		return serve();
+		return write();
 	}
 
 	var script_name = checkURLParam("/script_manager/view/:script", path).script;
@@ -19,8 +19,8 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		[user.id, script_name]);
 	
 	if(!script) {
-		return serve();
+		return write();
 	}
 
-	serve(script.content);
+	write(script.content);
 }

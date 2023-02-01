@@ -3,12 +3,12 @@ var intv;
 var handle_error;
 var db;
 var broadcastMonitorEvent;
-module.exports.main = async function(vars) {
-	db_ch = vars.db_ch;
-	intv = vars.intv;
-	handle_error = vars.handle_error;
-	db = vars.db;
-	broadcastMonitorEvent = vars.broadcastMonitorEvent;
+module.exports.main = async function(server) {
+	db_ch = server.db_ch;
+	intv = server.intv;
+	handle_error = server.handle_error;
+	db = server.db;
+	broadcastMonitorEvent = server.broadcastMonitorEvent;
 
 	await init_chat_history();
 
@@ -38,14 +38,12 @@ async function init_chat_history() {
 		await db_ch.run("CREATE TABLE default_channels (channel_id integer, world_id integer)");
 		await db_ch.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
 			["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0]);
-		// TODO: we must add the following indices:
-		/*
-		CREATE INDEX "chan_default" ON default_channels (world_id, channel_id);
-		CREATE INDEX "chan_id" ON channels (world_id, id);
-		CREATE INDEX "ent_id" ON entries (channel, id DESC);
-		CREATE INDEX "ent_date" ON entries (channel, date);
-		CREATE INDEX "ent_channel" ON entries (channel);
-		*/
+		// add important indices
+		await db_ch.run("CREATE INDEX chan_default ON default_channels (world_id, channel_id)");
+		await db_ch.run("CREATE INDEX chan_id ON channels (world_id, id)");
+		await db_ch.run("CREATE INDEX ent_id ON entries (channel, id DESC)");
+		await db_ch.run("CREATE INDEX ent_date ON entries (channel, date)");
+		await db_ch.run("CREATE INDEX ent_channel ON entries (channel)");
 	}
 	chatDatabaseClock();
 }
@@ -279,7 +277,7 @@ async function doUpdateChatLogData() {
 		var row = copy_global_chat_additions[i];
 		var data = row[0];
 		var date = row[2];
-		var global_channel = (await db_ch.get("SELECT id FROM channels WHERE name='global'")).id;
+		var global_channel = (await db_ch.get("SELECT id FROM channels WHERE name='global'")).id; // XXX
 		var cent = await db_ch.run("INSERT INTO entries VALUES(null, ?, ?, ?)",
 			[date, global_channel, JSON.stringify(data)]);
 	}

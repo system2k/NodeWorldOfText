@@ -1,17 +1,17 @@
 var utils = require("../../utils/utils.js");
 var http_time = utils.http_time;
 
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var cookies = evars.cookies;
-	var HTML = evars.HTML;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var cookies = ctx.cookies;
+	var HTML = ctx.HTML;
 
-	var db = vars.db;
-	var new_token = vars.new_token;
-	var accountSystem = vars.accountSystem;
-	var uvias = vars.uvias;
+	var db = server.db;
+	var new_token = server.new_token;
+	var accountSystem = server.accountSystem;
+	var uvias = server.uvias;
 	
 	if(accountSystem == "uvias") {
-		return serve(null, null, {
+		return write(null, null, {
 			redirect: uvias.loginPath
 		});
 	}
@@ -23,22 +23,22 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		username: params.username
 	};
 
-	serve(HTML("registration/login.html", data));
+	write(HTML("registration/login.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, evars, params) {
-	var cookies = evars.cookies;
-	var post_data = evars.post_data;
-	var referer = evars.referer;
+module.exports.POST = async function(req, write, server, ctx, params) {
+	var cookies = ctx.cookies;
+	var post_data = ctx.post_data;
+	var referer = ctx.referer;
 
-	var db = vars.db;
-	var checkHash = vars.checkHash;
-	var new_token = vars.new_token;
-	var ms = vars.ms;
-	var querystring = vars.querystring;
-	var url = vars.url;
-	var dispage = vars.dispage;
-	var accountSystem = vars.accountSystem;
+	var db = server.db;
+	var checkHash = server.checkHash;
+	var new_token = server.new_token;
+	var ms = server.ms;
+	var querystring = server.querystring;
+	var url = server.url;
+	var dispage = server.dispage;
+	var accountSystem = server.accountSystem;
 	
 	if(accountSystem == "uvias") return;
 
@@ -51,11 +51,11 @@ module.exports.POST = async function(req, serve, vars, evars, params) {
 
 	var loginuser = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
 	if(!loginuser) {
-		return await dispage("accounts/login", {errors: true, username}, req, serve, vars, evars);
+		return await dispage("accounts/login", {errors: true, username}, req, write, server, ctx);
 	}
 	var valid = checkHash(loginuser.password, password);
 	if(!valid) { // wrong password
-		return await dispage("accounts/login", {errors: true, username}, req, serve, vars, evars);
+		return await dispage("accounts/login", {errors: true, username}, req, write, server, ctx);
 	}
 
 	var date_now = Date.now();
@@ -81,7 +81,7 @@ module.exports.POST = async function(req, serve, vars, evars, params) {
 		next = check_next.next;
 	}
 
-	serve(null, null, {
+	write(null, null, {
 		cookie: new_cookie,
 		redirect: next
 	});

@@ -1,13 +1,13 @@
-module.exports.GET = async function(req, serve, vars, evars) {
-	var HTML = evars.HTML;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx) {
+	var HTML = ctx.HTML;
+	var user = ctx.user;
 
-	var loadShellFile = vars.loadShellFile;
-	var shellEnabled = vars.shellEnabled;
-	var createCSRF = vars.createCSRF;
+	var loadShellFile = server.loadShellFile;
+	var shellEnabled = server.shellEnabled;
+	var createCSRF = server.createCSRF;
 
 	if(!user.superuser) return;
-	if(!shellEnabled) return serve("Shell is not enabled");
+	if(!shellEnabled) return write("Shell is not enabled");
 
 	/*
 	shell.js template:
@@ -17,14 +17,14 @@ module.exports.GET = async function(req, serve, vars, evars) {
 	}
 	*/
 
-	var query_data = evars.query_data;
+	var query_data = ctx.query_data;
 
 	if(query_data.command == "load") {
 		var data = loadShellFile();
 		if(data) {
-			return serve(data);
+			return write(data);
 		} else {
-			return serve(null, 404);
+			return write(null, 404);
 		}
 	}
 
@@ -34,29 +34,29 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		csrftoken
 	};
 
-	serve(HTML("administrator_shell.html", data));
+	write(HTML("administrator_shell.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var user = evars.user;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var user = ctx.user;
 
-	var runShellScript = vars.runShellScript;
-	var shellEnabled = vars.shellEnabled;
-	var checkCSRF = vars.checkCSRF;
+	var runShellScript = server.runShellScript;
+	var shellEnabled = server.shellEnabled;
+	var checkCSRF = server.checkCSRF;
 
 	if(!user.superuser) return;
-	if(!shellEnabled) return serve("Shell is not enabled");
+	if(!shellEnabled) return write("Shell is not enabled");
 
 	var csrftoken = post_data.csrfmiddlewaretoken;
 	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
-		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
+		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	if(post_data.command == "exec") {
 		var result = await runShellScript(post_data.colors === "true");
-		return serve(result);
+		return write(result);
 	} else {
-		return serve(null, 400);
+		return write(null, 400);
 	}
 }

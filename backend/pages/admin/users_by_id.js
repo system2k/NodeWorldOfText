@@ -1,19 +1,19 @@
 var utils = require("../../utils/utils.js");
 var checkURLParam = utils.checkURLParam;
 
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var path = evars.path;
-	var HTML = evars.HTML;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var path = ctx.path;
+	var HTML = ctx.HTML;
+	var user = ctx.user;
 
-	var db = vars.db;
-	var dispage = vars.dispage;
-	var uvias = vars.uvias;
-	var db_misc = vars.db_misc;
-	var accountSystem = vars.accountSystem;
+	var db = server.db;
+	var dispage = server.dispage;
+	var uvias = server.uvias;
+	var db_misc = server.db_misc;
+	var accountSystem = server.accountSystem;
 
 	if(!user.superuser) {
-		return await dispage("404", null, req, serve, vars, evars);
+		return await dispage("404", null, req, write, server, ctx);
 	}
 
 	var user_id = checkURLParam("/administrator/users/by_id/:id", path).id;
@@ -78,5 +78,5 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		display_name: user_info.display_name
 	};
 
-	serve(HTML("administrator_users_template.html", data));
+	write(HTML("administrator_users_template.html", data));
 }

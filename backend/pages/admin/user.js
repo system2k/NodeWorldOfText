@@ -1,20 +1,20 @@
 var utils = require("../../utils/utils.js");
 var checkURLParam = utils.checkURLParam;
 
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var path = evars.path;
-	var HTML = evars.HTML;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var path = ctx.path;
+	var HTML = ctx.HTML;
+	var user = ctx.user;
 
-	var db = vars.db;
-	var dispage = vars.dispage;
-	var db_misc = vars.db_misc;
-	var uvias = vars.uvias;
-	var accountSystem = vars.accountSystem;
-	var createCSRF = vars.createCSRF;
+	var db = server.db;
+	var dispage = server.dispage;
+	var db_misc = server.db_misc;
+	var uvias = server.uvias;
+	var accountSystem = server.accountSystem;
+	var createCSRF = server.createCSRF;
 
 	if(!user.operator) {
-		return await dispage("404", null, req, serve, vars, evars);
+		return await dispage("404", null, req, write, server, ctx);
 	}
 
 	var username = checkURLParam("/administrator/user/:username", path).username;
@@ -23,7 +23,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	if(accountSystem == "uvias") {
 		var db_user = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
 		if(!db_user) {
-			return await dispage("404", null, req, serve, vars, evars);
+			return await dispage("404", null, req, write, server, ctx);
 		}
 		var uid = db_user.uid;
 		uid = "x" + uid;
@@ -40,7 +40,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	} else if(accountSystem == "local") {
 		user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
 		if(!user_edit) {
-			return await dispage("404", null, req, serve, vars, evars);
+			return await dispage("404", null, req, write, server, ctx);
 		}
 	}
 
@@ -52,22 +52,22 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		csrftoken
 	};
 
-	serve(HTML("administrator_user.html", data));
+	write(HTML("administrator_user.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var path = evars.path;
-	var user = evars.user;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var path = ctx.path;
+	var user = ctx.user;
 
-	var db = vars.db;
-	var db_edits = vars.db_edits;
-	var dispage = vars.dispage;
-	var url = vars.url;
-	var uvias = vars.uvias;
-	var db_misc = vars.db_misc;
-	var accountSystem = vars.accountSystem;
-	var checkCSRF = vars.checkCSRF;
+	var db = server.db;
+	var db_edits = server.db_edits;
+	var dispage = server.dispage;
+	var url = server.url;
+	var uvias = server.uvias;
+	var db_misc = server.db_misc;
+	var accountSystem = server.accountSystem;
+	var checkCSRF = server.checkCSRF;
 
 	if(!user.operator) {
 		return;
@@ -75,7 +75,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var csrftoken = post_data.csrfmiddlewaretoken;
 	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
-		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
+		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	var username = checkURLParam("/administrator/user/:username", path).username;
@@ -104,7 +104,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	if(user_edit.id == user.id) {
 		return await dispage("admin/user", {
 			message: "You cannot set your own rank"
-		}, req, serve, vars, evars);
+		}, req, write, server, ctx);
 	}
 
 	if(post_data.form == "rank") {
@@ -139,14 +139,14 @@ module.exports.POST = async function(req, serve, vars, evars) {
 					rank: rank
 				})]);
 		} else {
-			return serve("Invalid rank");
+			return write("Invalid rank");
 		}
 		return await dispage("admin/user", {
 			message: "Successfully set " + user_edit.username + "'s rank to " + ["Default", "Staff", "Superuser", "Operator"][rank]
-		}, req, serve, vars, evars);
+		}, req, write, server, ctx);
 	}
 
-	serve(null, null, {
+	write(null, null, {
 		redirect: url.parse(req.url).pathname
 	});
 }

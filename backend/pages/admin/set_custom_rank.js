@@ -2,20 +2,20 @@ var utils = require("../../utils/utils.js");
 var checkURLParam = utils.checkURLParam;
 var san_nbr = utils.san_nbr;
 
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var path = evars.path;
-	var HTML = evars.HTML;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var path = ctx.path;
+	var HTML = ctx.HTML;
+	var user = ctx.user;
 
-	var db = vars.db;
-	var dispage = vars.dispage;
-	var ranks_cache = vars.ranks_cache;
-	var uvias = vars.uvias;
-	var accountSystem = vars.accountSystem;
-	var createCSRF = vars.createCSRF;
+	var db = server.db;
+	var dispage = server.dispage;
+	var ranks_cache = server.ranks_cache;
+	var uvias = server.uvias;
+	var accountSystem = server.accountSystem;
+	var createCSRF = server.createCSRF;
 
 	if(!user.superuser) {
-		return await dispage("404", null, req, serve, vars, evars);
+		return await dispage("404", null, req, write, server, ctx);
 	}
 
 	var username = checkURLParam("/administrator/set_custom_rank/:username", path).username;
@@ -24,7 +24,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	if(accountSystem == "uvias") {
 		var duser = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
 		if(!duser) {
-			return await dispage("404", null, req, serve, vars, evars);
+			return await dispage("404", null, req, write, server, ctx);
 		}
 		user_edit = {
 			id: "x" + duser.uid,
@@ -33,7 +33,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 	} else if(accountSystem == "local") {
 		user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
 		if(!user_edit) {
-			return await dispage("404", null, req, serve, vars, evars);
+			return await dispage("404", null, req, write, server, ctx);
 		}
 	}
 
@@ -62,22 +62,22 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		csrftoken
 	};
 
-	serve(HTML("administrator_set_custom_rank.html", data));
+	write(HTML("administrator_set_custom_rank.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var path = evars.path;
-	var user = evars.user;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var path = ctx.path;
+	var user = ctx.user;
 
-	var db = vars.db;
-	var dispage = vars.dispage;
-	var url = vars.url;
-	var ranks_cache = vars.ranks_cache;
-	var db_misc = vars.db_misc;
-	var uvias = vars.uvias;
-	var accountSystem = vars.accountSystem;
-	var checkCSRF = vars.checkCSRF;
+	var db = server.db;
+	var dispage = server.dispage;
+	var url = server.url;
+	var ranks_cache = server.ranks_cache;
+	var db_misc = server.db_misc;
+	var uvias = server.uvias;
+	var accountSystem = server.accountSystem;
+	var checkCSRF = server.checkCSRF;
 
 	if(!user.superuser) {
 		return;
@@ -85,7 +85,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var csrftoken = post_data.csrfmiddlewaretoken;
 	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
-		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
+		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	var username = checkURLParam("/administrator/set_custom_rank/:username", path).username;
@@ -137,5 +137,5 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	return await dispage("admin/set_custom_rank", {
 		message: "Successfully set " + user_edit.username + "'s rank to " + rankName
-	}, req, serve, vars, evars);
+	}, req, write, server, ctx);
 }

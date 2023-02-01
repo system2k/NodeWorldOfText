@@ -9,17 +9,17 @@ function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
 
-module.exports = async function(data, vars, params) {
+module.exports = async function(data, server, params) {
 	var user = params.user;
 	var channel = params.channel;
 	var world = params.world;
 
-	var tile_database = vars.tile_database;
-	var monitorEventSockets = vars.monitorEventSockets;
-	var broadcastMonitorEvent = vars.broadcastMonitorEvent;
-	var getRestrictions = vars.getRestrictions;
-	var checkCoalition = vars.checkCoalition;
-	var rate_limiter = vars.rate_limiter;
+	var tile_database = server.tile_database;
+	var monitorEventSockets = server.monitorEventSockets;
+	var broadcastMonitorEvent = server.broadcastMonitorEvent;
+	var getRestrictions = server.getRestrictions;
+	var checkCoalition = server.checkCoalition;
+	var rate_limiter = server.rate_limiter;
 
 	var memkeyAccess = world.opts.memKey && world.opts.memKey == params.keyQuery;
 

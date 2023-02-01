@@ -5,16 +5,16 @@ function searchRankLevel(rankCache, level) {
 	return false;
 }
 
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var HTML = evars.HTML;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var HTML = ctx.HTML;
+	var user = ctx.user;
 
-	var dispage = vars.dispage;
-	var ranks_cache = vars.ranks_cache;
-	var createCSRF = vars.createCSRF;
+	var dispage = server.dispage;
+	var ranks_cache = server.ranks_cache;
+	var createCSRF = server.createCSRF;
 
 	if(!user.superuser) {
-		return await dispage("404", null, req, serve, vars, evars);
+		return await dispage("404", null, req, write, server, ctx);
 	}
 
 	var rankCount = ranks_cache.count;
@@ -40,22 +40,22 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		csrftoken
 	};
 
-	serve(HTML("administrator_manage_ranks.html", data));
+	write(HTML("administrator_manage_ranks.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var user = evars.user;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var user = ctx.user;
 
-	var db_misc = vars.db_misc;
-	var ranks_cache = vars.ranks_cache;
-	var checkCSRF = vars.checkCSRF;
+	var db_misc = server.db_misc;
+	var ranks_cache = server.ranks_cache;
+	var checkCSRF = server.checkCSRF;
 
 	if(!user.superuser) return;
 
 	var csrftoken = req.headers["x-csrf-token"];
 	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
-		return serve("CSRF verification failed");
+		return write("CSRF verification failed");
 	}
 
 	var action = post_data.action;
@@ -66,26 +66,26 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 		var ids = ranks_cache.ids;
 
-		if(!Array.isArray(order)) return serve("PARAM");
-		if(order.length != ids.length) return serve("ORDER_RACE");
+		if(!Array.isArray(order)) return write("PARAM");
+		if(order.length != ids.length) return write("ORDER_RACE");
 		var orderParamTotal = 0;
 		// check if the id array from the client doesn't contain all of the ids,
 		// or contains multiple instances of the same id.
 		for(var i = 0; i < order.length; i++) {
 			var elm = order[i];
 			var pos = ids.indexOf(elm);
-			if(pos == -1) return serve("ORDER_RACE");
+			if(pos == -1) return write("ORDER_RACE");
 			if(pos > -1) orderParamTotal++;
 		}
 		if(orderParamTotal != order.length) {
-			return serve("ORDER_RACE");
+			return write("ORDER_RACE");
 		}
 
 		for(var i = 0; i < ids.length; i++) {
 			var id = ids[i];
-			if(!ranks[id]) serve("ORDER_RACE");
-			if(typeof ranks[id] != "object") return serve("PARAM");
-			if(Array.isArray(ranks[id])) return serve("PARAM");
+			if(!ranks[id]) write("ORDER_RACE");
+			if(typeof ranks[id] != "object") return write("PARAM");
+			if(Array.isArray(ranks[id])) return write("PARAM");
 		}
 		for(var i = 0; i < ids.length; i++) {
 			var id = ids[i];
@@ -108,20 +108,20 @@ module.exports.POST = async function(req, serve, vars, evars) {
 			await db_misc.run("UPDATE ranks SET level=? WHERE id=?", [i + 4, ord_id]);
 		}
 
-		return serve("SUCCESS");
+		return write("SUCCESS");
 
 	} else if(action == "add") {
 		var name = post_data.name;
 		var cc = post_data.cc;
 
 		var newId = await db_misc.get("SELECT value FROM properties WHERE key=?", "max_rank_id");
-		if(!newId) return serve("CRITICAL");
+		if(!newId) return write("CRITICAL");
 		newId = newId.value;
 
 		await db_misc.run("UPDATE properties SET value=? WHERE key=?", [newId + 1, "max_rank_id"]);
 
 		var newLevel = await db_misc.get("SELECT value FROM properties WHERE key=?", "rank_next_level");
-		if(!newLevel) return serve("CRITICAL");
+		if(!newLevel) return write("CRITICAL");
 		newLevel = newLevel.value;
 
 		await db_misc.run("UPDATE properties SET value=? WHERE key=?", [newLevel + 1, "rank_next_level"]);
@@ -140,8 +140,8 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		ranks_cache.count++;
 		ranks_cache.ids.push(newId);
 
-		return serve("SUCCESS");
+		return write("SUCCESS");
 	}
 
-	serve("ACTION");
+	write("ACTION");
 }

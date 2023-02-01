@@ -1,8 +1,8 @@
-module.exports = async function(ws, data, send, vars, evars) {
-	var tiles = await vars.modules.fetch_tiles(data, vars, {
-		world: evars.world,
-		ws: evars.ws,
-		channel: evars.channel
+module.exports = async function(ws, data, send, server, ctx) {
+	var tiles = await server.modules.fetch_tiles(data, server, {
+		world: ctx.world,
+		ws: ctx.ws,
+		channel: ctx.channel
 	});
 	// socket error
 	if(tiles === null) {

@@ -1,14 +1,14 @@
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var HTML = evars.HTML;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var HTML = ctx.HTML;
+	var user = ctx.user;
 
-	var dispage = vars.dispage;
-	var db = vars.db;
-	var createCSRF = vars.createCSRF;
+	var dispage = server.dispage;
+	var db = server.db;
+	var createCSRF = server.createCSRF;
 
 	// not staff
 	if(!user.staff) {
-		return await dispage("404", null, req, serve, vars, evars);
+		return await dispage("404", null, req, write, server, ctx);
 	}
 
 	var scripts = [];
@@ -28,16 +28,16 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		csrftoken
 	}
 
-	serve(HTML("script_manager.html", data));
+	write(HTML("script_manager.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var user = evars.user;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var user = ctx.user;
 
-	var db = vars.db;
-	var dispage = vars.dispage;
-	var checkCSRF = vars.checkCSRF;
+	var db = server.db;
+	var dispage = server.dispage;
+	var checkCSRF = server.checkCSRF;
 
 	if(!user.staff) {
 		return;
@@ -45,7 +45,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var csrftoken = post_data.csrfmiddlewaretoken;
 	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
-		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
+		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	var name = post_data.scriptname;
@@ -56,7 +56,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	if(exists) {
 		return await dispage("script_manager", {
 			message: "The script already exists"
-		}, req, serve, vars, evars);
+		}, req, write, server, ctx);
 	}
 
 	await db.run("INSERT INTO scripts VALUES(null, ?, ?, '', ?, 0)",
@@ -64,5 +64,5 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	await dispage("script_manager", {
 		message: "Script created successfully"
-	}, req, serve, vars, evars);
+	}, req, write, server, ctx);
 }

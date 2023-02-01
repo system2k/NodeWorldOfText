@@ -3,15 +3,15 @@ var releaseWorld = world_mgr.releaseWorld;
 var getOrCreateWorld = world_mgr.getOrCreateWorld;
 var canViewWorld = world_mgr.canViewWorld;
 
-module.exports.GET = async function(req, serve, vars, evars) {
-	var query_data = evars.query_data;
-	var user = evars.user;
-	var setCallback = evars.setCallback;
+module.exports.GET = async function(req, write, server, ctx) {
+	var query_data = ctx.query_data;
+	var user = ctx.user;
+	var setCallback = ctx.setCallback;
 	
-	if(typeof query_data.world != "string") return serve(null, 400);
+	if(typeof query_data.world != "string") return write(null, 400);
 	var world = await getOrCreateWorld(query_data.world);
 	if(!world) {
-		return serve(null, 404);
+		return write(null, 404);
 	}
 	
 	setCallback(function() {
@@ -22,7 +22,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		memKey: query_data.key
 	});
 	if(!perm) {
-		return serve(null, 403);
+		return write(null, 403);
 	}
 
 	var backgroundColor = world.theme.color || "#000";
@@ -49,7 +49,7 @@ module.exports.GET = async function(req, serve, vars, evars) {
 		owner_text: ownerTextColor
 	}
 
-	serve(JSON.stringify(style), null, {
+	write(JSON.stringify(style), null, {
 		mime: "application/json"
 	});
 }

@@ -36,16 +36,16 @@ function sendWorldStatusUpdate(server, worldId, userId) {
 	});
 }
 
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var cookies = evars.cookies;
-	var user = evars.user;
-	var HTML = evars.HTML;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var cookies = ctx.cookies;
+	var user = ctx.user;
+	var HTML = ctx.HTML;
 
-	var db = vars.db;
-	var createCSRF = vars.createCSRF;
+	var db = server.db;
+	var createCSRF = server.createCSRF;
 
 	if(!user.authenticated) {
-		return serve(null, null, {
+		return write(null, null, {
 			redirect: "/accounts/login/?next=/accounts/profile/"
 		});
 	}
@@ -126,25 +126,25 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		email_verified: user.is_active
 	};
 
-	serve(HTML("profile.html", data));
+	write(HTML("profile.html", data));
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var user = evars.user;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var user = ctx.user;
 
-	var db = vars.db;
-	var dispage = vars.dispage;
-	var wss = vars.wss;
-	var checkCSRF = vars.checkCSRF;
+	var db = server.db;
+	var dispage = server.dispage;
+	var wss = server.wss;
+	var checkCSRF = server.checkCSRF;
 
 	if(!user.authenticated) {
-		return serve(null, 403);
+		return write(null, 403);
 	}
 
 	var csrftoken = post_data.csrfmiddlewaretoken;
 	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
-		return serve("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
+		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
 	var message = null;
@@ -152,7 +152,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		if(user.uv_rank == 3) { // TODO: use rank table in uvias db
 			return await dispage("accounts/profile", {
 				message: "Guests cannot claim worlds"
-			}, req, serve, vars, evars);
+			}, req, write, server, ctx);
 		} else {
 			var worldname = post_data.worldname;
 			if(typeof worldname != "string") {
@@ -162,7 +162,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				message = status.message;
 				// TODO: what about isMember?
 				if(status.success) {
-					sendWorldStatusUpdate(vars, status.world.id, user.id);
+					sendWorldStatusUpdate(server, status.world.id, user.id);
 					releaseWorld(status.world);
 				}
 			}
@@ -173,7 +173,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 				var worldName = key.substr("leave_".length);
 				var revoke = await revokeMembershipByWorldName(worldName, user.id);
 				if(revoke && revoke[0]) {
-					sendWorldStatusUpdate(vars, revoke[1], user.id);
+					sendWorldStatusUpdate(server, revoke[1], user.id);
 				}
 				break;
 			}
@@ -181,5 +181,5 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	}
 	await dispage("accounts/profile", {
 		message
-	}, req, serve, vars, evars);
+	}, req, write, server, ctx);
 }

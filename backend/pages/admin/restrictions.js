@@ -298,28 +298,30 @@ function procCoal(list) {
 	};
 }
 
-module.exports.GET = async function(req, serve, vars, evars) {
-	var HTML = evars.HTML;
-	var user = evars.user;
+module.exports.GET = async function(req, write, server, ctx) {
+	var HTML = ctx.HTML;
+	var user = ctx.user;
 
-	var createCSRF = vars.createCSRF;
+	var createCSRF = server.createCSRF;
 
 	if(!user.superuser) return;
 
 	var csrftoken = createCSRF(user.id.toString(), 0);
 
-	serve(HTML("administrator_restrictions.html", {
+	write(HTML("administrator_restrictions.html", {
 		rstr: restrictions_string,
 		coal: coalition_group,
 		csrftoken
 	}));
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var user = evars.user;
-	var query_data = evars.query_data;
-	var checkCSRF = vars.checkCSRF;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var user = ctx.user;
+	var query_data = ctx.query_data;
+
+	var checkCSRF = server.checkCSRF;
+
 	var setRestrictions;
 	var setCoalition;
 
@@ -327,7 +329,7 @@ module.exports.POST = async function(req, serve, vars, evars) {
 
 	var csrftoken = req.headers["x-csrf-token"];
 	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
-		return serve("CSRF verification failed");
+		return write("CSRF verification failed");
 	}
 
 	var type = query_data.type;
@@ -342,5 +344,5 @@ module.exports.POST = async function(req, serve, vars, evars) {
 		setCoalition(procCoal(list));
 	}
 
-	serve("SUCCESS");
+	write("SUCCESS");
 }

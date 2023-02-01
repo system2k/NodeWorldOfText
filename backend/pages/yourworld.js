@@ -9,24 +9,24 @@ function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
 
-module.exports.GET = async function(req, serve, vars, evars, params) {
-	var query_data = evars.query_data;
-	var path = evars.path;
-	var user = evars.user;
-	var HTML = evars.HTML;
-	var setCallback = evars.setCallback;
+module.exports.GET = async function(req, write, server, ctx, params) {
+	var query_data = ctx.query_data;
+	var path = ctx.path;
+	var user = ctx.user;
+	var HTML = ctx.HTML;
+	var setCallback = ctx.setCallback;
 
-	var dispage = vars.dispage;
-	var db = vars.db;
-	var modules = vars.modules;
-	var announcement = vars.announcement();
-	var accountSystem = vars.accountSystem;
-	var createCSRF = vars.createCSRF;
+	var dispage = server.dispage;
+	var db = server.db;
+	var modules = server.modules;
+	var announcement = server.announcement();
+	var accountSystem = server.accountSystem;
+	var createCSRF = server.createCSRF;
 
 	var world_name = path;
 
 	var world = await getOrCreateWorld(world_name);
-	if(!world) return await dispage("404", null, req, serve, vars, evars);
+	if(!world) return await dispage("404", null, req, write, server, ctx);
 	
 	setCallback(function() {
 		releaseWorld(world);
@@ -39,11 +39,11 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		var privNote = world.opts.privNote;
 		return await dispage("accounts/private", {
 			privateWorldMsg: privNote
-		}, req, serve, vars, evars);
+		}, req, write, server, ctx);
 	}
 
 	if(query_data.fetch == 1) { // fetch request
-		evars.world = world;
+		ctx.world = world;
 		var tiles = await modules.fetch_tiles({
 			fetchRectangles: [{
 				minY: query_data.min_tileY,
@@ -55,9 +55,9 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			array: query_data.array,
 			content_only: query_data.content_only,
 			concat: query_data.concat
-		}, vars, evars);
+		}, server, ctx);
 		if(typeof tiles == "string") {
-			return serve(tiles);
+			return write(tiles);
 		}
 		if("data" in tiles) tiles = tiles.data;
 		var tData;
@@ -66,7 +66,7 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 		} else {
 			tData = JSON.stringify(tiles);
 		}
-		return serve(tData, null, {
+		return write(tData, null, {
 			mime: "application/json; charset=utf-8"
 		});
 	} else { // the HTML page
@@ -174,23 +174,23 @@ module.exports.GET = async function(req, serve, vars, evars, params) {
 			meta_desc,
 			csrftoken
 		};
-		return serve(HTML("yourworld.html", data), null, {
+		return write(HTML("yourworld.html", data), null, {
 			mime: "text/html; charset=utf-8"
 		});
 	}
 }
 
-module.exports.POST = async function(req, serve, vars, evars) {
-	var post_data = evars.post_data;
-	var path = evars.path;
-	var user = evars.user;
-	var setCallback = evars.setCallback;
+module.exports.POST = async function(req, write, server, ctx) {
+	var post_data = ctx.post_data;
+	var path = ctx.path;
+	var user = ctx.user;
+	var setCallback = ctx.setCallback;
 
-	var db = vars.db;
-	var modules = vars.modules;
+	var db = server.db;
+	var modules = server.modules;
 
 	var world = await getOrCreateWorld(path);
-	if(!world) return serve(null, 404);
+	if(!world) return write(null, 404);
 	
 	setCallback(function() {
 		releaseWorld(world);
@@ -199,22 +199,22 @@ module.exports.POST = async function(req, serve, vars, evars) {
 	var read_permission = await canViewWorld(world, user);
 	if(!read_permission) {
 		// no permission to view world?
-		return serve(null, 403);
+		return write(null, 403);
 	}
 
-	evars.world = world;
-	evars.isHTTP = true;
+	ctx.world = world;
+	ctx.isHTTP = true;
 
 	var edits_parsed;
 	try {
 		edits_parsed = JSON.parse(post_data.edits);
 	} catch(e) {
-		return serve(null, 400);
+		return write(null, 400);
 	}
 
 	var do_write = await modules.write_data({
 		edits: edits_parsed
-	}, vars, evars);
+	}, server, ctx);
 
-	serve(JSON.stringify(do_write.accepted));
+	write(JSON.stringify(do_write.accepted));
 }
