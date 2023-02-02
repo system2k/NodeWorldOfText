@@ -6,7 +6,7 @@ var removeLastSlash = utils.removeLastSlash;
 
 module.exports.GET = async function(req, write, server, ctx) {
 	var query_data = ctx.query_data;
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 
 	var static_data = server.static_data;
 	var staticShortcuts = server.staticShortcuts;

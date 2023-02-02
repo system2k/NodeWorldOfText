@@ -3,7 +3,7 @@ var http_time = utils.http_time;
 
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var cookies = ctx.cookies;
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 
 	var db = server.db;
 	var new_token = server.new_token;
@@ -23,7 +23,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		username: params.username
 	};
 
-	write(HTML("registration/login.html", data));
+	write(render("registration/login.html", data));
 }
 
 module.exports.POST = async function(req, write, server, ctx, params) {

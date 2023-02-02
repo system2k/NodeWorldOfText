@@ -5,7 +5,7 @@ var templates = require("../../utils/templates.js");
 module.exports.GET = async function(req, write, server, ctx) {
 	var path = ctx.path;
 	var user = ctx.user;
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 
 	var website = server.website;
 	var send_email = server.send_email;
@@ -26,7 +26,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 	}
 	var ver_count = (await db.get("SELECT COUNT(*) AS cnt FROM registration_registrationprofile WHERE user_id=?", user.id)).cnt;
 	if(ver_count >= 1) {
-		return write(HTML("registration/verify_email.html", {
+		return write(render("registration/verify_email.html", {
 			verified: true
 		}));
 	}
@@ -59,5 +59,5 @@ module.exports.GET = async function(req, write, server, ctx) {
 			[user.id, token]);
 	}
 
-	write(HTML("registration/verify_email.html"));
+	write(render("registration/verify_email.html"));
 }

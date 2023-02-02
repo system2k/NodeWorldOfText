@@ -1,5 +1,5 @@
 module.exports.GET = async function(req, write, server, ctx) {
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	
 	var website = server.website;
 
@@ -7,5 +7,5 @@ module.exports.GET = async function(req, write, server, ctx) {
 		website
 	};
 
-	write(HTML("home.html", data));
+	write(render("home.html", data));
 }

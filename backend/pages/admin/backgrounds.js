@@ -1,5 +1,5 @@
 module.exports.GET = async function(req, write, server, ctx, params) {
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 
 	var dispage = server.dispage;
@@ -19,7 +19,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		csrftoken
 	};
 
-	write(HTML("administrator_backgrounds.html", data));
+	write(render("administrator_backgrounds.html", data));
 }
 
 module.exports.POST = async function(req, write, server, ctx) {

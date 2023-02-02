@@ -13,7 +13,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var query_data = ctx.query_data;
 	var path = ctx.path;
 	var user = ctx.user;
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var setCallback = ctx.setCallback;
 
 	var dispage = server.dispage;
@@ -174,7 +174,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 			meta_desc,
 			csrftoken
 		};
-		return write(HTML("yourworld.html", data), null, {
+		return write(render("yourworld.html", data), null, {
 			mime: "text/html; charset=utf-8"
 		});
 	}

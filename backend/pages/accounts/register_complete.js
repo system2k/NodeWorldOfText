@@ -1,4 +1,4 @@
 module.exports.GET = async function(req, write, server, ctx) {
-	var HTML = ctx.HTML;
-	write(HTML("registration/registration_complete.html"));
+	var render = ctx.render;
+	write(render("registration/registration_complete.html"));
 }

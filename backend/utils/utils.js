@@ -92,48 +92,6 @@ function san_dp(x) {
 	return x;
 }
 
-// just to make things easier
-function toUpper(x) {
-	return x.toString().toUpperCase();
-}
-
-function NCaseCompare(str1, str2) {
-	str1 += "";
-	str2 += "";
-	var res = str1.localeCompare(str2, "en", {
-		sensitivity: "base"
-	});
-	return !res;
-}
-
-/*
-	usage:
-	split_limit("a|b|c|d|e|f|g", "|", 3) = ["a", "b", "c", "d|e|f|g"]
-*/
-function split_limit(str, char, limit) {
-	if(!limit && limit != 0) limit = Infinity;
-	var arr = str.split(char);
-	var result = arr.splice(0, limit);
-	result.push(arr.join(char));
-	return result;
-}
-
-function get_third(url, first, second) {
-	var value = split_limit(url, first + "/" + second + "/", 1)[1];
-	if(value.charAt(value.length - 1) === "/") {
-		value = value.substring(0, value.length - 1);
-	}
-	return value;
-}
-
-function get_fourth(url, first, second, third) {
-	var value = split_limit(url, first + "/" + second + "/" + third + "/", 1)[1];
-	if(value.charAt(value.length - 1) === "/") {
-		value = value.substring(0, value.length - 1);
-	}
-	return value;
-}
-
 function removeLastSlash(text) {
 	if(text.charAt(text.length - 1) == "/") {
 		text = text.slice(0, text.length - 1);
@@ -976,9 +934,6 @@ module.exports = {
 	create_date,
 	san_nbr,
 	san_dp,
-	toUpper,
-	NCaseCompare,
-	split_limit,
 	removeLastSlash,
 	parseCookie,
 	ar_str_trim,

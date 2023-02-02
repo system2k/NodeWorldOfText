@@ -3,7 +3,7 @@ var checkURLParam = utils.checkURLParam;
 
 module.exports.GET = async function(req, write, server, ctx) {
 	var path = ctx.path;
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 
 
 	var world_name = checkURLParam("/accounts/nsfw/*world", path).world;
@@ -11,5 +11,5 @@ module.exports.GET = async function(req, write, server, ctx) {
 		world_name
 	};
 
-	write(HTML("accounts_nsfw.html", data));
+	write(render("accounts_nsfw.html", data));
 }

@@ -1,5 +1,5 @@
 module.exports.GET = async function(req, write, server, ctx) {
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 
 	if(!user.superuser) return;
@@ -18,7 +18,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 		}
 	}
 
-	write(HTML("monitor.html", {
+	write(render("monitor.html", {
 		tc_worlds,
 		tc_tiles
 	}));

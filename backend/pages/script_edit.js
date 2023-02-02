@@ -3,7 +3,7 @@ var checkURLParam = utils.checkURLParam;
 
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var path = ctx.path;
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 
 	var dispage = server.dispage;
@@ -34,7 +34,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		csrftoken
 	};
 
-	write(HTML("script_edit.html", data));
+	write(render("script_edit.html", data));
 }
 
 module.exports.POST = async function(req, write, server, ctx) {

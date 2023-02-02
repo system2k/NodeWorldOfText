@@ -1,5 +1,5 @@
 module.exports.GET = async function(req, write, server, ctx, params) {
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 
 	var dispage = server.dispage;
@@ -28,7 +28,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		csrftoken
 	}
 
-	write(HTML("script_manager.html", data));
+	write(render("script_manager.html", data));
 }
 
 module.exports.POST = async function(req, write, server, ctx) {

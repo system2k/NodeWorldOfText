@@ -3,7 +3,7 @@ var checkURLParam = utils.checkURLParam;
 
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var path = ctx.path;
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 
 	var db = server.db;
@@ -78,5 +78,5 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		display_name: user_info.display_name
 	};
 
-	write(HTML("administrator_users_template.html", data));
+	write(render("administrator_users_template.html", data));
 }

@@ -39,7 +39,7 @@ function sendWorldStatusUpdate(server, worldId, userId) {
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var cookies = ctx.cookies;
 	var user = ctx.user;
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 
 	var db = server.db;
 	var createCSRF = server.createCSRF;
@@ -126,7 +126,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		email_verified: user.is_active
 	};
 
-	write(HTML("profile.html", data));
+	write(render("profile.html", data));
 }
 
 module.exports.POST = async function(req, write, server, ctx) {

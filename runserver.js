@@ -35,9 +35,6 @@ var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
 var san_nbr              = utils.san_nbr;
 var san_dp               = utils.san_dp;
-var toUpper              = utils.toUpper;
-var NCaseCompare         = utils.NCaseCompare;
-var split_limit          = utils.split_limit;
 var checkURLParam        = utils.checkURLParam;
 var removeLastSlash      = utils.removeLastSlash;
 var parseCookie          = utils.parseCookie;
@@ -1871,7 +1868,7 @@ async function process_request(req, res, compCallbacks) {
 					URL_mod = removeLastSlash(URL_mod);
 				}
 				// return compiled HTML pages
-				function HTML(path, data) {
+				function render(path, data) {
 					var template = templates.getFile(path);
 					if(!template) { // template not found
 						return "An unexpected error occurred while generating this page";
@@ -1899,7 +1896,7 @@ async function process_request(req, res, compCallbacks) {
 					path: URL_mod,
 					user,
 					referer: req.headers.referer,
-					HTML,
+					render,
 					ipAddress,
 					ipAddressFam,
 					ipAddressVal,

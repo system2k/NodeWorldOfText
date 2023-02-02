@@ -1,6 +1,6 @@
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var cookies = ctx.cookies;
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 
 	if(!user.authenticated) {
@@ -14,7 +14,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		error: params.error
 	};
 
-	write(HTML("password_change.html", data));
+	write(render("password_change.html", data));
 }
 
 module.exports.POST = async function(req, write, server, ctx) {

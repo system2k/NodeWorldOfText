@@ -1,5 +1,5 @@
 module.exports.GET = async function(req, write, server, ctx) {
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 
 	var loadShellFile = server.loadShellFile;
@@ -34,7 +34,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 		csrftoken
 	};
 
-	write(HTML("administrator_shell.html", data));
+	write(render("administrator_shell.html", data));
 }
 
 module.exports.POST = async function(req, write, server, ctx) {

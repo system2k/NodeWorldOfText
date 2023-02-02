@@ -4,7 +4,7 @@ var fetchOwnedWorldsByUserId = world_mgr.fetchOwnedWorldsByUserId;
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var cookies = ctx.cookies;
 	var user = ctx.user;
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 
 	if(!user.authenticated) {
 		return write(null, null, {
@@ -46,5 +46,5 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		worlds_owned: world_list
 	};
 
-	write(HTML("accounts_tabular.html", data));
+	write(render("accounts_tabular.html", data));
 }

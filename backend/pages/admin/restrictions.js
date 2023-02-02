@@ -299,7 +299,7 @@ function procCoal(list) {
 }
 
 module.exports.GET = async function(req, write, server, ctx) {
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 
 	var createCSRF = server.createCSRF;
@@ -308,7 +308,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 
 	var csrftoken = createCSRF(user.id.toString(), 0);
 
-	write(HTML("administrator_restrictions.html", {
+	write(render("administrator_restrictions.html", {
 		rstr: restrictions_string,
 		coal: coalition_group,
 		csrftoken

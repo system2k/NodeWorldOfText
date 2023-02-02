@@ -4,7 +4,7 @@ var san_nbr = utils.san_nbr;
 
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var path = ctx.path;
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 
 	var db = server.db;
@@ -62,7 +62,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		csrftoken
 	};
 
-	write(HTML("administrator_set_custom_rank.html", data));
+	write(render("administrator_set_custom_rank.html", data));
 }
 
 module.exports.POST = async function(req, write, server, ctx) {

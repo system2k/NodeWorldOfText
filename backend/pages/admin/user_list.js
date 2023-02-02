@@ -2,7 +2,7 @@ var utils = require("../../utils/utils.js");
 var create_date = utils.create_date;
 
 module.exports.GET = async function(req, write, server, ctx, params) {
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 
 	var db = server.db;
@@ -75,5 +75,5 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		users
 	};
 
-	write(HTML("administrator_user_list.html", data));
+	write(render("administrator_user_list.html", data));
 }

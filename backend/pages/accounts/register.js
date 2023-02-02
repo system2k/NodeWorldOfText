@@ -1,7 +1,7 @@
 var emailFormatRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 module.exports.GET = async function(req, write, server, ctx, params) {
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 
 	var accountSystem = server.accountSystem;
@@ -26,7 +26,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		password1: params.password
 	};
 
-	write(HTML("registration/registration_form.html", data));
+	write(render("registration/registration_form.html", data));
 }
 
 module.exports.POST = async function(req, write, server, ctx) {

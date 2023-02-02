@@ -2,7 +2,7 @@ var utils = require("../../utils/utils.js");
 var uptime = utils.uptime;
 
 module.exports.GET = async function(req, write, server, ctx, params) {
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 
 	var dispage = server.dispage;
@@ -91,7 +91,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		csrftoken
 	};
 
-	write(HTML("administrator.html", data));
+	write(render("administrator.html", data));
 }
 
 module.exports.POST = async function(req, write, server, ctx) {

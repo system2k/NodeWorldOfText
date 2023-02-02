@@ -55,7 +55,7 @@ function sendWorldStatusUpdate(server, worldId, userId, type, val) {
 
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var path = ctx.path;
-	var HTML = ctx.HTML;
+	var render = ctx.render;
 	var user = ctx.user;
 	var setCallback = ctx.setCallback;
 
@@ -233,7 +233,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		meta_desc: world.opts.desc
 	};
 
-	write(HTML("configure.html", data));
+	write(render("configure.html", data));
 }
 
 module.exports.POST = async function(req, write, server, ctx) {
