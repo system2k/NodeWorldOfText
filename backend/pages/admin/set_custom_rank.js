@@ -8,14 +8,14 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var user = ctx.user;
 
 	var db = server.db;
-	var dispage = server.dispage;
+	var callPage = server.callPage;
 	var ranks_cache = server.ranks_cache;
 	var uvias = server.uvias;
 	var accountSystem = server.accountSystem;
 	var createCSRF = server.createCSRF;
 
 	if(!user.superuser) {
-		return await dispage("404", null, req, write, server, ctx);
+		return await callPage("404", null, req, write, server, ctx);
 	}
 
 	var username = checkURLParam("/administrator/set_custom_rank/:username", path).username;
@@ -24,7 +24,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	if(accountSystem == "uvias") {
 		var duser = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
 		if(!duser) {
-			return await dispage("404", null, req, write, server, ctx);
+			return await callPage("404", null, req, write, server, ctx);
 		}
 		user_edit = {
 			id: "x" + duser.uid,
@@ -33,7 +33,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	} else if(accountSystem == "local") {
 		user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
 		if(!user_edit) {
-			return await dispage("404", null, req, write, server, ctx);
+			return await callPage("404", null, req, write, server, ctx);
 		}
 	}
 
@@ -71,7 +71,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var user = ctx.user;
 
 	var db = server.db;
-	var dispage = server.dispage;
+	var callPage = server.callPage;
 	var url = server.url;
 	var ranks_cache = server.ranks_cache;
 	var db_misc = server.db_misc;
@@ -135,7 +135,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 		delete ranks_cache.users[user_edit.id];
 	}
 
-	return await dispage("admin/set_custom_rank", {
+	return await callPage("admin/set_custom_rank", {
 		message: "Successfully set " + user_edit.username + "'s rank to " + rankName
 	}, req, write, server, ctx);
 }

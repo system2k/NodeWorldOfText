@@ -34,7 +34,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var user = ctx.user;
 
 	var db = server.db;
-	var dispage = server.dispage;
+	var callPage = server.callPage;
 	var encryptHash = server.encryptHash;
 	var testEmailAddress = server.testEmailAddress;
 	var accountSystem = server.accountSystem;
@@ -103,7 +103,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	   form_email_errors.length	 ||
 	   form_password1_errors.length ||
 	   form_password2_errors.length) {
-		 return await dispage("accounts/register", {
+		 return await callPage("accounts/register", {
 			 form_username_errors,
 			 form_email_errors,
 			 form_password1_errors,
@@ -124,7 +124,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	if(!email) {
 		await db.run("UPDATE auth_user SET is_active=1 WHERE id=?", user_id);
 	}
-	await dispage("accounts/login", {
+	await callPage("accounts/login", {
 		username: username,
 		password: password1,
 		registered: true

@@ -5,7 +5,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var render = ctx.render;
 	var user = ctx.user;
 
-	var dispage = server.dispage;
+	var callPage = server.callPage;
 	var db = server.db;
 	var announcement = server.announcement;
 	var wss = server.wss;
@@ -19,7 +19,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 
 	// not a superuser...
 	if(!user.superuser) {
-		return await dispage("404", null, req, write, server, ctx);
+		return await callPage("404", null, req, write, server, ctx);
 	}
 
 	var client_num = 0;
@@ -98,7 +98,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var post_data = ctx.post_data;
 	var user = ctx.user;
 
-	var dispage = server.dispage;
+	var callPage = server.callPage;
 	var announce = server.announce;
 	var db = server.db;
 	var db_misc = server.db_misc;
@@ -109,7 +109,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var setClientVersion = server.setClientVersion;
 
 	if(!user.superuser) {
-		return await dispage("404", null, req, write, server, ctx);
+		return await callPage("404", null, req, write, server, ctx);
 	}
 
 	var csrftoken = post_data.csrfmiddlewaretoken;
@@ -133,14 +133,14 @@ module.exports.POST = async function(req, write, server, ctx) {
 			acme.enabled = false;
 			acme_update_msg = "ACME disabled";
 		}
-		return await dispage("admin/administrator", {
+		return await callPage("admin/administrator", {
 			acme_update_msg
 		}, req, write, server, ctx);
 	}
 	if("set_cli_version" in post_data) {
 		var new_cli_version = post_data.set_cli_version;
 		if(setClientVersion(new_cli_version)) {
-			return await dispage("admin/administrator", {
+			return await callPage("admin/administrator", {
 				cons_update_msg: "Client version updated successfully"
 			}, req, write, server, ctx);
 		}
@@ -161,7 +161,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 				}
 			})]);
 	
-		return await dispage("admin/administrator", {
+		return await callPage("admin/administrator", {
 			announcement_update_msg: "Announcement updated"
 		}, req, write, server, ctx);
 	}

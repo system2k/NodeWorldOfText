@@ -7,13 +7,13 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var user = ctx.user;
 
 	var db = server.db;
-	var dispage = server.dispage;
+	var callPage = server.callPage;
 	var uvias = server.uvias;
 	var db_misc = server.db_misc;
 	var accountSystem = server.accountSystem;
 
 	if(!user.superuser) {
-		return await dispage("404", null, req, write, server, ctx);
+		return await callPage("404", null, req, write, server, ctx);
 	}
 
 	var username = checkURLParam("/administrator/users/by_username/:username", path).username;

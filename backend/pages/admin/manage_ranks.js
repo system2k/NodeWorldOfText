@@ -9,12 +9,12 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var render = ctx.render;
 	var user = ctx.user;
 
-	var dispage = server.dispage;
+	var callPage = server.callPage;
 	var ranks_cache = server.ranks_cache;
 	var createCSRF = server.createCSRF;
 
 	if(!user.superuser) {
-		return await dispage("404", null, req, write, server, ctx);
+		return await callPage("404", null, req, write, server, ctx);
 	}
 
 	var rankCount = ranks_cache.count;

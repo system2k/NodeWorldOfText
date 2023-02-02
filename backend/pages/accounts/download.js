@@ -38,14 +38,14 @@ module.exports.GET = async function(req, write, server, ctx) {
 	var user = ctx.user;
 	var setCallback = ctx.setCallback;
 
-	var dispage = server.dispage;
+	var callPage = server.callPage;
 	var db = server.db;
 
 	var world_name = checkURLParam("/accounts/download/*world", path).world;
 
 	var world = await getOrCreateWorld(world_name);
 	if(!world) {
-		return await dispage("404", null, req, write, server, ctx);
+		return await callPage("404", null, req, write, server, ctx);
 	}
 
 	setCallback(function() {
@@ -55,7 +55,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 	// not a superuser nor owner
 	var is_owner = world.ownerId == user.id;
 	if(!(user.superuser || is_owner)) {
-		return await dispage("404", null, req, write, server, ctx);
+		return await callPage("404", null, req, write, server, ctx);
 	}
 
 	write.startStream();

@@ -37,7 +37,7 @@ module.exports.POST = async function(req, write, server, ctx, params) {
 	var ms = server.ms;
 	var querystring = server.querystring;
 	var url = server.url;
-	var dispage = server.dispage;
+	var callPage = server.callPage;
 	var accountSystem = server.accountSystem;
 	
 	if(accountSystem == "uvias") return;
@@ -51,11 +51,11 @@ module.exports.POST = async function(req, write, server, ctx, params) {
 
 	var loginuser = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
 	if(!loginuser) {
-		return await dispage("accounts/login", {errors: true, username}, req, write, server, ctx);
+		return await callPage("accounts/login", {errors: true, username}, req, write, server, ctx);
 	}
 	var valid = checkHash(loginuser.password, password);
 	if(!valid) { // wrong password
-		return await dispage("accounts/login", {errors: true, username}, req, write, server, ctx);
+		return await callPage("accounts/login", {errors: true, username}, req, write, server, ctx);
 	}
 
 	var date_now = Date.now();

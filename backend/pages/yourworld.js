@@ -16,7 +16,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var render = ctx.render;
 	var setCallback = ctx.setCallback;
 
-	var dispage = server.dispage;
+	var callPage = server.callPage;
 	var db = server.db;
 	var modules = server.modules;
 	var announcement = server.announcement();
@@ -26,7 +26,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var world_name = path;
 
 	var world = await getOrCreateWorld(world_name);
-	if(!world) return await dispage("404", null, req, write, server, ctx);
+	if(!world) return await callPage("404", null, req, write, server, ctx);
 	
 	setCallback(function() {
 		releaseWorld(world);
@@ -37,7 +37,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	});
 	if(!read_permission) {
 		var privNote = world.opts.privNote;
-		return await dispage("accounts/private", {
+		return await callPage("accounts/private", {
 			privateWorldMsg: privNote
 		}, req, write, server, ctx);
 	}

@@ -1,6 +1,6 @@
 module.exports.POST = async function(req, write, server, ctx) {
-	var dispage = server.dispage;
-	await dispage("urllink", {
+	var callPage = server.callPage;
+	await callPage("urllink", {
 		coordlink: true
 	}, req, write, server, ctx, "POST");
 }

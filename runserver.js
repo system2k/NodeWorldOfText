@@ -1198,14 +1198,11 @@ var url_regexp = [ // regexp ; function/redirection ; options
 ];
 
 /*
-	dispatch page
-	usage: this is to be used in the page modules when
-	the module wants to dispatch a different page module.
-	EG: return dispage("404", { extra parameters for page }, req, write, server, ctx, "POST")
-	EG: return dispage("accounts/login", { extra parameters for page }, req, write, server, ctx)
-	(req, write, and server should already be defined by the parameters)
+	redirect the page's processing to that of another page
+	EG: return callPage("404", { extra parameters for page }, req, write, server, ctx, "POST")
+	EG: return callPage("accounts/login", { extra parameters for page }, req, write, server, ctx)
 */
-async function dispage(page, params, req, write, server, ctx, method) {
+async function callPage(page, params, req, write, server, ctx, method) {
 	if(!method || !valid_method(method)) {
 		method = "GET";
 	}
@@ -2844,7 +2841,7 @@ var global_data = {
 	announcement: function() { return announcement_cache },
 	uvias,
 	accountSystem,
-	dispage,
+	callPage,
 	ms,
 	checkHash,
 	encryptHash,

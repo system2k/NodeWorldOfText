@@ -1,6 +1,6 @@
 module.exports.POST = async function(req, write, server, ctx) {
-	var dispage = server.dispage;
-	await dispage("protect", {
+	var callPage = server.callPage;
+	await callPage("protect", {
 		char: true
 	}, req, write, server, ctx, "POST");
 }
