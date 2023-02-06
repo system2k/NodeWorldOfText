@@ -366,6 +366,9 @@ function normalize_tile(tile_db_data) {
 		prop_char: null,
 		prop_cell_props: null,
 
+		url_bytes: 0,
+		url_cells: 0,
+
 		props_updated: false,
 		content_updated: false,
 		writability_updated: false,
@@ -389,6 +392,18 @@ function normalize_tile(tile_db_data) {
 		}
 		if(parsed_props.cell_props) {
 			data.prop_cell_props = parsed_props.cell_props;
+			var props = data.prop_cell_props;
+			// record statistics for raw URL-link data
+			for(var y in props) {
+				for(var x in props[y]) {
+					var link = props[y][x].link;
+					if(!link) continue;
+					if(link.type == "url") {
+						data.url_bytes += Buffer.byteLength(link.url);
+						data.url_cells++;
+					}
+				}
+			}
 		} else {
 			data.prop_cell_props = {};
 		}
@@ -563,16 +578,22 @@ function tileWriteEdits(cacheTile, editObj) {
 
 	// detect overriden links
 	if(!preserve_links) {
-		if(cacheTile.prop_cell_props[charY]) {
+		var props = cacheTile.prop_cell_props;
+		if(props[charY]) {
 			// clear properties for this char
-			if(cacheTile.prop_cell_props[charY][charX]) {
-				delete cacheTile.prop_cell_props[charY][charX];
+			if(props[charY][charX]) {
+				var link = props[charY][charX].link;
+				if(link && link.type == "url") {
+					cacheTile.url_cells--;
+					cacheTile.url_bytes -= Buffer.byteLength(link.url);
+				}
+				delete props[charY][charX];
 				cacheTile.props_updated = true;
 				char_updated = true;
 			}
 			// the row for this tile is empty
-			if(Object.keys(cacheTile.prop_cell_props[charY]).length == 0) {
-				delete cacheTile.prop_cell_props[charY];
+			if(Object.keys(props[charY]).length == 0) {
+				delete props[charY];
 				cacheTile.props_updated = true;
 			}
 		}
@@ -639,17 +660,49 @@ function tileWriteLinks(cacheTile, editObj) {
 		return;
 	}
 
-	if(!cacheTile.prop_cell_props[charY]) cacheTile.prop_cell_props[charY] = {};
-	if(!cacheTile.prop_cell_props[charY][charX]) cacheTile.prop_cell_props[charY][charX] = {};
+	var cellProps = cacheTile.prop_cell_props;
+
+	if(!cellProps[charY]) cellProps[charY] = {};
+	if(!cellProps[charY][charX]) cellProps[charY][charX] = {};
 
 	if(typeof url != "string") url = "";
 	if(type == "url") {
-		cacheTile.prop_cell_props[charY][charX].link = {
+		var byteLen = Buffer.byteLength(url);
+		var bytesMaximum = 16384;
+		var minBytesGuarantee = 100;
+		var linkBytesMax = 10000;
+
+		var newByteLen = byteLen;
+		if(byteLen > linkBytesMax) newByteLen = linkBytesMax;
+		cacheTile.url_cells++;
+		// simulate a case where the rest of the cells are occupied by a URL link,
+		// and determine the maximum size that all the cells can be.
+		var peek = Math.floor((bytesMaximum - cacheTile.url_bytes - newByteLen) / (CONST.tileArea - cacheTile.url_cells));
+		if(peek < minBytesGuarantee) {
+			// we have determined that this URL link may potentially be too long,
+			// depriving the max guarantee from the rest of the cells that don't have a URL link.
+			var rem = bytesMaximum - cacheTile.url_bytes - (minBytesGuarantee * (CONST.tileArea - cacheTile.url_cells));
+			// truncate the length of the URL link to guarantee that the rest of the non-URL-link cells in the tile
+			// have the potential to have their byte count the at most minBytesGuarantee.
+			var sz = newByteLen;
+			if(rem < newByteLen) sz = rem;
+			if(sz < minBytesGuarantee) sz = minBytesGuarantee; // edge case
+			cacheTile.url_bytes += sz;
+			newByteLen = sz;
+		} else {
+			cacheTile.url_bytes += byteLen;
+		}
+		// the URL link was found to be too long, so truncate it
+		if(newByteLen < byteLen) {
+			url = Buffer.from(url).subarray(0, newByteLen).toString();
+		}
+
+		cellProps[charY][charX].link = {
 			type: "url",
-			url: url.slice(0, 10000) // size limit of urls
+			url: url
 		}
 	} else if(type == "coord") {
-		cacheTile.prop_cell_props[charY][charX].link = {
+		cellProps[charY][charX].link = {
 			type: "coord",
 			link_tileY: link_tileY,
 			link_tileX: link_tileX
@@ -820,6 +873,8 @@ function tileWriteClear(cacheTile, editObj) {
 	for(var d in cacheTile.prop_cell_props) {
 		delete cacheTile.prop_cell_props[d];
 	}
+	cacheTile.url_cells = 0;
+	cacheTile.url_bytes = 0;
 
 	cacheTile.content_updated = true;
 	cacheTile.props_updated = true;
@@ -1391,6 +1446,11 @@ async function beginTileIterationsLoop() {
 							dimTile.props_updated = true;
 							if(dimTile.prop_cell_props[charY]) {
 								if(dimTile.prop_cell_props[charY][charX]) {
+									var link = dimTile.prop_cell_props[charY][charX].link;
+									if(link && link.type == "url") {
+										dimTile.url_cells--;
+										dimTile.url_bytes -= Buffer.byteLength(link.url);
+									}
 									delete dimTile.prop_cell_props[charY][charX];
 								}
 								if(Object.keys(dimTile.prop_cell_props[charY]).length == 0) {
@@ -1422,6 +1482,12 @@ async function beginTileIterationsLoop() {
 							}
 							if(tileObj.prop_cell_props[charY]) {
 								if(tileObj.prop_cell_props[charY][charX]) {
+									// TODO: we're not following DRY here too well
+									var link = tileObj.prop_cell_props[charY][charX].link;
+									if(link && link.type == "url") {
+										tileObj.url_cells--;
+										tileObj.url_bytes -= Buffer.byteLength(link.url);
+									}
 									delete tileObj.prop_cell_props[charY][charX];
 								}
 								if(Object.keys(tileObj.prop_cell_props[charY]).length == 0) {
@@ -1503,6 +1569,8 @@ async function beginTileIterationsLoop() {
 					continue;
 				}
 				ctile.prop_cell_props = {};
+				ctile.url_bytes = 0;
+				ctile.url_cells = 0;
 				for(var x = 0; x < CONST.tileArea; x++) {
 					ctile.content[x] = " ";
 					ctile.prop_char[x] = null;

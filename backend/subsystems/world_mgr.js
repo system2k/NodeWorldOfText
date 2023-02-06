@@ -245,17 +245,16 @@ function normWorldProp(val, propName) {
 }
 
 function loadWorldIntoObject(world, wobj) {
+	var wprops = JSON.parse(world.properties);
+
 	wobj.id = world.id;
 	wobj.name = world.name;
 	wobj.ownerId = world.owner_id;
 	wobj.creationDate = world.created_at;
+	wobj.ownershipChangeDate = getAndProcWorldProp(wprops, "ownership_change_date");
 	
 	wobj.writability = world.writability;
 	wobj.readability = world.readability;
-
-	var wprops = JSON.parse(world.properties);
-
-	wobj.ownershipChangeDate = getAndProcWorldProp(wprops, "ownership_change_date");
 
 	wobj.feature.goToCoord = world.feature_go_to_coord;
 	wobj.feature.memberTilesAddRemove = Boolean(world.feature_membertiles_addremove);

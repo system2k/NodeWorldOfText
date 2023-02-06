@@ -6,7 +6,7 @@ var releaseWorld = world_mgr.releaseWorld;
 var getOrCreateWorld = world_mgr.getOrCreateWorld;
 
 async function iterateWorld(db, worldId, onTile) {
-	var groupSize = 512;
+	var groupSize = 100;
 	var initPos = await db.get("SELECT tileX, tileY FROM tile WHERE world_id=? LIMIT 1", [worldId]);
 	if(!initPos) return;
 	var posX = initPos.tileX - 1; // start before the first tile
@@ -27,7 +27,7 @@ async function iterateWorld(db, worldId, onTile) {
 }
 
 function sanitize_world_filename(input) {
-	var rSlash = /\\/g;
+	var rSlash = /\//g;
 	var rIllegal = /[\/\?<>\\:\*\|":]/g;
 	var rControl = /[\x00-\x1f\x80-\x9f]/g;
 	return input.replace(rSlash, "$").replace(rIllegal, "_").replace(rControl, "_");

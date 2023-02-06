@@ -1824,98 +1824,101 @@ async function process_request(req, res, compCallbacks) {
 		TODO: refactor
 		possible options: no_login; binary_post_data; remove_end_slash
 		*/
-		if(URL.match(urlReg)) {
-			page_resolved = true;
-			if(typeof pageRes == "object") {
-				var method = req.method.toUpperCase();
-				var rate_id = await check_http_rate_limit(ipAddress, pageRes, method);
-				if(rate_id != -1) { // release handle when this request finishes
-					compCallbacks.push(function() {
-						release_http_rate_limit(ipAddress, rate_id);
-					});
-				}
-				var post_data = {};
-				var query_data = querystring.parse(url.parse(req.url).query);
-				var cookies = parseCookie(req.headers.cookie);
-				var user;
-				if(no_login) {
-					user = {};
-				} else {
-					user = await get_user_info(cookies, false, dispatch);
-					// check if user is logged in
-					if(!cookies.csrftoken) {
-						var token = new_token(32);
-						var date = Date.now();
-						// TODO: introduce only for forms
-						dispatch.addCookie("csrftoken=" + token + "; expires=" + http_time(date + ms.year) + "; path=/;");
-						user.csrftoken = token;
-					} else {
-						user.csrftoken = cookies.csrftoken;
-					}
-				}
-				if(method == "POST") {
-					var dat = await wait_response_data(req, dispatch, binary_post_data, user.superuser);
-					if(dat) {
-						post_data = dat;
-					}
-				}
-				var URL_mod = URL; // modified url
-				// remove end slash if enabled
-				if(remove_end_slash) {
-					URL_mod = removeLastSlash(URL_mod);
-				}
-				// return compiled HTML pages
-				function render(path, data) {
-					var template = templates.getFile(path);
-					if(!template) { // template not found
-						return "An unexpected error occurred while generating this page";
-					}
-					if(!data) {
-						data = {};
-					}
-					data.user = user;
-					data.loginPath = loginPath;
-					data.logoutPath = logoutPath;
-					data.registerPath = registerPath;
-					data.profilePath = profilePath;
-					data.accountSystem = accountSystem;
-					var staticVersion = getClientVersion();
-					if(staticVersion) {
-						staticVersion = "?v=" + staticVersion;
-					}
-					data.staticVersion = staticVersion;
-					return templates.execute(template, data);
-				}
-				var ctx = { // request-specific variables
-					cookies,
-					post_data,
-					query_data,
-					path: URL_mod,
-					user,
-					referer: req.headers.referer,
-					render,
-					ipAddress,
-					ipAddressFam,
-					ipAddressVal,
-					setCallback: function(cb) {
-						compCallbacks.push(cb);
-					}
-				};
-				var pageStat;
-				if(pageRes[method] && valid_method(method)) {
-					// Return the page
-					pageStat = await pageRes[method](req, dispatch, global_data, ctx, {});
-				} else {
-					dispatch("Method " + method + " not allowed.", 405);
-				}
-				if(pageStat === -1) continue;
-			} else if(typeof pageRes == "string") { // redirection
-				dispatch(null, null, { redirect: pageRes });
-			} else {
-				page_resolved = false; // 404 not found
-			}
+		if(!URL.match(urlReg)) {
+			continue;
+		}
+		page_resolved = true;
+		if(typeof pageRes == "string") { // redirection
+			dispatch(null, null, { redirect: pageRes });
 			break;
 		}
+		if(typeof pageRes != "object") { // not a valid page type
+			page_resolved = false;
+			break;
+		}
+		var method = req.method.toUpperCase();
+		var rate_id = await check_http_rate_limit(ipAddress, pageRes, method);
+		if(rate_id != -1) { // release handle when this request finishes
+			compCallbacks.push(function() {
+				release_http_rate_limit(ipAddress, rate_id);
+			});
+		}
+		var post_data = {};
+		var query_data = querystring.parse(url.parse(req.url).query);
+		var cookies = parseCookie(req.headers.cookie);
+		var user;
+		if(no_login) {
+			user = {};
+		} else {
+			user = await get_user_info(cookies, false, dispatch);
+			// check if user is logged in
+			if(!cookies.csrftoken) {
+				var token = new_token(32);
+				var date = Date.now();
+				// TODO: introduce only for forms
+				dispatch.addCookie("csrftoken=" + token + "; expires=" + http_time(date + ms.year) + "; path=/;");
+				user.csrftoken = token;
+			} else {
+				user.csrftoken = cookies.csrftoken;
+			}
+		}
+		if(method == "POST") {
+			var dat = await wait_response_data(req, dispatch, binary_post_data, user.superuser);
+			if(dat) {
+				post_data = dat;
+			}
+		}
+		var URL_mod = URL; // modified url
+		// remove end slash if enabled
+		if(remove_end_slash) {
+			URL_mod = removeLastSlash(URL_mod);
+		}
+		// return compiled HTML pages
+		function render(path, data) {
+			var template = templates.getFile(path);
+			if(!template) { // template not found
+				return "An unexpected error occurred while generating this page";
+			}
+			if(!data) {
+				data = {};
+			}
+			data.user = user;
+			data.loginPath = loginPath;
+			data.logoutPath = logoutPath;
+			data.registerPath = registerPath;
+			data.profilePath = profilePath;
+			data.accountSystem = accountSystem;
+			var staticVersion = getClientVersion();
+			if(staticVersion) {
+				staticVersion = "?v=" + staticVersion;
+			}
+			data.staticVersion = staticVersion;
+			return templates.execute(template, data);
+		}
+		var ctx = { // request-specific variables
+			cookies,
+			post_data,
+			query_data,
+			path: URL_mod,
+			user,
+			referer: req.headers.referer,
+			render,
+			ipAddress,
+			ipAddressFam,
+			ipAddressVal,
+			setCallback: function(cb) {
+				compCallbacks.push(cb);
+			}
+		};
+		var pageStat;
+		if(pageRes[method] && valid_method(method)) {
+			// Return the page
+			pageStat = await pageRes[method](req, dispatch, global_data, ctx, {});
+		} else {
+			dispatch("Method " + method + " not allowed.", 405);
+		}
+		if(pageStat === -1) continue;
+		break;
 	}
 
 	if(!page_resolved || !dispatch.isResolved()) {

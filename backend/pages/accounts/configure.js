@@ -317,6 +317,12 @@ module.exports.POST = async function(req, write, server, ctx) {
 			}, req, write, server, ctx);
 		}
 
+		if(world.members.map.length >= 3000) {
+			return await callPage("accounts/configure", {
+				message: "There are too many members on this world"
+			}, req, write, server, ctx);
+		}
+
 		if(await promoteMembershipByWorldName(world.name, user_id)) {
 			sendWorldStatusUpdate(server, world.id, user_id, "isMember", true);
 		}
