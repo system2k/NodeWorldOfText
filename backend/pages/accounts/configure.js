@@ -252,6 +252,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var accountSystem = server.accountSystem;
 	var wss = server.wss;
 	var checkCSRF = server.checkCSRF;
+	var wsSend = server.wsSend;
 
 	var clearChatlog = chat_mgr.clearChatlog;
 

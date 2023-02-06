@@ -668,8 +668,8 @@ function tileWriteLinks(cacheTile, editObj) {
 	if(typeof url != "string") url = "";
 	if(type == "url") {
 		var byteLen = Buffer.byteLength(url);
-		var bytesMaximum = 16384;
-		var minBytesGuarantee = 100;
+		var byteMax = 16384;
+		var maxBytesGuarantee = 100;
 		var linkBytesMax = 10000;
 
 		var newByteLen = byteLen;
@@ -677,18 +677,17 @@ function tileWriteLinks(cacheTile, editObj) {
 		cacheTile.url_cells++;
 		// simulate a case where the rest of the cells are occupied by a URL link,
 		// and determine the maximum size that all the cells can be.
-		var peek = Math.floor((bytesMaximum - cacheTile.url_bytes - newByteLen) / (CONST.tileArea - cacheTile.url_cells));
-		if(peek < minBytesGuarantee) {
+		var remainingCells = CONST.tileArea - cacheTile.url_cells;
+		var peek = Math.floor((byteMax - cacheTile.url_bytes - newByteLen) / remainingCells);
+		if(peek < maxBytesGuarantee) {
 			// we have determined that this URL link may potentially be too long,
 			// depriving the max guarantee from the rest of the cells that don't have a URL link.
-			var rem = bytesMaximum - cacheTile.url_bytes - (minBytesGuarantee * (CONST.tileArea - cacheTile.url_cells));
+			var remainingBytes = byteMax - cacheTile.url_bytes - (maxBytesGuarantee * remainingCells);
 			// truncate the length of the URL link to guarantee that the rest of the non-URL-link cells in the tile
-			// have the potential to have their byte count the at most minBytesGuarantee.
-			var sz = newByteLen;
-			if(rem < newByteLen) sz = rem;
-			if(sz < minBytesGuarantee) sz = minBytesGuarantee; // edge case
-			cacheTile.url_bytes += sz;
-			newByteLen = sz;
+			// have the potential to have their byte count at most maxBytesGuarantee.
+			if(remainingBytes < newByteLen) newByteLen = remainingBytes;
+			if(newByteLen < maxBytesGuarantee) newByteLen = maxBytesGuarantee; // edge case
+			cacheTile.url_bytes += newByteLen;
 		} else {
 			cacheTile.url_bytes += byteLen;
 		}
