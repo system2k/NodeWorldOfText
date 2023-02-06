@@ -321,9 +321,8 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var query_data = ctx.query_data;
 
 	var checkCSRF = server.checkCSRF;
-
-	var setRestrictions;
-	var setCoalition;
+	var setRestrictions = server.setRestrictions;
+	var setCoalition = server.setCoalition;
 
 	if(!user.superuser) return;
 
