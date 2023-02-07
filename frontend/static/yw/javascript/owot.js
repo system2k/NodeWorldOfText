@@ -56,6 +56,7 @@ enums.position = makeEnum(["tileX", "tileY", "charX", "charY"]);
 
 var ws_path = createWsPath();
 
+var menu;
 var nextObjId              = 1; // Next edit ID
 var owotWidth              = getWndWidth();
 var owotHeight             = getWndHeight();
@@ -92,6 +93,9 @@ var specialFontTemplate    = "$px consolas, monospace";
 var fontOrder              = ["Courier New", "monospace"];
 var specialFontOrder       = ["consolas", "monospace"];
 var initiallyFetched       = false;
+var lastLinkHover          = null; // [tileX, tileY, charX, charY]
+var lastTileHover          = null; // [type, tileX, tileY, (charX, charY)]
+var regionSelections       = [];
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -3111,7 +3115,7 @@ function alertJS(data, restrict) {
 	elm.confirm_js.style.display = "";
 	elm.confirm_js_code.innerText = data;
 	if(restrict) {
-		elm.confirm_js_msg.innerText = "This is a snippet of untrusted JavaScript code.";
+		elm.confirm_js_msg.innerText = "This is a snippet of possibly untrusted JavaScript code.";
 		run_js_confirm.innerText = "Copy & Close";
 		run_js_confirm.onclick = function() {
 			w.clipboard.copy(data);
@@ -3639,10 +3643,10 @@ function createSocket() {
 		if(w.receivingBroadcasts) {
 			w.broadcastReceive(true);
 		}
+		clearTimeout(disconnectTimeout);
 		w.doAnnounce("", "err_connect");
 		w.doAnnounce("", "err_access");
 		w.doAnnounce("", "err_limit");
-		clearTimeout(disconnectTimeout);
 		disconnectTimeout = null;
 	}
 
@@ -5229,7 +5233,6 @@ function protectSelection() {
 	}
 }
 
-var menu;
 function buildMenu() {
 	menu = new Menu(elm.menu_elm, elm.nav_elm);
 	w.menu = menu;
@@ -5337,7 +5340,6 @@ function updateMenuEntryVisiblity() {
 	w.menu.setEntryVisibility(menuOptions.resetArea, permMemberArea);
 }
 
-var regionSelections = [];
 function regionSelectionsActive() {
 	for(var i = 0; i < regionSelections.length; i++) {
 		if(regionSelections[i].isSelecting) return true;
@@ -5844,11 +5846,6 @@ var network = {
 	}
 };
 
-// [tileX, tileY, charX, charY]
-var lastLinkHover = null;
-// [type, tileX, tileY, (charX, charY)]
-var lastTileHover = null;
-
 Object.assign(w, {
 	tiles: tiles,
 	periodDeletedTiles: 0,
@@ -6054,7 +6051,7 @@ Object.assign(w, {
 	},
 	jquery: function(callback) {
 		if(window.jQuery) return;
-		var jqueryURL = "/static/lib/jquery-1.7.min.js";
+		var jqueryURL = "https://code.jquery.com/jquery-1.7.min.js";
 		w.loadScript(jqueryURL, callback);
 	},
 	redraw: function() {
@@ -6107,9 +6104,6 @@ Object.assign(w, {
 	fixFonts: function(mainType) {
 		if(!window.Promise || !window.FontFace) return;
 		var list = {
-			"courier": "url('/static/font/cour.ttf')",
-			"calibri": "url('/static/font/calibri.ttf')",
-			"seguisym": "url('/static/font/seguisym.ttf')",
 			"legacycomputing": "url('/static/font/legacycomputing.woff2')"
 		};
 		if(mainType) { // load just one specific type
@@ -6979,7 +6973,7 @@ var ws_functions = {
 				}
 				colorChar(tileX, tileY, charX, charY, "err");
 				w.setTileRedraw(tileX, tileY);
-				tellEdit[x][4] = Date.now();
+				tellEdit[x][4] = getDate();
 				writeBuffer.push(tellEdit[x]);
 			}
 		}
