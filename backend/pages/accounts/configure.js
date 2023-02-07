@@ -782,8 +782,6 @@ module.exports.POST = async function(req, write, server, ctx) {
 				user
 			});
 		} else if("clear_all" in post_data) {
-			var call_id = tile_database.newCallId();
-			tile_database.reserveCallId(call_id);
 			tile_database.write(tile_database.types.eraseworld, {
 				date: Date.now(),
 				world,
