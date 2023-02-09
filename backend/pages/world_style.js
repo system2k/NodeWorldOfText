@@ -47,7 +47,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 		public_text: publicTextColor,
 		member_text: memberTextColor,
 		owner_text: ownerTextColor
-	}
+	};
 
 	write(JSON.stringify(style), null, {
 		mime: "application/json"

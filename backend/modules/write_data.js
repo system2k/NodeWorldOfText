@@ -43,6 +43,7 @@ module.exports = async function(data, server, params) {
 	var monitorEventSockets = server.monitorEventSockets;
 
 	var editReqLimit = 512;
+	var superuserEditReqLimit = 1280;
 	var defaultCharRatePerSecond = 20480;
 	var tileRatePerSecond = 256;
 
@@ -54,6 +55,9 @@ module.exports = async function(data, server, params) {
 	var preserve_links = !!data.preserve_links;
 
 	var editLimit = editReqLimit;
+	if(user.superuser) {
+		editLimit = superuserEditReqLimit;
+	}
 
 	var world_id = world.id;
 

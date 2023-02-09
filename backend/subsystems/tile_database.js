@@ -668,7 +668,7 @@ function tileWriteLinks(cacheTile, editObj) {
 	if(typeof url != "string") url = "";
 	if(type == "url") {
 		var byteLen = Buffer.byteLength(url);
-		var byteMax = 16384;
+		var byteMax = 65536;
 		var maxBytesGuarantee = 100;
 		var linkBytesMax = 10000;
 
