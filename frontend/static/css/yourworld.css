@@ -241,6 +241,7 @@ a:visited {
 	margin-bottom: 0px;
 	height: 100%;
 	padding: 2px;
+	contain: strict;
 }
 .unread_bar {
 	background-color: red;

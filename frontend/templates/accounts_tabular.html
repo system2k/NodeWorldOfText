@@ -122,63 +122,24 @@
 		}
 		var dir = sortDir[mode];
 		sortDir[mode] = 1 - sortDir[mode];
-		switch(mode) {
-			case "name":
-				sortData.sort(function(a, b) {
-					var cmp = a.name.localeCompare(b.name, "en", {
-						sensitivity: "base"
-					});
-					if(dir) {
-						cmp = -cmp;
-					}
-					return cmp;
+		if(mode == "name") {
+			sortData.sort(function(a, b) {
+				var cmp = a.name.localeCompare(b.name, "en", {
+					sensitivity: "base"
 				});
-				break;
-			case "write":
-				sortData.sort(function(a, b) {
-					if(dir) {
-						return b.write - a.write;
-					} else {
-						return a.write - b.write;
-					}
-				});
-				break;
-			case "read":
-				sortData.sort(function(a, b) {
-					if(dir) {
-						return b.read - a.read;
-					} else {
-						return a.read - b.read;
-					}
-				});
-				break;
-			case "members":
-				sortData.sort(function(a, b) {
-					if(dir) {
-						return b.members - a.members;
-					} else {
-						return a.members - b.members;
-					}
-				});
-				break;
-			case "views":
-				sortData.sort(function(a, b) {
-					if(dir) {
-						return b.views - a.views;
-					} else {
-						return a.views - b.views;
-					}
-				});
-				break;
-			case "created":
-				sortData.sort(function(a, b) {
-					if(dir) {
-						return b.created - a.created;
-					} else {
-						return a.created - b.created;
-					}
-				});
-				break;
+				if(dir) {
+					cmp = -cmp;
+				}
+				return cmp;
+			});
+		} else {
+			sortData.sort(function(a, b) {
+				if(dir) {
+					return b[mode] - a[mode];
+				} else {
+					return a[mode] - b[mode];
+				}
+			});
 		}
 		for(var i = 0; i < sortData.length; i++) {
 			var row = sortData[i];
@@ -189,7 +150,15 @@
 	var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 	function format_date(time) {
 		var date = new Date(time);
-		var str = "(GMT+" + date.getTimezoneOffset() / 60 + ") ";
+		var offsetStr = date.getTimezoneOffset() / 60;
+		if(offsetStr < 0) {
+			offsetStr = "-" + -offsetStr;
+		} else if(offsetStr > 0) {
+			offsetStr = "+" + offsetStr;
+		} else {
+			offsetStr = "";
+		}
+		var str = "(GMT" + offsetStr + ") ";
 
 		var month = date.getMonth();
 		str += months[month] + " ";
