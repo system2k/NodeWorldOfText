@@ -1065,7 +1065,9 @@ var http_rate_limits = [ // function ; hold limit ; [method]
 	[pages.coordlink, 512],
 	[pages.urllink, 512],
 	[pages.yourworld, 512, "POST"],
-	[pages.yourworld, 6, "GET"]
+	[pages.yourworld, 6, "GET"],
+	[pages.world_style, 2],
+	[pages.world_props, 2]
 ];
 
 var http_req_holds = {}; // ip/identifier -> {"<index>": {holds: <number>, resp: [<promises>,...]},...}
@@ -1132,70 +1134,88 @@ function release_http_rate_limit(ip, rate_id) {
 	}
 }
 
-var url_regexp = [ // regexp ; function/redirection ; options
-	[/^favicon\.ico[\/]?$/g, "/static/favicon.png", { no_login: true }],
-	[/^robots\.txt[\/]?$/g, "/static/robots.txt", { no_login: true }],
-	[/^home[\/]?$/g, pages.home],
-	[/^\.well-known\/(.*)/g, pages.well_known, { no_login: true, binary_post_data: true }],
+// pathname or regexp ; function or redirect path ; [options]
+var url_regexp = [
+	["favicon.ico", "/static/favicon.png", { no_login: true }],
+	["robots.txt", "/static/robots.txt", { no_login: true }],
+	["home", pages.home],
+	[".well-known/*", pages.well_known, { no_login: true, binary_post_data: true }],
 
-	[/^accounts\/login[\/]?$/g, pages.accounts.login],
-	[/^accounts\/logout[\/]?$/g, pages.accounts.logout],
-	[/^accounts\/register[\/]?$/g, pages.accounts.register],
-	[/^accounts\/profile$/g, "/accounts/profile/"], // ensure there is always an ending slash
-	[/^accounts\/profile[\/]?$/g, pages.accounts.profile],
-	[/^accounts\/private[\/]?$/g, pages.accounts.private],
-	[/^accounts\/configure\/$/g, pages.accounts.configure], // for front page configuring
-	[/^accounts\/configure\/(.*)\/$/g, pages.accounts.configure],
-	[/^accounts\/member_autocomplete[\/]?$/g, pages.accounts.member_autocomplete],
-	[/^accounts\/register\/complete[\/]?$/g, pages.accounts.register_complete],
-	[/^accounts\/verify\/(.*)\/$/g, pages.accounts.verify],
-	[/^accounts\/download\/$/g, pages.accounts.download], // for front page downloading
-	[/^accounts\/download\/(.*)\/$/g, pages.accounts.download],
-	[/^accounts\/password_change[\/]?$/g, pages.accounts.password_change],
-	[/^accounts\/password_change\/done[\/]?$/g, pages.accounts.password_change_done],
-	[/^accounts\/nsfw\/(.*)[\/]?$/g, pages.accounts.nsfw],
-	[/^accounts\/tabular[\/]?$/g, pages.accounts.tabular],
-	[/^accounts\/verify_email\/(.*)[\/]?$/g, pages.accounts.verify_email],
-	[/^accounts\/sso[\/]?$/g, pages.accounts.sso],
+	["accounts/login", pages.accounts.login],
+	["accounts/logout", pages.accounts.logout],
+	["accounts/register", pages.accounts.register],
+	["accounts/profile$", "/accounts/profile/"], // ensure there is always an ending slash
+	["accounts/profile", pages.accounts.profile],
+	["accounts/private", pages.accounts.private],
+	["accounts/configure/", pages.accounts.configure], // for front page configuring
+	["accounts/configure/*", pages.accounts.configure],
+	["accounts/member_autocomplete", pages.accounts.member_autocomplete],
+	["accounts/register/complete", pages.accounts.register_complete],
+	["accounts/verify/*", pages.accounts.verify],
+	["accounts/download/", pages.accounts.download], // for front page downloading
+	["accounts/download/*", pages.accounts.download],
+	["accounts/password_change", pages.accounts.password_change],
+	["accounts/password_change/done", pages.accounts.password_change_done],
+	["accounts/nsfw/*", pages.accounts.nsfw],
+	["accounts/tabular", pages.accounts.tabular],
+	["accounts/verify_email/*", pages.accounts.verify_email],
+	["accounts/sso", pages.accounts.sso],
 
-	[/^ajax\/protect[\/]?$/g, pages.protect],
-	[/^ajax\/unprotect[\/]?$/g, pages.unprotect],
-	[/^ajax\/protect\/char[\/]?$/g, pages.protect_char],
-	[/^ajax\/unprotect\/char[\/]?$/g, pages.unprotect_char],
-	[/^ajax\/coordlink[\/]?$/g, pages.coordlink],
-	[/^ajax\/urllink[\/]?$/g, pages.urllink],
+	["ajax/protect", pages.protect],
+	["ajax/unprotect", pages.unprotect],
+	["ajax/protect/char", pages.protect_char],
+	["ajax/unprotect/char", pages.unprotect_char],
+	["ajax/coordlink", pages.coordlink],
+	["ajax/urllink", pages.urllink],
 	
-	[/^administrator\/$/g, pages.admin.administrator],
-	[/^administrator\/user\/(.*)\/$/g, pages.admin.user],
-	[/^administrator\/users\/by_username\/(.*)[\/]?$/g, pages.admin.users_by_username],
-	[/^administrator\/users\/by_id\/(.*)[\/]?$/g, pages.admin.users_by_id],
-	[/^administrator\/backgrounds[\/]?$/g, pages.admin.backgrounds, { binary_post_data: true }],
-	[/^administrator\/manage_ranks[\/]?$/g, pages.admin.manage_ranks],
-	[/^administrator\/set_custom_rank\/(.*)\/$/g, pages.admin.set_custom_rank],
-	[/^administrator\/user_list[\/]?$/g, pages.admin.user_list],
-	[/^administrator\/monitor[\/]?$/g, pages.admin.monitor],
-	[/^administrator\/shell[\/]?$/g, pages.admin.shell],
-	[/^administrator\/restrictions[\/]?$/g, pages.admin.restrictions, { binary_post_data: true }],
+	["administrator/", pages.admin.administrator],
+	["administrator/user/*", pages.admin.user],
+	["administrator/users/by_username/*", pages.admin.users_by_username],
+	["administrator/users/by_id/*", pages.admin.users_by_id],
+	["administrator/backgrounds", pages.admin.backgrounds, { binary_post_data: true }],
+	["administrator/manage_ranks", pages.admin.manage_ranks],
+	["administrator/set_custom_rank/*", pages.admin.set_custom_rank],
+	["administrator/user_list", pages.admin.user_list],
+	["administrator/monitor", pages.admin.monitor],
+	["administrator/shell", pages.admin.shell],
+	["administrator/restrictions", pages.admin.restrictions, { binary_post_data: true }],
 
-	[/^script_manager\/$/g, pages.script_manager],
-	[/^script_manager\/edit\/(.*)\/$/g, pages.script_edit],
-	[/^script_manager\/view\/(.*)\/$/g, pages.script_view],
+	["script_manager/", pages.script_manager],
+	["script_manager/edit/*", pages.script_edit],
+	["script_manager/view/*", pages.script_view],
 	
-	[/^world_style[\/]?$/g, pages.world_style],
-	[/^world_props[\/]?$/g, pages.world_props],
+	["world_style", pages.world_style],
+	["world_props", pages.world_props],
 
-	[/^other\/random_color[\/]?$/g, pages.other.random_color, { no_login: true }],
-	[/^other\/backgrounds\/(.*)[\/]?$/g, pages.other.load_backgrounds, { no_login: true }],
-	[/^other\/test\/(.*)[\/]?$/g, pages.other.test, { no_login: true }],
-	[/^other\/ipaddress[\/]?$/g, pages.other.ipaddress],
+	["other/random_color", pages.other.random_color, { no_login: true }],
+	["other/backgrounds/*", pages.other.load_backgrounds, { no_login: true }],
+	["other/test/*", pages.other.test, { no_login: true }],
+	["other/ipaddress", pages.other.ipaddress],
 
-	[/^static\/(.*)[\/]?$/g, pages.static, { no_login: true }],
-	[/^static[\/]?$/g, pages.static, { no_login: true }],
+	["static/*", pages.static, { no_login: true }],
+	["static", pages.static, { no_login: true }],
 
 	[/^([\w\/\.\-\~]*)$/g, pages.yourworld, { remove_end_slash: true }],
 
 	[/./gs, pages["404"]]
 ];
+
+// URL regexp pre-processing
+for(var i = 0; i < url_regexp.length; i++) {
+	var rule = url_regexp[i];
+	if(typeof rule[0] != "string") continue;
+
+	var pathPattern = rule[0];
+	pathPattern = pathPattern.replace(/\./g, "\\.");
+	pathPattern = pathPattern.replace(/\*/g, "(.*)");
+	if(pathPattern.at(-1) != "$" && pathPattern.at(-1) != "/") {
+		pathPattern += "[/]?$";
+	}
+	if(pathPattern.at(-1) == "/") {
+		pathPattern += "$";
+	}
+	rule[0] = new RegExp("^" + pathPattern, "g");
+}
 
 /*
 	redirect the page's processing to that of another page

@@ -56,7 +56,8 @@ enums.position = makeEnum(["tileX", "tileY", "charX", "charY"]);
 
 var ws_path = createWsPath();
 
-var menu;
+var menu, menuStyle;
+var styles                 = defaultStyles();
 var nextObjId              = 1; // Next edit ID
 var owotWidth              = getWndWidth();
 var owotHeight             = getWndHeight();
@@ -1585,15 +1586,6 @@ var poolCleanupInterval = setInterval(function() {
 	shiftAllTilesInPools();
 }, 1000 * 10);
 
-// deprecated
-var textLayerCtx = owotCtx;
-
-function createWsPath() {
-	var search = window.location.search;
-	if(!search) search = "";
-	return "ws" + (window.location.protocol == "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/" + search;
-}
-
 function checkTextColorOverride() {
 	var public = 4;
 	var member = 2;
@@ -1615,9 +1607,7 @@ function checkTextColorOverride() {
 		textColorOverride &= textColorOverride ^ owner;
 	}
 }
-var styles = defaultStyles();
 
-var menuStyle;
 function menu_color(color) {
 	if(color.toLowerCase() == "#e5e5ff") {
 		if(window.menuStyle) {
@@ -3602,6 +3592,12 @@ function checkKeyPatterns(combination) {
 		if(!keyMap[k]) return false;
 	}
 	return true;
+}
+
+function createWsPath() {
+	var search = window.location.search;
+	if(!search) search = "";
+	return "ws" + (window.location.protocol == "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/" + search;
 }
 
 var fetchInterval;
