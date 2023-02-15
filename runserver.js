@@ -2511,6 +2511,10 @@ async function manageWebsocketConnection(ws, req) {
 		chat_blocks: null
 	};
 
+	var parsedURL = url.parse(req.url);
+	var location = parsedURL.pathname;
+	var search = querystring.parse(parsedURL.query);
+
 	var bytesWritten = 0;
 	var bytesRead = 0;
 	
@@ -2549,7 +2553,6 @@ async function manageWebsocketConnection(ws, req) {
 		}));
 		ws.close();
 	}
-	// TODO: querystring is deprecated?
 
 	if(!can_connect_ip_address(ws.sdata.ipAddress)) {
 		return error_ws("CONN_LIMIT", "Too many connections");
@@ -2573,10 +2576,23 @@ async function manageWebsocketConnection(ws, req) {
 		}
 	}
 	var kindLimits = get_ip_kind_limits(ws.sdata.ipAddress);
-	var parsedURL = url.parse(req.url);
-	var location = parsedURL.pathname;
-	var search = querystring.parse(parsedURL.query);
-	if(location == "/administrator/monitor/ws/") {
+
+	if(typeof location != "string") {
+		location = "/ws";
+	}
+
+	// remove initial and last slashes
+	if(location.at(0) == "/") location = location.slice(1);
+	if(location.at(-1) == "/") location = location.slice(0, -1);
+
+	if(location.toLowerCase().endsWith("/ws")) {
+		location = location.slice(0, -3); // remove "/ws"
+	} else {
+		// path doesn't end with /ws or /ws/
+		return error_ws("INVALID_ADDR", "Invalid address");
+	}
+
+	if(location == "administrator/monitor") {
 		var cookies = parseCookie(req.headers.cookie);
 		var user = await get_user_info(cookies, true);
 		if(!user.superuser) {
@@ -2645,13 +2661,6 @@ async function manageWebsocketConnection(ws, req) {
 	});
 	if(ws.sdata.terminated) return; // in the event of an immediate close
 
-	var world_name = "";
-	if(location.match(/(\/ws\/$)/)) {
-		world_name = location.replace(/(^\/)|(\/ws\/)|(ws\/$)/g, "");
-	} else {
-		return error_ws("INVALID_ADDR", "Invalid address");
-	}
-
 	var cookies = parseCookie(req.headers.cookie);
 	var user = await get_user_info(cookies, true);
 	if(ws.sdata.terminated) return;
@@ -2669,7 +2678,7 @@ async function manageWebsocketConnection(ws, req) {
 		ws.sdata.hide_user_count = true;
 	}
 
-	world = await getOrCreateWorld(world_name);
+	world = await getOrCreateWorld(location);
 	if(ws.sdata.terminated) return;
 	if(!world) {
 		return error_ws("NO_EXIST", "World does not exist");
