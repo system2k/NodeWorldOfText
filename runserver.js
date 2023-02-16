@@ -2768,7 +2768,10 @@ async function manageWebsocketConnection(ws, req) {
 
 	ws.off("message", pre_message);
 	ws.on("message", handle_message);
-	async function handle_message(msg) {
+	async function handle_message(msg, isBinary) {
+		if(!isBinary) {
+			msg = msg.toString("utf8");
+		}
 		updateNetworkStats();
 		if(!can_process_req()) return;
 		if(!(typeof msg == "string" || typeof msg == "object")) {
