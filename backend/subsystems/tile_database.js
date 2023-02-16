@@ -1358,7 +1358,7 @@ function processTileIORequest(call_id, type, data) {
 			cids[call_id][2] = function() {
 				prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, null);
 				if(!data.no_log_edits) {
-					appendToEditLogQueue(tileX, tileY, 0, "@{\"kind\":\"clear_public\"}", world.id, Date.now());
+					appendToEditLogQueue(tileX, tileY, 0, "@{\"kind\":\"clear_tile\"}", world.id, Date.now());
 				}
 			}
 

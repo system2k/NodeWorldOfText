@@ -1135,87 +1135,88 @@ function release_http_rate_limit(ip, rate_id) {
 }
 
 // pathname or regexp ; function or redirect path ; [options]
-var url_regexp = [
-	["favicon.ico", "/static/favicon.png", { no_login: true }],
-	["robots.txt", "/static/robots.txt", { no_login: true }],
-	["home", pages.home],
-	[".well-known/*", pages.well_known, { no_login: true, binary_post_data: true }],
+var url_patterns = [];
+function register_endpoint(pattern, router, opts) {
+	// pathname or regexp ; function or redirect path ; [options]
+	if(!opts) opts = {};
 
-	["accounts/login", pages.accounts.login],
-	["accounts/logout", pages.accounts.logout],
-	["accounts/register", pages.accounts.register],
-	["accounts/profile$", "/accounts/profile/"], // ensure there is always an ending slash
-	["accounts/profile", pages.accounts.profile],
-	["accounts/private", pages.accounts.private],
-	["accounts/configure/", pages.accounts.configure], // for front page configuring
-	["accounts/configure/*", pages.accounts.configure],
-	["accounts/member_autocomplete", pages.accounts.member_autocomplete],
-	["accounts/register/complete", pages.accounts.register_complete],
-	["accounts/verify/*", pages.accounts.verify],
-	["accounts/download/", pages.accounts.download], // for front page downloading
-	["accounts/download/*", pages.accounts.download],
-	["accounts/password_change", pages.accounts.password_change],
-	["accounts/password_change/done", pages.accounts.password_change_done],
-	["accounts/nsfw/*", pages.accounts.nsfw],
-	["accounts/tabular", pages.accounts.tabular],
-	["accounts/verify_email/*", pages.accounts.verify_email],
-	["accounts/sso", pages.accounts.sso],
-
-	["ajax/protect", pages.protect],
-	["ajax/unprotect", pages.unprotect],
-	["ajax/protect/char", pages.protect_char],
-	["ajax/unprotect/char", pages.unprotect_char],
-	["ajax/coordlink", pages.coordlink],
-	["ajax/urllink", pages.urllink],
-	
-	["administrator/", pages.admin.administrator],
-	["administrator/user/*", pages.admin.user],
-	["administrator/users/by_username/*", pages.admin.users_by_username],
-	["administrator/users/by_id/*", pages.admin.users_by_id],
-	["administrator/backgrounds", pages.admin.backgrounds, { binary_post_data: true }],
-	["administrator/manage_ranks", pages.admin.manage_ranks],
-	["administrator/set_custom_rank/*", pages.admin.set_custom_rank],
-	["administrator/user_list", pages.admin.user_list],
-	["administrator/monitor", pages.admin.monitor],
-	["administrator/shell", pages.admin.shell],
-	["administrator/restrictions", pages.admin.restrictions, { binary_post_data: true }],
-
-	["script_manager/", pages.script_manager],
-	["script_manager/edit/*", pages.script_edit],
-	["script_manager/view/*", pages.script_view],
-	
-	["world_style", pages.world_style],
-	["world_props", pages.world_props],
-
-	["other/random_color", pages.other.random_color, { no_login: true }],
-	["other/backgrounds/*", pages.other.load_backgrounds, { no_login: true }],
-	["other/test/*", pages.other.test, { no_login: true }],
-	["other/ipaddress", pages.other.ipaddress],
-
-	["static/*", pages.static, { no_login: true }],
-	["static", pages.static, { no_login: true }],
-
-	[/^([\w\/\.\-\~]*)$/g, pages.yourworld, { remove_end_slash: true }],
-
-	[/./gs, pages["404"]]
-];
-
-// URL regexp pre-processing
-for(var i = 0; i < url_regexp.length; i++) {
-	var rule = url_regexp[i];
-	if(typeof rule[0] != "string") continue;
-
-	var pathPattern = rule[0];
-	pathPattern = pathPattern.replace(/\./g, "\\.");
-	pathPattern = pathPattern.replace(/\*/g, "(.*)");
-	if(pathPattern.at(-1) != "$" && pathPattern.at(-1) != "/") {
-		pathPattern += "[/]?$";
+	if(typeof pattern == "string") {
+		pattern = pattern.replace(/\./g, "\\.");
+		pattern = pattern.replace(/\*/g, "(.*)");
+		if(pattern.at(-1) != "$" && pattern.at(-1) != "/") {
+			pattern += "[/]?$";
+		}
+		if(pattern.at(-1) == "/") {
+			pattern += "$";
+		}
+		pattern = new RegExp("^" + pattern, "g");
 	}
-	if(pathPattern.at(-1) == "/") {
-		pathPattern += "$";
-	}
-	rule[0] = new RegExp("^" + pathPattern, "g");
+
+	url_patterns.push([pattern, router, opts]);
 }
+
+register_endpoint("favicon.ico", "/static/favicon.png", { no_login: true });
+register_endpoint("robots.txt", "/static/robots.txt", { no_login: true });
+register_endpoint("home", pages.home);
+register_endpoint(".well-known/*", pages.well_known, { no_login: true, binary_post_data: true });
+
+register_endpoint("accounts/login", pages.accounts.login);
+register_endpoint("accounts/logout", pages.accounts.logout);
+register_endpoint("accounts/register", pages.accounts.register);
+register_endpoint("accounts/profile$", "/accounts/profile/"); // ensure there is always an ending slash
+register_endpoint("accounts/profile", pages.accounts.profile);
+register_endpoint("accounts/private", pages.accounts.private);
+register_endpoint("accounts/configure/", pages.accounts.configure); // for front page configuring
+register_endpoint("accounts/configure/*", pages.accounts.configure);
+register_endpoint("accounts/member_autocomplete", pages.accounts.member_autocomplete);
+register_endpoint("accounts/register/complete", pages.accounts.register_complete);
+register_endpoint("accounts/verify/*", pages.accounts.verify);
+register_endpoint("accounts/download/", pages.accounts.download); // for front page downloading
+register_endpoint("accounts/download/*", pages.accounts.download);
+register_endpoint("accounts/password_change", pages.accounts.password_change);
+register_endpoint("accounts/password_change/done", pages.accounts.password_change_done);
+register_endpoint("accounts/nsfw/*", pages.accounts.nsfw);
+register_endpoint("accounts/tabular", pages.accounts.tabular);
+register_endpoint("accounts/verify_email/*", pages.accounts.verify_email);
+register_endpoint("accounts/sso", pages.accounts.sso);
+
+register_endpoint("ajax/protect", pages.protect);
+register_endpoint("ajax/unprotect", pages.unprotect);
+register_endpoint("ajax/protect/char", pages.protect_char);
+register_endpoint("ajax/unprotect/char", pages.unprotect_char);
+register_endpoint("ajax/coordlink", pages.coordlink);
+register_endpoint("ajax/urllink", pages.urllink);
+
+register_endpoint("administrator/", pages.admin.administrator);
+register_endpoint("administrator/user/*", pages.admin.user);
+register_endpoint("administrator/users/by_username/*", pages.admin.users_by_username);
+register_endpoint("administrator/users/by_id/*", pages.admin.users_by_id);
+register_endpoint("administrator/backgrounds", pages.admin.backgrounds, { binary_post_data: true });
+register_endpoint("administrator/manage_ranks", pages.admin.manage_ranks);
+register_endpoint("administrator/set_custom_rank/*", pages.admin.set_custom_rank);
+register_endpoint("administrator/user_list", pages.admin.user_list);
+register_endpoint("administrator/monitor", pages.admin.monitor);
+register_endpoint("administrator/shell", pages.admin.shell);
+register_endpoint("administrator/restrictions", pages.admin.restrictions, { binary_post_data: true });
+
+register_endpoint("script_manager/", pages.script_manager);
+register_endpoint("script_manager/edit/*", pages.script_edit);
+register_endpoint("script_manager/view/*", pages.script_view);
+
+register_endpoint("world_style", pages.world_style);
+register_endpoint("world_props", pages.world_props);
+
+register_endpoint("other/random_color", pages.other.random_color, { no_login: true });
+register_endpoint("other/backgrounds/*", pages.other.load_backgrounds, { no_login: true });
+register_endpoint("other/test/*", pages.other.test, { no_login: true });
+register_endpoint("other/ipaddress", pages.other.ipaddress);
+
+register_endpoint("static/*", pages.static, { no_login: true });
+register_endpoint("static", pages.static, { no_login: true });
+
+register_endpoint(/^([\w\/\.\-\~]*)$/g, pages.yourworld, { remove_end_slash: true });
+
+register_endpoint(/./gs, pages["404"]);
 
 /*
 	redirect the page's processing to that of another page
@@ -1829,8 +1830,8 @@ async function process_request(req, res, compCallbacks) {
 	});
 
 	var page_resolved = false;
-	for(var i in url_regexp) {
-		var pattern = url_regexp[i];
+	for(var i in url_patterns) {
+		var pattern = url_patterns[i];
 		var urlReg = pattern[0];
 		var pageRes = pattern[1];
 		var options = pattern[2];
