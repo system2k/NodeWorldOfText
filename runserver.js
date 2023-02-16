@@ -2582,16 +2582,17 @@ async function manageWebsocketConnection(ws, req) {
 		location = "/ws";
 	}
 
-	// remove initial and last slashes
-	if(location.at(0) == "/") location = location.slice(1);
+	// remove last slash
 	if(location.at(-1) == "/") location = location.slice(0, -1);
-
+	// check for and remove "/ws" at the end
 	if(location.toLowerCase().endsWith("/ws")) {
-		location = location.slice(0, -3); // remove "/ws"
+		location = location.slice(0, -3);
 	} else {
 		// path doesn't end with /ws or /ws/
 		return error_ws("INVALID_ADDR", "Invalid address");
 	}
+	// remove initial slash
+	if(location.at(0) == "/") location = location.slice(1);
 
 	if(location == "administrator/monitor") {
 		var cookies = parseCookie(req.headers.cookie);
