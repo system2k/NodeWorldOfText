@@ -133,7 +133,10 @@ var acme = {
 	enabled: false,
 	pass: null
 };
+var valid_subdomains = []; // e.g. ["test"]
+var closed_client_limit = 1000 * 60 * 20; // 20 min
 
+var wss; // websocket handler
 var intv = {}; // intervals and timeouts
 var pluginMgr = null;
 
@@ -146,6 +149,12 @@ CONST.tileArea = CONST.tileCols * CONST.tileRows;
 // tile cache for fetching and updating
 // 3 levels: world_id -> tile_y -> tile_x
 var memTileCache = {};
+
+var ranks_cache = { users: {} };
+var announcement_cache = "";
+var worldData = {};
+var client_cursor_pos = {};
+var client_ips = {};
 
 console.log("Loaded libs");
 
@@ -836,7 +845,7 @@ async function initialize_server() {
 		if(accountSystem == "local") {
 			account_prompt();
 		} else if(accountSystem == "uvias") {
-			account_prompt_uvias();
+			account_prompt(true);
 		}
 	}
 	if(!init) {
@@ -868,9 +877,6 @@ async function initialize_image_db() {
 	}
 }
 
-var ranks_cache = {
-	users: {}
-};
 /*
 	TODO: scrap this & rename to 'chat tag'
 	proposed change:
@@ -1786,10 +1792,8 @@ function createDispatcher(res, opts) {
 	return dispatch;
 }
 
-var valid_subdomains = []; // e.g. ["test"]
-
 async function process_request(req, res, compCallbacks) {
-	if(!serverLoaded) await waitForServerLoad();
+	if(!serverLoaded) return res.end("Server is not initialized");
 	if(isStopping) return;
 
 	var hostname = parseHostname(req.headers.host);
@@ -1969,8 +1973,6 @@ async function process_request(req, res, compCallbacks) {
 	res.end();
 }
 
-var announcement_cache = "";
-
 async function loadAnnouncement() {
 	announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
 	if(!announcement_cache) {
@@ -1997,7 +1999,6 @@ async function modifyAnnouncement(text) {
 	});
 }
 
-var worldData = {};
 function getWorldData(worldId) {
 	if(worldData[worldId]) return worldData[worldId];
 
@@ -2088,9 +2089,6 @@ async function clear_expired_sessions(no_timeout) {
 	if(!no_timeout) intv.clearExpiredSessions = setTimeout(clear_expired_sessions, ms.minute);
 }
 
-var client_cursor_pos = {};
-var client_ips = {};
-var closed_client_limit = 1000 * 60 * 20; // 20 min
 function setupClearClosedClientsInterval() {
 	intv.clear_closed_clients = setInterval(function() {
 		var curTime = Date.now();
@@ -2210,7 +2208,6 @@ function wsSend(socket, data) {
 	}
 }
 
-var wss;
 function ws_broadcast(data, world_id, opts) {
 	if(!wss) return; // this can only happen pre-initialization
 	if(!opts) opts = {};
@@ -2286,6 +2283,16 @@ async function initialize_server_components() {
 		await clear_expired_sessions();
 	}
 
+	// initialize the subsystems (tile database; chat manager)
+	await sysLoad();
+
+	// ping clients at a regular interval to ensure they dont disconnect constantly
+	initPingAuto();
+
+	serverLoaded = true;
+
+	loadPlugin(true);
+
 	server.listen(serverPort, settings.ip, function() {
 		var addr = server.address();
 
@@ -2311,26 +2318,6 @@ async function initialize_server_components() {
 			// failed to initialize
 			handle_error(e);
 		}
-	});
-
-	// initialize the subsystems (tile database; chat manager)
-	await sysLoad();
-
-	// ping clients at a regular interval to ensure they dont disconnect constantly
-	initPingAuto();
-
-	serverLoaded = true;
-	for(var i = 0; i < serverLoadWaitQueue.length; i++) {
-		serverLoadWaitQueue[i]();
-	}
-
-	loadPlugin(true);
-}
-
-var serverLoadWaitQueue = [];
-function waitForServerLoad() {
-	return new Promise(function(res) {
-		serverLoadWaitQueue.push(res);
 	});
 }
 
@@ -2503,8 +2490,7 @@ function invalidateWebsocketSession(session_token) {
 }
 
 async function manageWebsocketConnection(ws, req) {
-	if(!serverLoaded) await waitForServerLoad();
-	if(isStopping) return;
+	if(isStopping || !serverLoaded) return ws.close();
 	ws.sdata = {
 		terminated: false,
 		ipAddress: null,
