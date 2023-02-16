@@ -1136,6 +1136,7 @@ function release_http_rate_limit(ip, rate_id) {
 
 // pathname or regexp ; function or redirect path ; [options]
 var url_patterns = [];
+var url_error_endpoints = {};
 function register_endpoint(pattern, router, opts) {
 	// pathname or regexp ; function or redirect path ; [options]
 	if(!opts) opts = {};
@@ -1153,6 +1154,9 @@ function register_endpoint(pattern, router, opts) {
 	}
 
 	url_patterns.push([pattern, router, opts]);
+}
+function register_error_endpoint(code, router) {
+	url_error_endpoints[code] = router;
 }
 
 register_endpoint("favicon.ico", "/static/favicon.png", { no_login: true });
@@ -1215,8 +1219,8 @@ register_endpoint("static/*", pages.static, { no_login: true });
 register_endpoint("static", pages.static, { no_login: true });
 
 register_endpoint(/^([\w\/\.\-\~]*)$/g, pages.yourworld, { remove_end_slash: true });
-
-register_endpoint(/./gs, pages["404"]);
+register_error_endpoint(404, pages["404"]);
+register_error_endpoint(500, pages["500"]);
 
 /*
 	redirect the page's processing to that of another page
@@ -1829,33 +1833,19 @@ async function process_request(req, res, compCallbacks) {
 		gzip: gzipEnabled
 	});
 
-	var page_resolved = false;
-	for(var i in url_patterns) {
-		var pattern = url_patterns[i];
-		var urlReg = pattern[0];
-		var pageRes = pattern[1];
-		var options = pattern[2];
+	async function processPage(handler, options) {
 		if(!options) options = {};
-
 		var no_login = options.no_login;
 		var binary_post_data = options.binary_post_data;
 		var remove_end_slash = options.remove_end_slash;
 
-		/*
-		TODO: refactor
-		possible options: no_login; binary_post_data; remove_end_slash
-		*/
-		if(!URL.match(urlReg)) {
-			continue;
-		}
-		page_resolved = true;
 		if(typeof pageRes == "string") { // redirection
 			dispatch(null, null, { redirect: pageRes });
-			break;
+			return true;
 		}
 		if(typeof pageRes != "object") { // not a valid page type
-			page_resolved = false;
-			break;
+			//page_resolved = false;
+			return false;
 		}
 		var method = req.method.toUpperCase();
 		var rate_id = await check_http_rate_limit(ipAddress, pageRes, method);
@@ -1938,11 +1928,40 @@ async function process_request(req, res, compCallbacks) {
 		} else {
 			dispatch("Method " + method + " not allowed.", 405);
 		}
-		if(pageStat === -1) continue;
-		break;
+		if(!dispatch.isResolved()) return false;
+		return true;
 	}
 
-	if(!page_resolved || !dispatch.isResolved()) {
+	var page_resolved = false;
+	for(var i in url_patterns) {
+		var pattern = url_patterns[i];
+		var urlReg = pattern[0];
+		var pageRes = pattern[1];
+		var options = pattern[2];
+
+		if(!URL.match(urlReg)) {
+			continue;
+		}
+
+		var status = await processPage(pageRes, options);
+		if(status) {
+			page_resolved = true;
+			break;
+		}
+	}
+
+	if(!dispatch.isResolved()) {
+		var endpoint = url_error_endpoints["404"];
+		if(endpoint) {
+			var status = await processPage(endpoint, {});
+			if(status) {
+				page_resolved = true;
+			}
+		}
+	}
+
+	// the error page failed to render somehow
+	if(!page_resolved) {
 		return dispatch("HTTP 404: The resource cannot be found", 404);
 	}
 

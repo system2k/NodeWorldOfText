@@ -26,7 +26,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 	var parse = url.parse(req.url).pathname.substr(1);
 	var segmentCount = parse.split("/").length;
 	if(segmentCount == 1) {
-		return -1; // world "/static"
+		return; // top-level access is not possible
 	}
 	parse = removeLastSlash(parse).toLowerCase();
 	var mime_type = mime(parse.replace(/.*[\.\/\\]/, "").toLowerCase());
