@@ -135,8 +135,10 @@ var acme = {
 };
 var valid_subdomains = []; // e.g. ["test"]
 var closed_client_limit = 1000 * 60 * 20; // 20 min
+var ws_req_per_second = 1000;
 
 var wss; // websocket handler
+var pgConn; // postgreSQL connection for Uvias
 var intv = {}; // intervals and timeouts
 var pluginMgr = null;
 
@@ -155,6 +157,8 @@ var announcement_cache = "";
 var worldData = {};
 var client_cursor_pos = {};
 var client_ips = {};
+var ip_address_conn_limit = {}; // {ip: count}
+var ip_address_req_limit = {}; // {ip: ws_limits} // TODO: Cleanup objects
 
 console.log("Loaded libs");
 
@@ -275,10 +279,8 @@ async function runShellScript(includeColors) {
 	return resp;
 }
 
-var pgClient = pg.Client;
-var pgConn;
 function makePgClient() {
-	pgConn = new pgClient({
+	pgConn = new pg.Client({
 		connectionString: "pg://"
 	});
 	console.log("Postgres client connected");
@@ -2077,7 +2079,7 @@ function broadcastUserCount() {
 }
 
 async function clear_expired_sessions(no_timeout) {
-	// clear expires sessions
+	// clear expired sessions
 	await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
 	// clear expired registration keys
 	await db.each("SELECT id FROM auth_user WHERE is_active=0 AND ? - date_joined >= ? AND (SELECT COUNT(*) FROM registration_registrationprofile WHERE user_id=auth_user.id) > 0",
@@ -2404,12 +2406,6 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 	return [ipAddress, ipAddressFam, ipAddressVal];
 }
 
-// {ip: count}
-var ip_address_conn_limit = {};
-// {ip: ws_limits}
-var ip_address_req_limit = {}; // TODO: Cleanup objects
-
-var ws_req_per_second = 1000;
 var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	chat:			[256, 1000, 0], // rate-limiting handled separately
 	chathistory:	[4, 500, 0],

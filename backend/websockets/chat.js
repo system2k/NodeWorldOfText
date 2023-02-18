@@ -500,12 +500,12 @@ module.exports = async function(ws, data, send, server, ctx) {
 				privateMessage: "from_me"
 			});
 			// if user has blocked TELLs, don't let the /tell-er know
-			if(ws.sdata.chat_blocks[id] && (ws.sdata.chat_blocks.id.includes(clientId) || // is ID of the /tell sender? (not destination)
-				(ws.sdata.chat_blocks.block_all && opts.clientId != 0)) ||
-				(ws.sdata.chat_blocks.no_tell)) return;
+			if(client.sdata.chat_blocks[id] && (client.sdata.chat_blocks.id.includes(clientId) || // is ID of the /tell sender? (not destination)
+				(client.sdata.chat_blocks.block_all && opts.clientId != 0)) ||
+				(client.sdata.chat_blocks.no_tell)) return;
 				
 			// user has blocked the TELLer by IP
-			var tellblock = tell_blocks[ws.sdata.ipAddress];
+			var tellblock = tell_blocks[client.sdata.ipAddress];
 			if(tellblock && tellblock[ipHeaderAddr]) {
 				var blk = tellblock[ipHeaderAddr];
 				if(Date.now() - blk > 1000 * 60 * 60) { // delete after 1 hour
@@ -520,7 +520,7 @@ module.exports = async function(ws, data, send, server, ctx) {
 			if(clientIpObj && location == "global") {
 				clientIpObj[3] = Date.now();
 			}
-			broadcastMonitorEvent("TellSpam", "Tell from " + clientId + " (" + ws.sdata.ipAddress + ") to " + id + ", first 4 chars: [" + message.slice(0, 4) + "]");
+			broadcastMonitorEvent("TellSpam", "Tell from " + clientId + " (" + ipHeaderAddr + ") to " + id + ", first 4 chars: [" + message.slice(0, 4) + "]");
 		},
 		channel: async function() {
 			if(!user.staff) return;
