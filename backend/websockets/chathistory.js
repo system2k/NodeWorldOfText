@@ -1,4 +1,4 @@
-module.exports = async function(ws, data, send, server, ctx) {
+module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var user = ctx.user;
 	var world = ctx.world;
 

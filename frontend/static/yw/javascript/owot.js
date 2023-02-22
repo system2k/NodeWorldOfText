@@ -4405,10 +4405,9 @@ function clearCharTextDecorations(char) {
 	return char;
 }
 
-function renderChar(textRender, x, y, str, tile, writability, props, offsetX, offsetY, charOverflowMode, containsCursor) {
+function renderChar(textRender, x, y, str, tile, writability, props, offsetX, offsetY, charOverflowMode) {
 	var content = tile.content;
 	var colors = tile.properties.color;
-	var bgcolors = tile.properties.bgcolor;
 
 	// adjust baseline
 	var textYOffset = cellH - (5 * zoom);
@@ -4442,12 +4441,6 @@ function renderChar(textRender, x, y, str, tile, writability, props, offsetX, of
 		color = colorClasses[color];
 		textRender.fillStyle = color;
 		textRender.fillRect(fontX, fontY, cellW, cellH);
-	} else if(bgcolors && colorsEnabled && !containsCursor) {
-		var bgColor = bgcolors[y * tileC + x];
-		if(bgColor != -1) {
-			textRender.fillStyle = `rgb(${bgColor >> 16 & 255},${bgColor >> 8 & 255},${bgColor & 255})`;
-			textRender.fillRect(fontX, fontY, cellW, cellH);
-		}
 	}
 
 	var color = colors ? colors[y * tileC + x] : 0;
@@ -4737,7 +4730,6 @@ function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY, bounds, ch
 	if(!tile) return;
 	var props = tile.properties.cell_props || {};
 	var writability = tile.writability;
-	var containsCursor = cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY;
 	if(priorityOverwriteChar && tile.properties.char) { // TODO: doesn't work right
 		for(var lev = 0; lev < 3; lev++) {
 			for(var c = 0; c < tileArea; c++) {
@@ -4748,8 +4740,7 @@ function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY, bounds, ch
 				var cX = c % tileC;
 				var cY = Math.floor(c / tileC);
 				textRenderCtx.clearRect(cX * cellW, cY * cellH, cellW, cellH);
-				var charContainsCursor = containsCursor && cursorCoords[2] == cX && cursorCoords[3] == cY;
-				renderChar(textRenderCtx, cX, cY, str, tile, code, props, offsetX, offsetY, false, charContainsCursor);
+				renderChar(textRenderCtx, cX, cY, str, tile, code, props, offsetX, offsetY, false);
 			}
 		}
 	} else {
@@ -4771,9 +4762,31 @@ function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY, bounds, ch
 				}
 				if(protValue == null) protValue = tile.properties.writability;
 				if(protValue == null) protValue = state.worldModel.writability;
-				var charContainsCursor = containsCursor && cursorCoords[2] == x && cursorCoords[3] == y;
-				renderChar(textRenderCtx, x, y, str, tile, protValue, props, offsetX, offsetY, charOverflowMode, charContainsCursor);
+				renderChar(textRenderCtx, x, y, str, tile, protValue, props, offsetX, offsetY, charOverflowMode);
 			}
+		}
+	}
+}
+
+function renderCellBgColors(textRenderCtx, tileX, tileY) {
+	var tile = Tile.get(tileX, tileY);
+	if(!tile) return;
+	var containsCursor = cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY;
+	var bgcolors = tile.properties.bgcolor;
+	if(!bgcolors) return;
+	for(var y = 0; y < tileR; y++) {
+		for(var x = 0; x < tileC; x++) {
+			var bgColor = bgcolors[y * tileC + x];
+			if(bgColor == -1) continue;
+			if(containsCursor && cursorCoords && cursorCoords[2] == x && cursorCoords[3] == y) continue;
+			var tmpCellW = tileWidth / tileC;
+			var tmpCellH = tileHeight / tileR;
+			var sx = Math.floor(x * tmpCellW);
+			var sy = Math.floor(y * tmpCellH);
+			var ex = Math.floor((x + 1) * tmpCellW);
+			var ey = Math.floor((y + 1) * tmpCellH);
+			textRenderCtx.fillStyle = `rgb(${bgColor >> 16 & 255},${bgColor >> 8 & 255},${bgColor & 255})`;
+			textRenderCtx.fillRect(sx, sy, ex - sx, ey - sy);
 		}
 	}
 }
@@ -4872,6 +4885,8 @@ function renderTile(tileX, tileY, redraw) {
 	if(typeof tile.content == "string") {
 		tile.content = w.split(tile.content);
 	}
+
+	renderCellBgColors(textRenderCtx, tileX, tileY);
 
 	if(!bufferLargeChars || priorityOverwriteChar) {
 		renderContent(textRenderCtx, tileX, tileY, 0, 0);
@@ -5131,7 +5146,7 @@ function protectSelectionStart(start, end, width, height) {
 				// skip over gap
 				if(tw && ty >= ty1 && ty <= ty2 && tx >= tx1 && tx <= tx2) {
 					tx = tx2 + 1;
-					x += tw * 16 - 1;
+					x += tw * tileC - 1;
 					continue;
 				}
 				var pos = ty + "," + tx;
@@ -5139,13 +5154,13 @@ function protectSelectionStart(start, end, width, height) {
 				charList[pos].push([cx, cy]);
 				autoTotal++;
 				cx++;
-				if(cx >= 16) {
+				if(cx >= tileC) {
 					cx = 0;
 					tx++;
 				}
 			}
 			cy++;
-			if(cy >= 8) {
+			if(cy >= tileR) {
 				cy = 0;
 				ty++;
 			}

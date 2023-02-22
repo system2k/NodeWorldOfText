@@ -2,12 +2,11 @@ var WebSocket = require("ws");
 var utils = require("../utils/utils.js");
 var san_nbr = utils.san_nbr;
 
-module.exports = async function(ws, data, send, server, ctx) {
+module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var client_cursor_pos = server.client_cursor_pos;
 	var wss = server.wss;
 	var wsSend = server.wsSend;
 
-	var broadcast = ctx.broadcast; // broadcast to current world
 	var user = ctx.user;
 	var channel = ctx.channel;
 	var world = ctx.world;

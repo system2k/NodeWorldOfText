@@ -120,7 +120,6 @@ if(accountSystem != "uvias" && accountSystem != "local") {
 Error.stackTraceLimit = 1024;
 var gzipEnabled = false;
 var shellEnabled = true;
-var clientVersion = "";
 
 var isTestServer = false;
 var debugLogging = false;
@@ -136,11 +135,14 @@ var acme = {
 var valid_subdomains = []; // e.g. ["test"]
 var closed_client_limit = 1000 * 60 * 20; // 20 min
 var ws_req_per_second = 1000;
+var pw_encryption = "sha512WithRSAEncryption";
 
 var wss; // websocket handler
+var clientVersion = "";
 var pgConn; // postgreSQL connection for Uvias
 var intv = {}; // intervals and timeouts
 var pluginMgr = null;
+var monitorEventSockets = [];
 
 // Global
 CONST = {};
@@ -740,9 +742,8 @@ async function loadEmail() {
 	}
 }
 
-var testEmailAddress = "test@local";
-
 async function send_email(destination, subject, text) {
+	var testEmailAddress = "test@localhost";
 	if(accountSystem != "local") return;
 	if(isTestServer || subject == testEmailAddress) {
 		console.log("To:", destination);
@@ -920,7 +921,6 @@ async function initialize_ranks_db() {
 	}
 }
 
-var pw_encryption = "sha512WithRSAEncryption";
 function encryptHash(pass, salt) {
 	if(!salt) {
 		salt = crypto.randomBytes(10).toString("hex");
@@ -1066,13 +1066,13 @@ var http_rate_limits = [ // function ; hold limit ; [method]
 	[pages.accounts.download, 2],
 	[pages.accounts.tabular, 2],
 	[pages.accounts.sso, 3],
-	[pages.protect, 128],
-	[pages.unprotect, 128],
-	[pages.protect_char, 512],
-	[pages.unprotect_char, 512],
-	[pages.coordlink, 512],
-	[pages.urllink, 512],
-	[pages.yourworld, 512, "POST"],
+	[pages.protect, 16],
+	[pages.unprotect, 16],
+	[pages.protect_char, 16],
+	[pages.unprotect_char, 16],
+	[pages.coordlink, 16],
+	[pages.urllink, 16],
+	[pages.yourworld, 16, "POST"],
 	[pages.yourworld, 6, "GET"],
 	[pages.world_style, 2],
 	[pages.world_props, 2]
@@ -1145,7 +1145,7 @@ function release_http_rate_limit(ip, rate_id) {
 // pathname or regexp ; function or redirect path ; [options]
 var url_patterns = [];
 var url_error_endpoints = {};
-function register_endpoint(pattern, router, opts) {
+function registerEndpoint(pattern, router, opts) {
 	// pathname or regexp ; function or redirect path ; [options]
 	if(!opts) opts = {};
 
@@ -1163,72 +1163,73 @@ function register_endpoint(pattern, router, opts) {
 
 	url_patterns.push([pattern, router, opts]);
 }
-function register_error_endpoint(code, router) {
+function registerErrorEndpoint(code, router) {
 	url_error_endpoints[code] = router;
 }
 
-register_endpoint("favicon.ico", "/static/favicon.png", { no_login: true });
-register_endpoint("robots.txt", "/static/robots.txt", { no_login: true });
-register_endpoint("home", pages.home);
-register_endpoint(".well-known/*", pages.well_known, { no_login: true, binary_post_data: true });
+function createEndpoints() {
+	registerEndpoint("favicon.ico", "/static/favicon.png", { no_login: true });
+	registerEndpoint("robots.txt", "/static/robots.txt", { no_login: true });
+	registerEndpoint("home", pages.home);
+	registerEndpoint(".well-known/*", pages.well_known, { no_login: true, binary_post_data: true });
 
-register_endpoint("accounts/login", pages.accounts.login);
-register_endpoint("accounts/logout", pages.accounts.logout);
-register_endpoint("accounts/register", pages.accounts.register);
-register_endpoint("accounts/profile$", "/accounts/profile/"); // ensure there is always an ending slash
-register_endpoint("accounts/profile", pages.accounts.profile);
-register_endpoint("accounts/private", pages.accounts.private);
-register_endpoint("accounts/configure/", pages.accounts.configure); // for front page configuring
-register_endpoint("accounts/configure/*", pages.accounts.configure);
-register_endpoint("accounts/member_autocomplete", pages.accounts.member_autocomplete);
-register_endpoint("accounts/register/complete", pages.accounts.register_complete);
-register_endpoint("accounts/verify/*", pages.accounts.verify);
-register_endpoint("accounts/download/", pages.accounts.download); // for front page downloading
-register_endpoint("accounts/download/*", pages.accounts.download);
-register_endpoint("accounts/password_change", pages.accounts.password_change);
-register_endpoint("accounts/password_change/done", pages.accounts.password_change_done);
-register_endpoint("accounts/nsfw/*", pages.accounts.nsfw);
-register_endpoint("accounts/tabular", pages.accounts.tabular);
-register_endpoint("accounts/verify_email/*", pages.accounts.verify_email);
-register_endpoint("accounts/sso", pages.accounts.sso);
+	registerEndpoint("accounts/login", pages.accounts.login);
+	registerEndpoint("accounts/logout", pages.accounts.logout);
+	registerEndpoint("accounts/register", pages.accounts.register);
+	registerEndpoint("accounts/profile$", "/accounts/profile/"); // ensure there is always an ending slash
+	registerEndpoint("accounts/profile", pages.accounts.profile);
+	registerEndpoint("accounts/private", pages.accounts.private);
+	registerEndpoint("accounts/configure/*", pages.accounts.configure);
+	registerEndpoint("accounts/member_autocomplete", pages.accounts.member_autocomplete);
+	registerEndpoint("accounts/register/complete", pages.accounts.register_complete);
+	registerEndpoint("accounts/verify/*", pages.accounts.verify);
+	registerEndpoint("accounts/download/*", pages.accounts.download);
+	registerEndpoint("accounts/password_change", pages.accounts.password_change);
+	registerEndpoint("accounts/password_change/done", pages.accounts.password_change_done);
+	registerEndpoint("accounts/nsfw/*", pages.accounts.nsfw);
+	registerEndpoint("accounts/tabular", pages.accounts.tabular);
+	registerEndpoint("accounts/verify_email/*", pages.accounts.verify_email);
+	registerEndpoint("accounts/sso", pages.accounts.sso);
 
-register_endpoint("ajax/protect", pages.protect);
-register_endpoint("ajax/unprotect", pages.unprotect);
-register_endpoint("ajax/protect/char", pages.protect_char);
-register_endpoint("ajax/unprotect/char", pages.unprotect_char);
-register_endpoint("ajax/coordlink", pages.coordlink);
-register_endpoint("ajax/urllink", pages.urllink);
+	registerEndpoint("ajax/protect", pages.protect);
+	registerEndpoint("ajax/unprotect", pages.unprotect);
+	registerEndpoint("ajax/protect/char", pages.protect_char);
+	registerEndpoint("ajax/unprotect/char", pages.unprotect_char);
+	registerEndpoint("ajax/coordlink", pages.coordlink);
+	registerEndpoint("ajax/urllink", pages.urllink);
 
-register_endpoint("administrator/", pages.admin.administrator);
-register_endpoint("administrator/user/*", pages.admin.user);
-register_endpoint("administrator/users/by_username/*", pages.admin.users_by_username);
-register_endpoint("administrator/users/by_id/*", pages.admin.users_by_id);
-register_endpoint("administrator/backgrounds", pages.admin.backgrounds, { binary_post_data: true });
-register_endpoint("administrator/manage_ranks", pages.admin.manage_ranks);
-register_endpoint("administrator/set_custom_rank/*", pages.admin.set_custom_rank);
-register_endpoint("administrator/user_list", pages.admin.user_list);
-register_endpoint("administrator/monitor", pages.admin.monitor);
-register_endpoint("administrator/shell", pages.admin.shell);
-register_endpoint("administrator/restrictions", pages.admin.restrictions, { binary_post_data: true });
+	registerEndpoint("administrator/", pages.admin.administrator);
+	registerEndpoint("administrator/user/*", pages.admin.user);
+	registerEndpoint("administrator/users/by_username/*", pages.admin.users_by_username);
+	registerEndpoint("administrator/users/by_id/*", pages.admin.users_by_id);
+	registerEndpoint("administrator/backgrounds", pages.admin.backgrounds, { binary_post_data: true });
+	registerEndpoint("administrator/manage_ranks", pages.admin.manage_ranks);
+	registerEndpoint("administrator/set_custom_rank/*", pages.admin.set_custom_rank);
+	registerEndpoint("administrator/user_list", pages.admin.user_list);
+	registerEndpoint("administrator/monitor", pages.admin.monitor);
+	registerEndpoint("administrator/shell", pages.admin.shell);
+	registerEndpoint("administrator/restrictions", pages.admin.restrictions, { binary_post_data: true });
 
-register_endpoint("script_manager/", pages.script_manager);
-register_endpoint("script_manager/edit/*", pages.script_edit);
-register_endpoint("script_manager/view/*", pages.script_view);
+	registerEndpoint("script_manager/", pages.script_manager);
+	registerEndpoint("script_manager/edit/*", pages.script_edit);
+	registerEndpoint("script_manager/view/*", pages.script_view);
 
-register_endpoint("world_style", pages.world_style);
-register_endpoint("world_props", pages.world_props);
+	registerEndpoint("world_style", pages.world_style);
+	registerEndpoint("world_props", pages.world_props);
 
-register_endpoint("other/random_color", pages.other.random_color, { no_login: true });
-register_endpoint("other/backgrounds/*", pages.other.load_backgrounds, { no_login: true });
-register_endpoint("other/test/*", pages.other.test, { no_login: true });
-register_endpoint("other/ipaddress", pages.other.ipaddress);
+	registerEndpoint("other/random_color", pages.other.random_color, { no_login: true });
+	registerEndpoint("other/backgrounds/*", pages.other.load_backgrounds, { no_login: true });
+	registerEndpoint("other/test/*", pages.other.test, { no_login: true });
+	registerEndpoint("other/ipaddress", pages.other.ipaddress);
 
-register_endpoint("static/*", pages.static, { no_login: true });
-register_endpoint("static", pages.static, { no_login: true });
+	registerEndpoint("static/*", pages.static, { no_login: true });
+	registerEndpoint("static", pages.static, { no_login: true });
 
-register_endpoint(/^([\w\/\.\-\~]*)$/g, pages.yourworld, { remove_end_slash: true });
-register_error_endpoint(404, pages["404"]);
-register_error_endpoint(500, pages["500"]);
+	registerEndpoint(/^([\w\/\.\-\~]*)$/g, pages.yourworld, { remove_end_slash: true });
+
+	registerErrorEndpoint(404, pages["404"]);
+	registerErrorEndpoint(500, pages["500"]);
+}
 
 /*
 	redirect the page's processing to that of another page
@@ -1850,7 +1851,6 @@ async function process_request(req, res, compCallbacks) {
 			return true;
 		}
 		if(typeof pageRes != "object") { // not a valid page type
-			//page_resolved = false;
 			return false;
 		}
 		var method = req.method.toUpperCase();
@@ -2091,7 +2091,7 @@ async function clear_expired_sessions(no_timeout) {
 	if(!no_timeout) intv.clearExpiredSessions = setTimeout(clear_expired_sessions, ms.minute);
 }
 
-function setupClearClosedClientsInterval() {
+function initClearClosedClientsInterval() {
 	intv.clear_closed_clients = setInterval(function() {
 		var curTime = Date.now();
 		for(var w in client_ips) {
@@ -2111,7 +2111,7 @@ function setupClearClosedClientsInterval() {
 }
 
 // ping clients every 30 seconds
-function initPingAuto() {
+function initWebsocketPingInterval() {
 	intv.ping_clients = setInterval(function() {
 		if(!wss) return;
 		wss.clients.forEach(function(ws) {
@@ -2245,85 +2245,6 @@ function ws_broadcast(data, world_id, opts) {
 	});
 }
 
-async function initialize_server_components() {
-	await loadAnnouncement();
-
-	intv.userCount = setInterval(function() {
-		broadcastUserCount();
-	}, 2000);
-
-	intv.traff_mon_net_interval = setInterval(function() {
-		if(!monitorEventSockets.length) {
-			periodHTTPOutboundBytes = 0;
-			periodHTTPInboundBytes = 0;
-			periodWSOutboundBytes = 0;
-			periodWSInboundBytes = 0;
-			return;
-		}
-		if(periodHTTPOutboundBytes || periodHTTPInboundBytes) {
-			broadcastMonitorEvent("Network", "HTTP stream: " + periodHTTPOutboundBytes + " (out); " + periodHTTPInboundBytes + " (in)");
-			periodHTTPOutboundBytes = 0;
-			periodHTTPInboundBytes = 0;
-		}
-		if(periodWSOutboundBytes || periodWSInboundBytes) {
-			broadcastMonitorEvent("Network", "WebSocket: " + periodWSOutboundBytes + " (out); " + periodWSInboundBytes + " (in)");
-			periodWSOutboundBytes = 0;
-			periodWSInboundBytes = 0;
-			wss.clients.forEach(function(ws) {
-				if(!ws.sdata) return;
-				if(!ws.sdata.userClient) return;
-				if(ws.sdata.messageBackpressure > 1) {
-					broadcastMonitorEvent("Backpressure", "Warning - backpressure of " + ws.sdata.messageBackpressure + " (" + ws.sdata.ipAddress + ")");
-				}
-			});
-		}
-	}, 1000);
-
-	setupClearClosedClientsInterval();
-
-	if(accountSystem == "local") {
-		await clear_expired_sessions();
-	}
-
-	// initialize the subsystems (tile database; chat manager)
-	await sysLoad();
-
-	// ping clients at a regular interval to ensure they dont disconnect constantly
-	initPingAuto();
-
-	serverLoaded = true;
-
-	loadPlugin(true);
-
-	server.listen(serverPort, settings.ip, function() {
-		var addr = server.address();
-
-		console.log("\x1b[92;1mOWOT Server is running\x1b[0m");
-		console.log("Address: " + addr.address);
-		console.log("Port: " + addr.port);
-
-		// start listening for commands
-		command_prompt();
-	});
-
-	wss = new WebSocket.Server({
-		server,
-		perMessageDeflate: true,
-		maxPayload: 128000
-	});
-	global_data.wss = wss;
-
-	wss.on("connection", async function(ws, req) {
-		try {
-			manageWebsocketConnection(ws, req);
-		} catch(e) {
-			// failed to initialize
-			handle_error(e);
-		}
-	});
-}
-
-var monitorEventSockets = [];
 function sendMonitorEvents(ws) {
 	monitorEventSockets.push(ws);
 }
@@ -2828,10 +2749,7 @@ async function manageWebsocketConnection(ws, req) {
 		var res;
 		var resError = false;
 		try {
-			res = await websockets[kind](ws, msg, send, server, objIncludes(ctx, {
-				broadcast,
-				ws // to be passed on to modules
-			}));
+			res = await websockets[kind](ws, msg, send, broadcast, server, ctx);
 		} catch(e) {
 			resError = true;
 			handle_error(e);
@@ -2854,11 +2772,82 @@ async function manageWebsocketConnection(ws, req) {
 	}
 }
 
-function start_server() {
-	initialize_server_components().catch(function(e) {
-		console.log("An error occurred during component initialization");
-		console.log(e);
+async function start_server() {
+	await loadAnnouncement();
+	
+	if(accountSystem == "local") {
+		await clear_expired_sessions();
+	}
+
+	intv.userCount = setInterval(function() {
+		broadcastUserCount();
+	}, 2000);
+
+	intv.traff_mon_net_interval = setInterval(function() {
+		if(!monitorEventSockets.length) {
+			periodHTTPOutboundBytes = 0;
+			periodHTTPInboundBytes = 0;
+			periodWSOutboundBytes = 0;
+			periodWSInboundBytes = 0;
+			return;
+		}
+		if(periodHTTPOutboundBytes || periodHTTPInboundBytes) {
+			broadcastMonitorEvent("Network", "HTTP stream: " + periodHTTPOutboundBytes + " (out); " + periodHTTPInboundBytes + " (in)");
+			periodHTTPOutboundBytes = 0;
+			periodHTTPInboundBytes = 0;
+		}
+		if(periodWSOutboundBytes || periodWSInboundBytes) {
+			broadcastMonitorEvent("Network", "WebSocket: " + periodWSOutboundBytes + " (out); " + periodWSInboundBytes + " (in)");
+			periodWSOutboundBytes = 0;
+			periodWSInboundBytes = 0;
+			wss.clients.forEach(function(ws) {
+				if(!ws.sdata) return;
+				if(!ws.sdata.userClient) return;
+				if(ws.sdata.messageBackpressure > 1) {
+					broadcastMonitorEvent("Backpressure", "Warning - backpressure of " + ws.sdata.messageBackpressure + " (" + ws.sdata.ipAddress + ")");
+				}
+			});
+		}
+	}, 1000);
+
+	initClearClosedClientsInterval();
+
+	// ping clients at a regular interval to ensure they dont disconnect constantly
+	initWebsocketPingInterval();
+
+	loadPlugin(true);
+	createEndpoints();
+
+	server.listen(serverPort, settings.ip, function() {
+		var addr = server.address();
+
+		console.log("\x1b[92;1mOWOT Server is running\x1b[0m");
+		console.log("Address: " + addr.address);
+		console.log("Port: " + addr.port);
+
+		// start listening for commands
+		command_prompt();
 	});
+
+	wss = new WebSocket.Server({
+		server,
+		perMessageDeflate: true,
+		maxPayload: 128000
+	});
+	global_data.wss = wss;
+
+	wss.on("connection", async function(ws, req) {
+		try {
+			manageWebsocketConnection(ws, req);
+		} catch(e) {
+			// failed to initialize
+			handle_error(e);
+		}
+	});
+
+	await sysLoad(); // initialize the subsystems (tile database; chat manager)
+
+	serverLoaded = true;
 }
 
 // the server context
@@ -2901,7 +2890,6 @@ var global_data = {
 	ranks_cache,
 	static_data,
 	stopServer,
-	testEmailAddress,
 	broadcastMonitorEvent,
 	monitorEventSockets,
 	acme,

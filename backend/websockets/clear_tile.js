@@ -1,8 +1,7 @@
 var utils = require("../utils/utils.js");
 var san_nbr = utils.san_nbr;
 
-module.exports = async function(ws, data, send, server, ctx) {
-	var broadcast = ctx.broadcast;
+module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var user = ctx.user;
 	var world = ctx.world;
 

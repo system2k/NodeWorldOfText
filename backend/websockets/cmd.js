@@ -1,5 +1,4 @@
-module.exports = async function(ws, data, send, server, ctx) {
-	var broadcast = ctx.broadcast; // broadcast to current world
+module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var user = ctx.user;
 	var channel = ctx.channel;
 	var world = ctx.world;

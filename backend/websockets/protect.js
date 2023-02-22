@@ -1,4 +1,4 @@
-module.exports = async function(ws, data, send, server, ctx) {
+module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var modules = server.modules;
 
 	var sData = data.data;
@@ -18,5 +18,11 @@ module.exports = async function(ws, data, send, server, ctx) {
 		charX, charY,
 		precise,
 		type
-	}, server, ctx);
+	}, server, {
+		user: ctx.user,
+		channel: ctx.channel,
+		world: ctx.world,
+		keyQuery: ctx.keyQuery,
+		ws: ws
+	});
 }

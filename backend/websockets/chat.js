@@ -36,8 +36,7 @@ var chat_ip_limits = {};
 var tell_blocks = {};
 var blocked_ips_by_world_id = {}; // id 0 = global
 
-module.exports = async function(ws, data, send, server, ctx) {
-	var broadcast = ctx.broadcast; // broadcast to current world
+module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var channel = ctx.channel;
 	var user = ctx.user;
 	var world = ctx.world;

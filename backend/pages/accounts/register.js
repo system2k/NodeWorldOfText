@@ -36,7 +36,6 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var db = server.db;
 	var callPage = server.callPage;
 	var encryptHash = server.encryptHash;
-	var testEmailAddress = server.testEmailAddress;
 	var accountSystem = server.accountSystem;
 	
 	if(accountSystem == "uvias") {
@@ -58,7 +57,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var password2 = post_data.password2;
 
 	var checkEmailFormat = true;
-	if(email.toLowerCase() == testEmailAddress) {
+	if(email.toLowerCase() == "test@localhost") {
 		checkEmailFormat = false;
 	}
 

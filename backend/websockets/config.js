@@ -1,4 +1,4 @@
-module.exports = async function(ws, data, send, server, ctx) {
+module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	if(data.updates === true) {
 		ws.sdata.receiveContentUpdates = true;
 	} else if(data.updates === false) {
