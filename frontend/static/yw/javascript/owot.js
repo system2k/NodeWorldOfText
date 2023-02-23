@@ -4924,10 +4924,10 @@ function renderTile(tileX, tileY, redraw) {
 	if(!bufferLargeChars || priorityOverwriteChar) {
 		renderContent(textRenderCtx, tileX, tileY, clampW, clampH, 0, 0);
 	} else {
-		renderContent(textRenderCtx, tileX - 1, tileY, clampW, clampH, tileW * -1, 0, [tileC - 1, 0, tileC - 1, tileR - 1], true); // left
+		renderContent(textRenderCtx, tileX - 1, tileY, clampW, clampH, clampW * -1, 0, [tileC - 1, 0, tileC - 1, tileR - 1], true); // left
 		renderContent(textRenderCtx, tileX, tileY, clampW, clampH, 0, 0); // main
-		renderContent(textRenderCtx, tileX - 1, tileY + 1, clampW, clampH, tileW * -1, tileH * 1, [tileC - 1, 0, tileC - 1, 0], true); // bottom-left corner
-		renderContent(textRenderCtx, tileX, tileY + 1, clampW, clampH, 0, tileH * 1, [0, 0, tileC - 1, 0], true); // bottom
+		renderContent(textRenderCtx, tileX - 1, tileY + 1, clampW, clampH, clampW * -1, clampH * 1, [tileC - 1, 0, tileC - 1, 0], true); // bottom-left corner
+		renderContent(textRenderCtx, tileX, tileY + 1, clampW, clampH, 0, clampH * 1, [0, 0, tileC - 1, 0], true); // bottom
 	}
 
 	if(gridEnabled) {
