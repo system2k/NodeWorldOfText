@@ -4196,23 +4196,14 @@ var lcsOctantCharPoints = [
 ];
 
 function isValidSpecialSymbol(charCode) {
-	if((charCode & 0x1FB00) == 0x1FB00) return true;
-	if((charCode & 0x2500) == 0x2500) return true;
-	if(charCode >= 0x25E2 && charCode <= 0x25E5) return true;
-	if(charCode >= 0x1FB3C && charCode <= 0x1FB6F) return true;
-	if(charCode >= 0x1FB9A && charCode <= 0x1FB9B) return true;
+	if(charCode >= 0x2500 && charCode <= 0x25FF) return true;
+	if(charCode >= 0x1FB00 && charCode <= 0x1FBFF) return true;
 	if(charCode >= 0x1CD00 && charCode <= 0x1CDE5) return true;
 	switch(charCode) {
-		case 0x25B2: return true;
-		case 0x25BA: return true;
-		case 0x25BC: return true;
-		case 0x25C4: return true;
 		case 0x1CEA8: return true;
 		case 0x1CEAB: return true;
 		case 0x1CEA3: return true;
 		case 0x1CEA0: return true;
-		case 0x1FBE6: return true;
-		case 0x1FBE7: return true;
 	}
 	return false;
 }
