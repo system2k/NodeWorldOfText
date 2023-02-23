@@ -4217,7 +4217,7 @@ function isValidSpecialSymbol(charCode) {
 	return false;
 }
 
-function fillBlockChar(charCode, textRender, x, y, flags) {
+function fillBlockChar(charCode, textRender, x, y, clampW, clampH, flags) {
 	var isBold = flags ? flags & 1 : 0;
 	var isOverflow = flags ? flags & 2 : 0;
 	if(!isValidSpecialSymbol(charCode)) {
@@ -4226,8 +4226,8 @@ function fillBlockChar(charCode, textRender, x, y, flags) {
 	if(isOverflow) return true; // ignore
 	var transform = [0, 1]; // (left, right, up, down = 0, 1, 2, 3), percentage
 
-	var tmpCellW = tileWidth / tileC;
-	var tmpCellH = tileHeight / tileR;
+	var tmpCellW = clampW / tileC;
+	var tmpCellH = clampH / tileR;
 	var sx = Math.floor(x * tmpCellW);
 	var sy = Math.floor(y * tmpCellH);
 	var ex = Math.floor((x + 1) * tmpCellW);
@@ -4434,7 +4434,7 @@ function clearCharTextDecorations(char) {
 	return char;
 }
 
-function renderChar(textRender, x, y, str, tile, writability, props, offsetX, offsetY, charOverflowMode) {
+function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, props, offsetX, offsetY, charOverflowMode) {
 	var content = tile.content;
 	var colors = tile.properties.color;
 
@@ -4549,7 +4549,7 @@ function renderChar(textRender, x, y, str, tile, writability, props, offsetX, of
 			if((cCode & brOrder[b]) == 0) continue;
 			textRender.fillRect(fontX + (b % 2) * dimX, fontY + ((b / 2) | 0) * dimY, dimX, dimY);
 		}
-	} else if(ansiBlockFill && fillBlockChar(cCode, textRender, x, y, fillBlockFlags)) {
+	} else if(ansiBlockFill && fillBlockChar(cCode, textRender, x, y, clampW, clampH, fillBlockFlags)) {
 		return;
 	} else { // character rendering
 		var tempFont = null;
@@ -4755,7 +4755,7 @@ function clearTile(tileX, tileY) {
 	owotCtx.clearRect(offsetX, offsetY, tileWidth, tileHeight);
 }
 
-function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY, bounds, charOverflowMode) {
+function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, offsetY, bounds, charOverflowMode) {
 	var str = tileY + "," + tileX;
 	var tile = Tile.get(tileX, tileY);
 	if(!tile) return;
@@ -4771,7 +4771,7 @@ function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY, bounds, ch
 				var cX = c % tileC;
 				var cY = Math.floor(c / tileC);
 				textRenderCtx.clearRect(cX * cellW, cY * cellH, cellW, cellH);
-				renderChar(textRenderCtx, cX, cY, str, tile, code, props, offsetX, offsetY, false);
+				renderChar(textRenderCtx, cX, cY, clampW, clampH, str, tile, code, props, offsetX, offsetY, false);
 			}
 		}
 	} else {
@@ -4793,13 +4793,13 @@ function renderContent(textRenderCtx, tileX, tileY, offsetX, offsetY, bounds, ch
 				}
 				if(protValue == null) protValue = tile.properties.writability;
 				if(protValue == null) protValue = state.worldModel.writability;
-				renderChar(textRenderCtx, x, y, str, tile, protValue, props, offsetX, offsetY, charOverflowMode);
+				renderChar(textRenderCtx, x, y, clampW, clampH, str, tile, protValue, props, offsetX, offsetY, charOverflowMode);
 			}
 		}
 	}
 }
 
-function renderCellBgColors(textRenderCtx, tileX, tileY) {
+function renderCellBgColors(textRenderCtx, tileX, tileY, clampW, clampH) {
 	var tile = Tile.get(tileX, tileY);
 	if(!tile) return;
 	var containsCursor = cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY;
@@ -4810,8 +4810,8 @@ function renderCellBgColors(textRenderCtx, tileX, tileY) {
 			var bgColor = bgcolors[y * tileC + x];
 			if(bgColor == -1) continue;
 			if(containsCursor && cursorCoords && cursorCoords[2] == x && cursorCoords[3] == y) continue;
-			var tmpCellW = tileWidth / tileC;
-			var tmpCellH = tileHeight / tileR;
+			var tmpCellW = clampW / tileC;
+			var tmpCellH = clampH / tileR;
 			var sx = Math.floor(x * tmpCellW);
 			var sy = Math.floor(y * tmpCellH);
 			var ex = Math.floor((x + 1) * tmpCellW);
@@ -4918,16 +4918,16 @@ function renderTile(tileX, tileY, redraw) {
 	}
 
 	if(colorsEnabled) {
-		renderCellBgColors(textRenderCtx, tileX, tileY);
+		renderCellBgColors(textRenderCtx, tileX, tileY, clampW, clampH);
 	}
 
 	if(!bufferLargeChars || priorityOverwriteChar) {
-		renderContent(textRenderCtx, tileX, tileY, 0, 0);
+		renderContent(textRenderCtx, tileX, tileY, clampW, clampH, 0, 0);
 	} else {
-		renderContent(textRenderCtx, tileX - 1, tileY, tileW * -1, 0, [tileC - 1, 0, tileC - 1, tileR - 1], true); // left
-		renderContent(textRenderCtx, tileX, tileY, 0, 0); // main
-		renderContent(textRenderCtx, tileX - 1, tileY + 1, tileW * -1, tileH * 1, [tileC - 1, 0, tileC - 1, 0], true); // bottom-left corner
-		renderContent(textRenderCtx, tileX, tileY + 1, 0, tileH * 1, [0, 0, tileC - 1, 0], true); // bottom
+		renderContent(textRenderCtx, tileX - 1, tileY, clampW, clampH, tileW * -1, 0, [tileC - 1, 0, tileC - 1, tileR - 1], true); // left
+		renderContent(textRenderCtx, tileX, tileY, clampW, clampH, 0, 0); // main
+		renderContent(textRenderCtx, tileX - 1, tileY + 1, clampW, clampH, tileW * -1, tileH * 1, [tileC - 1, 0, tileC - 1, 0], true); // bottom-left corner
+		renderContent(textRenderCtx, tileX, tileY + 1, clampW, clampH, 0, tileH * 1, [0, 0, tileC - 1, 0], true); // bottom
 	}
 
 	if(gridEnabled) {
