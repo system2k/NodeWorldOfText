@@ -59,9 +59,7 @@ function escapeHTML(h) {
 	h = h.replace(/\0/g, " ");
 	h = h.replace(/\"/g, "&quot;");
 	h = h.replace(/\'/g, "&#39;");
-	h = h.replace(/\`/g, "&#96;");
 	h = h.replace(/\\/g, "&#x5C;");
-	h = h.replace(/\=/g, "&#61;");
 	return h;
 }
 
