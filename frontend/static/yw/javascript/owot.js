@@ -4195,10 +4195,46 @@ var lcsOctantCharPoints = [
 	236, 237, 238, 239, 241, 242, 243, 244, 246, 247, 248, 249, 251, 253, 254
 ];
 
+function isValidSpecialSymbol(charCode) {
+	if((charCode & 0x1FB00) == 0x1FB00) return true;
+	if((charCode & 0x2500) == 0x2500) return true;
+	if(charCode >= 0x25E2 && charCode <= 0x25E5) return true;
+	if(charCode >= 0x1FB3C && charCode <= 0x1FB6F) return true;
+	if(charCode >= 0x1FB9A && charCode <= 0x1FB9B) return true;
+	if(charCode >= 0x1CD00 && charCode <= 0x1CDE5) return true;
+	switch(charCode) {
+		case 0x25B2: return true;
+		case 0x25BA: return true;
+		case 0x25BC: return true;
+		case 0x25C4: return true;
+		case 0x1CEA8: return true;
+		case 0x1CEAB: return true;
+		case 0x1CEA3: return true;
+		case 0x1CEA0: return true;
+		case 0x1FBE6: return true;
+		case 0x1FBE7: return true;
+	}
+	return false;
+}
+
 function fillBlockChar(charCode, textRender, x, y, flags) {
 	var isBold = flags ? flags & 1 : 0;
-	if((charCode & 0x1FB00) != 0x1FB00 && (charCode & 0x2500) != 0x2500 && !(charCode >= 0x1CD00 && charCode <= 0x1FBE7)) return false; // symbols for legacy computing
+	var isOverflow = flags ? flags & 2 : 0;
+	if(!isValidSpecialSymbol(charCode)) {
+		return false;
+	}
+	if(isOverflow) return true; // ignore
 	var transform = [0, 1]; // (left, right, up, down = 0, 1, 2, 3), percentage
+
+	var tmpCellW = tileWidth / tileC;
+	var tmpCellH = tileHeight / tileR;
+	var sx = Math.floor(x * tmpCellW);
+	var sy = Math.floor(y * tmpCellH);
+	var ex = Math.floor((x + 1) * tmpCellW);
+	var ey = Math.floor((y + 1) * tmpCellH);
+	tmpCellW = ex - sx;
+	tmpCellH = ey - sy;
+
 	switch(charCode) { // 1/8 blocks
 		case 0x2580: transform = [2, 4/8]; break;
 		case 0x2581: transform = [3, 1/8]; break;
@@ -4240,20 +4276,24 @@ function fillBlockChar(charCode, textRender, x, y, flags) {
 									isBold && (is90degTri || isIsoTri);
 			if(is2by2) { // 2x2 blocks
 				var pattern = [2, 1, 8, 11, 9, 14, 13, 4, 6, 7][charCode - 0x2596];
-				if(pattern & 8) textRender.fillRect(x, y, cellW / 2, cellH / 2);
-				if(pattern & 4) textRender.fillRect(x + cellW / 2, y, cellW / 2, cellH / 2);
-				if(pattern & 2) textRender.fillRect(x, y + cellH / 2, cellW / 2, cellH / 2);
-				if(pattern & 1) textRender.fillRect(x + cellW / 2, y + cellH / 2, cellW / 2, cellH / 2);
+				textRender.beginPath();
+				if(pattern & 8) textRender.rect(sx, sy, tmpCellW / 2, tmpCellH / 2);
+				if(pattern & 4) textRender.rect(sx + tmpCellW / 2, sy, tmpCellW / 2, tmpCellH / 2);
+				if(pattern & 2) textRender.rect(sx, sy + tmpCellH / 2, tmpCellW / 2, tmpCellH / 2);
+				if(pattern & 1) textRender.rect(sx + tmpCellW / 2, sy + tmpCellH / 2, tmpCellW / 2, tmpCellH / 2);
+				textRender.fill();
 				return true;
 			} else if(is2by3) { // 2x3 blocks
 				var code = 0;
 				if(charCode >= 0x1FB00 && charCode <= 0x1FB13) code = charCode - 0x1FB00 + 1;
 				if(charCode >= 0x1FB14 && charCode <= 0x1FB27) code = charCode - 0x1FB00 + 2;
 				if(charCode >= 0x1FB28 && charCode <= 0x1FB3B) code = charCode - 0x1FB00 + 3;
+				textRender.beginPath();
 				for(var i = 0; i < 6; i++) {
 					if(!(code >> i & 1)) continue;
-					textRender.fillRect(x + (cellW / 2) * (i & 1), y + (cellH / 3) * (i >> 1), cellW / 2, cellH / 3);
+					textRender.rect(sx + (tmpCellW / 2) * (i & 1), sy + (tmpCellH / 3) * (i >> 1), tmpCellW / 2, tmpCellH / 3);
 				}
+				textRender.fill();
 				return true;
 			} else if(isTriangleShard) { // LCS shard characters
 				var vecIndex = charCode - 0x1FB3C;
@@ -4270,18 +4310,18 @@ function fillBlockChar(charCode, textRender, x, y, flags) {
 					}
 				}
 				var vecs = lcsShardCharVectors[vecIndex];
-				var gpX = [0, cellW / 2, cellW];
-				var gpY = [0, cellH / 3, cellH / 2, (cellH / 3) * 2, cellH];
+				var gpX = [0, tmpCellW / 2, tmpCellW];
+				var gpY = [0, tmpCellH / 3, tmpCellH / 2, (tmpCellH / 3) * 2, tmpCellH];
 				textRender.beginPath();
 				for(var i = 0; i < vecs.length; i++) {
 					var vec = vecs[i];
 					var gx = gpX[vec[0]];
 					var gy = gpY[vec[1]];
 					if(i == 0) {
-						textRender.moveTo(x + gx, y + gy);
+						textRender.moveTo(sx + gx, sy + gy);
 						continue;
 					}
-					textRender.lineTo(x + gx, y + gy);
+					textRender.lineTo(sx + gx, sy + gy);
 				}
 				textRender.closePath();
 				textRender.fill();
@@ -4306,7 +4346,7 @@ function fillBlockChar(charCode, textRender, x, y, flags) {
 					for(var px = 0; px < 2; px++) {
 						var idx = py * 2 + px;
 						if(code >> idx & 1) {
-							textRender.rect(x + px * (cellW / 2), y + py * (cellH / 4), cellW / 2, cellH / 4);
+							textRender.rect(sx + px * (tmpCellW / 2), sy + py * (tmpCellH / 4), tmpCellW / 2, tmpCellH / 4);
 						}
 					}
 				}
@@ -4319,22 +4359,11 @@ function fillBlockChar(charCode, textRender, x, y, flags) {
 	var dir = transform[0];
 	var frac = transform[1];
 
-	var sx = x;
-	var sy = y;
-	var ex = sx + cellW;
-	var ey = sy + cellH;
-
 	switch(dir) {
-		case 0: ex -= cellW - (cellW * frac); break;
-		case 1: sx += cellW - (cellW * frac); break;
-		case 2: ey -= cellH - (cellH * frac); break;
-		case 3: sy += cellH - (cellH * frac); break;
-	}
-	if(zoom != 1 && ex - sx > 1 && ey - sy > 1) {
-		sx = Math.round(sx);
-		sy = Math.round(sy);
-		ex = Math.round(ex);
-		ey = Math.round(ey);
+		case 0: ex -= tmpCellW - (tmpCellW * frac); break;
+		case 1: sx += tmpCellW - (tmpCellW * frac); break;
+		case 2: ey -= tmpCellH - (tmpCellH * frac); break;
+		case 3: sy += tmpCellH - (tmpCellH * frac); break;
 	}
 
 	textRender.fillRect(sx, sy, ex - sx, ey - sy);
@@ -4510,6 +4539,8 @@ function renderChar(textRender, x, y, str, tile, writability, props, offsetX, of
 	isSpecial = char.codePointAt(checkIdx) != void 0;
 	isSpecial = isSpecial || (cCode >= 0x2500 && cCode <= 0x257F);
 	if(deco && deco.bold) fillBlockFlags |= 1;
+	
+	if(charOverflowMode) fillBlockFlags |= 2;
 
 	if(brBlockFill && (cCode & 0x2800) == 0x2800) { // render braille chars as rectangles
 		var dimX = cellW / 2;
@@ -4518,7 +4549,7 @@ function renderChar(textRender, x, y, str, tile, writability, props, offsetX, of
 			if((cCode & brOrder[b]) == 0) continue;
 			textRender.fillRect(fontX + (b % 2) * dimX, fontY + ((b / 2) | 0) * dimY, dimX, dimY);
 		}
-	} else if(ansiBlockFill && fillBlockChar(cCode, textRender, fontX, fontY, fillBlockFlags)) {
+	} else if(ansiBlockFill && fillBlockChar(cCode, textRender, x, y, fillBlockFlags)) {
 		return;
 	} else { // character rendering
 		var tempFont = null;
@@ -4886,7 +4917,9 @@ function renderTile(tileX, tileY, redraw) {
 		tile.content = w.split(tile.content);
 	}
 
-	renderCellBgColors(textRenderCtx, tileX, tileY);
+	if(colorsEnabled) {
+		renderCellBgColors(textRenderCtx, tileX, tileY);
+	}
 
 	if(!bufferLargeChars || priorityOverwriteChar) {
 		renderContent(textRenderCtx, tileX, tileY, 0, 0);
