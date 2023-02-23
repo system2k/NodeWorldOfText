@@ -1,116 +1,37 @@
-# Our World Of Text README #
+# Our World Of Text #
 
-# OWOT Dev setup instructions
+## Software Requirements
 
+* Node.js (>18.x.x) ( https://nodejs.org/ )
+* Git ( https://git-scm.com/ )
+    * Not strictly necessary, but it's convenient for quickly downloading and updating your local repository.
 
-Lets iterate over how to start developing with us!
+## Quickstart
+* Clone the OWOT repository (ensure a 'data' directory doesn't already exist!)
+    * `git clone https://github.com/system2k/nodeworldoftext.git nwot`
+* Navigate to the directory
+    * `cd nwot`
+* Install the dependencies
+    * `npm install`
+* When running the server for the first time, you'll be asked to configure the settings. After doing so, run the command again.
+    * `node main.js`
+* You'll then be prompted to create a superuser account. You may see this message:
+    * "You've just installed the server,
+which means you don't have any superusers defined.
+Would you like to create one now? (yes/no):"
+    * A superuser account (i.e. administrator accont) can be used to manage your instance using the web interface.
+* After everything has been set up, your server may be live at this address:
+    * `http://localhost:8080`
 
-You'll need NodeJs : https://nodejs.org/ ->
+## Common Issues
+* If you're encountering issues with `nwot_error_logs.zip`, please delete the zip file and try again.
+* If you're receiving node-gyp errors while installing the modules via NPM, please ensure you've got some compiling tools installed on your system. If you have any further questions, be sure to ask us on Discord.
+* If you're receiving an error saying `Cannot find module`, make sure you've installed the modules by running `npm install`.
 
- - Your platform should be autodetected, but incase it isn't right:
- 
-   - https://nodejs.org/en/download/ gives more specific options:
-   
-     I'll be downloading the LTS 'Windows Installer (.msi)' for 64-bit
-     
- - LTS is the stable version of node, which is for folks like us!
+## License
+Our World of Text is licensed under the [MIT License](https://github.com/system2k/nodeworldoftext/blob/master/LICENSE).
 
-You'll need Git : https://git-scm.com/ ->
-
- - I'll be getting the GUI from their downloads link https://git-scm.com/downloads
- - Download based on your platform ( In my case 'Windows' )
- - A download popup should appear, otherwise use the link "If your download hasn't started, click here to download manually."
- - Run it
- - Installing windows version gives me these options:
-    'Windows Explorer integration: Bash, GUI'
-    both of which I HIGHLY recommend, because they're both awesome!
- - Git LFS (large file support) is always a plus, and file associations are great also!
- - I also set NotePad++ to my default commit message thingamabob, which I love anyways.
- - etc, etc, etc
-    
-Next, we'll clone the repository to some workspace
-I keep all of my projects in my /Desktop folder, ex:
-    
-    C:\Users\Jonathan\Desktop\Projects\Node
-    
-So i'll open up a terminal and navigate to that directory:
-    
-    cd C:\Users\Jonathan\Desktop\Projects\Node
-    
-Now i'll use git from the command line (its added to your environment 'path' variable, so its a global command)
-    
-    'git clone https://gitlab.com/System2k/NodeWorldOfText.git'
-    
-You'll need to login to GitLab, because at the time of this writting, the repository is private:
-
-A popup window should appear, so enter the email you used to register your GitLab
-account, and the password you setup also.
-
-- If that window never appeared, or you don't want to use the GUI for some reason (hit exit button), you should see the following in your terminal:
-    
-    Login failed, use ctrl+c to cancel basic credential prompt.
-    Username for 'https://gitlab.com':
-    
-After that, enter your password
-    
-    Password for 'https://< your username|email >@gitlab.com':
-    
-And if you've entered correct credentials, and have the permissions necessary,
-you should see the repository cloning via git.
-It will complete somewhat quickly, and say ' done.' when its done.
-
-Now we'll need to install dependencies!
-In terminal, navigate to the repository we cloned:
-    
-    cd C:\Users\Jonathan\Desktop\Projects\Node\NodeWorldOfText
-    
-Now we use Node JS's package manager (came with our fresh install of Node JS)
-to install the dependencies using this command:
-    
-    npm install
-    
-npm is also a global command, so it can be executed anywhere in theory.
-The above command tells npm to install dependencies given by the repository's
-    
-    package.json
-    
-After the package installation process is done, we're ready to go!
-Lets test out the server for fun!
-
-Navigate to the repository
-    
-    cd C:\Users\Jonathan\Desktop\Projects\Node\NodeWorldOfText
-    
-Now use 'node' command to start the server using the main script:
-    
-    node runserver.js
-    
-You should now see
-    Compiling HTML templates...
-    Handling previous error logs (if any)
-    Loading modules...
-    Starting server...
-    Running server in HTTP mode
-    Initializing server...
-    You just installed the server,
-    which means you don't have any superusers defined.
-    Would you like to create one now? (yes/no):
-    
-Type 'yes' and type your desired username -> your password -> confirm password
-
-    Superuser created successfully.
-    
-    Server is running.
-    Address: ::
-    Port: 11001
-    >>
-    
-Open up your browser and type in
-	
-	'localhost:11001'
-    
-Substituting the port number for whatever your terminal said the port was.
-
-You should see a neato OWOT client appear just as if you were on ourworldoftext.com!
-
-If you have any issues, you can try our Discord!
+## Links
+* [Our World of Text](https://ourworldoftext.com)
+* [Our World of Text Wiki](https://wiki.ourworldoftext.com)
+* [Our World of Text Discord](https://discord.gg/9buMtUt)
