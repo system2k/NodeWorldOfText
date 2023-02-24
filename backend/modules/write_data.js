@@ -3,6 +3,10 @@ var fixColors = utils.fixColors;
 var advancedSplit = utils.advancedSplit;
 var san_nbr = utils.san_nbr;
 
+var restrictions = require("../utils/restrictions.js");
+var checkCoalition = restrictions.checkCoalition;
+var getRestrictions = restrictions.getRestrictions;
+
 var emptyWriteResponse = { accepted: [], rejected: {} };
 
 function isMainPage(name) {
@@ -37,8 +41,6 @@ module.exports = async function(data, server, params) {
 	
 	var tile_database = server.tile_database;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
-	var getRestrictions = server.getRestrictions;
-	var checkCoalition = server.checkCoalition;
 	var rate_limiter = server.rate_limiter;
 	var monitorEventSockets = server.monitorEventSockets;
 

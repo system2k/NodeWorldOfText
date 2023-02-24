@@ -1,6 +1,9 @@
 var utils = require("../utils/utils.js");
 var san_nbr = utils.san_nbr;
 
+var restrictions = require("../utils/restrictions.js");
+var checkCoalition = restrictions.checkCoalition;
+
 function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
@@ -13,7 +16,6 @@ module.exports = async function(data, server, params) {
 	var tile_database = server.tile_database;
 	var monitorEventSockets = server.monitorEventSockets;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
-	var checkCoalition = server.checkCoalition;
 	var rate_limiter = server.rate_limiter;
 
 	var memkeyAccess = world.opts.memKey && world.opts.memKey == params.keyQuery;

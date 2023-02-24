@@ -19,7 +19,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var callPage = server.callPage;
 	var db = server.db;
 	var modules = server.modules;
-	var announcement = server.announcement();
+	var loadString = server.loadString;
 	var accountSystem = server.accountSystem;
 	var createCSRF = server.createCSRF;
 
@@ -89,6 +89,9 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		}
 		var write_int = world.opts.writeInt;
 		if(write_int == -1) write_int = 1000;
+
+		var announcement = loadString("announcement");
+
 		var state = {
 			userModel: {
 				username: username,

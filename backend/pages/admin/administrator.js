@@ -7,7 +7,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 
 	var callPage = server.callPage;
 	var db = server.db;
-	var announcement = server.announcement;
+	var loadString = server.loadString;
 	var wss = server.wss;
 	var ranks_cache = server.ranks_cache;
 	var db_misc = server.db_misc;
@@ -77,7 +77,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 
 	var data = {
 		user_ranks,
-		announcement: announcement(),
+		announcement: loadString("announcement"),
 		announcement_update_msg: params.announcement_update_msg,
 		cons_update_msg: params.cons_update_msg,
 		acme_update_msg: params.acme_update_msg,

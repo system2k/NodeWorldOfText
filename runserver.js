@@ -30,6 +30,7 @@ const templates    = require("./backend/utils/templates.js");
 const rate_limiter = require("./backend/utils/rate_limiter.js");
 const ipaddress    = require("./backend/utils/ipaddress.js");
 const prompt       = require("./backend/utils/prompt.js");
+const restrictions = require("./backend/utils/restrictions.js");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -98,13 +99,15 @@ initializeDirectoryStruct();
 const settings = require(SETTINGS_PATH);
 
 var serverPort     = settings.port;
-var serverDB       = settings.DATABASE_PATH;
-var editsDB        = settings.EDITS_PATH;
-var chatDB         = settings.CHAT_HISTORY_PATH;
-var imageDB        = settings.IMAGES_PATH;
-var miscDB         = settings.MISC_PATH;
-var staticNumsPath = settings.STATIC_SHORTCUTS_PATH;
-var accountSystem  = settings.accountSystem; // "uvias" or "local"
+var serverDB       = settings.paths.database;
+var editsDB        = settings.paths.edits;
+var chatDB         = settings.paths.chat_history;
+var imageDB        = settings.paths.images;
+var miscDB         = settings.paths.misc;
+var staticNumsPath = settings.paths.static_shortcuts;
+var restrPath      = settings.paths.restr;
+var restrCg1Path   = settings.paths.restr_cg1;
+var accountSystem  = settings.account_system; // "uvias" or "local"
 
 var loginPath = "/accounts/login/";
 var logoutPath = "/accounts/logout/";
@@ -123,7 +126,6 @@ var shellEnabled = true;
 
 var isTestServer = false;
 var debugLogging = false;
-var testServerMainDirs = false;
 var testUviasIds = false;
 var serverLoaded = false;
 var isStopping = false;
@@ -156,6 +158,8 @@ var memTileCache = {};
 
 var ranks_cache = { users: {} };
 var announcement_cache = "";
+var restr_cache = "";
+var restr_cg1_cache = "";
 var worldData = {};
 var client_cursor_pos = {};
 var client_ips = {};
@@ -235,9 +239,6 @@ process.argv.forEach(function(a) {
 		if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
 		debugLogging = true;
 	}
-	if(a == "--main-dirs") {
-		testServerMainDirs = true;
-	}
 	if(a == "--uvias-test-info") {
 		testUviasIds = true;
 	}
@@ -246,7 +247,6 @@ process.argv.forEach(function(a) {
 		isTestServer = true;
 		if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
 		debugLogging = true;
-		testServerMainDirs = true;
 		testUviasIds = true;
 	}
 });
@@ -327,14 +327,14 @@ if(testUviasIds) {
 	uvias.domain = "test.ourworldoftext.com";
 	uvias.private = true;
 	uvias.only_verified = false;
-	uvias.custom_css_file_path = settings.uvias_custom_css_file_path;
+	uvias.custom_css_file_path = settings.paths.uvias_css;
 } else {
 	uvias.id = "owot";
 	uvias.name = "Our World Of Text";
 	uvias.domain = "ourworldoftext.com";
 	uvias.private = false;
 	uvias.only_verified = false;
-	uvias.custom_css_file_path = settings.uvias_custom_css_file_path;
+	uvias.custom_css_file_path = settings.paths.uvias_css;
 }
 
 if(uvias.custom_css_file_path) {
@@ -370,17 +370,6 @@ function toInt64(n) {
 
 if(isTestServer) {
 	serverPort = settings.test_port;
-	if(!testServerMainDirs) {
-		serverDB = settings.TEST_DATABASE_PATH;
-		chatDB = settings.TEST_CHAT_HISTORY_PATH;
-		imageDB = settings.TEST_IMAGES_PATH;
-		miscDB = settings.TEST_MISC_PATH;
-		editsDB = settings.TEST_EDITS_PATH;
-		settings.LOG_PATH = settings.TEST_LOG_PATH;
-		settings.ZIP_LOG_PATH = settings.TEST_ZIP_LOG_PATH;
-		settings.UNCAUGHT_PATH = settings.TEST_UNCAUGHT_PATH;
-		settings.REQ_LOG_PATH = settings.TEST_REQ_LOG_PATH;
-	}
 }
 
 function log_error(err) {
@@ -388,7 +377,7 @@ function log_error(err) {
 		try {
 			err = JSON.stringify(err);
 			err = "TIME: " + Date.now() + "\r\n" + err + "\r\n" + "-".repeat(20) + "\r\n\r\n\r\n";
-			fs.appendFileSync(settings.LOG_PATH, err);
+			fs.appendFileSync(settings.paths.log, err);
 		} catch(e) {
 			console.log("Error logging error:", e);
 		}
@@ -479,21 +468,21 @@ var sql_edits_init = "./backend/edits.sql";
 
 var zip_file;
 function setupZipLog() {
-	if(!fs.existsSync(settings.ZIP_LOG_PATH)) {
+	if(!fs.existsSync(settings.paths.zip_log)) {
 		zip_file = new zip();
 	} else {
-		zip_file = new zip(settings.ZIP_LOG_PATH);
+		zip_file = new zip(settings.paths.zip_log);
 	}
 	console.log("Handling previous error logs (if any)");
-	if(fs.existsSync(settings.LOG_PATH)) {
-		var file = fs.readFileSync(settings.LOG_PATH);
+	if(fs.existsSync(settings.paths.log)) {
+		var file = fs.readFileSync(settings.paths.log);
 		if(file.length > 0) {
-			var log_data = fs.readFileSync(settings.LOG_PATH);
+			var log_data = fs.readFileSync(settings.paths.log);
 			zip_file.addFile("NWOT_LOG_" + Date.now() + ".txt", log_data, "", 0644);
-			fs.truncateSync(settings.LOG_PATH);
+			fs.truncateSync(settings.paths.log);
 		}
 	}
-	zip_file.writeZip(settings.ZIP_LOG_PATH);
+	zip_file.writeZip(settings.paths.zip_log);
 }
 
 console.log("Loading page files");
@@ -1318,60 +1307,6 @@ function wait_response_data(req, dispatch, binary_post_data, raise_limit) {
 	});
 }
 
-var restrictions = {};
-var coalition = {
-	v4: [],
-	v6: []
-};
-function setRestrictions(obj) {
-	restrictions = obj;
-}
-function getRestrictions() {
-	return restrictions;
-}
-function setCoalition(list) {
-	coalition = list;
-}
-function checkCoalition(val, fam) {
-	var list = null;
-	if(fam == 4) {
-		list = coalition.v4;
-	} else if(fam == 6) {
-		list = coalition.v6;
-	} else {
-		return false;
-	}
-	if(!list.length) return false;
-	var posa = 0;
-	var posb = list.length - 1;
-	// binary search through the list
-	for(var i = 0; i < list.length; i++) {
-		var pos = Math.floor((posa + posb) / 2);
-		var item = list[pos];
-		var a = item[0];
-		var b = item[1];
-		if(a <= val && b >= val) return true;
-		if(posb - posa == 1) {
-			var ra = list[posa];
-			var rb = list[posb];
-			if(ra[0] <= val && ra[1] >= val) return true;
-			if(rb[0] <= val && rb[1] >= val) return true;
-			return false;
-		}
-		if(a > val) {
-			if(posb - posa == 0) return false;
-			posb = pos - 1;
-			continue;
-		}
-		if(b < val) {
-			if(posb - posa == 0) return false;
-			posa = pos + 1;
-			continue;
-		}
-	}
-	return false;
-}
-
 function new_token(len) {
 	var token = crypto.randomBytes(len).toString("hex");
 	return token;
@@ -1593,7 +1528,7 @@ process.on("uncaughtException", function(e) {
 	try {
 		err = JSON.stringify(process_error_arg(e));
 		err = "TIME: " + Date.now() + "\r\n" + err + "\r\n" + "-".repeat(20) + "\r\n\r\n\r\n";
-		fs.appendFileSync(settings.UNCAUGHT_PATH, err);
+		fs.appendFileSync(settings.paths.uncaught, err);
 	} catch(e) {
 		console.log("Error while recording uncaught error", e);
 	}
@@ -1822,7 +1757,7 @@ async function process_request(req, res, compCallbacks) {
 	var ipAddressFam = evalIp[1];
 	var ipAddressVal = evalIp[2];
 
-	var restr = getRestrictions();
+	var restr = restrictions.getRestrictions();
 	var deniedPages = checkHTTPRestr(restr, ipAddressVal, ipAddressFam);
 	if(deniedPages.siteAccess) {
 		var deny_notes = "None";
@@ -1973,6 +1908,51 @@ async function process_request(req, res, compCallbacks) {
 
 	res.writeHead(404);
 	res.end();
+}
+
+function loadString(type) {
+	switch(type) {
+		case "announcement":
+			return announcement_cache;
+		case "restr":
+			return restr_cache;
+		case "restr_cg1":
+			return restr_cg1_cache;
+	}
+	return null;
+}
+
+function loadRestrictionsList() {
+	try {
+		restr_cache = fs.readFileSync(restrPath).toString("utf8");
+	} catch(e) {};
+	try {
+		restr_cg1_cache = fs.readFileSync(restrCg1Path).toString("utf8");
+	} catch(e) {};
+	try {
+		if(restr_cache) {
+			var list = restr_cache.toString("utf8").replace(/\r\n/g, "\n").split("\n");
+			var result = restrictions.procRest(list);
+			restrictions.setRestrictions(result.data);
+		}
+		if(restr_cg1_cache) {
+			var list = restr_cg1_cache.toString("utf8").replace(/\r\n/g, "\n").split("\n");
+			var result = restrictions.procCoal(list);
+			restrictions.setCoalition(result.data);
+		}
+	} catch(e) {
+		handle_error(e);
+	}
+}
+
+function saveRestrictions(type, data) {
+	if(type == "main") {
+		restr_cache = data;
+		fs.writeFileSync(restrPath, data);
+	} else if(type == "cg1") {
+		restr_cg1_cache = data;
+		fs.writeFileSync(restrCg1Path, data);
+	}
 }
 
 async function loadAnnouncement() {
@@ -2774,6 +2754,7 @@ async function manageWebsocketConnection(ws, req) {
 
 async function start_server() {
 	await loadAnnouncement();
+	loadRestrictionsList();
 	
 	if(accountSystem == "local") {
 		await clear_expired_sessions();
@@ -2865,7 +2846,8 @@ var global_data = {
 	memTileCache,
 	isTestServer,
 	shellEnabled,
-	announcement: function() { return announcement_cache },
+	loadString,
+	saveRestrictions,
 	uvias,
 	accountSystem,
 	callPage,
@@ -2895,10 +2877,6 @@ var global_data = {
 	acme,
 	uviasSendIdentifier,
 	client_cursor_pos,
-	setRestrictions,
-	getRestrictions,
-	setCoalition,
-	checkCoalition,
 	loadShellFile,
 	runShellScript,
 	loadPlugin,

@@ -1,4 +1,6 @@
 {
+	"version": "2.0",
+
 	"website": "http://ourworldoftext.com/",
 
 	"ssl_enabled": false,
@@ -12,8 +14,7 @@
 	"test_port": 9090,
 	"ip": null,
 
-	"accountSystem": "local",
-	"uvias_custom_css_file_path": "",
+	"account_system": "local",
 
 	"pg_db": {
 		"user": "",
@@ -23,34 +24,20 @@
 
 	"error_log": true,
 
-	"STATIC_SHORTCUTS_PATH": "../data/static_shortcuts.txt",
-
-	"DATABASE_PATH": "../data/nwot.sqlite",
-	"TEST_DATABASE_PATH": "../data/test/nwot_test.sqlite",
-
-	"EDITS_PATH": "../data/edits.sqlite",
-	"TEST_EDITS_PATH": "../data/test/edits_test.sqlite",
-
-	"IMAGES_PATH": "../data/images.sqlite",
-	"TEST_IMAGES_PATH": "../data/test/images_test.sqlite",
-
-	"MISC_PATH": "../data/misc.sqlite",
-	"TEST_MISC_PATH": "../data/test/misc_test.sqlite",
-
-	"LOG_PATH": "../data/nwot_log.log",
-	"TEST_LOG_PATH": "../data/test/test_nwot_log.log",
-
-	"ZIP_LOG_PATH": "../data/nwot_error_logs.zip",
-	"TEST_ZIP_LOG_PATH": "../data/test/test_nwot_error_logs.zip",
-
-	"UNCAUGHT_PATH": "../data/exc.err",
-	"TEST_UNCAUGHT_PATH": "../data/test/test_exc.err",
-
-	"REQ_LOG_PATH": "../data/reqs.err",
-	"TEST_REQ_LOG_PATH": "../data/test/test_reqs.err",
-
-	"CHAT_HISTORY_PATH": "../data/chat_history.sqlite",
-	"TEST_CHAT_HISTORY_PATH": "../data/test/test_chat_history.sqlite",
+	"paths": {
+		"database": "../data/nwot.sqlite",
+		"edits": "../data/edits.sqlite",
+		"images": "../data/images.sqlite",
+		"misc": "../data/misc.sqlite",
+		"chat_history": "../data/chat_history.sqlite",
+		"log": "../data/nwot_log.log",
+		"zip_log": "../data/nwot_error_logs.zip",
+		"uncaught": "../data/exc.err",
+		"restr": "../data/restr.txt",
+		"restr_cg1": "../data/restr_cg1.txt",
+		"static_shortcuts": "../data/static_shortcuts.txt",
+		"uvias_css": ""
+	},
 
 	"email": {
 		"enabled": false,
