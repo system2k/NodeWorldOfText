@@ -1,7 +1,7 @@
 {
 	"version": "2.0",
 
-	"website": "http://ourworldoftext.com/",
+	"website": "https://ourworldoftext.com/",
 
 	"ssl_enabled": false,
 	"ssl": {
@@ -25,17 +25,17 @@
 	"error_log": true,
 
 	"paths": {
-		"database": "../data/nwot.sqlite",
-		"edits": "../data/edits.sqlite",
-		"images": "../data/images.sqlite",
-		"misc": "../data/misc.sqlite",
-		"chat_history": "../data/chat_history.sqlite",
-		"log": "../data/nwot_log.log",
-		"zip_log": "../data/nwot_error_logs.zip",
-		"uncaught": "../data/exc.err",
-		"restr": "../data/restr.txt",
-		"restr_cg1": "../data/restr_cg1.txt",
-		"static_shortcuts": "../data/static_shortcuts.txt",
+		"database": "../nwotdata/nwot.sqlite",
+		"edits": "../nwotdata/edits.sqlite",
+		"images": "../nwotdata/images.sqlite",
+		"misc": "../nwotdata/misc.sqlite",
+		"chat_history": "../nwotdata/chat_history.sqlite",
+		"log": "../nwotdata/nwot_log.log",
+		"zip_log": "../nwotdata/nwot_error_logs.zip",
+		"uncaught": "../nwotdata/exc.err",
+		"restr": "../nwotdata/restr.txt",
+		"restr_cg1": "../nwotdata/restr_cg1.txt",
+		"static_shortcuts": "../nwotdata/static_shortcuts.txt",
 		"uvias_css": ""
 	},
 

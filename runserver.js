@@ -72,18 +72,13 @@ var ipv6_to_range  = ipaddress.ipv6_to_range;
 var is_cf_ipv4_int = ipaddress.is_cf_ipv4_int;
 var is_cf_ipv6_int = ipaddress.is_cf_ipv6_int;
 
-var DATA_PATH = "../data/";
-var DATA_PATH_TEST = DATA_PATH + "test/";
+var DATA_PATH = "../nwotdata/";
 var SETTINGS_PATH = DATA_PATH + "settings.json";
 
 function initializeDirectoryStruct() {
 	// create the data folder that stores all of the server's data
 	if(!fs.existsSync(DATA_PATH)) {
 		fs.mkdirSync(DATA_PATH, 0o777);
-	}
-	// directory used for storing data for the test server
-	if(!fs.existsSync(DATA_PATH_TEST)) {
-		fs.mkdirSync(DATA_PATH_TEST, 0o777);
 	}
 	// initialize server configuration
 	if(!fs.existsSync(SETTINGS_PATH)) {

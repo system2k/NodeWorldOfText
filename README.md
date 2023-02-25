@@ -7,13 +7,13 @@
     * Not strictly necessary, but it's convenient for quickly downloading and updating your local repository.
 
 ## Quickstart
-* Clone the OWOT repository (ensure a 'data' directory doesn't already exist!)
+* Clone the OWOT repository
     * `git clone https://github.com/system2k/nodeworldoftext.git nwot`
 * Navigate to the directory
     * `cd nwot`
 * Install the dependencies
     * `npm install`
-* When running the server for the first time, you'll be asked to configure the settings. After doing so, run the command again.
+* When running the server for the first time, you'll be asked to configure the settings. After doing so, run the command again. NOTE: This will create a 'nwotdata' directory on the same level as your repository.
     * `node main.js`
 * You'll then be prompted to create a superuser account. You may see this message:
     * "You've just installed the server,
