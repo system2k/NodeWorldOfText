@@ -15,7 +15,7 @@ args.forEach(function(a) {
 	}
 });
 
-var DATA_PATH = "../data/";
+var DATA_PATH = "../nwotdata/";
 var SETTINGS_PATH = DATA_PATH + "settings.json";
 var settings, maintenance_port;
 if(fs.existsSync(SETTINGS_PATH)) {
