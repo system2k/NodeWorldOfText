@@ -2979,7 +2979,7 @@ function event_keydown(e) {
 		writeChar("\n");
 	}
 	if(checkKeyPress(e, keyConfig.erase)) { // erase character
-		if(state.worldModel.char_rate[0] > 0) {
+		if(state.worldModel.char_rate[0] > 0 || state.userModel.is_member) {
 			moveCursor("left", true);
 			writeChar("\x08", true, null, false, 1);
 			previousErase = getDate();
@@ -2991,7 +2991,7 @@ function event_keydown(e) {
 		}
 	}
 	if(checkKeyPress(e, keyConfig.tab)) { // tab
-		if(state.worldModel.char_rate[0] > 0) {
+		if(state.worldModel.char_rate[0] > 0 || state.userModel.is_member) {
 			for(var i = 0; i < 4; i++) writeChar(" ");
 			e.preventDefault();
 		}
