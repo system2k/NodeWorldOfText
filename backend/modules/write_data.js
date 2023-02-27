@@ -270,6 +270,10 @@ module.exports = async function(data, server, params) {
 				}
 				if(!newColor) newColor = 0;
 
+				if(Array.isArray(newBgColor)) {
+					newBgColor = newBgColor[i];
+				}
+
 				if(newBgColor !== null) {
 					if(newBgColor === void 0) newBgColor = -1;
 					newBgColor = san_nbr(newBgColor);
