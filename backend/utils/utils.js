@@ -848,18 +848,6 @@ function sanitize_color(col) {
 	return col;
 }
 
-function fixColors(colors) {
-	if(Array.isArray(colors)) {
-		colors = colors.slice(0, CONST.tileArea);
-		for(var g = 0; g < colors.length; g++) {
-			colors[g] = sanitize_color(colors[g]);
-		}
-	} else {
-		colors = sanitize_color(colors);
-	}
-	return colors;
-}
-
 function parseAcceptEncoding(str) {
 	if(!str) return [];
 	var res = [];
@@ -954,7 +942,6 @@ module.exports = {
 	change_char_in_array,
 	html_tag_esc,
 	sanitize_color,
-	fixColors,
 	parseAcceptEncoding,
 	dump_dir,
 	arrayIsEntirely,

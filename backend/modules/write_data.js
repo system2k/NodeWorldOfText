@@ -1,5 +1,5 @@
 var utils = require("../utils/utils.js");
-var fixColors = utils.fixColors;
+var sanitize_color = utils.sanitize_color;
 var advancedSplit = utils.advancedSplit;
 var san_nbr = utils.san_nbr;
 
@@ -224,9 +224,9 @@ module.exports = async function(data, server, params) {
 			if(char.length <= 1) {
 				if(!editIncome[7]) editIncome[7] = 0;
 				if(Array.isArray(editIncome[7])) {
-					editIncome[7] = fixColors(editIncome[7][0]);
+					editIncome[7] = sanitize_color(editIncome[7][0]);
 				} else {
-					editIncome[7] = fixColors(editIncome[7]);
+					editIncome[7] = sanitize_color(editIncome[7]);
 				}
 				// client is restricted from using colors at specific parameters
 				if(!canColor) {
@@ -263,10 +263,10 @@ module.exports = async function(data, server, params) {
 				var newBgColor = editIncome[8];
 				if(Array.isArray(newColor)) {
 					// color is an array, get individual values
-					newColor = fixColors(newColor[i]);
+					newColor = sanitize_color(newColor[i]);
 				} else {
 					// color is a number
-					newColor = fixColors(newColor);
+					newColor = sanitize_color(newColor);
 				}
 				if(!newColor) newColor = 0;
 
