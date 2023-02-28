@@ -181,13 +181,13 @@ function checkHTTPWriteRestr(list, ipVal, ipFam, isGrouped, world) {
 	return false;
 }
 
-function setHold(id, tileX, tileY) {
+function setHold(id, worldId, tileX, tileY) {
 	if(!tileHolds[id]) tileHolds[id] = {
 		count: 0,
 		tiles: {}
 	};
 	var holdObj = tileHolds[id];
-	var pos = tileY + "," + tileX;
+	var pos = worldId + "," + tileY + "," + tileX;
 	if(!holdObj.tiles[pos]) {
 		if(holdObj.count >= 100) {
 			return false;
@@ -200,11 +200,11 @@ function setHold(id, tileX, tileY) {
 	return true;
 }
 
-function releaseHold(id, tileX, tileY) {
+function releaseHold(id, worldId, tileX, tileY) {
 	var obj = tileHolds[id];
 	if(!obj) return;
 	if(obj.count <= 0) return;
-	var pos = tileY + "," + tileX;
+	var pos = worldId + "," + tileY + "," + tileX;
 	if(obj.tiles[pos]) {
 		obj.tiles[pos]--;
 	}

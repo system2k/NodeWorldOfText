@@ -106,7 +106,7 @@ module.exports = async function(data, server, params) {
 			return [true, "RATE"];
 		}
 	}
-	if(!rate_limiter.setHold(idLabel, tileX, tileY)) {
+	if(!rate_limiter.setHold(idLabel, world.id, tileX, tileY)) {
 		return [true, "RATE"];
 	}
 
@@ -118,7 +118,7 @@ module.exports = async function(data, server, params) {
 		no_update: false
 	});
 
-	rate_limiter.releaseHold(idLabel, tileX, tileY);
+	rate_limiter.releaseHold(idLabel, world.id, tileX, tileY);
 
 	return resp;
 }

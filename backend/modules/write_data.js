@@ -87,8 +87,6 @@ module.exports = async function(data, server, params) {
 		editLimit = superuserEditReqLimit;
 	}
 
-	var world_id = world.id;
-
 	var no_log_edits = world.opts.noLogEdits;
 	var color_text = world.feature.colorText;
 	var color_cell = world.feature.colorCell;
@@ -134,7 +132,7 @@ module.exports = async function(data, server, params) {
 		if(customLimit.length == 2) {
 			charsPerPeriod = parseInt(customLimit[0]);
 			var periodLength = parseInt(customLimit[1]);
-			customLimiter = rate_limiter.prepareRateLimiter(rate_limiter.editRateLimits, periodLength, ipAddress + "-world-" + world_id);
+			customLimiter = rate_limiter.prepareRateLimiter(rate_limiter.editRateLimits, periodLength, ipAddress + "-world-" + world.id);
 		}
 	}
 
@@ -194,13 +192,13 @@ module.exports = async function(data, server, params) {
 			break;
 		}
 
-		var tileStr = tileY + "," + tileX;
+		var tileStr = world.id + "," + tileY + "," + tileX;
 		if(!tiles[tileStr]) {
-			if(!rate_limiter.checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world_id)) {
+			if(!rate_limiter.checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world.id)) {
 				rejected[editId] = 3;
 				continue;
 			}
-			if(!rate_limiter.setHold(idLabel, tileX, tileY)) {
+			if(!rate_limiter.setHold(idLabel, world.id, tileX, tileY)) {
 				rejected[editId] = 5;
 				continue;
 			}
