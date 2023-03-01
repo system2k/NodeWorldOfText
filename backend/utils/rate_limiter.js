@@ -7,18 +7,13 @@ function checkCharRateLimit(ipObj, cRate, editCount) {
 	if(!cRate) return false;
 	var date = Date.now();
 	if(!ipObj.value) {
-		ipObj.periodEpoch = date;
+		ipObj.periodEpoch = 0;
 	}
 	var per = Math.floor((date - ipObj.periodEpoch) / ipObj.periodLength);
 	var currentPer = ipObj.currentPeriod;
 	ipObj.currentPeriod = per;
 	if(currentPer != per || !ipObj.value) {
 		ipObj.value = editCount;
-		// reset the period offset if the beat drifts too far
-		if(date - (ipObj.periodEpoch + (per * ipObj.periodLength) < 1500)) {
-			ipObj.periodEpoch = date;
-			ipObj.currentPeriod = 0;
-		}
 		return true;
 	}
 	ipObj.value += editCount;
