@@ -20,6 +20,21 @@ function validateCSS(c) {
 	c = c.replace(/;/g, "");
 	c = c.replace(/\r/g, "");
 	c = c.replace(/\n/g, "");
+	// detect broken hex sequences and prepend '#'
+	if(c.length == 3 || c.length == 6) {
+		var hex = "abcdefABCDEF0123456789";
+		var validHex = true;
+		for(var i = 0; i < c.length; i++) {
+			var chr = c[i];
+			if(!hex.includes(chr)) {
+				validHex = false;
+				break;
+			}
+		}
+		if(validHex) {
+			c = "#" + c;
+		}
+	}
 	return c.slice(0, 20);
 }
 
