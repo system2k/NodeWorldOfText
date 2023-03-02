@@ -36,7 +36,7 @@ module.exports = async function(data, server, params) {
 	var charX = san_nbr(data.charX);
 	var charY = san_nbr(data.charY);
 
-	var url = data.url
+	var url = data.url;
 	var link_tileX = san_dp(data.link_tileX);
 	var link_tileY = san_dp(data.link_tileY);
 

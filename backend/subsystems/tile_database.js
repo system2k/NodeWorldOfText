@@ -6,6 +6,8 @@ var decodeCharProt = utils.decodeCharProt;
 var san_nbr = utils.san_nbr;
 var change_char_in_array = utils.change_char_in_array;
 
+var enums = require("../utils/enums.js");
+
 var WebSocket = require("ws");
 
 var db;
@@ -519,20 +521,20 @@ function tileWriteEdits(cacheTile, editObj) {
 
 	// tile is owner-only, but user is not owner
 	if(char_writability == 2 && !is_owner) {
-		if(rejected) rejected[editID] = 1;
+		if(rejected) rejected[editID] = enums.write.noWritePerm;
 		IOProgress(callID);
 		return;
 	}
 	// tile is member-only, but user is not member (nor owner)
 	if(char_writability == 1 && !is_owner && !is_member) {
-		if(rejected) rejected[editID] = 1;
+		if(rejected) rejected[editID] = enums.write.noWritePerm;
 		IOProgress(callID);
 		return;
 	}
 
 	// this edit request is only allowed to write on public areas
 	if(public_only && char_writability != 0) {
-		if(rejected) rejected[editID] = 1;
+		if(rejected) rejected[editID] = enums.write.noWritePerm;
 		IOProgress(callID);
 		return;
 	}

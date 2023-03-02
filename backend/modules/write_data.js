@@ -7,6 +7,8 @@ var restrictions = require("../utils/restrictions.js");
 var checkCoalition = restrictions.checkCoalition;
 var getRestrictions = restrictions.getRestrictions;
 
+var enums = require("../utils/enums.js");
+
 var emptyWriteResponse = { accepted: [], rejected: {} };
 
 function isMainPage(name) {
@@ -98,26 +100,18 @@ module.exports = async function(data, server, params) {
 	var is_member = !!world.members.map[user.id] || is_owner || memkeyAccess;
 
 	var can_color_text = true;
-	if(color_text == 1 && !is_member) can_color_text = false;
-	if(color_text == 2 && !is_owner) can_color_text = false;
+	if(color_text == enums.perm.member && !is_member) can_color_text = false;
+	if(color_text == enums.perm.owner && !is_owner) can_color_text = false;
 
-	var can_color_cell = color_cell != -1;
-	if(color_cell == 1 && !is_member) can_color_cell = false;
-	if(color_cell == 2 && !is_owner) can_color_cell = false;
+	var can_color_cell = color_cell != enums.perm.none;
+	if(color_cell == enums.perm.member && !is_member) can_color_cell = false;
+	if(color_cell == enums.perm.owner && !is_owner) can_color_cell = false;
 
 	var edits = data.edits;
 	if(!edits) return emptyWriteResponse;
 	if(!Array.isArray(edits)) return emptyWriteResponse;
 
 	var rejected = {};
-	/*
-	1: NO_TILE_PERM
-	2: CHAR_RATE_LIMIT
-	3: TILE_RATE_LIMIT
-	4: ZERO_RATE_LIMIT
-	5: TOO_MANY_HOLDS
-	*/
-	// TODO: use constants (some rejected values may be added by the tile manager subsystem)
 
 	var idLabel = isGrouped ? "cg1" : ipAddress;
 	
@@ -171,19 +165,19 @@ module.exports = async function(data, server, params) {
 		}
 
 		if(!rate_limiter.checkCharRateLimit(editLimiter, charRatePerSecond, 1)) {
-			rejected[editId] = 2;
-			if(charRatePerSecond == 0) rejected[editId] = 4;
+			rejected[editId] = enums.write.charRateLimit;
+			if(charRatePerSecond == 0) rejected[editId] = enums.write.zeroRateLimit;
 			continue;
 		}
 		if(customLimiter && rrate == null) {
 			if(!rate_limiter.checkCharRateLimit(customLimiter, charsPerPeriod, 1)) {
-				rejected[editId] = 2;
-				if(charsPerPeriod == 0) rejected[editId] = 4;
+				rejected[editId] = enums.write.charRateLimit;
+				if(charsPerPeriod == 0) rejected[editId] = enums.write.zeroRateLimit;
 				continue;
 			}
 		}
 		if(isHTTP && httpWriteDenied) {
-			rejected[editId] = 4;
+			rejected[editId] = enums.write.zeroRateLimit;
 			continue;
 		}
 
@@ -195,11 +189,11 @@ module.exports = async function(data, server, params) {
 		var tileStr = world.id + "," + tileY + "," + tileX;
 		if(!tiles[tileStr]) {
 			if(!rate_limiter.checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world.id)) {
-				rejected[editId] = 3;
+				rejected[editId] = enums.char.tileRateLimit;
 				continue;
 			}
 			if(!rate_limiter.setHold(idLabel, world.id, tileX, tileY)) {
-				rejected[editId] = 5;
+				rejected[editId] = enums.write.tooManyHolds;
 				continue;
 			}
 			tiles[tileStr] = [];
