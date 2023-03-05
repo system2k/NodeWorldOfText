@@ -206,10 +206,10 @@ module.exports = async function(data, server, params) {
 		}
 
 		var testChar = advancedSplit(char);
-		if(testChar.length == 0) {
+		if(testChar.length == 0) { // empty edit
 			char = "\0";
-		} else if(char.length > 1 && (user.superuser || is_member || is_owner)) {
-			validEdits.push(...partitionMultiEdit(editOffset, tileX, tileY, char, color, bgColor, editId));
+		} else if(char.length > 1 && (user.superuser || is_member || is_owner)) { // multi-char edit
+			validEdits.push(...partitionMultiEdit(editOffset, tileX, tileY, testChar, color, bgColor, editId));
 			continue;
 		}
 
