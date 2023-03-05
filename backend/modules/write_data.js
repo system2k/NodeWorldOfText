@@ -189,7 +189,7 @@ module.exports = async function(data, server, params) {
 		var tileStr = world.id + "," + tileY + "," + tileX;
 		if(!tiles[tileStr]) {
 			if(!rate_limiter.checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world.id)) {
-				rejected[editId] = enums.char.tileRateLimit;
+				rejected[editId] = enums.write.tileRateLimit;
 				continue;
 			}
 			if(!rate_limiter.setHold(idLabel, world.id, tileX, tileY)) {
