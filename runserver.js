@@ -2988,6 +2988,7 @@ function stopServer(restart, maintenance) {
 		if(restart) {
 			sendProcMsg("RESTART");
 		} else if(maintenance) {
+			sendProcMsg("PORT=" + serverPort);
 			sendProcMsg("MAINT");
 		}
 	})();

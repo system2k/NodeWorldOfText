@@ -3,28 +3,10 @@ console.log("Starting process...");
 var args = process.argv.slice(2);
 var fork = require("child_process").fork;
 var serverPath = "./runserver.js";
+
+// server used for maintenance message
 var http = require("http");
-var fs = require("fs");
-
-var isTestServer = false;
-var args = process.argv;
-args.forEach(function(a) {
-	if(a == "--test-server") {
-		isTestServer = true;
-		return;
-	}
-});
-
-var DATA_PATH = "../nwotdata/";
-var SETTINGS_PATH = DATA_PATH + "settings.json";
-var settings, maintenance_port;
-if(fs.existsSync(SETTINGS_PATH)) {
-	settings = require(SETTINGS_PATH);
-	maintenance_port = settings.port;
-	if(isTestServer) {
-		maintenance_port = settings.test_port;
-	}
-}
+var maintenance_port = null;
 
 function listenForExitCommand() {
 	process.stdin.resume();
@@ -75,12 +57,18 @@ function runServer() {
 			maintenance = true;
 			listenForExitCommand();
 		}
+		if(msg.startsWith("PORT=")) {
+			maintenance_port = parseInt(msg.slice(5));
+		}
 	});
 }
 
 runServer();
 
 function maintenanceMode() {
+	if(!maintenance_port || Number.isNaN(maintenance_port)) {
+		throw "Cannot fire up maintenance message server: Invalid port";
+	}
 	var time = new Date();
 	var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 	var timeStr = "";
