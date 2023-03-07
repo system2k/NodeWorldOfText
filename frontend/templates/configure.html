@@ -26,7 +26,6 @@
 		clear_all.onclick = function() { actionMethod = "clear_all" };
 		clear_chat_hist.onclick = function() { actionMethod = "clear_chat_hist" };
 
-		//ratelim_enabled.onclick = updateRatelimBox;
 		updateMemkeyBox();
 		memkey_enabled.onclick = updateMemkeyBox;
 
@@ -59,16 +58,16 @@
 	function action_confirm() {
 		var msg = "";
 		if(actionMethod == "unclaim") {
-			msg = "Are you sure you want to unclaim this world? This action cannot be undone if someone else reclaims the world."
+			msg = "Are you sure you want to unclaim this world? This action cannot be undone if someone else reclaims the world.";
 		}
 		if(actionMethod == "clear_public") {
-			msg = "Are you sure you want to clear all public areas? This action cannot be undone."
+			msg = "Are you sure you want to clear all public areas? This action cannot be undone.";
 		}
 		if(actionMethod == "clear_all") {
-			msg = "Are you sure you want to clear this world entirely? This action cannot be undone."
+			msg = "Are you sure you want to clear this world entirely? This action cannot be undone.";
 		}
 		if(actionMethod == "clear_chat_hist") {
-			msg = "Are you sure you want to clear the chat history? This action cannot be undone."
+			msg = "Are you sure you want to clear the chat history? This action cannot be undone.";
 		}
 		return confirm(msg);
 	}
