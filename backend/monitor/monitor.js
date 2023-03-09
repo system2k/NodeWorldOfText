@@ -101,7 +101,7 @@ var server = http.createServer(async function(req, res) {
 					created: Date.now()
 				};
 				res.writeHead(302, {
-					"Location": "",
+					"Location": ".",
 					"Set-Cookie": "key=" + key
 				});
 				res.end();
