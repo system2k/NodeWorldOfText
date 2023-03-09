@@ -70,7 +70,6 @@ module.exports = async function(data, server, params) {
 	var tile_database = server.tile_database;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
 	var rate_limiter = server.rate_limiter;
-	var monitorEventSockets = server.monitorEventSockets;
 
 	var editReqLimit = 512;
 	var superuserEditReqLimit = 1280;
@@ -228,7 +227,7 @@ module.exports = async function(data, server, params) {
 		validEdits.push([tileY, tileX, charY, charX, 0, char, editId, color, bgColor]);
 	}
 
-	if(params && monitorEventSockets.length) {
+	if(params) {
 		var ip = "", cliId = "", chan = "";
 		if(params.ws) {
 			ip = params.ws.sdata.ipAddress;

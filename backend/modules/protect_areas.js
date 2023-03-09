@@ -14,7 +14,6 @@ module.exports = async function(data, server, params) {
 	var world = params.world;
 
 	var tile_database = server.tile_database;
-	var monitorEventSockets = server.monitorEventSockets;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
 	var rate_limiter = server.rate_limiter;
 
@@ -48,9 +47,7 @@ module.exports = async function(data, server, params) {
 
 	var idLabel = isGrouped ? "cg1" : ipAddress;
 
-	if(monitorEventSockets.length) {
-		broadcastMonitorEvent("Protect", ipAddress + " set 'protect' on world '" + world.name + "' (" + world.id + "), coords (" + tileX + ", " + tileY + ")");
-	}
+	broadcastMonitorEvent("Protect", ipAddress + " set 'protect' on world '" + world.name + "' (" + world.id + "), coords (" + tileX + ", " + tileY + ")");
 
 	var no_log_edits = world.opts.noLogEdits;
 

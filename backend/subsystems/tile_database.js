@@ -1152,6 +1152,11 @@ async function databaseClock(serverExit) {
 	try {
 		var modCount = await iterateDatabaseChanges();
 		broadcastMonitorEvent("Database", "Clock cycle executed (" + modCount + " tiles)");
+		broadcastMonitorEvent("raw", {
+			type: "dbCount",
+			tiles: totalTilesCached,
+			worlds: Object.keys(memTileCache).length
+		});
 	} catch(e) {
 		handle_error(e, true);
 	}

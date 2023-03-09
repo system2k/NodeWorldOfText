@@ -48,7 +48,6 @@ module.exports = async function(data, server, params) {
 	var world = params.world;
 
 	var memTileCache = server.memTileCache;
-	var monitorEventSockets = server.monitorEventSockets;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
 	var tile_fetcher = server.tile_fetcher;
 
@@ -106,10 +105,8 @@ module.exports = async function(data, server, params) {
 			return "Too many tiles";
 		}
 
-		if(monitorEventSockets.length) {
-			var monPos = `minX=${minX}, minY=${minY}, maxX=${maxX}, maxY=${maxY}, area=${area}`;
-			broadcastMonitorEvent("Fetch", ipAddress + " requested tiles on world '" + world.name + "' (" + world.id + "), " + monPos);
-		}
+		var monPos = `minX=${minX}, minY=${minY}, maxX=${maxX}, maxY=${maxY}, area=${area}`;
+		broadcastMonitorEvent("Fetch", ipAddress + " requested tiles on world '" + world.name + "' (" + world.id + "), " + monPos);
 
 		rect.minY = minY;
 		rect.minX = minX;

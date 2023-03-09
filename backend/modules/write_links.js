@@ -19,7 +19,6 @@ module.exports = async function(data, server, params) {
 	var world = params.world;
 
 	var tile_database = server.tile_database;
-	var monitorEventSockets = server.monitorEventSockets;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
 	var rate_limiter = server.rate_limiter;
 
@@ -61,9 +60,7 @@ module.exports = async function(data, server, params) {
 	var linkLimiter = rate_limiter.prepareRateLimiter(rate_limiter.linkRateLimits, 1000, idLabel);
 	var lrate = rate_limiter.checkLinkrateRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name);
 
-	if(monitorEventSockets.length) {
-		broadcastMonitorEvent("Link", ipAddress + " set 'link' on world '" + world.name + "' (" + world.id + "), coords (" + tileX + ", " + tileY + ")");
-	}
+	broadcastMonitorEvent("Link", ipAddress + " set 'link' on world '" + world.name + "' (" + world.id + "), coords (" + tileX + ", " + tileY + ")");
 
 	var no_log_edits = world.opts.noLogEdits;
 

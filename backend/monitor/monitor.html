@@ -68,7 +68,6 @@
 				<tr style="background-color: #6961e2;">
 					<td style="padding: 4px;" id="mainTitle">
 						<span style="font-weight: bold;">Load Monitor</span>
-						<a style="float: right; margin-right: 10px;" href="/home/">Home Page</a>
 					</td>
 				</tr>
 				<tr style="height: 100%; color: #000000;">
@@ -81,8 +80,8 @@
 								</div>
 								<div id="tileCachePanel">
 									<b>Tile Cache</b><br>
-									<span>Worlds: {{tc_worlds}}</span><br>
-									<span>Total Tiles: {{tc_tiles}}</span>
+									<span id="tc_worlds">Worlds: --</span><br>
+									<span id="tc_tiles">Total Tiles: --</span>
 								</div>
 							</div>
 						</div>
@@ -145,7 +144,6 @@
 			function appendLine(string) {
 				var line = document.createElement("span");
 				string = string.replace(/\&/g, "&amp;").replace(/\</g, "&lt;").replace(/\>/g, "&gt;");
-				string = string.replace(/(?:^[0-9]{1,3}(?:\.[0-9]{1,3}){3})|(?:^[0-9a-f]{4}(?::[0-9a-f]{4}){7})/, "<a target='_blank' href='http://rwhois.he.net/whois.php?query=$&'>$&</a>")
 				line.innerHTML = string;
 				var scrollBottom = false;
 				if((outputPanel.scrollHeight - outputPanel.clientHeight) - outputPanel.scrollTop < 20) {
@@ -157,18 +155,49 @@
 				}
 			}
 
+			function processJSONReq(data) {
+				if(data.type == "dbCount") {
+					window.tc_worlds.innerText = "Worlds: " + data.worlds;
+					window.tc_tiles.innerText = "Total Tiles: " + data.tiles;
+				}
+			}
+
+			function getCookies() {
+				var list = {};
+				var raw = document.cookie.split(";");
+				for(var i = 0; i < raw.length; i++) {
+					var cookie = raw[i];
+					cookie = cookie.split("=");
+					var key = cookie[0];
+					var value = cookie[1];
+					if(!key || !value) continue;
+					key = key.trim();
+					value = value.trim();
+					list[key] = value;
+				}
+				return list;
+			}
+
 			var socket;
 			function makeSocket() {
-				socket = new WebSocket("ws" + (window.location.protocol === "https:" ? "s" : "") + "://" + window.location.host + "/administrator/monitor/ws/");
+				socket = new WebSocket("ws" + (window.location.protocol === "https:" ? "s" : "") + "://" + window.location.host + "/ws/");
 				socket.onopen = function() {
-					appendLine("[Monitor] Opened");
+					appendLine("[Monitor] Opened; Attempting to authenticate");
+					var cookies = getCookies();
+					socket.send(JSON.stringify({
+						kind: "csrftoken",
+						csrftoken: cookies.csrftoken
+					}));
 				}
 				socket.onclose = function() {
 					appendLine("[Monitor] Closed. Reconnecting...");
-					makeSocket();
+					setTimeout(makeSocket, 1000);
 				}
 				socket.onmessage = function(msg) {
 					var data = msg.data;
+					if(data.charAt(0) == "$") {
+						processJSONReq(JSON.parse(data.slice(1)));
+					}
 					var type = data.split("]")[0].substr(1);
 					if(!logCounts[type]) logCounts[type] = 0;
 					logCounts[type]++;

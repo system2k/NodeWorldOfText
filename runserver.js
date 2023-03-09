@@ -21,6 +21,7 @@ const sql         = require("sqlite3");
 const url         = require("url");
 const util        = require("util");
 const WebSocket   = require("ws");
+const worker      = require("node:worker_threads");
 const zip         = require("adm-zip");
 const zlib        = require("zlib");
 
@@ -133,11 +134,11 @@ var ws_req_per_second = 1000;
 var pw_encryption = "sha512WithRSAEncryption";
 
 var wss; // websocket handler
+var monitorWorker;
 var clientVersion = "";
 var pgConn; // postgreSQL connection for Uvias
 var intv = {}; // intervals and timeouts
 var pluginMgr = null;
-var monitorEventSockets = [];
 
 // Global
 CONST = {};
@@ -503,7 +504,6 @@ var pages = {
 		administrator: require("./backend/pages/admin/administrator.js"),
 		backgrounds: require("./backend/pages/admin/backgrounds.js"),
 		manage_ranks: require("./backend/pages/admin/manage_ranks.js"),
-		monitor: require("./backend/pages/admin/monitor.js"),
 		set_custom_rank: require("./backend/pages/admin/set_custom_rank.js"),
 		user: require("./backend/pages/admin/user.js"),
 		user_list: require("./backend/pages/admin/user_list.js"),
@@ -1188,7 +1188,7 @@ function createEndpoints() {
 	registerEndpoint("administrator/manage_ranks", pages.admin.manage_ranks);
 	registerEndpoint("administrator/set_custom_rank/*", pages.admin.set_custom_rank);
 	registerEndpoint("administrator/user_list", pages.admin.user_list);
-	registerEndpoint("administrator/monitor", pages.admin.monitor);
+	registerEndpoint("administrator/monitor/", (settings && settings.monitor && settings.monitor.redirect) ? settings.monitor.redirect : null);
 	registerEndpoint("administrator/shell", pages.admin.shell);
 	registerEndpoint("administrator/restrictions", pages.admin.restrictions, { binary_post_data: true });
 
@@ -1517,18 +1517,6 @@ function checkHTTPRestr(list, ipVal, ipFam) {
 	return resp;
 }
 
-process.on("uncaughtException", function(e) {
-	try {
-		err = JSON.stringify(process_error_arg(e));
-		err = "TIME: " + Date.now() + "\r\n" + err + "\r\n" + "-".repeat(20) + "\r\n\r\n\r\n";
-		fs.appendFileSync(settings.paths.uncaught, err);
-	} catch(e) {
-		console.log("Error while recording uncaught error", e);
-	}
-	console.log("Uncaught error:", e);
-	process.exit(-1);
-});
-
 process.on("unhandledRejection", function(reason) {
 	console.log("Unhandled promise rejection!\n" + Date.now());
 	console.log("Error:", reason);
@@ -1583,6 +1571,21 @@ function setupHTTPServer() {
 		socket.on("close", function() {
 			delete HTTPSockets[sockID];
 		});
+	});
+}
+
+function setupMonitorServer() {
+	if(typeof settings.monitor.port != "number") return;
+	monitorWorker = new worker.Worker("./backend/monitor/monitor.js", {
+		workerData: {
+			port: settings.monitor.port,
+			ip: settings.monitor.ip,
+			user: settings.monitor.credentials.user,
+			pass: settings.monitor.credentials.pass
+		}
+	});
+	monitorWorker.on("error", function(e) {
+		handle_error(e);
 	});
 }
 
@@ -1774,15 +1777,19 @@ async function process_request(req, res, compCallbacks) {
 		var binary_post_data = options.binary_post_data;
 		var remove_end_slash = options.remove_end_slash;
 
-		if(typeof pageRes == "string") { // redirection
-			dispatch(null, null, { redirect: pageRes });
+		if(handler == null) {
+			dispatch("No route is available for this page", 404);
 			return true;
 		}
-		if(typeof pageRes != "object") { // not a valid page type
+		if(typeof handler == "string") { // redirection
+			dispatch(null, null, { redirect: handler });
+			return true;
+		}
+		if(typeof handler != "object") { // not a valid page type
 			return false;
 		}
 		var method = req.method.toUpperCase();
-		var rate_id = await check_http_rate_limit(ipAddress, pageRes, method);
+		var rate_id = await check_http_rate_limit(ipAddress, handler, method);
 		if(rate_id != -1) { // release handle when this request finishes
 			compCallbacks.push(function() {
 				release_http_rate_limit(ipAddress, rate_id);
@@ -1856,9 +1863,9 @@ async function process_request(req, res, compCallbacks) {
 			}
 		};
 		var pageStat;
-		if(pageRes[method] && valid_method(method)) {
+		if(handler[method] && valid_method(method)) {
 			// Return the page
-			pageStat = await pageRes[method](req, dispatch, global_data, ctx, {});
+			pageStat = await handler[method](req, dispatch, global_data, ctx, {});
 		} else {
 			dispatch("Method " + method + " not allowed.", 405);
 		}
@@ -2218,22 +2225,15 @@ function ws_broadcast(data, world_id, opts) {
 	});
 }
 
-function sendMonitorEvents(ws) {
-	monitorEventSockets.push(ws);
-}
-function removeMonitorEvents(ws) {
-	var idx = monitorEventSockets.indexOf(ws);
-	if(idx > -1) {
-		monitorEventSockets.splice(idx, 1);
-	}
-}
 function broadcastMonitorEvent(type, data) {
-	if(!monitorEventSockets.length) return;
-	for(var i = 0; i < monitorEventSockets.length; i++) {
-		var sock = monitorEventSockets[i];
-		var str = "[" + type + "] " + data;
-		wsSend(sock, str);
-	}
+	if(!settings.monitor || !settings.monitor.enabled) return;
+	try {
+		if(type == "raw") {
+			monitorWorker.postMessage(data);
+		} else {
+			monitorWorker.postMessage("[" + type + "] " + data);
+		}
+	} catch(e) {}
 }
 
 // todo: fix this
@@ -2369,7 +2369,6 @@ function invalidateWebsocketSession(session_token) {
 	if(!session_token) return;
 	wss.clients.forEach(function(ws) {
 		if(!ws.sdata) return;
-		if(ws.sdata.monitorSocket) return;
 		if(ws.sdata.terminated) return;
 		if(!ws.sdata.user) return;
 		if(!ws.sdata.user.session_key) return; // safety layer: don't process unauthenticated clients
@@ -2388,7 +2387,6 @@ async function manageWebsocketConnection(ws, req) {
 		ipAddressVal: null,
 		origin: req.headers["origin"],
 		userClient: false,
-		monitorSocket: false,
 		world: null,
 		user: null,
 		channel: null,
@@ -2489,29 +2487,6 @@ async function manageWebsocketConnection(ws, req) {
 	// remove initial slash
 	if(location.at(0) == "/") location = location.slice(1);
 
-	if(location == "administrator/monitor") {
-		var cookies = parseCookie(req.headers.cookie);
-		var user = await get_user_info(cookies, true);
-		if(!user.superuser) {
-			remove_ip_address_connection(ws.sdata.ipAddress);
-			return ws.close();
-		}
-		sendMonitorEvents(ws);
-		ws.on("close", function() {
-			remove_ip_address_connection(ws.sdata.ipAddress);
-			removeMonitorEvents(ws);
-		});
-		ws.sdata.monitorSocket = true;
-		var msCount = 0;
-		wss.clients.forEach(function(msock) {
-			if(!msock.sdata) return;
-			if(msock.sdata.monitorSocket) {
-				msCount++;
-			}
-		});
-		broadcastMonitorEvent("Server", msCount + " listening sockets, " + monitorEventSockets.length + " listeners");
-		return;
-	}
 	var pre_queue = [];
 	// adds data to a queue. this must be before any async calls and the message event
 	function pre_message(msg) {
@@ -2626,9 +2601,7 @@ async function manageWebsocketConnection(ws, req) {
 		block_all: false
 	};
 
-	if(monitorEventSockets.length) {
-		broadcastMonitorEvent("Connect", ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + world.name + "', " + world.id + "]");
-	}
+	broadcastMonitorEvent("Connect", ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + world.name + "', " + world.id + "]");
 
 	var sentClientId = clientId;
 	if(!can_chat) sentClientId = -1;
@@ -2758,13 +2731,6 @@ async function start_server() {
 	}, 2000);
 
 	intv.traff_mon_net_interval = setInterval(function() {
-		if(!monitorEventSockets.length) {
-			periodHTTPOutboundBytes = 0;
-			periodHTTPInboundBytes = 0;
-			periodWSOutboundBytes = 0;
-			periodWSInboundBytes = 0;
-			return;
-		}
 		if(periodHTTPOutboundBytes || periodHTTPInboundBytes) {
 			broadcastMonitorEvent("Network", "HTTP stream: " + periodHTTPOutboundBytes + " (out); " + periodHTTPInboundBytes + " (in)");
 			periodHTTPOutboundBytes = 0;
@@ -2776,7 +2742,6 @@ async function start_server() {
 			periodWSInboundBytes = 0;
 			wss.clients.forEach(function(ws) {
 				if(!ws.sdata) return;
-				if(!ws.sdata.userClient) return;
 				if(ws.sdata.messageBackpressure > 1) {
 					broadcastMonitorEvent("Backpressure", "Warning - backpressure of " + ws.sdata.messageBackpressure + " (" + ws.sdata.ipAddress + ")");
 				}
@@ -2820,8 +2785,11 @@ async function start_server() {
 	});
 
 	await sysLoad(); // initialize the subsystems (tile database; chat manager)
-
 	serverLoaded = true;
+
+	if(settings.monitor && settings.monitor.enabled) {
+		setupMonitorServer();
+	}
 }
 
 // the server context
@@ -2866,7 +2834,6 @@ var global_data = {
 	static_data,
 	stopServer,
 	broadcastMonitorEvent,
-	monitorEventSockets,
 	acme,
 	uviasSendIdentifier,
 	client_cursor_pos,
@@ -2946,6 +2913,10 @@ function stopServer(restart, maintenance) {
 
 				if(accountSystem == "uvias") {
 					pgConn.end();
+				}
+
+				if(monitorWorker && settings.monitor && settings.monitor.enabled) {
+					monitorWorker.terminate();
 				}
 			}
 		} catch(e) {

@@ -1,5 +1,5 @@
 {
-	"version": "2.0",
+	"version": "2.1",
 
 	"website": "https://ourworldoftext.com/",
 
@@ -13,6 +13,17 @@
 	"port": 8080,
 	"test_port": 9090,
 	"ip": null,
+
+	"monitor": {
+		"enabled": false,
+		"port": null,
+		"ip": null,
+		"redirect": null,
+		"credentials": {
+			"user": "",
+			"pass": ""
+		}
+	},
 
 	"account_system": "local",
 
