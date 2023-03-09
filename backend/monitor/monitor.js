@@ -76,7 +76,7 @@ var server = http.createServer(async function(req, res) {
 				};
 				res.writeHead(200, {
 					"Content-Type": "text/html",
-					"Set-Cookie": "csrftoken=" + csrf
+					"Set-Cookie": "moncsrftoken=" + csrf
 				});
 				res.end(pageTemplate);
 			} else {
@@ -101,7 +101,7 @@ var server = http.createServer(async function(req, res) {
 					created: Date.now()
 				};
 				res.writeHead(302, {
-					"Location": "/",
+					"Location": "",
 					"Set-Cookie": "key=" + key
 				});
 				res.end();

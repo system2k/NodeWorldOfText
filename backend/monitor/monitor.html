@@ -180,13 +180,13 @@
 
 			var socket;
 			function makeSocket() {
-				socket = new WebSocket("ws" + (window.location.protocol === "https:" ? "s" : "") + "://" + window.location.host + "/ws/");
+				socket = new WebSocket("ws" + (window.location.protocol === "https:" ? "s" : "") + "://" + window.location.host + window.location.pathname + "ws/");
 				socket.onopen = function() {
 					appendLine("[Monitor] Opened; Attempting to authenticate");
 					var cookies = getCookies();
 					socket.send(JSON.stringify({
 						kind: "csrftoken",
-						csrftoken: cookies.csrftoken
+						csrftoken: cookies.moncsrftoken
 					}));
 				}
 				socket.onclose = function() {
