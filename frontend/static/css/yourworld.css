@@ -12,6 +12,19 @@ html, body {
 .announce_text {
 	text-align: center;
 	margin-right: 3px;
+	background-color: rgb(181 181 241);
+	border-radius: 5px;
+	color: #525252;
+	padding-left: 7px;
+	padding-right: 7px;
+	font-weight: bold;
+}
+.announce_text > a {
+	text-decoration: underline;
+	color: blue;
+}
+.announce_text:hover > a {
+	color: #f1d94a;
 }
 .screen_canvas {
 	overflow: hidden;

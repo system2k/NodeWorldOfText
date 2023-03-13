@@ -7247,6 +7247,11 @@ function begin() {
 	if(state.announce) {
 		w.doAnnounce(state.announce);
 	}
+
+	if(window.location.hostname == "www.ourworldoftext.com") {
+		w.doAnnounce("You are currently under the 'www' subdomain. <a href=\"https://ourworldoftext.com\">You may want to go here instead.<a>", "www_warn");
+	}
+
 	buildMenu();
 	updateMenuEntryVisiblity();
 	w.regionSelect.onselection(handleRegionSelection);
