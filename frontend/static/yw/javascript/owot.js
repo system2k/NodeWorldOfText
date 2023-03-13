@@ -3653,6 +3653,7 @@ function createSocket() {
 			if(typeof cb == "function") {
 				cb(null, true);
 			}
+			delete network.callbacks[i];
 		}
 		if(!disconnectTimeout) {
 			disconnectTimeout = setTimeout(function() {
@@ -5394,6 +5395,7 @@ function RegionSelection() {
 	this.lastSelectionTiled = this.tiled;
 	this.restartSelection = false;
 	this.init = function() {
+		if(this.selection) return;
 		var div = document.createElement("div");
 		div.className = "region_selection";
 		div.style.display = "none";
@@ -5504,7 +5506,6 @@ function RegionSelection() {
 		this.isSelecting = true;
 		elm.owot.style.cursor = "cell";
 	}
-	regionSelections.push(this);
 	this.destroy = function() {
 		for(var i = 0; i < regionSelections.length; i++) {
 			if(regionSelections[i] == this) {
@@ -5513,6 +5514,8 @@ function RegionSelection() {
 			}
 		}
 	}
+	regionSelections.push(this);
+	this.init();
 	return this;
 }
 
@@ -6797,6 +6800,7 @@ var ws_functions = {
 			if(typeof cb == "function") {
 				cb(data.tiles, null);
 			}
+			delete network.callbacks[id];
 		}
 		if(tileFetchOffsetX || tileFetchOffsetY) {
 			tile_offset_object(data.tiles, tileFetchOffsetX, tileFetchOffsetY);
@@ -6950,6 +6954,7 @@ var ws_functions = {
 			if(typeof cb == "function") {
 				cb(data, null);
 			}
+			delete network.callbacks[id];
 		}
 		w.emit("writeResponse", data);
 		for(var i = 0; i < data.accepted.length; i++) {
@@ -7245,12 +7250,10 @@ function begin() {
 	buildMenu();
 	updateMenuEntryVisiblity();
 	w.regionSelect.onselection(handleRegionSelection);
-	w.regionSelect.init();
 
 	w.protectSelect.onselection(protectSelectionStart);
 	w.protectSelect.oncancel(protectSelectionCancel);
 	w.protectSelect.tiled = true;
-	w.protectSelect.init();
 
 	w.fetchUnloadedTiles();
 	w.fixFonts("legacycomputing");

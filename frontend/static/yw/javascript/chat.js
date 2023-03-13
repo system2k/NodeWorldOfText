@@ -131,7 +131,10 @@ var client_commands = {
 	},
 	ping: function() {
 		var pingTime = getDate();
-		network.ping(function() {
+		network.ping(function(resp, err) {
+			if(err) {
+				return clientChatResponse("Ping failed");
+			}
 			var pongTime = getDate();
 			var pingMs = pongTime - pingTime;
 			clientChatResponse("Ping: " + pingMs + " MS");
