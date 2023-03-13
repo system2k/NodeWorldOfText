@@ -3619,10 +3619,12 @@ function createSocket() {
 	socket.onopen = function(msg) {
 		console.log("Connected socket");
 		clearAllGuestCursors();
-		for(var tile in tiles) {
-			if(tiles[tile] == null) {
-				delete tiles[tile];
-				w.tile.count--;
+		if(!initiallyFetched) {
+			for(var tile in tiles) {
+				if(tiles[tile] == null) {
+					delete tiles[tile];
+					w.tile.count--;
+				}
 			}
 		}
 		w.fetchUnloadedTiles();
