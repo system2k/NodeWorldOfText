@@ -1,0 +1,8 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" >
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 12 12">
+	<g transform="translate(0.5, 0.5)">
+		<path fill="white" d="M1 4 L7 4 L7 10 L1 10 L1 4 Z" stroke="#0066CC" stroke-width="1" />
+		<path fill="white" d="M3 6 L6 3 L5 3 L4 2 L5 1 L10 1 L10 6 L9 7 L8 6 L8 5 L5 8 L3 6 Z" stroke="#0066CC" stroke-width="1" />
+	</g>
+</svg>

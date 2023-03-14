@@ -501,3 +501,7 @@ a:visited {
 #text_deco_s {
 	text-decoration: line-through;
 }
+.menuPin {
+	width: 12px;
+	height: 12px;
+}

@@ -5279,7 +5279,9 @@ function buildMenu() {
 	homeLink.href = "/home";
 	homeLink.target = "_blank";
 	homeLink.innerHTML = "More...&nbsp";
-	homeLinkIcon.src = "/static/external_link.png";
+	homeLinkIcon.src = "/static/link.svg";
+	homeLinkIcon.style.width = "12px";
+	homeLinkIcon.style.height = "12px";
 	homeLink.appendChild(homeLinkIcon);
 	menuOptions.home = menu.addEntry(homeLink);
 	menuOptions.showCoords = menu.addCheckboxOption("Show coordinates", function() {
