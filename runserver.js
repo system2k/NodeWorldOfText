@@ -1260,6 +1260,9 @@ function wait_response_data(req, dispatch, binary_post_data, raise_limit) {
 		queryData = "";
 	}
 	var error = false;
+	if(req.aborted) { // request aborted before we could insert our listeners
+		return null;
+	}
 	return new Promise(function(resolve) {
 		req.on("data", function(data) {
 			if(error) return;
@@ -1771,6 +1774,8 @@ async function process_request(req, res, compCallbacks) {
 		gzip: gzipEnabled
 	});
 
+	var page_aborted = false;
+
 	async function processPage(handler, options) {
 		if(!options) options = {};
 		var no_login = options.no_login;
@@ -1787,6 +1792,10 @@ async function process_request(req, res, compCallbacks) {
 		}
 		if(typeof handler != "object") { // not a valid page type
 			return false;
+		}
+		if(req.aborted) {
+			page_aborted = true;
+			return;
 		}
 		var method = req.method.toUpperCase();
 		var rate_id = await check_http_rate_limit(ipAddress, handler, method);
@@ -1889,6 +1898,10 @@ async function process_request(req, res, compCallbacks) {
 			page_resolved = true;
 			break;
 		}
+	}
+
+	if(page_aborted) {
+		return;
 	}
 
 	if(!dispatch.isResolved()) {
