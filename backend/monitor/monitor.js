@@ -87,13 +87,17 @@ var server = http.createServer(async function(req, res) {
 			}
 			return;
 		} else if(method == "POST") {
-			if(!auth_user || !auth_pass) return res.end();
-			if(typeof auth_user != "string" || typeof auth_pass != "string") return res.end();
-			if(auth_pass.length < 3) return res.end();
+			if(!auth_user || !auth_pass) return res.end("Try again");
+			if(typeof auth_user != "string" || typeof auth_pass != "string") return res.end("Try again");
+			if(auth_pass.length < 3) return res.end("Try again");
 			let resp = await loadResponse(req);
 			let user = resp.i_user;
 			let pass = resp.i_pass;
-			if(user == auth_user && pass == auth_pass) {
+			if(user.length != auth_user.length) return res.end("Try again");
+			if(pass.length != auth_pass.length) return res.end("Try again");
+			var equal1 = crypto.timingSafeEqual(Buffer.from(user), Buffer.from(auth_user));
+			var equal2 = crypto.timingSafeEqual(Buffer.from(pass), Buffer.from(auth_pass));
+			if(equal1 && equal2 && user == auth_user && pass == auth_pass) {
 				let key = crypto.randomBytes(32).toString("hex");
 				sessionKeys[key] = {
 					isSessionKey: true,
