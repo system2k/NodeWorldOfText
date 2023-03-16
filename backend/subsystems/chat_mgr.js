@@ -230,7 +230,7 @@ async function doUpdateChatLogData() {
 
 	await db_ch.run("BEGIN");
 
-	for(var i in copy_chatIsCleared) {
+	for(var wid in copy_chatIsCleared) {
 		var worldId = parseInt(wid);
 		var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId);
 		if(!def_channel) continue;
