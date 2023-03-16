@@ -7253,7 +7253,7 @@ function begin() {
 	}
 
 	if(window.location.hostname == "www.ourworldoftext.com") {
-		w.doAnnounce("You are currently under the 'www' subdomain. <a href=\"https://ourworldoftext.com\">You may want to go here instead.<a>", "www_warn");
+		w.doAnnounce("You are currently under the 'www' subdomain. <a href=\"https://ourworldoftext.com\">You may want to go here instead.</a>", "www_warn");
 	}
 
 	buildMenu();
