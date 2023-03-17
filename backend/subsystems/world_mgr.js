@@ -435,6 +435,7 @@ async function commitWorld(world) {
 		"opts/noLogEdits",
 		"opts/halfChars",
 		"opts/charRate",
+		"opts/memKey",
 		"opts/desc",
 		"opts/privNote",
 		"opts/writeInt",
