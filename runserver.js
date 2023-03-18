@@ -1896,8 +1896,8 @@ async function process_request(req, res, compCallbacks) {
 		var status = await processPage(pageRes, options);
 		if(status) {
 			page_resolved = true;
-			break;
 		}
+		break;
 	}
 
 	if(page_aborted) {
