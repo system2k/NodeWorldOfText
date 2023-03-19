@@ -198,6 +198,7 @@ var client_commands = {
 		positionY = 0;
 		w.changeSocket(ws_path);
 		clientChatResponse("Switching to server: " + ws_path);
+		hasChangedServer = true;
 	},
 	night: function() {
 		w.night();
@@ -570,7 +571,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 		isGreen = true;
 	}
 
-	if(!op) {
+	if(!op || hasChangedServer) {
 		message = html_tag_esc(message);
 		nickname = html_tag_esc(nickname);
 	}
