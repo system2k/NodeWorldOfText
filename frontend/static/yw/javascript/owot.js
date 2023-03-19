@@ -1288,7 +1288,7 @@ function onKeyUp(e) {
 	if(checkKeyPress(e, keyConfig.cursorRight)) { // arrow right
 		autoArrowKeyMoveStop("right");
 	}
-	if(checkKeyPress(e, keyConfig.centerTeleport)) { // home
+	if(checkKeyPress(e, keyConfig.centerTeleport) && e.target == elm.textInput) { // home
 		w.doGoToCoord(0, 0);
 	}
 }
