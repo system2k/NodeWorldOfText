@@ -97,7 +97,6 @@ var initiallyFetched       = false;
 var lastLinkHover          = null; // [tileX, tileY, charX, charY]
 var lastTileHover          = null; // [type, tileX, tileY, (charX, charY)]
 var regionSelections       = [];
-var hasChangedServer       = false;
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -7031,9 +7030,7 @@ var ws_functions = {
 	},
 	announcement: function(data) {
 		w.emit("announcement", data);
-		if(hasChangedServer) {
-			data.text = html_tag_esc(data.text);
-		}
+		data.text = html_tag_esc(data.text);
 		w.doAnnounce(data.text);
 	},
 	ping: function(data) {

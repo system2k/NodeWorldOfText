@@ -187,19 +187,6 @@ var client_commands = {
 		w.changeSocket(ws_path);
 		clientChatResponse("Switching to world: \"" + address + "\"");
 	},
-	warpserver: function(args) {
-		var address = args[0];
-		if(!address) {
-			ws_path = createWsPath();
-		} else {
-			ws_path = address;
-		}
-		positionX = 0;
-		positionY = 0;
-		w.changeSocket(ws_path);
-		clientChatResponse("Switching to server: " + ws_path);
-		hasChangedServer = true;
-	},
 	night: function() {
 		w.night();
 	},
@@ -822,6 +809,105 @@ function addUnreadChatBar(chatfield, message, checkSituation) {
 	bar.appendChild(barText);
 	field.appendChild(bar);
 	return bar;
+}
+
+// check if a character is a combining character
+function isDiacriticalCombining(x) {
+	if(x >= 768 && x <= 879) return true;
+	if(x >= 1155 && x <= 1159) return true;
+	if(x >= 1425 && x <= 1441) return true;
+	if(x >= 1443 && x <= 1469) return true;
+	if(x == 1473 || x == 1474) return true;
+	if(x >= 1611 && x <= 1618) return true;
+	if(x == 1623 || x == 1624) return true;
+	if(x == 1759 || x == 1760) return true;
+	if(x >= 1770 && x <= 1772) return true;
+	if(x >= 1840 && x <= 1866) return true;
+	if(x >= 1958 && x <= 1968) return true;
+	if(x >= 2027 && x <= 2035) return true;
+	if(x == 2072 || x == 2073) return true;
+	if(x >= 2275 && x <= 2302) return true;
+	if(x >= 2385 && x <= 2388) return true;
+	if(x >= 2813 && x <= 2815) return true;
+	if(x == 3387 || x == 3388) return true;
+	if(x >= 3655 && x <= 3660) return true;
+	if(x >= 3784 && x <= 3788) return true;
+	if(x == 3864 || x == 3865) return true;
+	if(x >= 3970 && x <= 3972) return true;
+	if(x == 3974 || x == 3975) return true;
+	if(x == 4153 || x == 4154) return true;
+	if(x >= 6089 && x <= 6099) return true;
+	if(x >= 6457 && x <= 6459) return true;
+	if(x >= 6773 && x <= 6780) return true;
+	if(x >= 6832 && x <= 6845) return true;
+	if(x >= 7019 && x <= 7027) return true;
+	if(x == 7222 || x == 7223) return true;
+	if(x >= 7376 && x <= 7378) return true;
+	if(x >= 7380 && x <= 7392) return true;
+	if(x >= 7394 && x <= 7400) return true;
+	if(x == 7416 || x == 7417) return true;
+	if(x >= 7616 && x <= 7679) return true;
+	if(x >= 8400 && x <= 8447) return true;
+	if(x >= 11503 && x <= 11505) return true;
+	if(x >= 12330 && x <= 12333) return true;
+	if(x == 12441 || x == 12442) return true;
+	if(x == 42620 || x == 42621) return true;
+	if(x == 42736 || x == 42737) return true;
+	if(x >= 43232 && x <= 43249) return true;
+	if(x >= 43307 && x <= 43309) return true;
+	if(x >= 65056 && x <= 65071) return true;
+
+	if([1471, 1476, 2364, 2381, 2492, 2509, 2620, 2637, 2748, 2765, 2876, 2893, 3021, 3149,
+    3260, 3277, 3405, 3530, 3662, 3893, 3895, 3897, 4038, 4151, 4237, 6109, 6783, 6964,
+    7083, 7405, 7412, 42607, 43204, 64286].includes(x)) return true;
+    
+	return false;
+}
+
+function isLongWidthChar(x) {
+	switch(x) {
+		case 0x2E3B: return true;
+		case 0xA9C5: return true;
+		case 0xFDFD: return true;
+		case 0x12219: return true;
+		case 0x1242B: return true;
+	}
+	return false;
+}
+
+function filterChatMessage(str) {
+	if(typeof str != "string") return "";
+	var res = "";
+	var diacriticLimit = 2;
+	var longWidthLimit = 1;
+	var diacriticLength = 0;
+	var longWidthCount = 0;
+	str = [...str];
+	for(var i = 0; i < str.length; i++) {
+		var chr = str[i];
+		var code = chr.codePointAt();
+		var isComb = isDiacriticalCombining(code);
+		var isLong = isLongWidthChar(code);
+		if(isComb) {
+			if(diacriticLength < diacriticLimit) {
+				res += chr;
+			}
+			diacriticLength++;
+		} else {
+			if(isLong) {
+				if(longWidthCount >= longWidthLimit) {
+					res += ".";
+				} else {
+					res += chr;
+					longWidthCount++;
+				}
+			} else {
+				res += chr;
+			}
+			diacriticLength = 0;
+		}
+	}
+	return res;
 }
 
 function getChatfield() {

@@ -194,7 +194,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "nick", ["nickname"], "change your nickname", "JohnDoe"], // client-side
 		[0, "ping", null, "check the latency", null],
 		[0, "warp", ["world"], "go to another world", "forexample"], // client-side
-		[0, "warpserver", ["server"], "use a different server", "wss://www.yourworldoftext.com/~help/ws/"], // client-side
 		[0, "gridsize", ["WxH"], "change the size of cells", "10x20"], // client-side
 		[0, "block", ["id"], "mute someone by id", "1220"],
 		[0, "blockuser", ["username"], "mute someone by username", "JohnDoe"],
