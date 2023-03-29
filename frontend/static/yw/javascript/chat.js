@@ -545,17 +545,14 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 	var pm = dataObj.privateMessage;
 	var isGreen = false;
 
-	if(chatLimitCombChars) {
-		message = w.split(message);
-		for(var i = 0; i < message.length; i++) {
-			message[i] = message[i].slice(0, 5);
-		}
-		message = message.join("");
-	}
-
 	if(chatGreentext && message[0] == ">" && !(":;_-".includes(message[1]))) { // exception to some emoticons
 		message = message.substr(1);
 		isGreen = true;
+	}
+
+	if(chatLimitCombChars) {
+		message = filterChatMessage(message);
+		nickname = filterChatMessage(nickname);
 	}
 
 	if(!op) {
@@ -830,6 +827,7 @@ function isDiacriticalCombining(x) {
 	if(x >= 2385 && x <= 2388) return true;
 	if(x >= 2813 && x <= 2815) return true;
 	if(x == 3387 || x == 3388) return true;
+	if(x >= 3636 && x <= 3642) return true;
 	if(x >= 3655 && x <= 3660) return true;
 	if(x >= 3784 && x <= 3788) return true;
 	if(x == 3864 || x == 3865) return true;
@@ -858,7 +856,7 @@ function isDiacriticalCombining(x) {
 	if(x >= 65056 && x <= 65071) return true;
 
 	if([1471, 1476, 2364, 2381, 2492, 2509, 2620, 2637, 2748, 2765, 2876, 2893, 3021, 3149,
-    3260, 3277, 3405, 3530, 3662, 3893, 3895, 3897, 4038, 4151, 4237, 6109, 6783, 6964,
+    3260, 3277, 3405, 3530, 3633, 3662, 3893, 3895, 3897, 4038, 4151, 4237, 6109, 6783, 6964,
     7083, 7405, 7412, 42607, 43204, 64286].includes(x)) return true;
     
 	return false;
@@ -878,7 +876,7 @@ function isLongWidthChar(x) {
 function filterChatMessage(str) {
 	if(typeof str != "string") return "";
 	var res = "";
-	var diacriticLimit = 2;
+	var diacriticLimit = 3;
 	var longWidthLimit = 1;
 	var diacriticLength = 0;
 	var longWidthCount = 0;
