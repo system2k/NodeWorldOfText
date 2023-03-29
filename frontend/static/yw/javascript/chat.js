@@ -558,7 +558,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 		isGreen = true;
 	}
 
-	if(!op || hasChangedServer) {
+	if(!op) {
 		message = html_tag_esc(message);
 		nickname = html_tag_esc(nickname);
 	}
