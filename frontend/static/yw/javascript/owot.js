@@ -134,7 +134,6 @@ var defaultURLLinkColor    = "#0000FF";
 var defaultHighlightColor  = [0xFF, 0xFF, 0x99];
 var secureJSLink           = true; // display warning prompt when clicking on javascript links
 var secureLink             = true; // display confirmation when clicking on links in a suspicious setting
-var priorityOverwriteChar  = false; // (Experimental) prevents characters from lower protection levels from overflowing to higher levels
 var pasteDirRight          = true; // move cursor right when writing
 var pasteDirDown           = true; // move cursor down after pressing enter
 var defaultCursor          = "text";
@@ -4755,40 +4754,25 @@ function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, off
 	if(!tile) return;
 	var props = tile.properties.cell_props || {};
 	var writability = tile.writability;
-	if(priorityOverwriteChar && tile.properties.char) { // TODO: doesn't work right
-		for(var lev = 0; lev < 3; lev++) {
-			for(var c = 0; c < tileArea; c++) {
-				var code = tile.properties.char[c]; // writability
-				if(code == null) code = tile.properties.writability;
-				if(code == null) code = state.worldModel.writability;
-				if(code != lev) continue;
-				var cX = c % tileC;
-				var cY = Math.floor(c / tileC);
-				textRenderCtx.clearRect(cX * cellW, cY * cellH, cellW, cellH);
-				renderChar(textRenderCtx, cX, cY, clampW, clampH, str, tile, code, props, offsetX, offsetY, false);
+	var x1 = 0;
+	var y1 = 0;
+	var x2 = tileC - 1;
+	var y2 = tileR - 1;
+	if(bounds) {
+		x1 = bounds[0];
+		y1 = bounds[1];
+		x2 = bounds[2];
+		y2 = bounds[3];
+	}
+	for(var y = y1; y <= y2; y++) {
+		for(var x = x1; x <= x2; x++) {
+			var protValue = writability;
+			if(tile.properties.char) {
+				protValue = tile.properties.char[y * tileC + x];
 			}
-		}
-	} else {
-		var x1 = 0;
-		var y1 = 0;
-		var x2 = tileC - 1;
-		var y2 = tileR - 1;
-		if(bounds) {
-			x1 = bounds[0];
-			y1 = bounds[1];
-			x2 = bounds[2];
-			y2 = bounds[3];
-		}
-		for(var y = y1; y <= y2; y++) {
-			for(var x = x1; x <= x2; x++) {
-				var protValue = writability;
-				if(tile.properties.char) {
-					protValue = tile.properties.char[y * tileC + x];
-				}
-				if(protValue == null) protValue = tile.properties.writability;
-				if(protValue == null) protValue = state.worldModel.writability;
-				renderChar(textRenderCtx, x, y, clampW, clampH, str, tile, protValue, props, offsetX, offsetY, charOverflowMode);
-			}
+			if(protValue == null) protValue = tile.properties.writability;
+			if(protValue == null) protValue = state.worldModel.writability;
+			renderChar(textRenderCtx, x, y, clampW, clampH, str, tile, protValue, props, offsetX, offsetY, charOverflowMode);
 		}
 	}
 }
@@ -4915,7 +4899,7 @@ function renderTile(tileX, tileY, redraw) {
 		renderCellBgColors(textRenderCtx, tileX, tileY, clampW, clampH);
 	}
 
-	if(!bufferLargeChars || priorityOverwriteChar) {
+	if(!bufferLargeChars) {
 		renderContent(textRenderCtx, tileX, tileY, clampW, clampH, 0, 0);
 	} else {
 		renderContent(textRenderCtx, tileX - 1, tileY, clampW, clampH, clampW * -1, 0, [tileC - 1, 0, tileC - 1, tileR - 1], true); // left
