@@ -22,5 +22,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 		return write();
 	}
 
-	write(script.content);
+	write(script.content, null, {
+		mime: "text/javascript; charset=utf-8"
+	});
 }
