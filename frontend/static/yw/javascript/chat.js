@@ -627,7 +627,7 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 		nickDom.style.color = color;
 		var impersonationWarning = "";
 		if(usernameHasSpecialChars) {
-			impersonationWarning = " (Special chars; Potential impersonator)";
+			impersonationWarning = " (Special chars)";
 		}
 		nickTitle.push("Username \"" + realUsername + "\"" + impersonationWarning);
 		if(state.userModel.is_operator) idTag = "[*" + id + "]";
@@ -847,6 +847,7 @@ function isDiacriticalCombining(x) {
 
 function isLongWidthChar(x) {
 	switch(x) {
+		case 0x0BF5: return true;
 		case 0x2E3B: return true;
 		case 0xA9C5: return true;
 		case 0xFDFD: return true;
