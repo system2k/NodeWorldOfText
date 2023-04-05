@@ -4024,9 +4024,6 @@ function uncolorChar(tileX, tileY, charX, charY, colorClass) {
 var isTileLoaded = Tile.loaded;
 var isTileVisible = Tile.visible;
 
-var brOrder = [1, 8, 2, 16, 4, 32, 64, 128];
-var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
 /*
 	Writability format (tiles and chars):
 		null: Writability of parent tile
@@ -4035,6 +4032,7 @@ var base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678
 		2: owners
 */
 function decodeCharProt(str) {
+	const base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	var res = new Array(tileArea).fill(0);
 	var encoding = str.charAt(0);
 	str = str.substr(1);
@@ -4182,6 +4180,8 @@ var lcsShardCharVectors = [
 	[[2,0],[2,4],[0,2],[2,0]] 
 ];
 
+// 2x4 octant character lookup (relative char code -> bit pattern)
+// range: 0x1CD00 - 0x1CDE5
 var lcsOctantCharPoints = [
 	4, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
 	32, 33, 34, 35, 36, 37, 38, 39, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
@@ -4197,33 +4197,185 @@ var lcsOctantCharPoints = [
 	236, 237, 238, 239, 241, 242, 243, 244, 246, 247, 248, 249, 251, 253, 254
 ];
 
+var fracBlockTransforms = [
+	// relative offset: 0x2580 (until 0x2590)
+	[[2, 4/8],
+	[3, 1/8],
+	[3, 2/8],
+	[3, 3/8],
+	[3, 4/8],
+	[3, 5/8],
+	[3, 6/8],
+	[3, 7/8],
+	[0, 8/8],
+	[0, 7/8],
+	[0, 6/8],
+	[0, 5/8],
+	[0, 4/8],
+	[0, 3/8],
+	[0, 2/8],
+	[0, 1/8],
+	[1, 4/8]],
+
+	// relative offset: 0x2594 (until 0x2595)
+	[[2, 1/8],
+	[1, 1/8]],
+	
+	// relative offset: 0x1FB82 (until 0x1FB8B)
+	[[2, 2/8],
+	[2, 3/8],
+	[2, 5/8],
+	[2, 6/8],
+	[2, 7/8],
+	[1, 2/8],
+	[1, 3/8],
+	[1, 5/8],
+	[1, 6/8],
+	[1, 7/8]]
+];
+
 function isValidSpecialSymbol(charCode) {
-	if(charCode >= 0x2580 && charCode <= 0x259F) return true;
+	if(charCode >= 0x2580 && charCode <= 0x2590) return true;
+	if(charCode >= 0x2594 && charCode <= 0x259F) return true;
 	if(charCode >= 0x25E2 && charCode <= 0x25E5) return true;
-	if(charCode >= 0x1FB00 && charCode <= 0x1FBFF) return true;
 	if(charCode >= 0x1CD00 && charCode <= 0x1CDE5) return true;
+	if(charCode >= 0x1FB00 && charCode <= 0x1FB3B) return true;
+	if(charCode >= 0x1FB3C && charCode <= 0x1FB6F) return true;
+	if(charCode >= 0x1FB82 && charCode <= 0x1FB8B) return true;
+
 	switch(charCode) {
 		case 0x25B2: return true;
 		case 0x25BA: return true;
 		case 0x25BC: return true;
 		case 0x25C4: return true;
+		case 0x1CEA0: return true;
+		case 0x1CEA3: return true;
 		case 0x1CEA8: return true;
 		case 0x1CEAB: return true;
-		case 0x1CEA3: return true;
-		case 0x1CEA0: return true;
+		case 0x1FB9A: return true;
+		case 0x1FB9B: return true;
+		case 0x1FBE6: return true;
+		case 0x1FBE7: return true;
 	}
+
 	return false;
 }
 
-function fillBlockChar(charCode, textRender, x, y, clampW, clampH, flags) {
-	var isBold = flags ? flags & 1 : 0;
-	var isOverflow = flags ? flags & 2 : 0;
-	if(!isValidSpecialSymbol(charCode)) {
-		return false;
-	}
-	if(isOverflow) return true; // ignore
-	var transform = [0, 1]; // (left, right, up, down = 0, 1, 2, 3), percentage
+function draw2by2Char(charCode, textRender, x, y, width, height) {
+	// relative offset: 0x2596 - 0x259F
+	var pattern = [2, 1, 8, 11, 9, 14, 13, 4, 6, 7][charCode - 0x2596];
+	textRender.beginPath();
+	if(pattern & 8) textRender.rect(x, y, width / 2, height / 2);
+	if(pattern & 4) textRender.rect(x + width / 2, y, width / 2, height / 2);
+	if(pattern & 2) textRender.rect(x, y + height / 2, width / 2, height / 2);
+	if(pattern & 1) textRender.rect(x + width / 2, y + height / 2, width / 2, height / 2);
+	textRender.fill();
+}
 
+function draw2by3Char(charCode, textRender, x, y, width, height) {
+	var code = 0;
+	if(charCode >= 0x1FB00 && charCode <= 0x1FB13) code = charCode - 0x1FB00 + 1;
+	if(charCode >= 0x1FB14 && charCode <= 0x1FB27) code = charCode - 0x1FB00 + 2;
+	if(charCode >= 0x1FB28 && charCode <= 0x1FB3B) code = charCode - 0x1FB00 + 3;
+	textRender.beginPath();
+	for(var i = 0; i < 6; i++) {
+		if(!(code >> i & 1)) continue;
+		textRender.rect(x + (width / 2) * (i & 1), y + (height / 3) * (i >> 1), width / 2, height / 3);
+	}
+	textRender.fill();
+}
+
+function drawTriangleShardChar(charCode, textRender, x, y, width, height) {
+	var is90degTri = charCode >= 0x25E2 && charCode <= 0x25E5;
+	var isIsoTri = charCode == 0x25B2 || charCode == 0x25BA || charCode == 0x25BC || charCode == 0x25C4;
+
+	var vecIndex = charCode - 0x1FB3C;
+	if(charCode >= 0x1FB9A && charCode <= 0x1FB9B) {
+		vecIndex -= 42;
+	} else if(is90degTri) {
+		vecIndex = (charCode - 0x25E2) + 54;
+	} else if(isIsoTri) {
+		switch(charCode) {
+			case 0x25B2: vecIndex = 58; break;
+			case 0x25BA: vecIndex = 59; break;
+			case 0x25BC: vecIndex = 60; break;
+			case 0x25C4: vecIndex = 61; break;
+		}
+	}
+	var vecs = lcsShardCharVectors[vecIndex];
+	var gpX = [0, width / 2, width];
+	var gpY = [0, height / 3, height / 2, (height / 3) * 2, height];
+	textRender.beginPath();
+	for(var i = 0; i < vecs.length; i++) {
+		var vec = vecs[i];
+		var gx = gpX[vec[0]];
+		var gy = gpY[vec[1]];
+		if(i == 0) {
+			textRender.moveTo(x + gx, y + gy);
+		} else {
+			textRender.lineTo(x + gx, y + gy);
+		}
+	}
+	textRender.closePath();
+	textRender.fill();
+}
+
+function draw2by4Char(charCode, textRender, x, y, width, height) {
+	var code = 0;
+	if(charCode >= 0x1CD00 && charCode <= 0x1CDE5) {
+		code = lcsOctantCharPoints[charCode - 0x1CD00];
+	} else {
+		switch(charCode) {
+			case 0x1CEA8: code = 1; break;
+			case 0x1CEAB: code = 2; break;
+			case 0x1CEA3: code = 64; break;
+			case 0x1CEA0: code = 128; break;
+			case 0x1FBE6: code = 20; break;
+			case 0x1FBE7: code = 40; break;
+		}
+	}
+	if(!code) return false;
+	textRender.beginPath();
+	for(var py = 0; py < 4; py++) {
+		for(var px = 0; px < 2; px++) {
+			var idx = py * 2 + px;
+			if(code >> idx & 1) {
+				textRender.rect(x + px * (width / 2), y + py * (height / 4), width / 2, height / 4);
+			}
+		}
+	}
+	textRender.fill();
+}
+
+function drawFractionalBlockChar(charCode, textRender, x, y, width, height) {
+	var transform = null;
+	// basic fractional blocks
+	if(charCode >= 0x2580 && charCode <= 0x2590) {
+		transform = fracBlockTransforms[0][charCode - 0x2580];
+	} else if(charCode >= 0x2594 && charCode <= 0x2595) {
+		transform = fracBlockTransforms[1][charCode - 0x2594];
+	} else if(charCode >= 0x1FB82 && charCode <= 0x1FB8B) {
+		transform = fracBlockTransforms[2][charCode - 0x1FB82];
+	}
+	if(!transform) return;
+
+	var dir = transform[0];
+	var frac = transform[1];
+	var x2 = x + width - 1;
+	var y2 = y + height - 1;
+
+	switch(dir) {
+		case 0: x2 -= width - (width * frac); break;
+		case 1: x += width - (width * frac); break;
+		case 2: y2 -= height - (height * frac); break;
+		case 3: y += height - (height * frac); break;
+	}
+
+	textRender.fillRect(x, y, x2 - x + 1, y2 - y + 1);
+}
+
+function drawBlockChar(charCode, textRender, x, y, clampW, clampH) {
+	// since the char grid varies on other zoom levels, we must account for it to avoid line artifacts
 	var tmpCellW = clampW / tileC;
 	var tmpCellH = clampH / tileR;
 	var sx = Math.floor(x * tmpCellW);
@@ -4233,139 +4385,31 @@ function fillBlockChar(charCode, textRender, x, y, clampW, clampH, flags) {
 	tmpCellW = ex - sx;
 	tmpCellH = ey - sy;
 
-	switch(charCode) { // 1/8 blocks
-		case 0x2580: transform = [2, 4/8]; break;
-		case 0x2581: transform = [3, 1/8]; break;
-		case 0x2582: transform = [3, 2/8]; break;
-		case 0x2583: transform = [3, 3/8]; break;
-		case 0x2584: transform = [3, 4/8]; break;
-		case 0x2585: transform = [3, 5/8]; break;
-		case 0x2586: transform = [3, 6/8]; break;
-		case 0x2587: transform = [3, 7/8]; break;
-		case 0x2588: transform = [0, 8/8]; break; // full block
-		case 0x2589: transform = [0, 7/8]; break;
-		case 0x258A: transform = [0, 6/8]; break;
-		case 0x258B: transform = [0, 5/8]; break;
-		case 0x258C: transform = [0, 4/8]; break;
-		case 0x258D: transform = [0, 3/8]; break;
-		case 0x258E: transform = [0, 2/8]; break;
-		case 0x258F: transform = [0, 1/8]; break;
-		case 0x2590: transform = [1, 4/8]; break;
-		case 0x2594: transform = [2, 1/8]; break;
-		case 0x2595: transform = [1, 1/8]; break;
-		case 0x1FB82: transform = [2, 2/8]; break;
-		case 0x1FB83: transform = [2, 3/8]; break;
-		case 0x1FB84: transform = [2, 5/8]; break;
-		case 0x1FB85: transform = [2, 6/8]; break;
-		case 0x1FB86: transform = [2, 7/8]; break;
-		case 0x1FB87: transform = [1, 2/8]; break;
-		case 0x1FB88: transform = [1, 3/8]; break;
-		case 0x1FB89: transform = [1, 5/8]; break;
-		case 0x1FB8A: transform = [1, 6/8]; break;
-		case 0x1FB8B: transform = [1, 7/8]; break;
-		default:
-			var is2by2 = charCode >= 0x2596 && charCode <= 0x259F;
-			var is2by3 = charCode >= 0x1FB00 && charCode <= 0x1FB3B;
-			var is2by4 = charCode >= 0x1CD00 && charCode <= 0x1FBE7;
-			var is90degTri = charCode >= 0x25E2 && charCode <= 0x25E5;
-			var isIsoTri = charCode == 0x25B2 || charCode == 0x25BA || charCode == 0x25BC || charCode == 0x25C4;
-			var isTriangleShard = (charCode >= 0x1FB3C && charCode <= 0x1FB6F) ||
-									(charCode >= 0x1FB9A && charCode <= 0x1FB9B) ||
-									isBold && (is90degTri || isIsoTri);
-			if(is2by2) { // 2x2 blocks
-				var pattern = [2, 1, 8, 11, 9, 14, 13, 4, 6, 7][charCode - 0x2596];
-				textRender.beginPath();
-				if(pattern & 8) textRender.rect(sx, sy, tmpCellW / 2, tmpCellH / 2);
-				if(pattern & 4) textRender.rect(sx + tmpCellW / 2, sy, tmpCellW / 2, tmpCellH / 2);
-				if(pattern & 2) textRender.rect(sx, sy + tmpCellH / 2, tmpCellW / 2, tmpCellH / 2);
-				if(pattern & 1) textRender.rect(sx + tmpCellW / 2, sy + tmpCellH / 2, tmpCellW / 2, tmpCellH / 2);
-				textRender.fill();
-				return true;
-			} else if(is2by3) { // 2x3 blocks
-				var code = 0;
-				if(charCode >= 0x1FB00 && charCode <= 0x1FB13) code = charCode - 0x1FB00 + 1;
-				if(charCode >= 0x1FB14 && charCode <= 0x1FB27) code = charCode - 0x1FB00 + 2;
-				if(charCode >= 0x1FB28 && charCode <= 0x1FB3B) code = charCode - 0x1FB00 + 3;
-				textRender.beginPath();
-				for(var i = 0; i < 6; i++) {
-					if(!(code >> i & 1)) continue;
-					textRender.rect(sx + (tmpCellW / 2) * (i & 1), sy + (tmpCellH / 3) * (i >> 1), tmpCellW / 2, tmpCellH / 3);
-				}
-				textRender.fill();
-				return true;
-			} else if(isTriangleShard) { // LCS shard characters
-				var vecIndex = charCode - 0x1FB3C;
-				if(charCode >= 0x1FB9A && charCode <= 0x1FB9B) {
-					vecIndex -= 42;
-				} else if(is90degTri) {
-					vecIndex = (charCode - 0x25E2) + 54;
-				} else if(isIsoTri) {
-					switch(charCode) {
-						case 0x25B2: vecIndex = 58; break;
-						case 0x25BA: vecIndex = 59; break;
-						case 0x25BC: vecIndex = 60; break;
-						case 0x25C4: vecIndex = 61; break;
-					}
-				}
-				var vecs = lcsShardCharVectors[vecIndex];
-				var gpX = [0, tmpCellW / 2, tmpCellW];
-				var gpY = [0, tmpCellH / 3, tmpCellH / 2, (tmpCellH / 3) * 2, tmpCellH];
-				textRender.beginPath();
-				for(var i = 0; i < vecs.length; i++) {
-					var vec = vecs[i];
-					var gx = gpX[vec[0]];
-					var gy = gpY[vec[1]];
-					if(i == 0) {
-						textRender.moveTo(sx + gx, sy + gy);
-						continue;
-					}
-					textRender.lineTo(sx + gx, sy + gy);
-				}
-				textRender.closePath();
-				textRender.fill();
-				return true;
-			} else if(is2by4) { // 2x4 LCS octant characters
-				var code = 0;
-				if(charCode >= 0x1CD00 && charCode <= 0x1CDE5) {
-					code = lcsOctantCharPoints[charCode - 0x1CD00];
-				} else {
-					switch(charCode) {
-						case 0x1CEA8: code = 1; break;
-						case 0x1CEAB: code = 2; break;
-						case 0x1CEA3: code = 64; break;
-						case 0x1CEA0: code = 128; break;
-						case 0x1FBE6: code = 20; break;
-						case 0x1FBE7: code = 40; break;
-					}
-				}
-				if(!code) return false;
-				textRender.beginPath();
-				for(var py = 0; py < 4; py++) {
-					for(var px = 0; px < 2; px++) {
-						var idx = py * 2 + px;
-						if(code >> idx & 1) {
-							textRender.rect(sx + px * (tmpCellW / 2), sy + py * (tmpCellH / 4), tmpCellW / 2, tmpCellH / 4);
-						}
-					}
-				}
-				textRender.fill();
-				return true;
-			} else {
-				return false;
-			}
-	}
-	var dir = transform[0];
-	var frac = transform[1];
+	var isFractionalBlock = (charCode >= 0x2580 && charCode <= 0x2590) ||
+							(charCode >= 0x2594 && charCode <= 0x2595) ||
+							(charCode >= 0x1FB82 && charCode <= 0x1FB8B);
+	var is2by2 = charCode >= 0x2596 && charCode <= 0x259F;
+	var is2by3 = charCode >= 0x1FB00 && charCode <= 0x1FB3B;
+	var is2by4 = (charCode >= 0x1CD00 && charCode <= 0x1CDE5) ||
+					charCode == 0x1CEA8 || charCode == 0x1CEAB || charCode == 0x1CEA3 || 
+					charCode == 0x1CEA0 || charCode == 0x1FBE6 || charCode == 0x1FBE7;
+	var is90degTri = charCode >= 0x25E2 && charCode <= 0x25E5;
+	var isIsoTri = charCode == 0x25B2 || charCode == 0x25BA || charCode == 0x25BC || charCode == 0x25C4;
+	var isTriangleShard = (charCode >= 0x1FB3C && charCode <= 0x1FB6F) ||
+							(charCode >= 0x1FB9A && charCode <= 0x1FB9B) ||
+							(is90degTri || isIsoTri);
 
-	switch(dir) {
-		case 0: ex -= tmpCellW - (tmpCellW * frac); break;
-		case 1: sx += tmpCellW - (tmpCellW * frac); break;
-		case 2: ey -= tmpCellH - (tmpCellH * frac); break;
-		case 3: sy += tmpCellH - (tmpCellH * frac); break;
+	if(isFractionalBlock) { // basic fractional blocks (full, half, n/8)
+		drawFractionalBlockChar(charCode, textRender, sx, sy, tmpCellW, tmpCellH);
+	} else if(is2by2) { // 2x2 blocks
+		draw2by2Char(charCode, textRender, sx, sy, tmpCellW, tmpCellH);
+	} else if(is2by3) { // 2x3 blocks
+		draw2by3Char(charCode, textRender, sx, sy, tmpCellW, tmpCellH);
+	} else if(isTriangleShard) { // LCS shard characters
+		drawTriangleShardChar(charCode, textRender, sx, sy, tmpCellW, tmpCellH);
+	} else if(is2by4) { // 2x4 LCS octant characters
+		draw2by4Char(charCode, textRender, sx, sy, tmpCellW, tmpCellH);
 	}
-
-	textRender.fillRect(sx, sy, ex - sx, ey - sy);
-	return true;
 }
 
 function getCharTextDecorations(char) {
@@ -4442,8 +4486,7 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 	var fontX = x * cellW + offsetX;
 	var fontY = y * cellH + offsetY;
 
-	var char = content[y * tileC + x];
-	if(!char) char = " ";
+	var char = content[y * tileC + x] || " ";
 
 	var deco = null;
 	if(textDecorationsEnabled) {
@@ -4530,25 +4573,21 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 		}
 	}
 
-	var fillBlockFlags = 0;
-	var isSpecial = false;
+	var isBold = deco && deco.bold;
+	var isItalic = deco && deco.italic;
+	var isHalfShard = ((cCode >= 0x25E2 && cCode <= 0x25E5) ||
+						cCode == 0x25B2 || cCode == 0x25C4 || cCode == 0x25BA || cCode == 0x25BC);
 	var checkIdx = 1;
 	if(char.codePointAt(0) > 65535) checkIdx = 2;
-	isSpecial = char.codePointAt(checkIdx) != void 0;
+	var isSpecial = char.codePointAt(checkIdx) != void 0;
 	isSpecial = isSpecial || (cCode >= 0x2500 && cCode <= 0x257F);
-	if(deco && deco.bold) fillBlockFlags |= 1;
-	
-	if(charOverflowMode) fillBlockFlags |= 2;
 
-	if(brBlockFill && (cCode & 0x2800) == 0x2800) { // render braille chars as rectangles
-		var dimX = cellW / 2;
-		var dimY = cellH / 4;
-		for(var b = 0; b < 8; b++) {
-			if((cCode & brOrder[b]) == 0) continue;
-			textRender.fillRect(fontX + (b % 2) * dimX, fontY + ((b / 2) | 0) * dimY, dimX, dimY);
+	if(window.fillBlockChar && !isValidSpecialSymbol(cCode) && window.fillBlockChar(cCode, textRender, x, y, clampW, clampH)) {
+		return; // temporary!
+	} else if(ansiBlockFill && isValidSpecialSymbol(cCode) && !(isHalfShard && !isBold)) {
+		if(!charOverflowMode) {
+			drawBlockChar(cCode, textRender, x, y, clampW, clampH);
 		}
-	} else if(ansiBlockFill && fillBlockChar(cCode, textRender, x, y, clampW, clampH, fillBlockFlags)) {
-		return;
 	} else { // character rendering
 		var tempFont = null;
 		var prevFont = null;
@@ -4556,10 +4595,8 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 			prevFont = textRender.font;
 			tempFont = textRender.font;
 			if(isSpecial) tempFont = specialCharFont;
-			if(deco) {
-				if(deco.bold) tempFont = "bold " + tempFont;
-				if(deco.italic) tempFont = "italic " + tempFont;
-			}
+			if(isBold) tempFont = "bold " + tempFont;
+			if(isItalic) tempFont = "italic " + tempFont;
 			textRender.font = tempFont;
 		}
 		textRender.fillText(char, Math.round(fontX + XPadding), Math.round(fontY + textYOffset));
@@ -5008,8 +5045,9 @@ function renderTilesSelective() {
 				renderTile(x, y);
 				continue;
 			}
-			if(!tile.redraw) continue;
-			renderTile(x, y);
+			if(tile.redraw) {
+				renderTile(x, y);
+			}
 		}
 	}
 }
