@@ -2240,7 +2240,7 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 
 	// set char locally
 	var con = tile.content;
-	prevChar = con[charY * tileC + charX]
+	prevChar = con[charY * tileC + charX];
 	con[charY * tileC + charX] = char;
 	if(prevChar != char) hasChanged = true;
 	w.setTileRedraw(tileX, tileY);
@@ -6894,76 +6894,85 @@ var ws_functions = {
 			var pos = getPos(tileKey);
 			var tileX = pos[1];
 			var tileY = pos[0];
-			// if tile isn't loaded, load it blank
-			if(!tiles[tileKey]) {
-				Tile.set(tileX, tileY, blankTile());
+			var tile = data.tiles[tileKey];
+			if(!tile.properties) {
+				tile.properties = {};
 			}
-			if(!data.tiles[tileKey]) {
-				data.tiles[tileKey] = blankTile();
-			}
-			// TODO: untangle this part of the code
-			// processing bgColor is not necessary since it's nullable
-			if(!data.tiles[tileKey].properties.color) {
-				data.tiles[tileKey].properties.color = new Array(tileArea).fill(0);
-			}
-			if(data.tiles[tileKey].properties.char) {
-				data.tiles[tileKey].properties.char = decodeCharProt(data.tiles[tileKey].properties.char);
-			}
-			if(!tiles[tileKey].properties.color) {
-				tiles[tileKey].properties.color = new Array(tileArea).fill(0);
-			}
-			var newContent;
-			var newColors;
-			var newBgColors;
-			// get content and colors from new tile data
-			if(data.tiles[tileKey]) {
-				newContent = w.splitTile(data.tiles[tileKey].content);
-				if(data.tiles[tileKey].properties.color) {
-					newColors = data.tiles[tileKey].properties.color;
-				} else {
-					newColors = new Array(tileArea).fill(0);
+			var localTile = Tile.get(tileX, tileY);
+			if(!localTile) {
+				tile.content = w.splitTile(tile.content);
+				if(tile.properties.char) {
+					tile.properties.char = decodeCharProt(tile.properties.char);
 				}
-				newBgColors = data.tiles[tileKey].properties.bgcolor;
-			} else {
-				newContent = new Array(tileArea).fill(" ");
+				Tile.set(tileX, tileY, tile);
+				w.setTileRedraw(tileX, tileY);
+				continue;
 			}
-			// TODO: find a better way - this is very bad for memory
-			var oldContent = tiles[tileKey].content;
-			var oldColors = tiles[tileKey].properties.color.slice(0);
-			var oldBgColors = tiles[tileKey].properties.bgcolor ? tiles[tileKey].properties.bgcolor.slice(0) : null;
-			var charX = 0;
-			var charY = 0;
-			// compare data
-			for(var g = 0; g < tileArea; g++) {
-				var oChar = oldContent[g];
-				var nChar = newContent[g];
-				var oCol = oldColors[g];
-				var nCol = newColors[g];
-				var oBgCol = oldBgColors ? oldBgColors[g] : -1;
-				var nBgCol = newBgColors ? newBgColors[g] : -1;
-				if(oChar != nChar || oCol != nCol || oBgCol != nBgCol) {
+			var props = tile.properties;
+			var localProps = localTile.properties;
+
+			var charData = w.splitTile(tile.content);
+			var colorData = props.color;
+			var bgColorData = props.bgcolor;
+
+			var localCharData = localTile.content;
+			var localColorData = localProps.color;
+			var localBgColorData = localProps.bgcolor;
+
+			localProps.writability = props.writability;
+			if(props.cell_props) {
+				localProps.cell_props = props.cell_props;
+			} else {
+				delete localProps.cell_props;
+			}
+			if(props.char) {
+				localProps.char = decodeCharProt(props.char);
+			} else {
+				delete localProps.char;
+			}
+			if(!colorData) { // no remote color data, delete local
+				delete localProps.color;
+			} else if(!localColorData) { // remote color data exists, set local value to remote
+				localColorData = colorData; // we will be sharing a reference with the remote color data
+				localProps.color = localColorData;
+			}
+			if(!bgColorData) {
+				delete localProps.bgcolor;
+			} else if(!localBgColorData) {
+				localBgColorData = bgColorData; // again, same with the remote bg color data
+				localProps.bgcolor = localBgColorData;
+			}
+
+			for(var c = 0; c < tileArea; c++) {
+				var charX = c % tileC;
+				var charY = Math.floor(c / tileC);
+
+				var localChar = localCharData[c];
+				var remoteChar = charData[c];
+
+				var localColor = localColorData ? localColorData[c] : 0;
+				var remoteColor = colorData ? colorData[c] : 0;
+
+				var localBgColor = localBgColorData ? localBgColorData[c] : -1;
+				var remoteBgColor = bgColorData ? bgColorData[c] : -1;
+
+				if(localChar != remoteChar || localColor != remoteColor || localBgColor != remoteBgColor) {
 					// don't overwrite local changes until those changes are confirmed
 					if(!searchTellEdit(tileX, tileY, charX, charY)) {
-						oldContent[g] = nChar;
-						oldColors[g] = nCol;
-						if(!oldBgColors) oldBgColors = new Array(tileArea).fill(-1);
-						oldBgColors[g] = nBgCol;
+						localCharData[c] = remoteChar;
+						if(localColorData) {
+							localColorData[c] = remoteColor;
+						}
+						if(localBgColorData) {
+							localBgColorData[c] = remoteBgColor;
+						}
 					}
 					// briefly highlight these changes (10 at a time)
 					if(useHighlight && Tile.visible(tileX, tileY)) {
 						highlights.push([tileX, tileY, charX, charY]);
 					}
 				}
-				charX++;
-				if(charX >= tileC) {
-					charX = 0;
-					charY++;
-				}
 			}
-			tiles[tileKey].properties = data.tiles[tileKey].properties; // update tile
-			tiles[tileKey].content = oldContent; // update only necessary character updates
-			tiles[tileKey].properties.color = oldColors; // update only necessary color updates
-			tiles[tileKey].properties.bgcolor = oldBgColors; // update likewise
 			w.setTileRedraw(tileX, tileY);
 			if(bufferLargeChars) {
 				w.setTileRedraw(tileX, tileY - 1);
