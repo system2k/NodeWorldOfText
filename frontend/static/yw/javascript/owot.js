@@ -4528,7 +4528,8 @@ function clearCharTextDecorations(char) {
 }
 
 function dispatchCharClientHook(cCode, textRender, str, x, y, clampW, clampH) {
-	var funcs = specialClientHooks.char;
+	var funcs = specialClientHooks.renderchar;
+	if(!funcs.length) return false;
 	for(var i = 0; i < funcs.length; i++) {
 		var func = funcs[i];
 		var tilePos = getPos(str);
@@ -4543,9 +4544,10 @@ function dispatchCharClientHook(cCode, textRender, str, x, y, clampW, clampH) {
 		tmpCellH = ey - sy;
 		var status = func(cCode, textRender, tilePos[1], tilePos[0], x, y, sx, sy, tmpCellW, tmpCellH);
 		if(status) {
-			return;
+			return true;
 		}
 	}
+	return false;
 }
 
 function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, props, offsetX, offsetY, charOverflowMode) {
@@ -4633,7 +4635,7 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 		}
 	}
 
-	if((specialClientHookMap >> 0) & 1) {
+	if(((specialClientHookMap >> 0) & 1) && !charOverflowMode) {
 		var status = dispatchCharClientHook(cCode, textRender, str, x, y, clampW, clampH);
 		if(status) {
 			return;
@@ -6477,7 +6479,7 @@ Object.assign(w, {
 	},
 	registerHook: function(event, callback) {
 		event = event.toLowerCase();
-		if(event == "char") {
+		if(event == "renderchar") {
 			// parameters: charCode, ctx, tileX, tileY, charX, charY, offsetX, offsetY, width, height
 			specialClientHookMap |= (1 << 0);
 			if(!specialClientHooks[event]) {
