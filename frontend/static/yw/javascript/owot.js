@@ -97,6 +97,8 @@ var initiallyFetched       = false;
 var lastLinkHover          = null; // [tileX, tileY, charX, charY]
 var lastTileHover          = null; // [type, tileX, tileY, (charX, charY)]
 var regionSelections       = [];
+var specialClientHooks     = {};
+var specialClientHookMap   = 0; // bitfield (starts at 0): [before char rendering, (future expansion)]
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -4525,6 +4527,27 @@ function clearCharTextDecorations(char) {
 	return char;
 }
 
+function dispatchCharClientHook(cCode, textRender, str, x, y, clampW, clampH) {
+	var funcs = specialClientHooks.char;
+	for(var i = 0; i < funcs.length; i++) {
+		var func = funcs[i];
+		var tilePos = getPos(str);
+		// duplicate from drawBlockChar - needs refactoring
+		var tmpCellW = clampW / tileC;
+		var tmpCellH = clampH / tileR;
+		var sx = Math.floor(x * tmpCellW);
+		var sy = Math.floor(y * tmpCellH);
+		var ex = Math.floor((x + 1) * tmpCellW);
+		var ey = Math.floor((y + 1) * tmpCellH);
+		tmpCellW = ex - sx;
+		tmpCellH = ey - sy;
+		var status = func(cCode, textRender, tilePos[1], tilePos[0], x, y, sx, sy, tmpCellW, tmpCellH);
+		if(status) {
+			return;
+		}
+	}
+}
+
 function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, props, offsetX, offsetY, charOverflowMode) {
 	var content = tile.content;
 	var colors = tile.properties.color;
@@ -4607,6 +4630,13 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 		}
 		if(deco.strike) {
 			textRender.fillRect(fontX, fontY + Math.floor((16 * zoom) / 2), cellW, zoom);
+		}
+	}
+
+	if((specialClientHookMap >> 0) & 1) {
+		var status = dispatchCharClientHook(cCode, textRender, str, x, y, clampW, clampH);
+		if(status) {
+			return;
 		}
 	}
 
@@ -6444,6 +6474,17 @@ Object.assign(w, {
 		if(typeof rate != "number" || rate < 0 || isNaN(rate) || !isFinite(rate) || rate > 1000000) rate = 1000;
 		writeFlushRate = rate;
 		setWriteInterval();
+	},
+	registerHook: function(event, callback) {
+		event = event.toLowerCase();
+		if(event == "char") {
+			// parameters: charCode, ctx, tileX, tileY, charX, charY, offsetX, offsetY, width, height
+			specialClientHookMap |= (1 << 0);
+			if(!specialClientHooks[event]) {
+				specialClientHooks[event] = [];
+			}
+			specialClientHooks[event].push(callback);
+		}
 	}
 });
 
