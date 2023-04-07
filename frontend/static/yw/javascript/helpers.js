@@ -538,6 +538,14 @@ CircularBuffer.prototype.unwind = function() {
 	return res;
 }
 
+CircularBuffer.prototype.top = function() {
+	if(!this.buffer.length) return;
+	if(!this.elms) return;
+	var tmpPos = this.pos - 1;
+	if(tmpPos < 0) tmpPos = this.len - 1;
+	return this.buffer[tmpPos];
+}
+
 function getBasicHostname(host) {
 	var host = host.toLowerCase().split(".");
 	if(host[0] == "www") host.shift();

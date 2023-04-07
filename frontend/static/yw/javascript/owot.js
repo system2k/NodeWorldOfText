@@ -2154,8 +2154,21 @@ function moveCursor(direction, preserveVertPos, amount) {
 	return renderCursor(pos);
 }
 
+function markCharacterAsUndoable(tileX, tileY, charX, charY) {
+	var info = getCharInfo(tileX, tileY, charX, charY);
+	var link = getLink(tileX, tileY, charX, charY);
+	undoBuffer.push([tileX, tileY, charX, charY, info.char, info.color, link, info.bgColor, info.decoration, 0]);
+}
+
+function isCharLatestInUndoBuffer(tileX, tileY, charX, charY) {
+	if(!undoBuffer.top()) return false;
+	var latest = undoBuffer.top();
+	return (latest[0] == tileX & latest[1] == tileY && latest[2] == charX && latest[3] == charY);
+}
+
 // place a character
-function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOffset, charBgColor) {
+// TODO: after refactoring this function, we will keep this header for legacy purposes
+function writeCharTo(char, charColor, tileX, tileY, charX, charY, undoFlags, undoOffset, charBgColor, dB, dI, dU, dS) {
 	if(!Tile.get(tileX, tileY)) {
 		Tile.set(tileX, tileY, blankTile());
 	}
@@ -2217,24 +2230,31 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 	// update cell properties (link positions)
 	tile.properties.cell_props = cell_props;
 
+	var cBold, cItalic, cUnder, cStrike, currDeco;
 	if(!isErase) {
 		currDeco = getCharTextDecorations(char);
 		char = clearCharTextDecorations(char);
 		char = detectCharEmojiCombinations(char) || char;
-		var cBold = textDecorationModes.bold;
-		var cItalic = textDecorationModes.italic;
-		var cUnder = textDecorationModes.under;
-		var cStrike = textDecorationModes.strike;
+		cBold = textDecorationModes.bold;
+		cItalic = textDecorationModes.italic;
+		cUnder = textDecorationModes.under;
+		cStrike = textDecorationModes.strike;
 		if(currDeco) {
 			cBold = cBold || currDeco.bold;
 			cItalic = cItalic || currDeco.italic;
 			cUnder = cUnder || currDeco.under;
 			cStrike = cStrike || currDeco.strike;
 		}
-		if(char == " ") { // don't let spaces be bold/italic
+		// don't let spaces be bold/italic
+		if(char == " ") {
 			cBold = false;
 			cItalic = false;
 		}
+		// parameter overrides
+		if(dB != null) cBold = dB ? true : false;
+		if(dI != null) cItalic = dI ? true : false;
+		if(dU != null) cUnder = dU ? true : false;
+		if(dS != null) cStrike = dS ? true : false;
 		char = setCharTextDecorations(char, cBold, cItalic, cUnder, cStrike);
 	}
 
@@ -2249,12 +2269,17 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 		if(charX == tileC - 1) w.setTileRedraw(tileX + 1, tileY);
 		if(charY == 0 && charX == tileC - 1) w.setTileRedraw(tileX + 1, tileY - 1);
 	}
-
-	if(hasChanged && (!noUndo || noUndo == -1)) {
-		if(noUndo != -1) {
+	var undoFlag_dontMarkUndo = undoFlags ? undoFlags & 1 : 0;
+	var undoFlag_dontStepBack = undoFlags ? (undoFlags >> 1) & 1 : 0;
+	var undoFlag_forceMarkUndo = undoFlags ? (undoFlags >> 2) & 1 : 0;
+	if(hasChanged && (!undoFlag_dontMarkUndo || undoFlag_dontStepBack) || undoFlag_forceMarkUndo) {
+		if(!undoFlag_dontStepBack) {
 			undoBuffer.trim();
 		}
-		undoBuffer.push([tileX, tileY, charX, charY, prevChar, prevColor, prevLink, prevBgColor, undoOffset]);
+		if(!isCharLatestInUndoBuffer(tileX, tileY, charX, charY)) {
+			// while the prevChar already stores deco info in the form of combining chars, it's stripped away once undo/redo is done
+			undoBuffer.push([tileX, tileY, charX, charY, prevChar, prevColor, prevLink, prevBgColor, getCharTextDecorations(prevChar), undoOffset]);
+		}
 	}
 
 	//TEMP
@@ -2283,6 +2308,8 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, noUndo, undoOf
 	tellEdit.push(editArray); // track local changes
 	writeBuffer.push(editArray); // send edits to server
 	nextObjId++;
+
+	return hasChanged;
 }
 
 function undoWrite() {
@@ -2296,8 +2323,17 @@ function undoWrite() {
 	var color = edit[5];
 	var link = edit[6];
 	var bgColor = edit[7];
-	var offset = edit[8] || 0;
-	writeCharTo(char, color, tileX, tileY, charX, charY, -1, offset, bgColor);
+	var deco = edit[8] || {};
+	var offset = edit[9] || 0;
+	var dBold = Boolean(deco.bold);
+	var dItalic = Boolean(deco.italic);
+	var dUnder = Boolean(deco.under);
+	var dStrike = Boolean(deco.strike);
+	var undoFlags = 2;
+	if(link) {
+		undoFlags |= 4;
+	}
+	var hasChanged = writeCharTo(char, color, tileX, tileY, charX, charY, undoFlags, offset, bgColor, dBold, dItalic, dUnder, dStrike);
 	if(link) {
 		if(link.type == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
 			linkQueue.push(["url", tileX, tileY, charX, charY, link.url]);
@@ -2307,7 +2343,7 @@ function undoWrite() {
 	}
 	renderCursor([edit[0], edit[1], edit[2], edit[3]]);
 	moveCursor("right", false, offset);
-	undoBuffer.pop();
+	if(hasChanged || link) undoBuffer.pop();
 }
 
 function redoWrite() {
@@ -2322,15 +2358,22 @@ function redoWrite() {
 	var color = edit[5];
 	var link = edit[6];
 	var bgColor = edit[7];
-	var offset = edit[8] || 0;
-	writeCharTo(char, color, tileX, tileY, charX, charY, -1, offset, bgColor);
+	var deco = edit[8] || {};
+	var offset = edit[9] || 0;
+	var dBold = Boolean(deco.bold);
+	var dItalic = Boolean(deco.italic);
+	var dUnder = Boolean(deco.under);
+	var dStrike = Boolean(deco.strike);
+	var undoFlags = 2;
 	if(link) {
-		if(link) {
-			if(link.type == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
-				linkQueue.push(["url", tileX, tileY, charX, charY, link.url]);
-			} else if(link.type == "coord" && Permissions.can_coordlink(state.userModel, state.worldModel)) {
-				linkQueue.push(["coord", tileX, tileY, charX, charY, link.link_tileX, link.link_tileY]);
-			}
+		undoFlags |= 4;
+	}
+	writeCharTo(char, color, tileX, tileY, charX, charY, undoFlags, offset, bgColor, dBold, dItalic, dUnder, dStrike);
+	if(link) {
+		if(link.type == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
+			linkQueue.push(["url", tileX, tileY, charX, charY, link.url]);
+		} else if(link.type == "coord" && Permissions.can_coordlink(state.userModel, state.worldModel)) {
+			linkQueue.push(["coord", tileX, tileY, charX, charY, link.link_tileX, link.link_tileY]);
 		}
 	}
 	renderCursor([edit[0], edit[1], edit[2], edit[3]]);
@@ -2402,7 +2445,7 @@ function writeChar(char, doNotMoveCursor, color, noNewline, undoCursorOffset, bg
 		};
 
 		w.emit("writeBefore", data);
-		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, false, undoCursorOffset, data.bgColor);
+		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, 0, undoCursorOffset, data.bgColor);
 		w.emit("write", data);
 	}
 }
@@ -2759,10 +2802,16 @@ var char_input_check = setInterval(function() {
 				charCount++;
 			}
 		} else if(item.type == "link") {
+			var undoTop = undoBuffer.top();
 			if(item.linkType == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
 				linkQueue.push(["url", item.tileX, item.tileY, item.charX, item.charY, item.url]);
 			} else if(item.linkType == "coord" && Permissions.can_coordlink(state.userModel, state.worldModel)) {
 				linkQueue.push(["coord", item.tileX, item.tileY, item.charX, item.charY, item.coord_tileX, item.coord_tileY]);
+			}
+			// a link was potentially put over a character that was changed to an identical character,
+			// meaning it did not get added to the undo buffer.
+			if(!isCharLatestInUndoBuffer(item.tileX, item.tileY, item.charX, item.charY)) {
+				markCharacterAsUndoable(item.tileX, item.tileY, item.charX, item.charY);
 			}
 		} else if(item.type == "protect") {
 			var protType = item.protType;
