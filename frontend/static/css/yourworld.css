@@ -63,6 +63,8 @@ a:visited {
 	background-color: #C5C2C2;
 	border-radius: 2px;
 	padding: 0 3px;
+	position: relative;
+	z-index: 1;
 }
 .announce_close:hover {
 	background: #928E8E;
