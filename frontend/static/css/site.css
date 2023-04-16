@@ -30,6 +30,11 @@ h1 {
 #topbar {
 	text-align: right;
 }
+@media (hover: none) {
+	#topbar {
+		text-align: left;
+	}
+}
 .content_set {
 	background-color: #DDDDDD;
 	border: 1px solid #AAAAAA;
