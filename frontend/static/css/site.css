@@ -16,10 +16,10 @@ body {
 	padding-left: 2em;
 }
 .span-14 {
-	width: 550px;
+	max-width: 550px;
 }
 .span-19 {
-	width: 750px;
+	max-width: 750px;
 }
 h1 {
 	font-size: 3em;
@@ -29,6 +29,7 @@ h1 {
 }
 #topbar {
 	text-align: right;
+	width: 100%;
 }
 @media (hover: none) {
 	#topbar {
