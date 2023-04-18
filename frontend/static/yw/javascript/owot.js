@@ -158,6 +158,7 @@ var textDecorationsEnabled = true; // bold, italic, underline, and strikethrough
 var keyConfig = {
 	reset: "ESC",
 	copyColor: "ALT+C",
+	copyBgColor: "ALT+B",
 	copyCharacterText: "CTRL+C",
 	copyCharacterMouse: "CTRL+M",
 	sidewaysScroll: "SHIFT",
@@ -1480,17 +1481,27 @@ document.addEventListener("keydown", event_keydown_copy_char);
 // color picker
 function event_keydown_copy_color(e) {
 	if(!worldFocused) return;
-	if(!checkKeyPress(e, keyConfig.copyColor)) return;
+	var keyCopyColor = checkKeyPress(e, keyConfig.copyColor);
+	var keyCopyBgColor = checkKeyPress(e, keyConfig.copyBgColor);
+	if(!keyCopyColor && !keyCopyBgColor) return;
+	e.preventDefault();
 	stopPasting();
 	// alt + c to use color of text cell (where mouse cursor is) as main color
+	// alt + b to overwrite your background color with the one the mouse cursor is on
 	var pos = currentPosition;
 	if(!pos) return;
 	var tileX = pos[0];
 	var tileY = pos[1];
 	var charX = pos[2];
 	var charY = pos[3];
-	var color = getCharColor(tileX, tileY, charX, charY);
-	w.changeColor(color);
+	var color;
+	if(keyCopyColor) {
+		color = getCharColor(tileX, tileY, charX, charY);
+		w.changeColor(color);
+	} else if(keyCopyBgColor) {
+		color = getCharBgColor(tileX, tileY, charX, charY);
+		w.changeBgColor(color);
+	}
 }
 document.addEventListener("keydown", event_keydown_copy_color);
 
