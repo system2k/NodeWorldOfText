@@ -3663,7 +3663,8 @@ function createWsPath() {
 
 var fetchInterval;
 var timesConnected = 0;
-function createSocket() {
+function createSocket(getChatHist) {
+	getChatHist = !!getChatHist;
 	socket = new ReconnectingWebSocket(ws_path);
 	w.socket = socket;
 	timesConnected++;
@@ -3693,10 +3694,10 @@ function createSocket() {
 		fetchInterval = setInterval(function() {
 			w.fetchUnloadedTiles();
 		}, checkTileFetchInterval);
-		if(timesConnected == 1) {
-			if(Permissions.can_chat(state.userModel, state.worldModel)) {
-				network.chathistory();
-			}
+		if ((timesConnected == 1 || getChatHist) &&
+		    Permissions.can_chat(state.userModel, state.worldModel))
+		{
+			network.chathistory();
 		}
 		timesConnected++;
 		if(w.receivingBroadcasts) {
@@ -6433,10 +6434,10 @@ Object.assign(w, {
 	resetDragCursor: function() {
 		defaultDragCursor = "move";
 	},
-	changeSocket: function(addr) {
+	changeSocket: function(addr, getChatHist) {
 		ws_path = addr;
 		socket.close();
-		createSocket();
+		createSocket(getChatHist);
 		clearTiles(true);
 		clearInterval(fetchInterval);
 	},
