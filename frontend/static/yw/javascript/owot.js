@@ -107,6 +107,7 @@ var coordSizeX             = 4;
 var coordSizeY             = 4;
 var gridEnabled            = false;
 var subgridEnabled         = false; // character-level grid
+var subgridSize            = 1; // amount of characters for the subgrid to cover
 var linksEnabled           = true;
 var linksRendered          = true;
 var colorsEnabled          = true;
@@ -4709,8 +4710,8 @@ function drawGrid(renderCtx, gridColor, offsetX, offsetY) {
 		var dashSize = 1
 		renderCtx.setLineDash([dashSize]);
 		renderCtx.lineWidth = dashSize;
-		for(var x = 1; x < tileC; x++) {
-			for(var y = 1; y < tileR; y++) {
+		for(var x = subgridSize; x < tileC; x += subgridSize) {
+			for(var y = subgridSize; y < tileR; y += subgridSize) {
 				renderCtx.beginPath();
 				renderCtx.moveTo(0, Math.floor(y * cellH) + 0.5);
 				renderCtx.lineTo(tileW, Math.floor(y * cellH) + 0.5);
@@ -5427,19 +5428,30 @@ function buildMenu() {
 		gridEnabled = true;
 		w.render(true);
 		menu.showEntry(menuOptions.subgrid);
+		if(gridEnabled && subgridEnabled) menu.showEntry(menuOptions.subgridlevel);
 	}, function() {
 		gridEnabled = false;
 		w.render(true);
 		menu.hideEntry(menuOptions.subgrid);
+		menu.hideEntry(menuOptions.subgridlevel);
 	});
 	menuOptions.subgrid = menu.addCheckboxOption("Subgrid", function() {
 		subgridEnabled = true;
 		w.render(true);
+		if(gridEnabled && subgridEnabled) menu.showEntry(menuOptions.subgridlevel);
 	}, function() {
 		subgridEnabled = false;
 		w.render(true);
+		menu.hideEntry(menuOptions.subgridlevel);
 	});
 	menu.hideEntry(menuOptions.subgrid);
+	menuOptions.subgridlevel = menu.addEntry(`<input title="Subgrid level" type="range" value="1" min="1" max="4" style="width: 100%" id="subgridlevel">`);
+	var subgridBar = document.getElementById("subgridlevel");
+        subgridBar.onchange = function(){
+		subgridSize = 2 ** (+this.value - 1);
+		w.redraw();
+	};
+	menu.hideEntry(menuOptions.subgridlevel);
 	menuOptions.linksEnabled = menu.addCheckboxOption("Links enabled", function() {
 		linksEnabled = true;
 	}, function() {
