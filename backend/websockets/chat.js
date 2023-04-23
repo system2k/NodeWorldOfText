@@ -197,6 +197,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "gridsize", ["WxH"], "change the size of cells", "10x20"], // client-side
 		[0, "block", ["id"], "mute someone by id", "1220"],
 		[0, "blockuser", ["username"], "mute someone by username", "JohnDoe"],
+		[0, "unblock", ["id"], "unblock someone by id", "1220"],
+		[0, "unblockuser", ["username"], "unblock someone by username", "JohnDoe"],
 		[0, "unblockall", null, "unblock all users", null],
 		[0, "mute", ["id", "seconds"], "mute a user for everyone", "1220 9999"], // check for permission
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
@@ -393,6 +395,60 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			blocks.user.push(username_value);
 
 			serverChatResponse("Blocked chats from user: " + html_tag_esc(username), location);
+		},
+		unblock: function(id) {
+			var blocks = ws.sdata.chat_blocks;
+
+			switch (id) {
+			case "*":
+				blocks.block_all = false;
+				break;
+			case "tell":
+				blocks.no_tell = false;
+				break;
+			default:
+				id = san_nbr(id);
+				if(id < 0) return;
+
+				var idx = blocks.id.indexOf(id);
+				if(idx == -1) return;
+				blocks.id.splice(idx, 1);
+			}
+			
+			var unblocked_ip = getClientIPByChatID(id, location == "global");
+			if(unblocked_ip) {
+				var blist = tell_blocks[ipHeaderAddr];
+				if(!blist) {
+					blist = {};
+					tell_blocks[ipHeaderAddr] = blist;
+				}
+
+				var idx = blist.indexOf(unblocked_ip);
+				if(idx != -1) {
+					blist.splice(idx, 1);
+				}
+			}
+
+			serverChatResponse("Unblocked chats from ID: " + id, location);
+		},
+		unblockuser: function(username) {
+			var blocks = ws.sdata.chat_blocks;
+			if(typeof username != "string" || !username) {
+				serverChatResponse("Invalid username", location);
+				return;
+			}
+
+			// Regexp taken from Uvias login page.
+			if (!/^[a-zA-Z0-9_.-]+$/.test(username)) return;
+
+			// The case-insensitive value to be stored in chat_blocks.
+			var username_value = username.toUpperCase();
+
+			var idx = blocks.user.indexOf(username_value);
+			if(idx == -1) return;
+			blocks.user.splice(idx, 1);
+
+			serverChatResponse("Unblocked chats from user: " + html_tag_esc(username), location);
 		},
 		unblockall: function() {
 			ws.sdata.chat_blocks.id.splice(0);
@@ -722,6 +778,12 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				return;
 			case "blockuser":
 				com.blockuser(commandArgs[1]);
+				return;
+			case "unblock":
+				com.unblock(commandArgs[1]);
+				return;
+			case "unblockuser":
+				com.unblockuser(commandArgs[1]);
 				return;
 			case "unblockall":
 				com.unblockall();
