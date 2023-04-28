@@ -7023,6 +7023,9 @@ var ws_functions = {
 			var localColorData = localProps.color;
 			var localBgColorData = localProps.bgcolor;
 
+			var shouldDeleteLocalColor = false;
+			var shouldDeleteLocalBgColor = false;
+
 			localProps.writability = props.writability;
 			if(props.cell_props) {
 				localProps.cell_props = props.cell_props;
@@ -7035,13 +7038,13 @@ var ws_functions = {
 				delete localProps.char;
 			}
 			if(!colorData) { // no remote color data, delete local
-				delete localProps.color;
+				shouldDeleteLocalColor = true;
 			} else if(!localColorData) { // remote color data exists, set local value to remote
 				localColorData = colorData; // we will be sharing a reference with the remote color data
 				localProps.color = localColorData;
 			}
 			if(!bgColorData) {
-				delete localProps.bgcolor;
+				shouldDeleteLocalBgColor = true;
 			} else if(!localBgColorData) {
 				localBgColorData = bgColorData; // again, same with the remote bg color data
 				localProps.bgcolor = localBgColorData;
@@ -7070,12 +7073,21 @@ var ws_functions = {
 						if(localBgColorData) {
 							localBgColorData[c] = remoteBgColor;
 						}
+					} else {
+						shouldDeleteLocalColor = false;
+						shouldDeleteLocalBgColor = false;
 					}
 					// briefly highlight these changes (10 at a time)
 					if(useHighlight && Tile.visible(tileX, tileY)) {
 						highlights.push([tileX, tileY, charX, charY]);
 					}
 				}
+			}
+			if(shouldDeleteLocalColor) {
+				delete localProps.color;
+			}
+			if(shouldDeleteLocalBgColor) {
+				delete localProps.bgcolor;
 			}
 			w.setTileRedraw(tileX, tileY);
 			if(bufferLargeChars) {
