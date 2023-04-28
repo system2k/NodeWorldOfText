@@ -67,7 +67,10 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 			tData = JSON.stringify(tiles);
 		}
 		return write(tData, null, {
-			mime: "application/json; charset=utf-8"
+			mime: "application/json; charset=utf-8",
+			headers: {
+				"Cache-Control": "no-store"
+			}
 		});
 	} else { // the HTML page
 		if(!query_data.hide) {
