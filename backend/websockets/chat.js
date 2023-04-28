@@ -418,14 +418,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			var unblocked_ip = getClientIPByChatID(id, location == "global");
 			if(unblocked_ip) {
 				var blist = tell_blocks[ipHeaderAddr];
-				if(!blist) {
-					blist = {};
-					tell_blocks[ipHeaderAddr] = blist;
-				}
-
-				var idx = blist.indexOf(unblocked_ip);
-				if(idx != -1) {
-					blist.splice(idx, 1);
+				if(blist) {
+					delete blist[unblocked_ip];
 				}
 			}
 
