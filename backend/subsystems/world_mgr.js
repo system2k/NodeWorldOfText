@@ -799,6 +799,8 @@ async function renameWorld(world, newName, user) {
 		delete worldCache[destHash];
 	}
 	var oldWorldName = world.name;
+	var isCaseChange = srcHash == destHash;
+	var isSwap = target && !isCaseChange;
 	delete worldCache[srcHash];
 	world.name = newName;
 	nameUpdates.push([world.id, newName]);
@@ -806,7 +808,7 @@ async function renameWorld(world, newName, user) {
 	var targetTempName = null;
 	var internalError = false;
 	try {
-		if(target) {
+		if(isSwap) {
 			worldCache[srcHash] = target;
 			target.name = oldWorldName;
 			nameUpdates.push([target.id, oldWorldName]);
@@ -815,7 +817,7 @@ async function renameWorld(world, newName, user) {
 			await db.run("UPDATE world SET name=? WHERE id=?", [targetTempName, target.id]);
 		}
 		await db.run("UPDATE world SET name=? WHERE id=?", [newName, world.id]);
-		if(target) {
+		if(isSwap) {
 			await db.run("UPDATE world SET name=? WHERE id=?", [oldWorldName, target.id]);
 		}
 	} catch(e) {
