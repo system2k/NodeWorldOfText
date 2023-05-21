@@ -652,6 +652,7 @@ function dispatchCharClientHook(cCode, textRender, str, x, y, clampW, clampH) {
 function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, props, offsetX, offsetY, charOverflowMode) {
 	var content = tile.content;
 	var colors = tile.properties.color;
+	var hasDrawn = false;
 
 	// adjust baseline
 	var textYOffset = cellH - (5 * zoom);
@@ -684,6 +685,7 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 		color = colorClasses[color];
 		textRender.fillStyle = color;
 		textRender.fillRect(fontX, fontY, cellW, cellH);
+		hasDrawn = true;
 	}
 
 	var color = colors ? colors[y * tileC + x] : 0;
@@ -723,26 +725,29 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 	// underline link
 	if(isLink) {
 		textRender.fillRect(fontX, fontY + textYOffset + zoom, cellW, zoom);
+		hasDrawn = true;
 	}
 
 	if(deco) {
 		if(deco.under) {
 			textRender.fillRect(fontX, fontY + textYOffset + zoom, cellW, zoom);
+			hasDrawn = true;
 		}
 		if(deco.strike) {
 			textRender.fillRect(fontX, fontY + Math.floor((16 * zoom) / 2), cellW, zoom);
+			hasDrawn = true;
 		}
 	}
 
 	if(((specialClientHookMap >> 0) & 1) && !charOverflowMode) {
 		var status = dispatchCharClientHook(cCode, textRender, str, x, y, clampW, clampH);
 		if(status) {
-			return;
+			return true;
 		}
 	}
 
 	// don't render whitespaces
-	if(char == "\u0020" || char == "\u00A0") return;
+	if(char == "\u0020" || char == "\u00A0") return hasDrawn;
 
 	if(!surrogateCharsEnabled || !combiningCharsEnabled) {
 		char = w.split(char, !surrogateCharsEnabled, !combiningCharsEnabled);
@@ -762,11 +767,10 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 	var isSpecial = char.codePointAt(checkIdx) != void 0;
 	isSpecial = isSpecial || (cCode >= 0x2500 && cCode <= 0x257F);
 
-	if(window.fillBlockChar && !isValidSpecialSymbol(cCode) && window.fillBlockChar(cCode, textRender, x, y, clampW, clampH)) {
-		return; // temporary!
-	} else if(ansiBlockFill && isValidSpecialSymbol(cCode) && !(isHalfShard && !isBold)) {
+	if(ansiBlockFill && isValidSpecialSymbol(cCode) && !(isHalfShard && !isBold)) {
 		if(!charOverflowMode) {
 			drawBlockChar(cCode, textRender, x, y, clampW, clampH);
+			hasDrawn = true;
 		}
 	} else { // character rendering
 		var tempFont = null;
@@ -780,10 +784,12 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 			textRender.font = tempFont;
 		}
 		textRender.fillText(char, Math.round(fontX + XPadding), Math.round(fontY + textYOffset));
+		hasDrawn = true;
 		if(prevFont) {
 			textRender.font = prevFont;
 		}
 	}
+	return hasDrawn;
 }
 
 function drawGrid(renderCtx, gridColor, offsetX, offsetY, tileX, tileY) {
@@ -839,6 +845,7 @@ function getTileBackgroundColor(tile) {
 }
 
 function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, cursorVisibility) {
+	var hasDrawn = false;
 	renderCtx.fillStyle = getTileBackgroundColor(tile);
 
 	var clamp, clampW, clampH;
@@ -854,6 +861,7 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 	}
 
 	// fill tile background color
+	// in this case, we don't mark 'hasDrawn' as true since the bg drawing can be outsourced to a different component
 	renderCtx.fillRect(offsetX, offsetY, clampW, clampH);
 
 	// render char protections
@@ -875,15 +883,20 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 					var x2 = Math.floor((cX + 1) * tmpCellW);
 					var y2 = Math.floor((cY + 1) * tmpCellH);
 					renderCtx.fillRect(offsetX + sx, offsetY + sy, x2 - sx, y2 - sy);
+					hasDrawn = true;
 				} else {
 					renderCtx.fillRect(offsetX + cX * cellW, offsetY + cY * cellH, cellW, cellH);
+					hasDrawn = true;
 				}
 			}
 		}
 	}
 
 	if(guestCursorsEnabled) {
-		renderGuestCursors(renderCtx, offsetX, offsetY, tile, tileX, tileY);
+		var dCursor = renderGuestCursors(renderCtx, offsetX, offsetY, tile, tileX, tileY);
+		if(dCursor) {
+			hasDrawn = true;
+		}
 	}
 
 	// render cursor
@@ -892,6 +905,7 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 		var charY = cursorCoords[3];
 		renderCtx.fillStyle = styles.cursor;
 		renderCtx.fillRect(offsetX + charX * cellW, offsetY + charY * cellH, cellW, cellH);
+		hasDrawn = true;
 	}
 
 	var highlight = highlightFlash[tileY + "," + tileX];
@@ -903,11 +917,13 @@ function renderTileBackground(renderCtx, offsetX, offsetY, tile, tileX, tileY, c
 						var flashRGB = highlight[y][x][1];
 						renderCtx.fillStyle = "rgb(" + flashRGB[0] + "," + flashRGB[1] + "," + flashRGB[2] + ")";
 						renderCtx.fillRect(offsetX + x * cellW, offsetY + y * cellH, cellW, cellH);
+						hasDrawn = true;
 					}
 				}
 			}
 		}
 	}
+	return hasDrawn;
 }
 
 function renderTileBackgroundImage(renderCtx, tileX, tileY, ctxOffX, ctxOffY) {
@@ -987,6 +1003,7 @@ function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, off
 		x2 = bounds[2];
 		y2 = bounds[3];
 	}
+	var hasDrawn = false;
 	for(var y = y1; y <= y2; y++) {
 		for(var x = x1; x <= x2; x++) {
 			var protValue = writability;
@@ -995,9 +1012,13 @@ function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, off
 			}
 			if(protValue == null) protValue = tile.properties.writability;
 			if(protValue == null) protValue = state.worldModel.writability;
-			renderChar(textRenderCtx, x, y, clampW, clampH, str, tile, protValue, props, offsetX, offsetY, charOverflowMode);
+			var dChar = renderChar(textRenderCtx, x, y, clampW, clampH, str, tile, protValue, props, offsetX, offsetY, charOverflowMode);
+			if(dChar) {
+				hasDrawn = true;
+			}
 		}
 	}
+	return hasDrawn;
 }
 
 function renderCellBgColors(textRenderCtx, tileX, tileY, clampW, clampH) {
@@ -1005,6 +1026,7 @@ function renderCellBgColors(textRenderCtx, tileX, tileY, clampW, clampH) {
 	if(!tile) return;
 	var containsCursor = cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY;
 	var bgcolors = tile.properties.bgcolor;
+	var hasDrawn = false;
 	if(!bgcolors) return;
 	for(var y = 0; y < tileR; y++) {
 		for(var x = 0; x < tileC; x++) {
@@ -1019,76 +1041,17 @@ function renderCellBgColors(textRenderCtx, tileX, tileY, clampW, clampH) {
 			var ey = Math.floor((y + 1) * tmpCellH);
 			textRenderCtx.fillStyle = `rgb(${bgColor >> 16 & 255},${bgColor >> 8 & 255},${bgColor & 255})`;
 			textRenderCtx.fillRect(sx, sy, ex - sx, ey - sy);
+			hasDrawn = true;
 		}
 	}
-}
-
-function isTileVisiblyEmpty(tileX, tileY) {
-	if(gridEnabled) return false;
-	var tile = Tile.get(tileX, tileY);
-	var pos = tileY + "," + tileX;
-	if(highlightFlash[pos]) return false;
-	if(coloredChars[pos]) return false;
-
-	for(var i = 0; i < tile.content.length; i++) {
-		if(tile.content[i] != "\u00A0" && tile.content[i] != "\u0020") {
-			return false;
-		}
-	}
-	if(tile.properties.color) {
-		for(var i = 0; i < tile.properties.color.length; i++) {
-			if(tile.properties.color[i] != 0) {
-				return false;
-			}
-		}
-	}
-	if(tile.properties.bgcolor) {
-		for(var i = 0; i < tile.properties.bgcolor.length; i++) {
-			if(tile.properties.color[i] != -1) {
-				return false;
-			}
-		}
-	}
-	if(tile.properties.char) {
-		for(var i = 0; i < tile.properties.char.length; i++) {
-			if(tile.properties.char[i] != null) {
-				return false;
-			}
-		}
-	}
-	if(tile.properties.cell_props) {
-		if(Object.keys(tile.properties.cell_props).length > 0) {
-			return false;
-		}
-	}
-	if(!transparentBackground) {
-		if(tile.properties.writability != null) {
-			return false;
-		}
-		if(tile.backgroundColor) {
-			return false;
-		}
-		if(cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
-			return false;
-		}
-	}
-	return true;
+	return hasDrawn;
 }
 
 function drawTile(tileX, tileY) {
 	var tile = Tile.get(tileX, tileY);
 	if(!tile) return;
 
-	if(isTileVisiblyEmpty(tileX, tileY)) {
-		markTileFromPoolAsEmpty(tileX, tileY);
-		return;
-	}
-
-	var tileImage = loadTileFromPool(tileX, tileY);
-	var poolCtx = tileImage.pool.ctx;
-	var poolCanv = tileImage.pool.canv;
-	var poolX = tileImage.poolX;
-	var poolY = tileImage.poolY;
+	var hasDrawn = false;
 
 	var clampW = tileWidth;
 	var clampH = tileHeight;
@@ -1097,33 +1060,59 @@ function drawTile(tileX, tileY) {
 		textRenderCtx.clearRect(0, 0, textRenderCanvas.width, textRenderCanvas.width);
 	} else {
 		var cursorVisibility = cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY;
-		renderTileBackground(textRenderCtx, 0, 0, tile, tileX, tileY, cursorVisibility);
+		var dBack = renderTileBackground(textRenderCtx, 0, 0, tile, tileX, tileY, cursorVisibility);
+		if(dBack) {
+			hasDrawn = true;
+		}
 	}
 
 	if(backgroundEnabled) {
-		renderTileBackgroundImage(textRenderCtx, tileX, tileY, 0, 0);
+		var dImage = renderTileBackgroundImage(textRenderCtx, tileX, tileY, 0, 0);
+		if(dImage) {
+			hasDrawn = true;
+		}
 	}
 
 	if(colorsEnabled) {
-		renderCellBgColors(textRenderCtx, tileX, tileY, clampW, clampH);
+		var dCell = renderCellBgColors(textRenderCtx, tileX, tileY, clampW, clampH);
+		if(dCell) {
+			hasDrawn = true;
+		}
 	}
 
 	if(!bufferLargeChars) {
-		renderContent(textRenderCtx, tileX, tileY, clampW, clampH, 0, 0);
+		var dCont = renderContent(textRenderCtx, tileX, tileY, clampW, clampH, 0, 0);
+		if(dCont) {
+			hasDrawn = true;
+		}
 	} else {
-		renderContent(textRenderCtx, tileX - 1, tileY, clampW, clampH, clampW * -1, 0, [tileC - 1, 0, tileC - 1, tileR - 1], true); // left
-		renderContent(textRenderCtx, tileX, tileY, clampW, clampH, 0, 0); // main
-		renderContent(textRenderCtx, tileX - 1, tileY + 1, clampW, clampH, clampW * -1, clampH * 1, [tileC - 1, 0, tileC - 1, 0], true); // bottom-left corner
-		renderContent(textRenderCtx, tileX, tileY + 1, clampW, clampH, 0, clampH * 1, [0, 0, tileC - 1, 0], true); // bottom
+		var d1 = renderContent(textRenderCtx, tileX - 1, tileY, clampW, clampH, clampW * -1, 0, [tileC - 1, 0, tileC - 1, tileR - 1], true); // left
+		var d2 = renderContent(textRenderCtx, tileX, tileY, clampW, clampH, 0, 0); // main
+		var d3 = renderContent(textRenderCtx, tileX - 1, tileY + 1, clampW, clampH, clampW * -1, clampH * 1, [tileC - 1, 0, tileC - 1, 0], true); // bottom-left corner
+		var d4 = renderContent(textRenderCtx, tileX, tileY + 1, clampW, clampH, 0, clampH * 1, [0, 0, tileC - 1, 0], true); // bottom
+		if(d1 || d2 || d3 || d4) {
+			hasDrawn = true;
+		}
 	}
 
 	if(gridEnabled) {
 		var gridColor = int_to_hexcode(0xFFFFFF - resolveColorValue(getTileBackgroundColor(tile)));
 		drawGrid(textRenderCtx, gridColor, 0, 0);
+		hasDrawn = true;
 	}
 
-	poolCtx.clearRect(poolX, poolY, tileWidth, tileHeight);
-	poolCtx.drawImage(textRenderCanvas, 0, 0, tileWidth, tileHeight, poolX, poolY, tileWidth, tileHeight);
+	if(hasDrawn) {
+		var tileImage = loadTileFromPool(tileX, tileY);
+		var poolCtx = tileImage.pool.ctx;
+		var poolCanv = tileImage.pool.canv;
+		var poolX = tileImage.poolX;
+		var poolY = tileImage.poolY;
+
+		poolCtx.clearRect(poolX, poolY, tileWidth, tileHeight);
+		poolCtx.drawImage(textRenderCanvas, 0, 0, tileWidth, tileHeight, poolX, poolY, tileWidth, tileHeight);
+	} else {
+		markTileFromPoolAsEmpty(tileX, tileY);
+	}
 
 	if(cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
 		if(unobstructCursor) {
@@ -1210,7 +1199,7 @@ function renderTile(tileX, tileY) {
 		}
 		if(isEmpty) {
 			if(!transparentBackground) {
-				owotCtx.fillStyle = styles.public;
+				owotCtx.fillStyle = getTileBackgroundColor(tile);
 				owotCtx.fillRect(offsetX, offsetY, clampW, clampH);
 			}
 		} else {
@@ -1322,6 +1311,7 @@ function renderTilesSelective() {
 }
 
 function renderGuestCursors(renderCtx, offsetX, offsetY, tile, tileX, tileY) {
+	var hasDrawn = false;
 	var tilePos = tileY + "," + tileX;
 	var list = guestCursorsByTile[tilePos];
 	for(var channel in list) {
@@ -1330,7 +1320,9 @@ function renderGuestCursors(renderCtx, offsetX, offsetY, tile, tileX, tileY) {
 		var charY = cursor.charY;
 		renderCtx.fillStyle = styles.guestCursor;
 		renderCtx.fillRect(offsetX + charX * cellW, offsetY + charY * cellH, cellW, cellH);
+		hasDrawn = true;
 	}
+	return hasDrawn;
 }
 
 function renderCursorOutline(renderCtx, offsetX, offsetY) {
