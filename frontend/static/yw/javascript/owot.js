@@ -706,8 +706,8 @@ function reloadRenderer() {
 	}
 }
 
-// set absolute zoom
-function doZoom(percentage) {
+// set absolute zoom - must not be called directly (use changeZoom)
+function updateRendererZoom(percentage) {
 	if(percentage < 3) percentage = 3;
 	if(percentage > 1000) percentage = 1000;
 	percentage = decimal(percentage);
@@ -740,7 +740,7 @@ function changeZoom(percentage) {
 	userZoom = percentage / 100;
 	if(userZoom < 0.2) userZoom = 0.2;
 	if(userZoom > 10) userZoom = 10;
-	doZoom(userZoom * deviceRatio() * 100);
+	updateRendererZoom(userZoom * deviceRatio() * 100);
 	positionX *= zoom;
 	positionY *= zoom;
 	positionX = Math.trunc(positionX); // remove decimals
@@ -785,7 +785,7 @@ function browserZoomAdjust(initial) {
 	positionX /= zoom;
 	positionY /= zoom;
 	adjust_scaling_DOM(zoomRatio);
-	doZoom(absZoom * 100);
+	updateRendererZoom(absZoom * 100);
 	positionX *= zoom;
 	positionY *= zoom;
 	positionX = Math.trunc(positionX);
