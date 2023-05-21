@@ -1229,21 +1229,29 @@ function renderTile(tileX, tileY) {
 function renderNextTilesInQueue() {
 	var start = performance.now();
 	var rq = renderQueue.length;
+	var fastQueue = true;
 	for(var i = 0; i < rq; i++) {
-		var tile = renderQueue.shift();
-		if(tile) {
-			var tileX = tile[0];
-			var tileY = tile[1];
+		var tileCoords = renderQueue.shift();
+		if(tileCoords) {
+			var tileX = tileCoords[0];
+			var tileY = tileCoords[1];
+			var tile = Tile.get(tileX, tileY);
 			renderQueueMap.delete(tileY + "," + tileX);
 			if(Tile.visible(tileX, tileY)) {
 				drawTile(tileX, tileY);
 				renderTile(tileX, tileY);
 			}
+			if(tile && tile.fastQueue) {
+				tile.fastQueue = false;
+			} else {
+				fastQueue = false;
+			}
 		} else {
 			break;
 		}
 		var end = performance.now();
-		if(end - start >= 16) break;
+		var diff = end - start;
+		if(diff >= 16 && (!fastQueue || diff > 700)) break;
 	}
 }
 

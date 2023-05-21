@@ -3641,11 +3641,14 @@ function getAndFetchTiles() {
 			var bound = toFetch[0];
 			networkHTTP.fetch(bound.minX, bound.minY, bound.maxX, bound.maxY, function(tiles) {
 				if(tiles == null) { // initial HTTP request failed
-					network.fetch(toFetch);
+					network.fetch(toFetch, {
+						id: -1 // id "-1" needed to mark initial fetch response
+					});
 					return;
 				}
 				ws_functions.fetch({
-					tiles: tiles
+					tiles: tiles,
+					request: -1
 				});
 			});
 		} else {
@@ -4799,6 +4802,9 @@ var network = {
 			content_only: opts.content_only,
 			concat: opts.concat
 		};
+		if(opts.id) {
+			fetchReq.request = opts.id;
+		}
 		if(callback) {
 			var id = network.latestID++;
 			fetchReq.request = id;
@@ -5078,11 +5084,12 @@ Object.assign(w, {
 			}
 		}
 	},
-	setTileRedraw: function(tileX, tileY) {
+	setTileRedraw: function(tileX, tileY, fastQueue) {
 		var tile = Tile.get(tileX, tileY);
 		if(!tile) return;
 		w.hasSelectiveUpdated = true;
 		tile.redraw = true;
+		if(fastQueue) tile.fastQueue = true;
 	},
 	setTileRender: function(tileX, tileY) {
 		// render tile again on main canvas on next render loop
@@ -5779,14 +5786,16 @@ function tile_offset_object(data, tileOffX, tileOffY) {
 
 var ws_functions = {
 	fetch: function(data) {
+		var id = 0;
 		if("request" in data) {
-			var id = data.request;
+			id = data.request;
 			var cb = network.callbacks[id];
 			if(typeof cb == "function") {
 				cb(data.tiles, null);
 			}
 			delete network.callbacks[id];
 		}
+		var fastQueue = id == -1;
 		if(tileFetchOffsetX || tileFetchOffsetY) {
 			tile_offset_object(data.tiles, tileFetchOffsetX, tileFetchOffsetY);
 		}
@@ -5805,11 +5814,11 @@ var ws_functions = {
 			}
 			var tileX = pos[1];
 			var tileY = pos[0];
-			w.setTileRedraw(tileX, tileY);
+			w.setTileRedraw(tileX, tileY, fastQueue);
 			if(bufferLargeChars) {
-				w.setTileRedraw(tileX, tileY - 1);
-				w.setTileRedraw(tileX + 1, tileY - 1);
-				w.setTileRedraw(tileX + 1, tileY);
+				w.setTileRedraw(tileX, tileY - 1, fastQueue);
+				w.setTileRedraw(tileX + 1, tileY - 1, fastQueue);
+				w.setTileRedraw(tileX + 1, tileY, fastQueue);
 			}
 		}
 		w.emit("afterFetch", data);
