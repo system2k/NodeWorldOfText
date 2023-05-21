@@ -181,6 +181,9 @@ function cleanupDirtyTiles() {
 			if(tilePool && (tilePool.pool.tileWidth != tileWidth || tilePool.pool.tileHeight != tileHeight)) {
 				removeTileFromPool(tileX, tileY);
 			}
+			if(tilePool === null) {
+				delete tilePixelCache[t];
+			}
 		}
 	}
 }
@@ -235,8 +238,11 @@ function removeTileFromPool(tileX, tileY) {
 
 function removeAllTilesFromPools() {
 	for(var tile in tilePixelCache) {
-		deallocateTile(tilePixelCache[tile]);
+		var tileObj = tilePixelCache[tile];
 		delete tilePixelCache[tile];
+		if(tileObj) {
+			deallocateTile(tileObj);
+		}
 	}
 }
 
