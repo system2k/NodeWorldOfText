@@ -1108,6 +1108,10 @@ function drawTile(tileX, tileY) {
 		var poolX = tileImage.poolX;
 		var poolY = tileImage.poolY;
 
+		// we read a single pixel to force the browser to draw immediately,
+		// since we want to precisely control the timing for the queue
+		textRenderCtx.getImageData(0, 0, 1, 1);
+
 		poolCtx.clearRect(poolX, poolY, tileWidth, tileHeight);
 		poolCtx.drawImage(textRenderCanvas, 0, 0, tileWidth, tileHeight, poolX, poolY, tileWidth, tileHeight);
 	} else {

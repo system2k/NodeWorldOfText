@@ -687,10 +687,13 @@ function setupTextRenderCtx() {
 		textRenderCanvas = document.createElement("canvas");
 	}
 	if(transparentBackground) {
-		textRenderCtx = textRenderCanvas.getContext("2d");
+		textRenderCtx = textRenderCanvas.getContext("2d", {
+			willReadFrequently: true
+		});
 	} else {
 		textRenderCtx = textRenderCanvas.getContext("2d", {
-			alpha: false
+			alpha: false,
+			willReadFrequently: true
 		});
 	}
 }
