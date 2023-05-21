@@ -1123,15 +1123,6 @@ function drawTile(tileX, tileY) {
 	} else {
 		markTileFromPoolAsEmpty(tileX, tileY);
 	}
-
-	if(cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
-		if(unobstructCursor) {
-			drawObstructedCursor(owotCtx, tile.content, cursorCoords[2], cursorCoords[3], offsetX, offsetY);
-		}
-		if(cursorOutlineEnabled) {
-			renderCursorOutline(owotCtx, offsetX, offsetY, tileX, tileY);
-		}
-	}
 }
 
 function renderTile(tileX, tileY) {
@@ -1216,6 +1207,15 @@ function renderTile(tileX, tileY) {
 			if(transparentBackground) {
 				clearTile(tileX, tileY);
 			}
+		}
+	}
+
+	if(cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
+		if(unobstructCursor) {
+			drawObstructedCursor(owotCtx, tile.content, cursorCoords[2], cursorCoords[3], offsetX, offsetY);
+		}
+		if(cursorOutlineEnabled) {
+			renderCursorOutline(owotCtx, offsetX, offsetY, tileX, tileY);
 		}
 	}
 
