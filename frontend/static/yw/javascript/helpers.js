@@ -316,14 +316,6 @@ function getPos(ref) {
 	return [parseInt(ref[0]), parseInt(ref[1])];
 }
 
-function getPoolDimensions(tileWidth, tileHeight) {
-	var sizeX = Math.floor(1024 / tileWidth);
-	var sizeY = Math.floor(1024 / tileHeight);
-	if(sizeX < 1) sizeX = 1;
-	if(sizeY < 1) sizeY = 1;
-	return [sizeX, sizeY];
-}
-
 function html_tag_esc(str, non_breaking_space, newline_br) {
 	str += "";
 	str = str.replace(/\&/g, "&amp;");
