@@ -39,11 +39,37 @@ function createTilePool() {
 	return pool;
 }
 
+function expandPool(pool) {
+	if(pool.width < pool.maxWidth) {
+		pool.width *= 2;
+		if(pool.width > pool.maxWidth) {
+			pool.width = pool.maxWidth;
+		}
+	} else if(pool.height < pool.maxHeight) {
+		pool.height *= 2;
+		if(pool.height > pool.maxHeight) {
+			pool.height = pool.maxHeight;
+		}
+	} else {
+		return;
+	}
+	
+	var pCanv = document.createElement("canvas");
+	var pWidth = pool.width * tileWidth;
+	var pHeight = pool.height * tileHeight;
+	pCanv.width = pWidth;
+	pCanv.height = pHeight;
+	var pCtx = pCanv.getContext("2d");
+	pCtx.drawImage(pool.canv, 0, 0);
 
-function allocateTile() {
-	var pLocated = false;
+	pool.canv.height = 0;
+	pool.canv = pCanv;
+	pool.ctx = pCtx;
+}
+
+function locateAvailablePool() {
 	var pObj, pTilePos;
-	// scan for next available canvas pool
+	var pLocated = false;
 	for(var i = 0; i < tileCanvasPool.length; i++) {
 		var pool = tileCanvasPool[i];
 		if(pool.tileWidth != tileWidth || pool.tileHeight != tileHeight) continue;
@@ -52,30 +78,8 @@ function allocateTile() {
 		var currentArea = pool.width * pool.height;
 		if(pool.size >= currentArea) {
 			// expand canvas
-			if(pool.width < pool.maxWidth) {
-				pool.width *= 2;
-				if(pool.width > pool.maxWidth) {
-					pool.width = pool.maxWidth;
-				}
-			} else if(pool.height < pool.maxHeight) {
-				pool.height *= 2;
-				if(pool.height > pool.maxHeight) {
-					pool.height = pool.maxHeight;
-				}
-			}
+			expandPool(pool);
 			currentArea = pool.width * pool.height;
-
-			var pCanv = document.createElement("canvas");
-			var pWidth = pool.width * tileWidth;
-			var pHeight = pool.height * tileHeight;
-			pCanv.width = pWidth;
-			pCanv.height = pHeight;
-			var pCtx = pCanv.getContext("2d");
-			pCtx.drawImage(pool.canv, 0, 0);
-
-			pool.canv.height = 0;
-			pool.canv = pCanv;
-			pool.ctx = pCtx;
 		}
 		var map = pool.map;
 		for(var t = 0; t < currentArea; t++) {
@@ -88,22 +92,37 @@ function allocateTile() {
 		if(pLocated) break;
 	}
 	if(!pLocated) {
-		pObj = createTilePool();
-		pTilePos = 0;
+		return null;
 	}
-	var pMap = pObj.map;
-	pObj.size++;
-	var mapX = pTilePos % pObj.width;
-	var mapY = Math.floor(pTilePos / pObj.width);
-	var tileObj = {
+	return {
 		pool: pObj,
+		index: pTilePos
+	}
+}
+
+function allocateTile() {
+	var pool, index;
+	var poolObj = locateAvailablePool();
+	if(poolObj) {
+		pool = poolObj.pool;
+		index = poolObj.index;
+	} else {
+		pool = createTilePool();
+		index = 0;
+	}
+	var pMap = pool.map;
+	pool.size++;
+	var mapX = index % pool.width;
+	var mapY = Math.floor(index / pool.width);
+	var tileObj = {
+		pool: pool,
 		x: mapX,
 		y: mapY,
-		idx: pTilePos,
+		idx: index,
 		poolX: mapX * tileWidth,
 		poolY: mapY * tileHeight
 	};
-	pMap[pTilePos] = tileObj;
+	pMap[index] = tileObj;
 	return tileObj;
 }
 
@@ -990,7 +1009,12 @@ function clearTile(tileX, tileY) {
 	var tileScreenPos = getTileScreenPosition(tileX, tileY);
 	var offsetX = Math.floor(tileScreenPos[0]);
 	var offsetY = Math.floor(tileScreenPos[1]);
-	owotCtx.clearRect(offsetX, offsetY, tileWidth, tileHeight);
+
+	var clamp = getTileScreenPosition(tileX + 1, tileY + 1);
+	var clampW = Math.floor(clamp[0]) - offsetX;
+	var clampH = Math.floor(clamp[1]) - offsetY;
+
+	owotCtx.clearRect(offsetX, offsetY, clampW, clampH);
 }
 
 function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, offsetY, bounds, charOverflowMode) {
@@ -1062,7 +1086,7 @@ function drawTile(tileX, tileY) {
 	var tileScreenPos = getTileScreenPosition(tileX, tileY);
 	var offsetX = Math.floor(tileScreenPos[0]);
 	var offsetY = Math.floor(tileScreenPos[1]);
-	
+
 	var clamp = getTileScreenPosition(tileX + 1, tileY + 1);
 	var clampW = Math.floor(clamp[0]) - offsetX;
 	var clampH = Math.floor(clamp[1]) - offsetY;
