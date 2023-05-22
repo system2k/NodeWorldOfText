@@ -1059,8 +1059,13 @@ function drawTile(tileX, tileY) {
 
 	var hasDrawn = false;
 
-	var clampW = tileWidth;
-	var clampH = tileHeight;
+	var tileScreenPos = getTileScreenPosition(tileX, tileY);
+	var offsetX = Math.floor(tileScreenPos[0]);
+	var offsetY = Math.floor(tileScreenPos[1]);
+	
+	var clamp = getTileScreenPosition(tileX + 1, tileY + 1);
+	var clampW = Math.floor(clamp[0]) - offsetX;
+	var clampH = Math.floor(clamp[1]) - offsetY;
 
 	if(transparentBackground) {
 		textRenderCtx.clearRect(0, 0, textRenderCanvas.width, textRenderCanvas.width);
