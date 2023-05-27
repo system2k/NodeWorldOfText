@@ -3293,6 +3293,8 @@ var touchPrev = null;
 function event_touchstart(e) {
 	var touches = e.touches;
 	var target = e.target;
+	touchPrev = touches;
+	
 	if(closest(target, getChatfield()) || target == elm.chatbar || target == elm.confirm_js_code) {
 		worldFocused = false;
 	} else {
