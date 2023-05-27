@@ -3386,6 +3386,8 @@ function event_touchmove(e) {
 		positionX = dragPosX + (x - dragStartX);
 		positionY = dragPosY + (y - dragStartY);
 	}
+	positionX = Math.round(positionX);
+	positionY = Math.round(positionY);
 	hasDragged = true;
 	
 	w.render();
