@@ -3304,6 +3304,9 @@ function event_touchstart(e) {
 		return;
 	}
 
+	if(touches.length) {
+		event_mousemove(e, touches[0].pageX * zoomRatio, touches[0].pageY * zoomRatio);
+	}
 	triggerUIClick();
 
 	var pos = getCenterTouchPosition(touches);
