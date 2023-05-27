@@ -737,17 +737,21 @@ function updateRendererZoom(percentage) {
 }
 
 // set user zoom
-function changeZoom(percentage) {
-	positionX /= zoom;
-	positionY /= zoom;
+function changeZoom(percentage, dontChangePosition) {
+	if(!dontChangePosition) {
+		positionX /= zoom;
+		positionY /= zoom;
+	}
 	userZoom = percentage / 100;
 	if(userZoom < 0.2) userZoom = 0.2;
 	if(userZoom > 10) userZoom = 10;
 	updateRendererZoom(userZoom * deviceRatio() * 100);
-	positionX *= zoom;
-	positionY *= zoom;
-	positionX = Math.trunc(positionX); // remove decimals
-	positionY = Math.trunc(positionY);
+	if(!dontChangePosition) {
+		positionX *= zoom;
+		positionY *= zoom;
+		positionX = Math.trunc(positionX); // remove decimals
+		positionY = Math.trunc(positionY);
+	}
 	w.render();
 
 	// cleanup
@@ -1681,6 +1685,28 @@ function doProtect() {
 	network.protect(position, action);
 }
 
+function triggerUIClick() {
+	stopPasting();
+	if(w.isLinking) {
+		doLink();
+	}
+	if(!w.protectSelect.isSelecting && w.isProtecting) {
+		doProtect();
+	}
+	var foundActiveSelection = false;
+	for(var i = 0; i < regionSelections.length; i++) {
+		var reg = regionSelections[i];
+		if(reg.isSelecting) {
+			reg.regionCoordA = currentPosition;
+			reg.show();
+			reg.setSelection(reg.regionCoordA, reg.regionCoordA);
+			foundActiveSelection = true;
+		}
+	}
+	if(foundActiveSelection) return;
+	w.menu.hideNow();
+}
+
 var dragStartX = 0;
 var dragStartY = 0;
 // the offset before clicking to drag
@@ -1713,24 +1739,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
 		dragPosY = positionY;
 		isDragging = true;
 	}
-	stopPasting();
-	if(w.isLinking) {
-		doLink();
-	}
-	if(!w.protectSelect.isSelecting && w.isProtecting) {
-		doProtect();
-	}
-	var foundActiveSelection = false;
-	for(var i = 0; i < regionSelections.length; i++) {
-		var reg = regionSelections[i];
-		if(reg.isSelecting) {
-			reg.regionCoordA = currentPosition;
-			reg.show();
-			reg.setSelection(reg.regionCoordA, reg.regionCoordA);
-			foundActiveSelection = true;
-		}
-	}
-	if(foundActiveSelection) return;
+	triggerUIClick();
 	var pos = getTileCoordsFromMouseCoords(pageX, pageY);
 	w.emit("mouseDown", {
 		tileX: pos[0],
@@ -1741,25 +1750,8 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
 		pageY: pageY
 	});
 	elm.owot.style.cursor = defaultDragCursor;
-	w.menu.hideNow();
 }
 document.addEventListener("mousedown", event_mousedown);
-
-function event_touchstart(e) {
-	var pos = touch_pagePos(e);
-	touchPosX = pos[0];
-	touchPosY = pos[1];
-	event_mousemove(e, touchPosX, touchPosY);
-	if(w.isProtecting) {
-		var cp = currentPosition;
-		lastTileHover = [protectPrecision, cp[0], cp[1], cp[2], cp[3]];
-	}
-	if(w.isLinking) {
-		lastLinkHover = currentPosition;
-	}
-	event_mousedown(e, pos[0], pos[1]);
-}
-document.addEventListener("touchstart", event_touchstart, { passive: false });
 
 // change cursor position
 function renderCursor(coords) {
@@ -1936,10 +1928,7 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 }
 
 document.addEventListener("mouseup", event_mouseup);
-function event_touchend(e) {
-	event_mouseup(e, touchPosX, touchPosY);
-}
-document.addEventListener("touchend", event_touchend);
+
 function event_mouseleave(e) {
 	event_mousemove(e);
 	w.emit("mouseLeave", e);
@@ -3141,8 +3130,6 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 	}
 }
 
-var touchPosX = 0;
-var touchPosY = 0;
 function event_mousemove(e, arg_pageX, arg_pageY) {
 	currentMousePosition[0] = e.pageX;
 	currentMousePosition[1] = e.pageY;
@@ -3283,15 +3270,124 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 	w.render();
 }
 document.addEventListener("mousemove", event_mousemove);
-function event_touchmove(e) {
-	var pos = touch_pagePos(e);
-	touchPosX = pos[0];
-	touchPosY = pos[1];
-	if(closest(e.target, elm.main_view) || Modal.isOpen) {
-		e.preventDefault();
+
+function getCenterTouchPosition(touches) {
+	var x = 0;
+	var y = 0;
+	var touchCount = Math.min(touches.length, 2);
+	for(var i = 0; i < touchCount; i++) {
+		x += touches[i].pageX;
+		y += touches[i].pageY;
 	}
-	event_mousemove(e, pos[0], pos[1]);
+	x = Math.floor(x / touchCount);
+	y = Math.floor(y / touchCount);
+	x *= zoomRatio;
+	y *= zoomRatio;
+	return [x, y];
 }
+
+var touchInitZoom = 0;
+var touchInitDistance = 0;
+var touchPrev = null;
+
+function event_touchstart(e) {
+	var touches = e.touches;
+	var target = e.target;
+	if(closest(target, getChatfield()) || target == elm.chatbar || target == elm.confirm_js_code) {
+		worldFocused = false;
+	} else {
+		worldFocused = true;
+	}
+	if(target != elm.owot && target != linkDiv) {
+		return;
+	}
+
+	triggerUIClick();
+
+	var pos = getCenterTouchPosition(touches);
+	var x = pos[0];
+	var y = pos[1];
+	
+	if(touches.length >= 2) {
+		touchInitZoom = zoom / deviceRatio();
+		touchInitDistance = getDistance(touches[0].clientX * zoomRatio,
+			touches[0].clientY * zoomRatio,
+			touches[1].clientX * zoomRatio,
+			touches[1].clientY * zoomRatio);
+	}
+	
+	dragStartX = x;
+	dragStartY = y;
+	dragPosX = positionX;
+	dragPosY = positionY;
+
+	isDragging = true;
+}
+function event_touchend(e) {
+	var touches = e.touches;
+	if(touches.length == 0) {
+		if(touchPrev && touchPrev.length) {
+			event_mouseup(e, touchPrev[0].pageX * zoomRatio, touchPrev[0].pageY * zoomRatio);
+		}
+		isDragging = false;
+		hasDragged = false;
+	} else {
+		var pos = getCenterTouchPosition(touches);
+		var x = pos[0];
+		var y = pos[1];
+		dragStartX = x;
+		dragStartY = y;
+		dragPosX = positionX;
+		dragPosY = positionY;
+	}
+}
+function event_touchmove(e) {
+	var touches = e.touches;
+	touchPrev = touches;
+
+	if(!isDragging) {
+		var pos = touch_pagePos(e);
+		if(closest(e.target, elm.main_view) || Modal.isOpen) {
+			e.preventDefault();
+		}
+		event_mousemove(e, pos[0], pos[1]);
+		return;
+	}
+	
+	var halfX = Math.floor(owotWidth / 2);
+	var halfY = Math.floor(owotHeight / 2);
+	
+	var pos = getCenterTouchPosition(touches);
+	var x = pos[0];
+	var y = pos[1];
+	
+	if(touches.length == 2) {
+		var distance = getDistance(touches[0].clientX * zoomRatio,
+			touches[0].clientY * zoomRatio,
+			touches[1].clientX * zoomRatio,
+			touches[1].clientY * zoomRatio);
+
+		changeZoom((touchInitZoom * (distance / touchInitDistance)) * 100, true);
+		
+		var relClickX = dragStartX - halfX;
+		var relClickY = dragStartY - halfY;
+
+		var logicalZoom = zoom / deviceRatio();
+		
+		positionX = (dragPosX / touchInitZoom * logicalZoom) + (x - dragStartX) + relClickX - (relClickX / touchInitZoom * logicalZoom);
+		positionY = (dragPosY / touchInitZoom * logicalZoom) + (y - dragStartY) + relClickY - (relClickY / touchInitZoom * logicalZoom);
+	} else {
+		positionX = dragPosX + (x - dragStartX);
+		positionY = dragPosY + (y - dragStartY);
+	}
+	hasDragged = true;
+	
+	w.render();
+	e.preventDefault();
+}
+
+document.addEventListener("touchstart", event_touchstart);
+document.addEventListener("touchend", event_touchend);
 document.addEventListener("touchmove", event_touchmove, { passive: false });
 
 // get position from touch event

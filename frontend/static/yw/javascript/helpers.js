@@ -58,6 +58,10 @@ function lineGen(x0, y0, x1, y1, max) {
 	return list;
 }
 
+function getDistance(x1, y1, x2, y2) {
+	return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+}
+
 function orderRangeABCoords(coordA, coordB) {
 	var tmp;
 	if(coordA[0] > coordB[0]) {
