@@ -1703,8 +1703,8 @@ function triggerUIClick() {
 			foundActiveSelection = true;
 		}
 	}
-	if(foundActiveSelection) return;
 	w.menu.hideNow();
+	return foundActiveSelection;
 }
 
 var dragStartX = 0;
@@ -1739,7 +1739,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
 		dragPosY = positionY;
 		isDragging = true;
 	}
-	triggerUIClick();
+	var isActive = triggerUIClick();
 	var pos = getTileCoordsFromMouseCoords(pageX, pageY);
 	w.emit("mouseDown", {
 		tileX: pos[0],
@@ -1749,7 +1749,9 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
 		pageX: pageX,
 		pageY: pageY
 	});
-	elm.owot.style.cursor = defaultDragCursor;
+	if(!isActive) {
+		elm.owot.style.cursor = defaultDragCursor;
+	}
 }
 document.addEventListener("mousedown", event_mousedown);
 
