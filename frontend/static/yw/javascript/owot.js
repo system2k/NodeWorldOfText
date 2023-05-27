@@ -3321,12 +3321,13 @@ function event_touchstart(e) {
 			touches[1].clientY * zoomRatio);
 	}
 	
-	dragStartX = x;
-	dragStartY = y;
-	dragPosX = positionX;
-	dragPosY = positionY;
-
-	isDragging = true;
+	if(draggingEnabled) {
+		dragStartX = x;
+		dragStartY = y;
+		dragPosX = positionX;
+		dragPosY = positionY;
+		isDragging = true;
+	}
 }
 function event_touchend(e) {
 	var touches = e.touches;
