@@ -3309,7 +3309,7 @@ function event_touchstart(e) {
 	if(touches.length) {
 		event_mousemove(e, touches[0].pageX * zoomRatio, touches[0].pageY * zoomRatio);
 	}
-	triggerUIClick();
+	var uiActive = triggerUIClick();
 
 	var pos = getCenterTouchPosition(touches);
 	var x = pos[0];
@@ -3323,7 +3323,7 @@ function event_touchstart(e) {
 			touches[1].clientY * zoomRatio);
 	}
 	
-	if(draggingEnabled) {
+	if(draggingEnabled && !uiActive) {
 		dragStartX = x;
 		dragStartY = y;
 		dragPosX = positionX;
