@@ -2312,8 +2312,8 @@ function coordinateAdd(tileX1, tileY1, charX1, charY1, tileX2, tileY2, charX2, c
 	return [
 		tileX1 + tileX2 + Math.floor((charX1 + charX2) / tileC),
 		tileY1 + tileY2 + Math.floor((charY1 + charY2) / tileR),
-		(charX1 + charX2) % tileC,
-		(charY1 + charY2) % tileR
+		(charX1 + charX2) - Math.floor((charX1 + charX2) / tileC) * tileC,
+		(charY1 + charY2) - Math.floor((charY1 + charY2) / tileR) * tileR
 	];
 }
 
