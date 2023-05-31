@@ -2,6 +2,7 @@ var tilePixelCache = {};
 var tileCanvasPool = [];
 var renderQueue = [];
 var renderQueueMap = new Map();
+var canBypassRenderDefer = true;
 
 function isTileQueued(x, y) {
 	var pos = y + "," + x;
@@ -350,6 +351,16 @@ function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
 	x += Math.trunc(owotWidth / 2);
 	y += Math.trunc(owotHeight / 2);
 	return [Math.trunc(x / zoomRatio), Math.trunc(y / zoomRatio)];
+}
+
+function testCanvasForCrossOriginError() {
+	if(!textRenderCtx) return;
+	try {
+		textRenderCtx.getImageData(0, 0, 1, 1);
+		canBypassRenderDefer = true;
+	} catch(e) {
+		canBypassRenderDefer = false;
+	}
 }
 
 var lcsShardCharVectors = [
@@ -1143,9 +1154,16 @@ function drawTile(tileX, tileY) {
 		var poolX = tileImage.poolX;
 		var poolY = tileImage.poolY;
 
+		if(bgImageHasChanged) {
+			testCanvasForCrossOriginError();
+			bgImageHasChanged = false;
+		}
+
 		// we read a single pixel to force the browser to draw immediately,
 		// since we want to precisely control the timing for the queue
-		textRenderCtx.getImageData(0, 0, 1, 1);
+		if(canBypassRenderDefer) {
+			textRenderCtx.getImageData(0, 0, 1, 1);
+		}
 
 		poolCtx.clearRect(poolX, poolY, tileWidth, tileHeight);
 		poolCtx.drawImage(textRenderCanvas, 0, 0, tileWidth, tileHeight, poolX, poolY, tileWidth, tileHeight);

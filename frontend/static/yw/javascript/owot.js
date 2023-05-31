@@ -98,6 +98,7 @@ var lastTileHover          = null; // [type, tileX, tileY, (charX, charY)]
 var regionSelections       = [];
 var specialClientHooks     = {};
 var specialClientHookMap   = 0; // bitfield (starts at 0): [before char rendering, (future expansion)]
+var bgImageHasChanged      = false;
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -501,6 +502,7 @@ function loadBackgroundData(cb, timeout_cb) {
 		} else {
 			cb();
 		}
+		bgImageHasChanged = true;
 	}
 	backImgElm.onerror = function() {
 		error = true;
