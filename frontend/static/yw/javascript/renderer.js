@@ -1246,11 +1246,13 @@ function renderTile(tileX, tileY) {
 			queueTile(tileX, tileY);
 		}
 		if(isEmpty) {
+			// tile has no cached image, so render a background
 			if(!transparentBackground) {
 				owotCtx.fillStyle = getTileBackgroundColor(tile);
 				owotCtx.fillRect(offsetX, offsetY, clampW, clampH);
 			}
 		} else {
+			// tile has no cached image, and rendering is in progress
 			if(transparentBackground) {
 				clearTile(tileX, tileY);
 			}
@@ -1275,9 +1277,9 @@ function renderTile(tileX, tileY) {
 
 function renderNextTilesInQueue() {
 	var start = performance.now();
-	var rq = renderQueue.length;
+	var size = renderQueue.length;
 	var fastQueue = true;
-	for(var i = 0; i < rq; i++) {
+	for(var i = 0; i < size; i++) {
 		var tileCoords = renderQueue.shift();
 		if(tileCoords) {
 			var tileX = tileCoords[0];
@@ -1331,6 +1333,7 @@ function renderTiles(redraw) {
 				shouldRender = tile.redraw || tile.rerender;
 			}
 			if(optShifted && !shouldRender) {
+				// at really far zooms, we can just shift the whole screen and only blit the tiles beyond the edges
 				if(!(shiftOptState.x1 < x && x < shiftOptState.x2 && shiftOptState.y1 < y && y < shiftOptState.y2)) {
 					renderTile(x, y);
 				}

@@ -13,6 +13,7 @@ function init_dom() {
 	owot.style.display = "block";
 	owot.style.cursor = defaultCursor;
 	owotCtx = owot.getContext("2d");
+	owotCtx.globalCompositeOperation = "copy";
 	textInput = document.getElementById("textInput");
 	textInput.value = "";
 	linkElm = elm.link_element;
