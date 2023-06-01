@@ -9,11 +9,15 @@ function isTileQueued(x, y) {
 	var pos = y + "," + x;
 	return renderQueueMap.has(pos);
 }
-function queueTile(x, y) {
+function queueTile(x, y, highPriority) {
 	if(isTileQueued(x, y)) return;
 	var pos = y + "," + x;
 	renderQueueMap.set(pos, true);
-	renderQueue.push([x, y]);
+	if(highPriority) {
+		renderQueue.unshift([x, y]);
+	} else {
+		renderQueue.push([x, y]);
+	}
 }
 
 function createTilePool() {
