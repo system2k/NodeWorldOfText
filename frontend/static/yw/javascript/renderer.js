@@ -1254,7 +1254,12 @@ function renderTile(tileX, tileY) {
 		} else {
 			// tile has no cached image, and rendering is in progress
 			if(transparentBackground) {
-				clearTile(tileX, tileY);
+				if(shiftOptimization) {
+					owotCtx.fillStyle = "#C0C0C0";
+					owotCtx.fillRect(offsetX, offsetY, clampW, clampH);
+				} else {
+					clearTile(tileX, tileY);
+				}
 			}
 		}
 	}
