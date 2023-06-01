@@ -1294,6 +1294,8 @@ function renderNextTilesInQueue() {
 			if(Tile.visible(tileX, tileY)) {
 				drawTile(tileX, tileY);
 				renderTile(tileX, tileY);
+			} else if(tile) {
+				tile.redraw = true;
 			}
 			if(tile && tile.fastQueue) {
 				tile.fastQueue = false;
