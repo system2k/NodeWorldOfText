@@ -3,6 +3,7 @@ var tileCanvasPool = [];
 var renderQueue = [];
 var renderQueueMap = new Map();
 var canBypassRenderDefer = true;
+var renderSerial = 1;
 
 function isTileQueued(x, y) {
 	var pos = y + "," + x;
@@ -1214,8 +1215,9 @@ function renderTile(tileX, tileY) {
 		}
 	}
 
-	if(tile.redraw) {
+	if(tile.redraw || (tile.serial && tile.serial != renderSerial)) {
 		tile.redraw = false;
+		tile.serial = renderSerial;
 		if(!isTileQueued(tileX, tileY)) {
 			queueTile(tileX, tileY);
 		}

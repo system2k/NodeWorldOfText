@@ -5188,17 +5188,7 @@ Object.assign(w, {
 		reloadRenderer();
 	},
 	setRedraw: function() {
-		for(var t in tilePixelCache) {
-			if(tiles[t]) {
-				tiles[t].redraw = true;
-			}
-			var pos = getPos(t);
-			var tileX = pos[1];
-			var tileY = pos[0];
-			if(isTileVisible(tileX, tileY)) {
-				queueTile(tileX, tileY);
-			}
-		}
+		renderSerial++;
 	},
 	setTileRedraw: function(tileX, tileY, fastQueue) {
 		var tile = Tile.get(tileX, tileY);
