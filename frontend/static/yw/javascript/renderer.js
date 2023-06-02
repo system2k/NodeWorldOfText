@@ -126,7 +126,9 @@ function allocateTile() {
 		y: mapY,
 		idx: index,
 		poolX: mapX * tileWidth,
-		poolY: mapY * tileHeight
+		poolY: mapY * tileHeight,
+		clampW: tileWidth,
+		clampH: tileHeight
 	};
 	pMap[index] = tileObj;
 	return tileObj;
@@ -201,12 +203,12 @@ function cleanupDirtyTiles() {
 		var pos = getPos(t);
 		var tileX = pos[1];
 		var tileY = pos[0];
-		var tilePool = loadTileFromPool(tileX, tileY, true);
+		var tileImage = loadTileFromPool(tileX, tileY, true);
 		if(!Tile.visible(tileX, tileY)) {
-			if(tilePool && (tilePool.pool.tileWidth != tileWidth || tilePool.pool.tileHeight != tileHeight)) {
+			if(tileImage && (tileImage.pool.tileWidth != tileWidth || tileImage.pool.tileHeight != tileHeight)) {
 				removeTileFromPool(tileX, tileY);
 			}
-			if(tilePool === null) {
+			if(tileImage === null) {
 				delete tilePixelCache[t];
 			}
 		}
@@ -1159,6 +1161,9 @@ function drawTile(tileX, tileY) {
 		var poolX = tileImage.poolX;
 		var poolY = tileImage.poolY;
 
+		tileImage.clampW = clampW;
+		tileImage.clampH = clampH;
+
 		if(bgImageHasChanged) {
 			testCanvasForCrossOriginError();
 			bgImageHasChanged = false;
@@ -1227,16 +1232,16 @@ function renderTile(tileX, tileY) {
 		}
 	}
 
-	var tilePool = loadTileFromPool(tileX, tileY, true);
-	if(tilePool) {
+	var tileImage = loadTileFromPool(tileX, tileY, true);
+	if(tileImage) {
 		// render text data from cache
-		var pCanv = tilePool.pool.canv;
-		var pX = tilePool.poolX;
-		var pY = tilePool.poolY;
-		if(tilePool.pool.tileWidth == tileWidth && tilePool.pool.tileHeight == tileHeight) {
+		var pCanv = tileImage.pool.canv;
+		var pX = tileImage.poolX;
+		var pY = tileImage.poolY;
+		if(tileImage.pool.tileWidth == tileWidth && tileImage.pool.tileHeight == tileHeight) {
 			owotCtx.drawImage(pCanv, pX, pY, clampW, clampH, offsetX, offsetY, clampW, clampH);
 		} else {
-			owotCtx.drawImage(pCanv, pX, pY, tilePool.pool.tileWidth, tilePool.pool.tileHeight, offsetX, offsetY, clampW, clampH);
+			owotCtx.drawImage(pCanv, pX, pY, tileImage.clampW, tileImage.clampH, offsetX, offsetY, clampW, clampH);
 		}
 		if(cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY) {
 			if(unobstructCursor) {
@@ -1247,7 +1252,7 @@ function renderTile(tileX, tileY) {
 			}
 		}
 	} else {
-		var isEmpty = tilePool === null;
+		var isEmpty = tileImage === null;
 		if(!isTileQueued(tileX, tileY) && !isEmpty) {
 			queueTile(tileX, tileY);
 		}
