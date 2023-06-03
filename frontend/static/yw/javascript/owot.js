@@ -2590,7 +2590,18 @@ function stabilizeTextInput() {
 	elm.textInput.selectionStart = elm.textInput.selectionEnd;
 }
 
+function event_input(e) {
+	if(e.inputType == "deleteContentBackward") {
+		if(getDate() - previousErase > 25 || !previousErase) {
+			moveCursor("left", true);
+			writeChar("\x08", true, null, false, 1);
+		}
+		previousErase = getDate();
+	}
+}
+
 elm.textInput.addEventListener("keydown", stabilizeTextInput);
+elm.textInput.addEventListener("input", event_input);
 
 var write_busy = false; // currently pasting
 var pasteInterval;
@@ -2603,16 +2614,9 @@ var char_input_check = setInterval(function() {
 		return;
 	}
 	var value = elm.textInput.value;
-	var hasErased = getDate() - previousErase < 1000;
-	if(!value) {
-		if(hasErased) {
+	if(!value || value == "\x7F") {
+		if(value != "\x7F") {
 			elm.textInput.value = "\x7F";
-		}
-		return;
-	}
-	if(value == "\x7F") {
-		if(!hasErased) {
-			elm.textInput.value = "";
 		}
 		return;
 	}
