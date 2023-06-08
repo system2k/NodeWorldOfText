@@ -5197,6 +5197,7 @@ Object.assign(w, {
 	},
 	setRedraw: function() {
 		renderSerial++;
+		w.hasUpdated = true;
 	},
 	setTileRedraw: function(tileX, tileY, highPriority, fastQueue) {
 		var tile = Tile.get(tileX, tileY);
@@ -5278,43 +5279,43 @@ Object.assign(w, {
 	changeSpecialCharFont: function(fontData, nr) {
 		specialFontTemplate = fontData;
 		specialCharFont = specialFontTemplate.replace("$", normFontSize(16 * zoom));
-		if(!nr) w.redraw();
+		if(!nr) w.setRedraw();
 	},
 	enableCombining: function(nr) {
 		combiningCharsEnabled = true;
-		if(!nr) w.redraw();
+		if(!nr) w.setRedraw();
 	},
 	disableCombining: function(nr) {
 		combiningCharsEnabled = false;
-		if(!nr) w.redraw();
+		if(!nr) w.setRedraw();
 	},
 	enableSurrogates: function(nr) {
 		surrogateCharsEnabled = true;
-		if(!nr) w.redraw();
+		if(!nr) w.setRedraw();
 	},
 	disableSurrogates: function(nr) {
 		surrogateCharsEnabled = false;
-		if(!nr) w.redraw();
+		if(!nr) w.setRedraw();
 	},
 	enableColors: function(nr) {
 		colorsEnabled = true;
-		if(!nr) w.redraw();
+		if(!nr) w.setRedraw();
 	},
 	disableColors: function(nr) {
 		colorsEnabled = false;
-		if(!nr) w.redraw();
+		if(!nr) w.setRedraw();
 	},
 	basic: function() {
 		w.disableSurrogates(1);
 		w.disableCombining(1);
 		w.disableColors(1);
-		w.redraw();
+		w.setRedraw();
 	},
 	restore: function() {
 		w.enableSurrogates(1);
 		w.enableCombining(1);
 		w.enableColors(1);
-		w.redraw();
+		w.setRedraw();
 	},
 	night: function(ignoreUnloadedPattern) {
 		styles.member = "#111";
@@ -5327,7 +5328,7 @@ Object.assign(w, {
 		} else if(!elm.owot.classList.contains("nightmode")) {
 			elm.owot.classList.add("nightmode");
 		}
-		w.redraw();
+		w.setRedraw();
 	},
 	day: function(reloadStyle) {
 		w.nightMode = 0;
@@ -5343,7 +5344,7 @@ Object.assign(w, {
 					styles.text = style.text;
 				}
 				menu_color(styles.menu);
-				w.redraw();
+				w.setRedraw();
 			});
 		} else {
 			var def = defaultStyles();
@@ -5351,7 +5352,7 @@ Object.assign(w, {
 			styles.owner = def.owner;
 			styles.public = def.public;
 			styles.text = def.text;
-			w.redraw();
+			w.setRedraw();
 		}
 	},
 	rotate: function(speed) {
