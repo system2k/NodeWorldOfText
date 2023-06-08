@@ -4393,10 +4393,12 @@ function buildMenu() {
 	menuOptions.grid = menu.addCheckboxOption("Toggle grid", function() {
 		gridEnabled = true;
 		w.render(true);
+		setRedrawPatterned("square");
 		menu.showEntry(menuOptions.subgrid);
 	}, function() {
 		gridEnabled = false;
 		w.render(true);
+		setRedrawPatterned("square");
 		menu.hideEntry(menuOptions.subgrid);
 	});
 	menuOptions.subgrid = menu.addCheckboxOption("Subgrid", function() {
@@ -4414,8 +4416,10 @@ function buildMenu() {
 	}, true);
 	menuOptions.colorsEnabled = menu.addCheckboxOption("Colors enabled", function() {
 		w.enableColors();
+		setRedrawPatterned("square");
 	}, function() {
 		w.disableColors();
+		setRedrawPatterned("square");
 	}, true);
 	if(state.background) {
 		menuOptions.backgroundEnabled = menu.addCheckboxOption("Background", function() {

@@ -1348,7 +1348,7 @@ function renderTiles(redraw) {
 			var tile = Tile.get(x, y);
 			var shouldRender = false;
 			if(tile) {
-				shouldRender = tile.redraw || tile.rerender;
+				shouldRender = tile.redraw || tile.rerender || (tile.serial && tile.serial != renderSerial);
 			}
 			if(optShifted && !shouldRender) {
 				// at really far zooms, we can just shift the whole screen and only blit the tiles beyond the edges
@@ -1389,9 +1389,51 @@ function renderTilesSelective() {
 			if(tile.rerender) {
 				delete tile.rerender;
 				renderTile(x, y);
-			} else if(tile.redraw) {
+			} else if(tile.redraw || (tile.serial && tile.serial != renderSerial)) {
 				renderTile(x, y);
 			}
+		}
+	}
+}
+
+function setRedrawPatterned(pattern) {
+	var visibleRange = getVisibleTileRange(1.0);
+	var startX = visibleRange[0][0];
+	var startY = visibleRange[0][1];
+	var endX = visibleRange[1][0];
+	var endY = visibleRange[1][1];
+	if(pattern == "square") {
+		var midX = Math.floor((startX + endX) / 2);
+		var midY = Math.floor((startY + endY) / 2);
+		queueTile(midX, midY);
+		var dist = Math.max(endY - midY, endX - midX);
+		for(var i = 1; i < dist; i++) {
+			var xh1 = Math.max(midX - i, startX);
+			var xh2 = Math.min(midX + i, endX);
+			var yv1 = Math.max(midY - i, startY);
+			var yv2 = Math.min(midY + i, endY);
+			for(var x = xh1; x <= xh2; x++) {
+				if(x < startX || x > endX) break;
+				queueTile(x, yv1);
+				queueTile(x, yv2);
+			}
+			for(var y = yv1; y <= yv2; y++) {
+				if(y < startY || y > endY) break;
+				queueTile(xh1, y);
+				queueTile(xh2, y);
+			}
+		}
+	} else if(pattern == "random") {
+		var tiles = getVisibleTiles(1.0);
+		for(var i = tiles.length - 1; i >= 0; i--) {
+			var pos = Math.floor(Math.random() * (i + 1));
+			var temp = tiles[i];
+			tiles[i] = tiles[pos];
+			tiles[pos] = temp;
+		}
+		for(var i = 0; i < tiles.length; i++) {
+			var pos = tiles[i];
+			queueTile(pos[0], pos[1]);
 		}
 	}
 }
