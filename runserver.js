@@ -1918,9 +1918,6 @@ async function process_request(req, res, compCallbacks) {
 	if(!page_resolved) {
 		return dispatch("HTTP 404: The resource cannot be found", 404);
 	}
-
-	res.writeHead(404);
-	res.end();
 }
 
 function loadString(type) {

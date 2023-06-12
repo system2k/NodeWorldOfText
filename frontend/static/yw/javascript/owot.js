@@ -4404,9 +4404,11 @@ function buildMenu() {
 	menuOptions.subgrid = menu.addCheckboxOption("Subgrid", function() {
 		subgridEnabled = true;
 		w.render(true);
+		setRedrawPatterned("square");
 	}, function() {
 		subgridEnabled = false;
 		w.render(true);
+		setRedrawPatterned("square");
 	});
 	menu.hideEntry(menuOptions.subgrid);
 	menuOptions.linksEnabled = menu.addCheckboxOption("Links enabled", function() {
