@@ -294,6 +294,47 @@ function generateMicroTileUpdate(worldQueue, worldID) {
 	};
 }
 
+function filterUpdatePacketDistance(client, packet) {
+	if(!packet) return null;
+	var tiles = packet.tiles;
+	var newPacket = {
+		channel: packet.channel,
+		kind: packet.kind,
+		source: packet.source,
+		tiles: {}
+	};
+	var isFiltered = false;
+	var center = client.sdata.center;
+	var boundary = client.sdata.boundary;
+	var x1 = boundary[0];
+	var y1 = boundary[1];
+	var x2 = boundary[2];
+	var y2 = boundary[3];
+	for(var idx in tiles) {
+		var pos = idx.split(",");
+		var tileX = san_nbr(pos[1]);
+		var tileY = san_nbr(pos[0]);
+		var dist = (center[0] - tileX) ** 2 + (center[1] - tileY) ** 2;
+		if(dist > 128 * 128) {
+			// not in range from center point
+			isFiltered = true;
+			continue;
+		}
+		if(x1 && y1 && x2 && y2) {
+			// not in range of boundary
+			if(!(tileX >= x1 && tileX <= x2 && tileY >= y1 && tileY <= y2)) {
+				isFiltered = true;
+				continue;
+			}
+		}
+		newPacket[idx] = tiles[idx];
+	}
+	if(isFiltered) {
+		return newPacket;
+	}
+	return null;
+}
+
 function sendTileUpdatesToClients() {
 	if(server_exiting) return;
 	var hasUpdates = Object.keys(tileClientUpdateQueue).length > 0;
@@ -312,12 +353,22 @@ function sendTileUpdatesToClients() {
 			cliUpdPkt = generateFullTileUpdate(worldQueue, world);
 		}
 		var pktBroadcast = JSON.stringify(cliUpdPkt);
+
 		wss.clients.forEach(function(client) {
 			if(!client.sdata) return;
 			if(!client.sdata.userClient) return;
 			if(!client.sdata.receiveContentUpdates) return;
 			if(client.sdata.world.id == worldID && client.readyState == WebSocket.OPEN) {
-				wsSend(client, pktBroadcast);
+				var filteredPacket = filterUpdatePacketDistance(client, cliUpdPkt);
+				if(filteredPacket) {
+					// this client was found to be too far away from the location of the edits,
+					// so we must re-serialize the update message
+					if(Object.keys(filteredPacket.tiles).length > 0) {
+						wsSend(client, JSON.stringify(filteredPacket));
+					}
+				} else {
+					wsSend(client, pktBroadcast);
+				}
 			}
 		});
 	}

@@ -99,6 +99,8 @@ var regionSelections       = [];
 var specialClientHooks     = {};
 var specialClientHookMap   = 0; // bitfield (starts at 0): [before char rendering, (future expansion)]
 var bgImageHasChanged      = false;
+var remoteBoundary         = { centerX: 0, centerY: 0, minX: 0, minY: 0, maxX: 0, maxY: 0 };
+var boundaryStatus         = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -1414,6 +1416,7 @@ Tile.set = function(tileX, tileY, data) {
 		w.tile.count++;
 	}
 	tiles[str] = data;
+	expandLocalBoundary(tileX, tileY);
 	return data;
 }
 Tile.delete = function(tileX, tileY) {
@@ -3711,6 +3714,36 @@ function cullRanges(map, width, height) {
 	return ranges;
 }
 
+function updateRemoteBoundary() {
+	var vis = w.getTileVisibility();
+	var centerX = Math.round(vis.centerX);
+	var centerY = Math.round(vis.centerY);
+	var x1 = boundaryStatus.minX;
+	var y1 = boundaryStatus.minY;
+	var x2 = boundaryStatus.maxX;
+	var y2 = boundaryStatus.maxY;
+
+	if(remoteBoundary.centerX == centerX && remoteBoundary.centerY == centerY &&
+		remoteBoundary.minX == x1 && remoteBoundary.minY == y1 &&
+		remoteBoundary.maxX == x2 && remoteBoundary.maxY == y2) return;
+
+	remoteBoundary.centerX = centerX;
+	remoteBoundary.centerY = centerY;
+	remoteBoundary.minX = x1;
+	remoteBoundary.minY = y1;
+	remoteBoundary.maxX = x2;
+	remoteBoundary.maxY = y2;
+
+	network.boundary(centerX, centerY, x1, y1, x2, y2);
+}
+
+function expandLocalBoundary(x, y) {
+	if(boundaryStatus.minX > x) boundaryStatus.minX = x;
+	if(boundaryStatus.minY > y) boundaryStatus.minY = y;
+	if(boundaryStatus.maxX < x) boundaryStatus.maxX = x;
+	if(boundaryStatus.maxY < y) boundaryStatus.maxY = y;
+}
+
 // fetches only unloaded tiles
 function getAndFetchTiles() {
 	var viewWidth = getWidth(fetchClientMargin);
@@ -3750,6 +3783,9 @@ function getAndFetchTiles() {
 				Tile.set(x, y, null);
 			}
 		}
+	}
+	if(initiallyFetched) {
+		updateRemoteBoundary();
 	}
 	if(toFetch.length > 0) {
 		if(!initiallyFetched) {
@@ -4970,7 +5006,18 @@ var network = {
 			}
 		}
 		network.transmit(data);
-	}
+	},
+	boundary: function(centerX, centerY, minX, minY, maxX, maxY) {
+		network.transmit({
+			kind: "boundary",
+			centerX: centerX,
+			centerY: centerY,
+			minX: minX,
+			minY: minY,
+			maxX: maxX,
+			maxY: maxY
+		});
+	}	
 };
 
 Object.assign(w, {

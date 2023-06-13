@@ -549,7 +549,8 @@ var websockets = {
 	link: require("./backend/websockets/link.js"),
 	protect: require("./backend/websockets/protect.js"),
 	write: require("./backend/websockets/write.js"),
-	config: require("./backend/websockets/config.js")
+	config: require("./backend/websockets/config.js"),
+	boundary: require("./backend/websockets/boundary.js")
 };
 
 var modules = {
@@ -2415,7 +2416,9 @@ async function manageWebsocketConnection(ws, req) {
 		cmdsSentInSecond: 0,
 		lastCmdSecond: 0,
 		hide_user_count: false,
-		chat_blocks: null
+		chat_blocks: null,
+		center: [0, 0],
+		boundary: [0, 0, 0, 0]
 	};
 
 	var parsedURL = url.parse(req.url);
