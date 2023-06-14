@@ -3585,6 +3585,8 @@ function createSocket(getChatHist) {
 				}
 			}
 		}
+		clearRemoteBoundary();
+		updateRemoteBoundary();
 		w.fetchUnloadedTiles();
 		clearInterval(fetchInterval);
 		fetchInterval = setInterval(function() {
@@ -3739,6 +3741,15 @@ function updateRemoteBoundary() {
 	remoteBoundary.maxY = y2;
 
 	network.boundary(centerX, centerY, x1, y1, x2, y2);
+}
+
+function clearRemoteBoundary() {
+	remoteBoundary.centerX = 0;
+	remoteBoundary.centerY = 0;
+	remoteBoundary.minX = 0;
+	remoteBoundary.minY = 0;
+	remoteBoundary.maxX = 0;
+	remoteBoundary.maxY = 0;
 }
 
 function expandLocalBoundary(x, y) {
