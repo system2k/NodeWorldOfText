@@ -338,7 +338,7 @@ function filterUpdatePacketDistance(client, packet) {
 				continue;
 			}
 		}
-		newPacket[idx] = tiles[idx];
+		newPacket.tiles[idx] = tiles[idx];
 	}
 	if(isFiltered) {
 		return newPacket;
