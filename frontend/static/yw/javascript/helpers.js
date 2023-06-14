@@ -30,6 +30,21 @@ function closest(element, parElement) {
 	return false;
 }
 
+function getQuerystring(search) {
+	var res = {};
+	if(!search || typeof search != "string") return res;
+	if(search[0] == "?") search = search.slice(1);
+	search = search.split("&");
+	for(var i = 0; i < search.length; i++) {
+		var data = search[i].split("=");
+		if(data.length < 2) continue;
+		var key = data[0].trim();
+		var value = data[1].trim();
+		res[key] = value;
+	}
+	return res;
+}
+
 function lineGen(x0, y0, x1, y1, max) {
 	if(!max) max = 2000;
 	var list = [];
