@@ -2418,7 +2418,8 @@ async function manageWebsocketConnection(ws, req) {
 		hide_user_count: false,
 		chat_blocks: null,
 		center: [0, 0],
-		boundary: [0, 0, 0, 0]
+		boundary: [0, 0, 0, 0],
+		localFilter: true
 	};
 
 	var parsedURL = url.parse(req.url);

@@ -296,6 +296,17 @@ function generateMicroTileUpdate(worldQueue, worldID) {
 
 function filterUpdatePacketDistance(client, packet) {
 	if(!packet) return null;
+	if(client.sdata.localFilter === false) {
+		// client has chosen to exepmt itself from local update filtering
+		var world = client.sdata.world;
+		var user = client.sdata.user;
+		// TODO: create a standard function for this
+		var isSuperuser = user && user.superuser;
+		var isOwner = user && user.id == world.ownerId;
+		var isMember = user && world.members.map[user.id];
+		var isKeyedMember = world.opts.memKey && world.opts.memKey == client.sdata.keyQuery;
+		if(isSuperuser || isOwner || isMember || isKeyedMember) return null;
+	}
 	var tiles = packet.tiles;
 	var newPacket = {
 		channel: packet.channel,
