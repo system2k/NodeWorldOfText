@@ -296,7 +296,7 @@ function generateMicroTileUpdate(worldQueue, worldID) {
 
 function filterUpdatePacketDistance(client, packet) {
 	if(!packet) return null;
-	if(client.sdata.localFilter === false) {
+	if(!client.sdata.localFilter) {
 		// client has chosen to exepmt itself from local update filtering
 		var world = client.sdata.world;
 		var user = client.sdata.user;

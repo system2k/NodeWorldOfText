@@ -4709,6 +4709,10 @@ var networkHTTP = {
 			max_tileX: x2,
 			max_tileY: y2
 		};
+		var query = getQuerystring(window.location.search);
+		if(query.key) {
+			data.key = query.key;
+		}
 		if(opts.utf16) data.utf16 = true;
 		if(opts.array) data.array = true;
 		if(opts.content_only) data.content_only = true;
