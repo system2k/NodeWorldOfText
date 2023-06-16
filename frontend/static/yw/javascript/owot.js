@@ -709,7 +709,7 @@ function reloadRenderer() {
 	if(tileCanvasPool.length) {
 		removeAllTilesFromPools();
 		deleteAllPools();
-		w.render(true);
+		w.redraw();
 	}
 }
 
@@ -737,7 +737,7 @@ function updateRendererZoom(percentage) {
 	linkDiv.style.height = (cellH / zoomRatio) + "px";
 
 	// rerender everything
-	w.render(true);
+	w.redraw();
 }
 
 function zoomGarbageCollect() {
@@ -4452,22 +4452,22 @@ function buildMenu() {
 
 	menuOptions.grid = menu.addCheckboxOption("Toggle grid", function() {
 		gridEnabled = true;
-		w.render(true);
+		w.redraw();
 		setRedrawPatterned("square");
 		menu.showEntry(menuOptions.subgrid);
 	}, function() {
 		gridEnabled = false;
-		w.render(true);
+		w.redraw();
 		setRedrawPatterned("square");
 		menu.hideEntry(menuOptions.subgrid);
 	});
 	menuOptions.subgrid = menu.addCheckboxOption("Subgrid", function() {
 		subgridEnabled = true;
-		w.render(true);
+		w.redraw();
 		setRedrawPatterned("square");
 	}, function() {
 		subgridEnabled = false;
-		w.render(true);
+		w.redraw();
 		setRedrawPatterned("square");
 	});
 	menu.hideEntry(menuOptions.subgrid);
@@ -4486,10 +4486,10 @@ function buildMenu() {
 	if(state.background) {
 		menuOptions.backgroundEnabled = menu.addCheckboxOption("Background", function() {
 			backgroundEnabled = true;
-			w.render(true);
+			w.redraw();
 		}, function() {
 			backgroundEnabled = false;
-			w.render(true);
+			w.redraw();
 		}, true);
 	}
 	var zoomBar = document.createElement("input");
@@ -5267,14 +5267,14 @@ Object.assign(w, {
 		w.loadScript(jqueryURL, callback);
 	},
 	redraw: function() {
-		renderTiles(true);
+		renderSerial++;
+		w.hasUpdated = true;
 	},
 	reloadRenderer: function() {
 		reloadRenderer();
 	},
-	setRedraw: function() {
-		renderSerial++;
-		w.hasUpdated = true;
+	setRedraw: function() { // deprecated
+		w.redraw();
 	},
 	setTileRedraw: function(tileX, tileY, highPriority, fastQueue) {
 		var tile = Tile.get(tileX, tileY);
@@ -5303,7 +5303,7 @@ Object.assign(w, {
 		w.redraw();
 	},
 	render: function(redraw) {
-		if(redraw) w.setRedraw();
+		if(redraw) w.redraw();
 		w.hasUpdated = true;
 	},
 	changeFont: function(fontData, nr) {
@@ -5356,43 +5356,43 @@ Object.assign(w, {
 	changeSpecialCharFont: function(fontData, nr) {
 		specialFontTemplate = fontData;
 		specialCharFont = specialFontTemplate.replace("$", normFontSize(16 * zoom));
-		if(!nr) w.setRedraw();
+		if(!nr) w.redraw();
 	},
 	enableCombining: function(nr) {
 		combiningCharsEnabled = true;
-		if(!nr) w.setRedraw();
+		if(!nr) w.redraw();
 	},
 	disableCombining: function(nr) {
 		combiningCharsEnabled = false;
-		if(!nr) w.setRedraw();
+		if(!nr) w.redraw();
 	},
 	enableSurrogates: function(nr) {
 		surrogateCharsEnabled = true;
-		if(!nr) w.setRedraw();
+		if(!nr) w.redraw();
 	},
 	disableSurrogates: function(nr) {
 		surrogateCharsEnabled = false;
-		if(!nr) w.setRedraw();
+		if(!nr) w.redraw();
 	},
 	enableColors: function(nr) {
 		colorsEnabled = true;
-		if(!nr) w.setRedraw();
+		if(!nr) w.redraw();
 	},
 	disableColors: function(nr) {
 		colorsEnabled = false;
-		if(!nr) w.setRedraw();
+		if(!nr) w.redraw();
 	},
 	basic: function() {
 		w.disableSurrogates(1);
 		w.disableCombining(1);
 		w.disableColors(1);
-		w.setRedraw();
+		w.redraw();
 	},
 	restore: function() {
 		w.enableSurrogates(1);
 		w.enableCombining(1);
 		w.enableColors(1);
-		w.setRedraw();
+		w.redraw();
 	},
 	night: function(ignoreUnloadedPattern) {
 		styles.member = "#111";
@@ -5405,7 +5405,7 @@ Object.assign(w, {
 		} else if(!elm.owot.classList.contains("nightmode")) {
 			elm.owot.classList.add("nightmode");
 		}
-		w.setRedraw();
+		w.redraw();
 	},
 	day: function(reloadStyle) {
 		w.nightMode = 0;
@@ -5421,7 +5421,7 @@ Object.assign(w, {
 					styles.text = style.text;
 				}
 				menu_color(styles.menu);
-				w.setRedraw();
+				w.redraw();
 			});
 		} else {
 			var def = defaultStyles();
@@ -5429,7 +5429,7 @@ Object.assign(w, {
 			styles.owner = def.owner;
 			styles.public = def.public;
 			styles.text = def.text;
-			w.setRedraw();
+			w.redraw();
 		}
 	},
 	rotate: function(speed) {
@@ -6036,7 +6036,7 @@ var ws_functions = {
 		styles.member_text = data.colors.member_text;
 		styles.owner_text = data.colors.owner_text;
 		checkTextColorOverride();
-		w.render(true);
+		w.redraw();
 		menu_color(styles.menu);
 	},
 	tileUpdate: function(data) {

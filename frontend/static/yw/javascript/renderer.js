@@ -1322,6 +1322,7 @@ function renderNextTilesInQueue() {
 	}
 }
 
+// the 'redraw' parameter is deprecated
 function renderTiles(redraw) {
 	w.emit("beforeTilesRendered");
 	updateCoordDisplay();
@@ -1336,7 +1337,7 @@ function renderTiles(redraw) {
 		owotCtx.drawImage(owot, Math.floor(positionX) - shiftOptState.prevX, Math.floor(positionY) - shiftOptState.prevY);
 		optShifted = true;
 	}
-	if(redraw) w.setRedraw();
+	if(redraw) w.redraw();
 	// render all visible tiles
 	var visibleRange = getVisibleTileRange(1.0);
 	var startX = visibleRange[0][0];
