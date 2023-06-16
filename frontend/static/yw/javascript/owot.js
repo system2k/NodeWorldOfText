@@ -2497,9 +2497,9 @@ function textcode_parser(value, coords, defaultColor, defaultBgColor) {
 					charY: charPos[3]
 				};
 			} else if(hCode == "*") { // skip character
-				index++;
-				chr = "";
-				doWriteChar = true;
+				index += 2;
+				chr = " ";
+				doWriteChar = false;
 			} else if(hCode == "x" || (hCode >= "A" && hCode <= "F")) { // colored paste
 				var cCol = "";
 				if(hCode == "x") {
@@ -2668,6 +2668,8 @@ var char_input_check = setInterval(function() {
 					return false;
 				}
 				charCount++;
+			} else {
+				moveCursor("right");
 			}
 		} else if(item.type == "link") {
 			var undoTop = undoBuffer.top();
