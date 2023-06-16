@@ -3826,15 +3826,27 @@ function getAndFetchTiles() {
 
 // clears all tiles outside the viewport (to free up memory)
 function clearTiles(all) {
-	var coordinates;
 	var visible = {};
-	if(!all) {
-		coordinates = getVisibleTiles();
-		// reference to tile coordinates (EG: "5,6")
-		visible = {};
-		for(var i = 0; i < coordinates.length; i++) {
-			visible[coordinates[i][1] + "," + coordinates[i][0]] = 1;
+	if(all) {
+		boundaryStatus.minX = 0;
+		boundaryStatus.minY = 0;
+		boundaryStatus.maxX = 0;
+		boundaryStatus.maxY = 0;
+	} else {
+		var visibleRange = getVisibleTileRange();
+		var x1 = visibleRange[0][0];
+		var y1 = visibleRange[0][1];
+		var x2 = visibleRange[1][0];
+		var y2 = visibleRange[1][1];
+		for(var y = y1; y <= y2; y++) {
+			for(var x = x1; x <= x2; x++) {
+				visible[y + "," + x] = 1;
+			}
 		}
+		boundaryStatus.minX = x1;
+		boundaryStatus.minY = y1;
+		boundaryStatus.maxX = x2;
+		boundaryStatus.maxY = y2;
 	}
 	for(var i in tiles) {
 		if(!(i in visible) || all) {
