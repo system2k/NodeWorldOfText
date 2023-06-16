@@ -2243,16 +2243,17 @@ function redoWrite() {
 	moveCursor("right", false, -offset + 1);
 }
 
-function writeCharToXY(char, charColor, x, y) {
+function writeCharToXY(char, charColor, x, y, charBgColor, dB, dI, dU, dS) {
 	writeCharTo(char, charColor,
 		Math.floor(x / tileC),
 		Math.floor(y / tileR),
 		x - Math.floor(x / tileC) * tileC,
-		y - Math.floor(y / tileR) * tileR);
+		y - Math.floor(y / tileR) * tileR,
+		null, null, charBgColor, dB, dI, dU, dS);
 }
 
 // type a character
-function writeChar(char, doNotMoveCursor, color, noNewline, undoCursorOffset, bgColor) {
+function writeChar(char, doNotMoveCursor, color, noNewline, undoCursorOffset, bgColor, dB, dI, dU, dS) {
 	char += "";
 	var charColor = color || YourWorld.Color;
 	var charBgColor = bgColor || YourWorld.BgColor;
@@ -2308,7 +2309,7 @@ function writeChar(char, doNotMoveCursor, color, noNewline, undoCursorOffset, bg
 		};
 
 		w.emit("writeBefore", data);
-		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, 0, undoCursorOffset, data.bgColor);
+		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, 0, undoCursorOffset, data.bgColor, dB, dI, dU, dS);
 		w.emit("write", data);
 	}
 }
