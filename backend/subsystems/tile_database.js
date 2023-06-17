@@ -751,13 +751,13 @@ function tileWriteLinks(cacheTile, editObj) {
 			// have the potential to have their byte count at most maxBytesGuarantee.
 			if(remainingBytes < newByteLen) newByteLen = remainingBytes;
 			if(newByteLen < maxBytesGuarantee) newByteLen = maxBytesGuarantee; // edge case
-			cacheTile.url_bytes += newByteLen;
-		} else {
-			cacheTile.url_bytes += byteLen;
 		}
 		// the URL link was found to be too long, so truncate it
 		if(newByteLen < byteLen) {
 			url = Buffer.from(url).subarray(0, newByteLen).toString();
+			cacheTile.url_bytes += newByteLen;
+		} else {
+			cacheTile.url_bytes += byteLen;
 		}
 
 		cellProps[charY][charX].link = {
