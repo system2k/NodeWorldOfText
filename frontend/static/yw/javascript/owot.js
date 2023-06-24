@@ -3043,6 +3043,15 @@ linkElm.onclick = function(e) {
 		return linkEvent[0];
 	}
 }
+linkElm.onauxclick = function(e) {
+	if(e.which == 2) {
+		var prot = linkParams.protocol;
+		if(prot == "javascript") {
+			e.preventDefault();
+			return false;
+		}
+	}
+}
 var currentSelectedLink = null;
 var currentSelectedLinkCoords = null; // [tileX, tileY, charX, charY]
 
