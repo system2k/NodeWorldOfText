@@ -80,7 +80,6 @@ module.exports = async function(data, server, params) {
 	var isGrouped = checkCoalition(ipAddressVal, ipAddressFam);
 
 	var public_only = !!data.public_only;
-	var no_update = !!data.no_update;
 	var preserve_links = !!data.preserve_links;
 
 	var editLimit = editReqLimit;
@@ -260,7 +259,6 @@ module.exports = async function(data, server, params) {
 		can_color_text, can_color_cell,
 		public_only, no_log_edits, preserve_links,
 		channel,
-		no_update,
 		rejected
 	});
 
