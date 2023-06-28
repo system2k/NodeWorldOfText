@@ -534,12 +534,13 @@ function lookupTileQueue(tileUID) {
 
 function IOProgress(callID) {
 	if(!cids[callID]) return;
-	cids[callID][4]++;
-	if(cids[callID][4] >= cids[callID][3]) {
-		var response = cids[callID][0];
-		var completion = cids[callID][2];
-		cids[callID][2] = null;
-		if(response) response(cids[callID][1]);
+	var call = cids[callID];
+	call.current++;
+	if(call.current >= call.total) {
+		var response = call.responseCall;
+		var completion = call.completionCall;
+		call.completionCall = null;
+		if(response) response(call.responseData);
 		if(completion) completion();
 	}
 }
@@ -695,8 +696,8 @@ function writeChar(world, tile, charX, charY, char, color, bgColor, isOwner, isM
 }
 
 function tileWriteEdits(callID, tile, options, sharedObj, editData) {
-	var accepted = cids[callID][1][0];
-	var rejected = cids[callID][1][1];
+	var accepted = cids[callID].responseData[0];
+	var rejected = cids[callID].responseData[1];
 
 	var world = options.world;
 	var user = options.user;
@@ -746,7 +747,7 @@ function tileWriteEdits(callID, tile, options, sharedObj, editData) {
 }
 
 function tileWriteLinks(callID, tile, options, sharedObj) {
-	var respData = cids[callID][1];
+	var respData = cids[callID].responseData;
 
 	var tileX = options.tileX;
 	var tileY = options.tileY;
@@ -840,7 +841,7 @@ function tileWriteLinks(callID, tile, options, sharedObj) {
 }
 
 function tileWriteProtections(callID, tile, options, sharedObj) {
-	var respData = cids[callID][1];
+	var respData = cids[callID].responseData;
 
 	var tileX = options.tileX;
 	var tileY = options.tileY;
@@ -1354,14 +1355,14 @@ function processTileIORequest(call_id, type, data) {
 				buckets[tup].push(edit);
 			}
 
-			cids[call_id][1] = [[], data.rejected];
-			cids[call_id][3] = Object.keys(buckets).length;
+			cids[call_id].responseData = [[], data.rejected];
+			cids[call_id].total = Object.keys(buckets).length;
 
 			var sharedObj = {
 				editLog: [],
 				tileUpdates: {} // used for keeping track of which tiles have been modified by this edit
 			};
-			cids[call_id][2] = function() { // when the write is completed
+			cids[call_id].completionCall = function() { // when the write is completed
 				if(Object.keys(sharedObj.tileUpdates).length > 0) {
 					var updTile = [];
 					for(var i in sharedObj.tileUpdates) {
@@ -1412,13 +1413,13 @@ function processTileIORequest(call_id, type, data) {
 			var tileX = data.tileX;
 			var tileY = data.tileY;
 
-			cids[call_id][1] = [false, false];
-			cids[call_id][3] = 1;
+			cids[call_id].responseData = [false, false];
+			cids[call_id].total = 1;
 			var sharedObj = {
 				editLog: [],
 				tile: null
 			};
-			cids[call_id][2] = function() {
+			cids[call_id].completionCall = function() {
 				if(sharedObj.tile) {
 					prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
 					if(!data.no_log_edits && editlog_cell_props) {
@@ -1455,13 +1456,13 @@ function processTileIORequest(call_id, type, data) {
 			var tileX = data.tileX;
 			var tileY = data.tileY;
 
-			cids[call_id][1] = [false, false];
-			cids[call_id][3] = 1;
+			cids[call_id].responseData = [false, false];
+			cids[call_id].total = 1;
 			var sharedObj = {
 				editLog: [],
 				tile: null
 			};
-			cids[call_id][2] = function() {
+			cids[call_id].completionCall = function() {
 				if(sharedObj.tile) {
 					prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
 					if(!data.no_log_edits && editlog_cell_props) {
@@ -1489,11 +1490,11 @@ function processTileIORequest(call_id, type, data) {
 			var tileY = data.tileY;
 			var world = data.world;
 
-			cids[call_id][3] = 1;
+			cids[call_id].total = 1;
 			var sharedObj = {
 				tile: null
 			};
-			cids[call_id][2] = function() {
+			cids[call_id].completionCall = function() {
 				prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, null);
 				if(!data.no_log_edits) {
 					appendToEditLogQueue(tileX, tileY, 0, "@{\"kind\":\"clear_tile\"}", world.id, Date.now());
@@ -1682,64 +1683,60 @@ function appendToTileIterationsQueue(world, callID, type, user) {
 }
 
 function processTileIteration(call_id, type, data) {
-	switch(type) {
-		case types.publicclear:
-			var world = data.world;
-			var user = data.user;
-			if(!user.superuser) {
-				if(check_ratelimit("world_clear", world.id)) {
-					IOProgress(call_id);
-					return;
-				}
-				set_ratelimit("world_clear", world.id, 1000 * 60 * 2);
+	if(type == types.publicclear) {
+		var world = data.world;
+		var user = data.user;
+		if(!user.superuser) {
+			if(check_ratelimit("world_clear", world.id)) {
+				IOProgress(call_id);
+				return;
 			}
-			// if any tile iteration operation is occuring, cancel
-			for(var i = 0; i < activeTileIterationsQueue.length; i++) {
-				var queue = activeTileIterationsQueue[i];
-				if(queue.world.id == world.id) {
-					IOProgress(call_id);
-					return;
-				}
+			set_ratelimit("world_clear", world.id, 1000 * 60 * 2);
+		}
+		// if any tile iteration operation is occuring, cancel
+		for(var i = 0; i < activeTileIterationsQueue.length; i++) {
+			var queue = activeTileIterationsQueue[i];
+			if(queue.world.id == world.id) {
+				IOProgress(call_id);
+				return;
 			}
-			appendToTileIterationsQueue(world, call_id, types.publicclear, user);
-			break;
-		case types.eraseworld:
-			var world = data.world;
-			var user = data.user;
-			if(!user.superuser) {
-				if(check_ratelimit("world_clear", world.id)) {
-					IOProgress(call_id);
-					return;
-				}
-				set_ratelimit("world_clear", world.id, 1000 * 60 * 2);
+		}
+		appendToTileIterationsQueue(world, call_id, types.publicclear, user);
+	} else if(type == types.eraseworld) {
+		var world = data.world;
+		var user = data.user;
+		if(!user.superuser) {
+			if(check_ratelimit("world_clear", world.id)) {
+				IOProgress(call_id);
+				return;
 			}
-			// cancel if full-world erasing is in operation. suspend any public clear operation.
-			for(var i = 0; i < activeTileIterationsQueue.length; i++) {
-				var queue = activeTileIterationsQueue[i];
-				if(queue.world.id == world.id) {
-					if(queue.type == types.publicclear) {
-						queue.suspended = true;
-					} else {
-						return IOProgress(call_id);
-					}
+			set_ratelimit("world_clear", world.id, 1000 * 60 * 2);
+		}
+		// cancel if full-world erasing is in operation. suspend any public clear operation.
+		for(var i = 0; i < activeTileIterationsQueue.length; i++) {
+			var queue = activeTileIterationsQueue[i];
+			if(queue.world.id == world.id) {
+				if(queue.type == types.publicclear) {
+					queue.suspended = true;
+				} else {
+					return IOProgress(call_id);
 				}
 			}
-			appendToTileIterationsQueue(world, call_id, types.eraseworld, user);
-			break;
+		}
+		appendToTileIterationsQueue(world, call_id, types.eraseworld, user);
 	}
 }
 
-function coordinateAdd(tileX1, tileY1, charX1, charY1, tileX2, tileY2, charX2, charY2) {
-	return [
-		tileX1 + tileX2 + Math.floor((charX1 + charX2) / 16),
-		tileY1 + tileY2 + Math.floor((charY1 + charY2) / 8),
-		(charX1 + charX2) % 16,
-		(charY1 + charY2) % 8
-	];
-}
-
 function reserveCallId(id) {
-	if(!cids[id]) cids[id] = [null, null, null, 0, 0];
+	if(!cids[id]) {
+		cids[id] = {
+			responseCall: null,
+			responseData: null,
+			completionCall: null,
+			total: 0,
+			current: 0
+		};
+	}
 }
 
 var current_call_id = 0;
@@ -1752,16 +1749,17 @@ async function editResponse(id) {
 		if(!cids[id]) {
 			return console.log("An error occurred while sending back an edit response");
 		}
-		if(cids[id][3] && cids[id][4] >= cids[id][3]) { // I/O is already completed
-			res(cids[id][1]);
-			if(cids[id][2]) { // completion callback
-				var completion = cids[id][2];
-				cids[id][2] = null;
+		var call = cids[id];
+		if(call.total && call.current >= call.total) { // I/O is already completed
+			res(call.responseData);
+			if(call.completionCall) { // completion callback
+				var completion = call.completionCall;
+				call.completionCall = null;
 				if(completion) completion();
 			}
 			delete cids[id];
 		} else {
-			cids[id][0] = function(resData) {
+			call.responseCall = function(resData) {
 				res(resData);
 				delete cids[id];
 			}
