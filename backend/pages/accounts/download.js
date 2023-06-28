@@ -6,7 +6,7 @@ var releaseWorld = world_mgr.releaseWorld;
 var getOrCreateWorld = world_mgr.getOrCreateWorld;
 
 async function iterateWorld(db, worldId, onTile) {
-	var groupSize = 100;
+	var groupSize = 16;
 	var initPos = await db.get("SELECT tileX, tileY FROM tile WHERE world_id=? LIMIT 1", [worldId]);
 	if(!initPos) return;
 	var posX = initPos.tileX - 1; // start before the first tile

@@ -418,7 +418,7 @@ function is_consistent(array) {
 	return true;
 }
 
-function normalize_tile(tile_db_data) {
+function normalizeTile(tile_db_data) {
 	// tile_db_data must contain: (rowid, content, writability, properties)
 	var data = {
 		tile_id: null, // rowid; id must be set once inserted to database. null if does not exist yet.
@@ -490,7 +490,7 @@ function normalize_tile(tile_db_data) {
 
 async function loadTileCacheData(world_id, tileX, tileY) {
 	var tile = await db.get("SELECT rowid as rowid, content, properties, writability FROM tile WHERE tileX=? AND tileY=? AND world_id=?", [tileX, tileY, world_id]);
-	return normalize_tile(tile);
+	return normalizeTile(tile);
 }
 
 // free all in-memory tiles if they haven't been written to in a while
@@ -542,6 +542,64 @@ function IOProgress(callID) {
 		if(response) response(cids[callID][1]);
 		if(completion) completion();
 	}
+}
+
+function clearTileContent(tile) {
+	tile.prop_cell_props = {};
+	tile.url_bytes = 0;
+	tile.url_cells = 0;
+	for(var x = 0; x < CONST.tileArea; x++) {
+		tile.content[x] = " ";
+		tile.prop_char[x] = null;
+		tile.prop_color[x] = 0;
+		if(tile.prop_bgcolor !== null) {
+			tile.prop_bgcolor[x] = -1;
+		}
+		tile.writability = null;
+	}
+	if(tile.prop_bgcolor !== null && arrayIsEntirely(tile.prop_bgcolor, -1)) {
+		tile.prop_bgcolor = null;
+	}
+	tile.content_updated = true;
+	tile.writability_updated = true;
+	tile.props_updated = true;
+	tile.last_accessed = Date.now();
+}
+
+function clearTilePublicContent(world, tile) {
+	for(var x = 0; x < tile.content.length; x++) {
+		var charX = x % CONST.tileCols;
+		var charY = Math.floor(x / CONST.tileCols);
+		var cellProt = tile.prop_char[x];
+		if(cellProt == null) cellProt = tile.writability;
+		if(cellProt == null) cellProt = world.writability;
+		if(cellProt == 0) {
+			tile.content[x] = " ";
+			tile.prop_color[x] = 0;
+			if(tile.prop_bgcolor !== null) {
+				tile.prop_bgcolor[x] = -1;
+			}
+			tile.content_updated = true;
+			tile.props_updated = true;
+			if(tile.prop_cell_props[charY]) {
+				if(tile.prop_cell_props[charY][charX]) {
+					var link = tile.prop_cell_props[charY][charX].link;
+					if(link && link.type == "url") {
+						tile.url_cells--;
+						tile.url_bytes -= Buffer.byteLength(link.url);
+					}
+					delete tile.prop_cell_props[charY][charX];
+				}
+				if(Object.keys(tile.prop_cell_props[charY]).length == 0) {
+					delete tile.prop_cell_props[charY];
+				}
+			}
+		}
+	}
+	if(tile.prop_bgcolor !== null && arrayIsEntirely(tile.prop_bgcolor, -1)) {
+		tile.prop_bgcolor = null;
+	}
+	tile.last_accessed = Date.now();
 }
 
 function writeChar(world, tile, charX, charY, char, color, bgColor, isOwner, isMember, options) {
@@ -941,7 +999,7 @@ function tileWriteClear(callID, tile, options, sharedObj) {
 }
 
 function processPendingEdits(worldID, tileX, tileY, pendingEdits) {
-	var tile = isTileDIM(worldID, tileX, tileY);
+	var tile = getCachedTile(worldID, tileX, tileY);
 	if(send_microedits) {
 		prepareMicroTileUpdateMessage(worldID, tileX, tileY, tile);
 	}
@@ -999,7 +1057,7 @@ function doFetchTile(queueArray) {
 		if(idx > -1) {
 			fetch_tile_queue.splice(idx, 1);
 		}
-		addTileMem(world_id, tile_x, tile_y, tile);
+		setCachedTile(world_id, tile_x, tile_y, tile);
 		processPendingEdits(world_id, tile_x, tile_y, pending_edits);
 		handleTooManyCachedTiles();
 	}).catch(function(e) {
@@ -1246,11 +1304,11 @@ async function editLogClock(serverExit) {
 	}
 }
 
-function isTileDIM(worldID, tileX, tileY) {
+function getCachedTile(worldID, tileX, tileY) {
 	var iteratedTileCache = tileIterationTempMem[worldID + "," + tileY + "," + tileX];
 	// already exists in the iteration cache. add to main tile cache.
 	if(iteratedTileCache) {
-		addTileMem(worldID, tileX, tileY, iteratedTileCache);
+		setCachedTile(worldID, tileX, tileY, iteratedTileCache);
 		return iteratedTileCache;
 	}
 	if(!memTileCache[worldID]) return false;
@@ -1258,7 +1316,7 @@ function isTileDIM(worldID, tileX, tileY) {
 	if(!memTileCache[worldID][tileY][tileX]) return false;
 	return memTileCache[worldID][tileY][tileX];
 }
-function addTileMem(worldID, tileX, tileY, cacheTileData) {
+function setCachedTile(worldID, tileX, tileY, cacheTileData) {
 	if(!memTileCache[worldID]) {
 		memTileCache[worldID] = {};
 	}
@@ -1341,7 +1399,7 @@ function processTileIORequest(call_id, type, data) {
 				var tileY = parseInt(tup[0]);
 				var tileX = parseInt(tup[1]);
 				var edits = buckets[i];
-				var tile = isTileDIM(world.id, tileX, tileY);
+				var tile = getCachedTile(world.id, tileX, tileY);
 				if(tile) {
 					tileWriteEdits(call_id, tile, data, sharedObj, edits);
 				} else {
@@ -1385,7 +1443,7 @@ function processTileIORequest(call_id, type, data) {
 					}
 				}
 			}
-			var tile = isTileDIM(world.id, tileX, tileY);
+			var tile = getCachedTile(world.id, tileX, tileY);
 			if(tile) {
 				tileWriteLinks(call_id, tile, data, sharedObj);
 			} else {
@@ -1419,7 +1477,7 @@ function processTileIORequest(call_id, type, data) {
 					}
 				}
 			}
-			var tile = isTileDIM(world.id, tileX, tileY);
+			var tile = getCachedTile(world.id, tileX, tileY);
 			if(tile) {
 				tileWriteProtections(call_id, tile, data, sharedObj);
 			} else {
@@ -1441,7 +1499,7 @@ function processTileIORequest(call_id, type, data) {
 					appendToEditLogQueue(tileX, tileY, 0, "@{\"kind\":\"clear_tile\"}", world.id, Date.now());
 				}
 			}
-			var tile = isTileDIM(world.id, tileX, tileY);
+			var tile = getCachedTile(world.id, tileX, tileY);
 			if(tile) {
 				tileWriteClear(call_id, tile, data, sharedObj);
 			} else {
@@ -1504,82 +1562,18 @@ async function beginTileIterationsLoop() {
 				[context.world.id, context.posY, context.posX, chunkSize]);
 			for(var d = 0; d < data.length; d++) {
 				var tile = data[d];
-				var tileObj = normalize_tile(tile);
+				var tileObj = normalizeTile(tile);
 				var tileX = tile.tileX;
 				var tileY = tile.tileY;
-				var dimTile = isTileDIM(context.world.id, tileX, tileY);
+				var dimTile = getCachedTile(context.world.id, tileX, tileY);
 				if(dimTile) {
-					for(var i = 0; i < dimTile.content.length; i++) {
-						var charX = i % CONST.tileCols;
-						var charY = Math.floor(i / CONST.tileCols);
-						var cellProt = dimTile.prop_char[i];
-						if(cellProt == null) cellProt = dimTile.writability;
-						if(cellProt == null) cellProt = context.world.writability;
-						if(cellProt == 0) {
-							dimTile.content[i] = " ";
-							dimTile.prop_color[i] = 0;
-							if(dimTile.prop_bgcolor) {
-								dimTile.prop_bgcolor[i] = -1;
-							}
-							dimTile.content_updated = true;
-							dimTile.props_updated = true;
-							if(dimTile.prop_cell_props[charY]) {
-								if(dimTile.prop_cell_props[charY][charX]) {
-									var link = dimTile.prop_cell_props[charY][charX].link;
-									if(link && link.type == "url") {
-										dimTile.url_cells--;
-										dimTile.url_bytes -= Buffer.byteLength(link.url);
-									}
-									delete dimTile.prop_cell_props[charY][charX];
-								}
-								if(Object.keys(dimTile.prop_cell_props[charY]).length == 0) {
-									delete dimTile.prop_cell_props[charY];
-								}
-							}
-						}
-					}
-					if(dimTile.prop_bgcolor !== null && arrayIsEntirely(dimTile.prop_bgcolor, -1)) {
-						dimTile.prop_bgcolor = null;
-					}
-					dimTile.last_accessed = Date.now();
+					clearTilePublicContent(context.world, dimTile);
 				} else {
 					if(lookupTileQueue(context.world.id + "," + tileX + "," + tileY)) {
 						continue;
 					}
 					tileIterationTempMem[context.world.id + "," + tileY + "," + tileX] = tileObj;
-					for(var i = 0; i < tileObj.content.length; i++) {
-						var charX = i % CONST.tileCols;
-						var charY = Math.floor(i / CONST.tileCols);
-						var cellProt = tileObj.prop_char[i];
-						if(cellProt == null) cellProt = tileObj.writability;
-						if(cellProt == null) cellProt = context.world.writability;
-						if(cellProt == 0) {
-							tileObj.content[i] = " ";
-							tileObj.prop_color[i] = 0;
-							if(tileObj.prop_bgcolor) {
-								tileObj.prop_bgcolor[i] = -1;
-							}
-							if(tileObj.prop_cell_props[charY]) {
-								if(tileObj.prop_cell_props[charY][charX]) {
-									// TODO: we're not following DRY here too well
-									var link = tileObj.prop_cell_props[charY][charX].link;
-									if(link && link.type == "url") {
-										tileObj.url_cells--;
-										tileObj.url_bytes -= Buffer.byteLength(link.url);
-									}
-									delete tileObj.prop_cell_props[charY][charX];
-								}
-								if(Object.keys(tileObj.prop_cell_props[charY]).length == 0) {
-									delete tileObj.prop_cell_props[charY];
-								}
-							}
-							tileObj.props_updated = true;
-							tileObj.content_updated = true;
-						}
-					}
-					if(tileObj.prop_bgcolor !== null && arrayIsEntirely(tileObj.prop_bgcolor, -1)) {
-						tileObj.prop_bgcolor = null;
-					}
+					clearTilePublicContent(context.world, tileObj);
 					if(tileObj.props_updated) {
 						tileObj.props_updated = false;
 						var propObj = {};
@@ -1627,7 +1621,6 @@ async function beginTileIterationsLoop() {
 		} else if(context.type == types.eraseworld) {
 			var data = await db.all("SELECT tileX, tileY FROM tile WHERE world_id=? AND (tileY, tileX) > (?, ?) LIMIT ?",
 				[context.world.id, context.posY, context.posX, chunkSize]);
-			var localTiles = {};
 			for(var i = 0; i < data.length; i++) {
 				var coords = data[i];
 				var tileX = coords.tileX;
@@ -1635,36 +1628,12 @@ async function beginTileIterationsLoop() {
 				if(lookupTileQueue(context.world.id + "," + tileX + "," + tileY)) {
 					continue;
 				}
-				localTiles[tileY + "," + tileX] = 1;
-			}
-			// begin to delete tiles from memory
-			for(var i in localTiles) {
-				var pos = i.split(",");
-				var tileX = parseInt(pos[1]);
-				var tileY = parseInt(pos[0]);
-				var ctile = isTileDIM(context.world.id, tileX, tileY);
-				if(!ctile) {
+				var ctile = getCachedTile(context.world.id, tileX, tileY);
+				if(ctile) {
+					clearTileContent(ctile);
+				} else {
 					writeQueue.push(["DELETE FROM tile WHERE world_id=? AND tileX=? and tileY=?", [context.world.id, tileX, tileY]]);
-					continue;
 				}
-				ctile.prop_cell_props = {};
-				ctile.url_bytes = 0;
-				ctile.url_cells = 0;
-				for(var x = 0; x < CONST.tileArea; x++) {
-					ctile.content[x] = " ";
-					ctile.prop_char[x] = null;
-					ctile.prop_color[x] = 0;
-					if(ctile.prop_bgcolor !== null) {
-						ctile.prop_bgcolor = -1;
-					}
-					ctile.writability = null;
-				}
-				if(ctile.prop_bgcolor !== null && arrayIsEntirely(ctile.prop_bgcolor, -1)) {
-					ctile.prop_bgcolor = null;
-				}
-				ctile.content_updated = true;
-				ctile.writability_updated = true;
-				ctile.props_updated = true;
 			}
 			if(writeQueue.length) {
 				await bulkWriteEdits(writeQueue);
