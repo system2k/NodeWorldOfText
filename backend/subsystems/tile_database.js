@@ -1407,6 +1407,7 @@ async function processNextPublicClearBatch(context) {
 		if(dimTile) {
 			clearTilePublicContent(context.world, dimTile);
 		} else {
+			// do not handle tiles that are currently loading
 			if(lookupTileQueue(context.world.id + "," + tileX + "," + tileY)) {
 				continue;
 			}
@@ -1468,6 +1469,7 @@ async function processNextEraseWorldBatch(context) {
 		var coords = data[i];
 		var tileX = coords.tileX;
 		var tileY = coords.tileY;
+		// do not handle tiles that are currently loading
 		if(lookupTileQueue(context.world.id + "," + tileX + "," + tileY)) {
 			continue;
 		}
@@ -1683,7 +1685,7 @@ module.exports.write = function(type, data) {
 			processPublicClearIteration(call_id, data);
 			break;
 		case types.eraseworld:
-			processEraseWorldIteration(call_id, type, data);
+			processEraseWorldIteration(call_id, data);
 			break;
 		default:
 			break;
