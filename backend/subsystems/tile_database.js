@@ -21,7 +21,6 @@ var wsSend;
 
 var server_exiting = false;
 var editlog_cell_props = false;
-var send_microedits = false;
 
 var fetch_tile_queue = [];
 var totalTilesCached = 0;
@@ -89,38 +88,8 @@ module.exports.server_exit = async function() {
 }
 
 var tileClientUpdateQueue = {};
-var microTileUpdateRefs = {};
 var linkBandwidthInPeriod = 0;
 var linkBandwidthPeriod = 0;
-
-function deepTileCopy(tile) {
-	var props = {};
-	for(var cy in tile.prop_cell_props) {
-		props[cy] = {};
-		for(var cx in tile.prop_cell_props[cy]) {
-			props[cy][cx] = tile.prop_cell_props[cy][cx];
-		}
-	}
-	var obj = {
-		content: tile.content.slice(0),
-		color: tile.prop_color.slice(0),
-		char: tile.prop_char.slice(0),
-		props,
-		writability: tile.writability
-	};
-	return obj;
-}
-
-function prepareMicroTileUpdateMessage(worldID, tileX, tileY, cacheTile) {
-	var pos = tileY + "," + tileX;
-	if(!microTileUpdateRefs[worldID]) {
-		microTileUpdateRefs[worldID] = {};
-	}
-	// keep a copy of the tile for comparison when broadcasting micro-updates
-	if(!microTileUpdateRefs[worldID][pos]) {
-		microTileUpdateRefs[worldID][pos] = deepTileCopy(cacheTile);
-	}
-}
 
 function prepareTileUpdateMessage(tileObj, worldObj, channel) {
 	var worldID = worldObj.id;
@@ -202,97 +171,6 @@ function generateFullTileUpdate(worldQueue, worldID) {
 		tiles: cliUpdData
 	};
 }
-function generateMicroTileUpdate(worldQueue, worldID) {
-	var cliUpdData = {};
-	var microRefs = microTileUpdateRefs[worldID];
-	var totalUpdatedTiles = [];
-	for(var coord in worldQueue) {
-		var tileUpdate = worldQueue[coord];
-		var tileRef = microRefs[coord];
-		if(!tileRef) continue; // possible bug in this case
-		delete microRefs[coord];
-		delete worldQueue[coord];
-		if(totalUpdatedTiles > 100) {
-			continue;
-		}
-		var upds = [];
-		var tile = tileUpdate[0];
-		var channel = tileUpdate[1];
-		var updChar = [];
-		var updProt = [];
-		var updLink = [];
-		for(var u = 0; u < CONST.tileArea; u++) {
-			var partAU = tileRef.content[u];
-			var partBU = tile.content[u];
-			var partAC = tileRef.color[u];
-			var partBC = tile.prop_color[u];
-			var partAP = tileRef.char[u];
-			var partBP = tile.prop_char[u];
-			var cy = Math.floor(u / CONST.tileCols);
-			var cx = u % CONST.tileCols;
-			var partAL = tileRef.props[cy] ? tileRef.props[cy][cx] : null;
-			var partBL = tile.prop_cell_props[cy] ? tile.prop_cell_props[cy][cx] : null;
-			if(partAU != partBU || partAC != partBC) {
-				updChar.push([u, partBU, partBC]);
-			}
-			if(partAP != partBP) {
-				updProt.push([u, partBP]);
-			}
-			if(partAL && !partBL) {
-				updLink.push([u, null]);
-			} else if(!partAL && partBL) {
-				updLink.push([u, partBL.link]);
-			} else if(partAL && partBL) {
-				var l1 = partAL.link;
-				var l2 = partBL.link;
-				if(l1.type != l2.type) {
-					updLink.push([u, partBL.link]);
-				} else {
-					if(l1.type == "coord") {
-						if(l1.link_tileX != l2.link_tileX && l1.link_tileY != l2.link_tileY) {
-							updLink.push([u, partBL.link]);
-						}
-					} else if(l1.type == "url") {
-						if(l1.url != l2.url) {
-							updLink.push([u, partBL.link]);
-						}
-					}
-				}
-			}
-		}
-		if(updChar.length) {
-			upds.push({
-				type: "char",
-				data: updChar
-			});
-		}
-		if(updProt.length) {
-			upds.push({
-				type: "prot",
-				data: updProt
-			});
-		}
-		if(updLink.length) {
-			upds.push({
-				type: "link",
-				data: updLink
-			});
-		}
-		if(tileRef.writability != tile.writability) {
-			upds.push({
-				type: "writability",
-				data: tile.writability
-			});
-		}
-		cliUpdData[coord] = upds;
-	}
-	delete tileClientUpdateQueue[worldID];
-	delete microTileUpdateRefs[worldID];
-	return {
-		kind: "update",
-		tiles: cliUpdData
-	};
-}
 
 function filterUpdatePacketDistance(client, packet) {
 	if(!packet) return null;
@@ -357,12 +235,7 @@ function sendTileUpdatesToClients() {
 		var worldQueue = tileClientUpdateQueue[world];
 		var worldID = parseInt(world);
 
-		var cliUpdPkt = null;
-		if(send_microedits) {
-			cliUpdPkt = generateMicroTileUpdate(worldQueue, world);
-		} else {
-			cliUpdPkt = generateFullTileUpdate(worldQueue, world);
-		}
+		var cliUpdPkt = generateFullTileUpdate(worldQueue, world);
 		var pktBroadcast = JSON.stringify(cliUpdPkt);
 
 		wss.clients.forEach(function(client) {
@@ -1006,9 +879,6 @@ function tileWriteClear(callID, tile, options) {
 
 function processPendingEdits(worldID, tileX, tileY, pendingEdits) {
 	var tile = getCachedTile(worldID, tileX, tileY);
-	if(send_microedits) {
-		prepareMicroTileUpdateMessage(worldID, tileX, tileY, tile);
-	}
 	// the first element of an editData array must be the edit type
 	for(var i = 0; i < pendingEdits.length; i++) {
 		var editDesc = pendingEdits[i];
