@@ -540,8 +540,8 @@ function IOProgress(callID) {
 		var response = call.responseCall;
 		var completion = call.completionCall;
 		call.completionCall = null;
-		if(response) response(call.responseData);
 		if(completion) completion();
+		if(response) response(call.responseData);
 	}
 }
 
@@ -698,6 +698,7 @@ function writeChar(world, tile, charX, charY, char, color, bgColor, isOwner, isM
 function tileWriteEdits(callID, tile, options, editData) {
 	var accepted = cids[callID].responseData[0];
 	var rejected = cids[callID].responseData[1];
+	var sharedData = cids[callID].sharedData;
 
 	var world = options.world;
 	var user = options.user;
@@ -728,18 +729,18 @@ function tileWriteEdits(callID, tile, options, editData) {
 			rejected[editID] = enums.write.noWritePerm;
 		} else {
 			accepted.push(editID);
-			if(charUpdated && !no_log_edits && sharedObj.editLog) {
+			sharedData.updatedTiles[tileY + "," + tileX] = tile;
+			if(charUpdated && !no_log_edits) {
 				var ar = [tileY, tileX, charY, charX, Date.now(), char, editID];
 				if(color) ar.push(color);
 				if(bgcolor != -1) {
 					if(!color) ar.push(0);
 					ar.push(bgcolor);
 				}
-				sharedObj.editLog.push(ar); // TODO: remove need for shared objects
+				sharedData.editLog.push(ar);
 			}
 			if(charUpdated) {
 				tile.last_accessed = Date.now();
-				sharedObj.tileUpdates[tileY + "," + tileX] = tile;
 			}
 		}
 	}
@@ -748,6 +749,7 @@ function tileWriteEdits(callID, tile, options, editData) {
 
 function tileWriteLinks(callID, tile, options) {
 	var respData = cids[callID].responseData;
+	var sharedData = cids[callID].sharedData;
 
 	var tileX = options.tileX;
 	var tileY = options.tileY;
@@ -836,12 +838,13 @@ function tileWriteLinks(callID, tile, options) {
 
 	respData[0] = false;
 	respData[1] = true;
-	sharedObj.tile = tile;
+	sharedData.updatedTile = tile;
 	IOProgress(callID);
 }
 
 function tileWriteProtections(callID, tile, options) {
 	var respData = cids[callID].responseData;
+	var sharedData = cids[callID].sharedData;
 
 	var tileX = options.tileX;
 	var tileY = options.tileY;
@@ -974,11 +977,13 @@ function tileWriteProtections(callID, tile, options) {
 
 	respData[0] = false;
 	respData[1] = true;
-	sharedObj.tile = tile;
+	sharedData.updatedTile = tile;
 	IOProgress(callID);
 }
 
 function tileWriteClear(callID, tile, options) {
+	var sharedData = cids[callID].sharedData;
+
 	for(var x = 0; x < CONST.tileArea; x++) {
 		tile.content[x] = " ";
 		tile.prop_color[x] = 0;
@@ -995,7 +1000,7 @@ function tileWriteClear(callID, tile, options) {
 	tile.props_updated = true;
 	tile.last_accessed = Date.now();
 
-	sharedObj.tile = tile;
+	sharedData.updatedTile = tile;
 	IOProgress(callID);
 }
 
@@ -1354,19 +1359,20 @@ function processTileWriteRequest(call_id, data) {
 
 	cids[call_id].responseData = [[], data.rejected];
 	cids[call_id].total = Object.keys(buckets).length;
-
-	var sharedObj = {
+	cids[call_id].sharedData = {
 		editLog: [],
-		tileUpdates: {} // used for keeping track of which tiles have been modified by this edit
+		updatedTiles: {}
 	};
 	cids[call_id].completionCall = function() { // when the write is completed
-		if(Object.keys(sharedObj.tileUpdates).length > 0) {
+		var sharedData = cids[call_id].sharedData;
+		var updatedTiles = sharedData.updatedTiles;
+		if(Object.keys(updatedTiles).length > 0) {
 			var updTile = [];
-			for(var i in sharedObj.tileUpdates) {
+			for(var i in updatedTiles) {
 				var pos = i.split(",");
 				var tileX = parseInt(pos[1]);
 				var tileY = parseInt(pos[0]);
-				var tile = sharedObj.tileUpdates[i];
+				var tile = updatedTiles[i];
 				updTile.push({
 					tileX,
 					tileY,
@@ -1377,8 +1383,8 @@ function processTileWriteRequest(call_id, data) {
 		}
 		if(!data.no_log_edits) {
 			var tileGroups = {};
-			for(var i = 0; i < sharedObj.editLog.length; i++) {
-				var edit = sharedObj.editLog[i];
+			for(var i = 0; i < sharedData.editLog.length; i++) {
+				var edit = sharedData.editLog[i];
 				var tileX = edit[1];
 				var tileY = edit[0];
 				if(!tileGroups[tileY + "," + tileX]) tileGroups[tileY + "," + tileX] = [];
@@ -1413,13 +1419,13 @@ function processTileLinkRequest(call_id, data) {
 
 	cids[call_id].responseData = [false, false];
 	cids[call_id].total = 1;
-	var sharedObj = {
-		editLog: [],
-		tile: null
+	cids[call_id].sharedData = {
+		updatedTile: null
 	};
 	cids[call_id].completionCall = function() {
-		if(sharedObj.tile) {
-			prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
+		var updatedTile = cids[call_id].sharedData.updatedTile;
+		if(updatedTile) {
+			prepareTileUpdateMessage([{tileX, tileY, tile: updatedTile}], world, data.channel);
 			if(!data.no_log_edits && editlog_cell_props) {
 				var linkArch = {
 					kind: "link",
@@ -1457,13 +1463,13 @@ function processTileProtectRequest(call_id, data) {
 
 	cids[call_id].responseData = [false, false];
 	cids[call_id].total = 1;
-	var sharedObj = {
-		editLog: [],
-		tile: null
+	cids[call_id].sharedData = {
+		updatedTile: null
 	};
 	cids[call_id].completionCall = function() {
-		if(sharedObj.tile) {
-			prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
+		var updatedTile = cids[call_id].sharedData.updatedTile;
+		if(updatedTile) {
+			prepareTileUpdateMessage([{tileX, tileY, tile: updatedTile}], world, data.channel);
 			if(!data.no_log_edits && editlog_cell_props) {
 				var protArch = {
 					kind: "protect",
@@ -1491,13 +1497,16 @@ function processTileClearRequest(call_id, data) {
 	var world = data.world;
 
 	cids[call_id].total = 1;
-	var sharedObj = {
-		tile: null
+	cids[call_id].sharedData = {
+		updatedTile: null
 	};
 	cids[call_id].completionCall = function() {
-		prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, null);
-		if(!data.no_log_edits) {
-			appendToEditLogQueue(tileX, tileY, 0, "@{\"kind\":\"clear_tile\"}", world.id, Date.now());
+		var updatedTile = cids[call_id].sharedData.updatedTile;
+		if(updatedTile) {
+			prepareTileUpdateMessage([{tileX, tileY, tile: updatedTile}], world, null);
+			if(!data.no_log_edits) {
+				appendToEditLogQueue(tileX, tileY, 0, "@{\"kind\":\"clear_tile\"}", world.id, Date.now());
+			}
 		}
 	}
 	var tile = getCachedTile(world.id, tileX, tileY);
@@ -1748,7 +1757,8 @@ function reserveCallId(id) {
 			responseData: null,
 			completionCall: null,
 			total: 0,
-			current: 0
+			current: 0,
+			sharedData: null
 		};
 	}
 }
@@ -1765,17 +1775,17 @@ async function editResponse(id) {
 		}
 		var call = cids[id];
 		if(call.total && call.current >= call.total) { // I/O is already completed
-			res(call.responseData);
 			if(call.completionCall) { // completion callback
 				var completion = call.completionCall;
 				call.completionCall = null;
 				if(completion) completion();
 			}
 			delete cids[id];
+			res(call.responseData);
 		} else {
 			call.responseCall = function(resData) {
-				res(resData);
 				delete cids[id];
+				res(resData);
 			}
 		}
 	});
