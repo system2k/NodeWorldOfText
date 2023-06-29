@@ -502,7 +502,7 @@ function performCacheInvalidation() {
 				var tile = memTileCache[worldID][tileY][tileX];
 				if(tile.props_updated || tile.content_updated || tile.writability_updated || tile.inserting) continue;
 				if(date - tile.last_accessed > tileCacheTimeLimit) {
-					deleteTileDIM(worldID, tileX, tileY);
+					deleteCachedTile(worldID, tileX, tileY);
 				}
 			}
 		}
@@ -518,7 +518,7 @@ function handleTooManyCachedTiles() {
 			for(var tileX in memTileCache[worldID][tileY]) {
 				var tile = memTileCache[worldID][tileY][tileX];
 				if(tile.props_updated || tile.content_updated || tile.writability_updated || tile.inserting) continue;
-				deleteTileDIM(worldID, tileX, tileY);
+				deleteCachedTile(worldID, tileX, tileY);
 			}
 		}
 	}
@@ -695,7 +695,7 @@ function writeChar(world, tile, charX, charY, char, color, bgColor, isOwner, isM
 	return char_updated;
 }
 
-function tileWriteEdits(callID, tile, options, sharedObj, editData) {
+function tileWriteEdits(callID, tile, options, editData) {
 	var accepted = cids[callID].responseData[0];
 	var rejected = cids[callID].responseData[1];
 
@@ -746,7 +746,7 @@ function tileWriteEdits(callID, tile, options, sharedObj, editData) {
 	IOProgress(callID);
 }
 
-function tileWriteLinks(callID, tile, options, sharedObj) {
+function tileWriteLinks(callID, tile, options) {
 	var respData = cids[callID].responseData;
 
 	var tileX = options.tileX;
@@ -840,7 +840,7 @@ function tileWriteLinks(callID, tile, options, sharedObj) {
 	IOProgress(callID);
 }
 
-function tileWriteProtections(callID, tile, options, sharedObj) {
+function tileWriteProtections(callID, tile, options) {
 	var respData = cids[callID].responseData;
 
 	var tileX = options.tileX;
@@ -978,7 +978,7 @@ function tileWriteProtections(callID, tile, options, sharedObj) {
 	IOProgress(callID);
 }
 
-function tileWriteClear(callID, tile, options, sharedObj) {
+function tileWriteClear(callID, tile, options) {
 	for(var x = 0; x < CONST.tileArea; x++) {
 		tile.content[x] = " ";
 		tile.prop_color[x] = 0;
@@ -1011,22 +1011,21 @@ function processPendingEdits(worldID, tileX, tileY, pendingEdits) {
 		var editType = editDesc[0];
 		var callID = editDesc[1];
 		var options = editDesc[2];
-		var sharedObj = editDesc[3];
-		var editData = editDesc[4];
+		var editData = editDesc[3];
 
 		// these should all be synchronous operations
 		switch(editType) {
 			case types.write:
-				tileWriteEdits(callID, tile, options, sharedObj, editData);
+				tileWriteEdits(callID, tile, options, editData);
 				break;
 			case types.link:
-				tileWriteLinks(callID, tile, options, sharedObj);
+				tileWriteLinks(callID, tile, options);
 				break;
 			case types.protect:
-				tileWriteProtections(callID, tile, options, sharedObj);
+				tileWriteProtections(callID, tile, options);
 				break;
 			case types.clear:
-				tileWriteClear(callID, tile, options, sharedObj);
+				tileWriteClear(callID, tile, options);
 				break;
 		}
 	}
@@ -1329,184 +1328,183 @@ function setCachedTile(worldID, tileX, tileY, cacheTileData) {
 		totalTilesCached++;
 	}
 }
-function deleteTileDIM(worldID, tileX, tileY) {
+function deleteCachedTile(worldID, tileX, tileY) {
 	delete memTileCache[worldID][tileY][tileX];
 	totalTilesCached--;
 	if(!Object.keys(memTileCache[worldID][tileY]).length) delete memTileCache[worldID][tileY];
 	if(!Object.keys(memTileCache[worldID]).length) delete memTileCache[worldID];
 }
 
-function processTileIORequest(call_id, type, data) {
-	switch(type) {
-		case types.write:
-			var tile_edits = data.tile_edits;
-			if(!tile_edits.length) return IOProgress(call_id);
-			var world = data.world;
+function processTileWriteRequest(call_id, data) {
+	var tile_edits = data.tile_edits;
+	if(!tile_edits.length) return IOProgress(call_id);
+	var world = data.world;
 
-			var buckets = {};
-			for(var i = 0; i < tile_edits.length; i++) {
-				var edit = tile_edits[i];
-				var tileY = edit[0];
+	var buckets = {};
+	for(var i = 0; i < tile_edits.length; i++) {
+		var edit = tile_edits[i];
+		var tileY = edit[0];
+		var tileX = edit[1];
+		var tup = tileY + "," + tileX;
+		if(!buckets[tup]) {
+			buckets[tup] = [];
+		}
+		buckets[tup].push(edit);
+	}
+
+	cids[call_id].responseData = [[], data.rejected];
+	cids[call_id].total = Object.keys(buckets).length;
+
+	var sharedObj = {
+		editLog: [],
+		tileUpdates: {} // used for keeping track of which tiles have been modified by this edit
+	};
+	cids[call_id].completionCall = function() { // when the write is completed
+		if(Object.keys(sharedObj.tileUpdates).length > 0) {
+			var updTile = [];
+			for(var i in sharedObj.tileUpdates) {
+				var pos = i.split(",");
+				var tileX = parseInt(pos[1]);
+				var tileY = parseInt(pos[0]);
+				var tile = sharedObj.tileUpdates[i];
+				updTile.push({
+					tileX,
+					tileY,
+					tile
+				});
+			}
+			prepareTileUpdateMessage(updTile, world, data.channel);
+		}
+		if(!data.no_log_edits) {
+			var tileGroups = {};
+			for(var i = 0; i < sharedObj.editLog.length; i++) {
+				var edit = sharedObj.editLog[i];
 				var tileX = edit[1];
-				var tup = tileY + "," + tileX;
-				if(!buckets[tup]) {
-					buckets[tup] = [];
-				}
-				buckets[tup].push(edit);
+				var tileY = edit[0];
+				if(!tileGroups[tileY + "," + tileX]) tileGroups[tileY + "," + tileX] = [];
+				tileGroups[tileY + "," + tileX].push(edit);
 			}
+			for(var i in tileGroups) {
+				var pos = i.split(",");
+				var tileX = parseInt(pos[1]);
+				var tileY = parseInt(pos[0]);
+				appendToEditLogQueue(tileX, tileY, 0, JSON.stringify(tileGroups[i]), world.id, tileGroups[i][0][4]);
+			}
+		}
+	}
+	for(var i in buckets) {
+		var tup = i.split(",");
+		var tileY = parseInt(tup[0]);
+		var tileX = parseInt(tup[1]);
+		var edits = buckets[i];
+		var tile = getCachedTile(world.id, tileX, tileY);
+		if(tile) {
+			tileWriteEdits(call_id, tile, data, edits);
+		} else {
+			appendToUnloadedTileCache(world.id, tileX, tileY, [types.write, call_id, data, edits]);
+		}
+	}
+}
 
-			cids[call_id].responseData = [[], data.rejected];
-			cids[call_id].total = Object.keys(buckets).length;
+function processTileLinkRequest(call_id, data) {
+	var world = data.world;
+	var tileX = data.tileX;
+	var tileY = data.tileY;
 
-			var sharedObj = {
-				editLog: [],
-				tileUpdates: {} // used for keeping track of which tiles have been modified by this edit
-			};
-			cids[call_id].completionCall = function() { // when the write is completed
-				if(Object.keys(sharedObj.tileUpdates).length > 0) {
-					var updTile = [];
-					for(var i in sharedObj.tileUpdates) {
-						var pos = i.split(",");
-						var tileX = parseInt(pos[1]);
-						var tileY = parseInt(pos[0]);
-						var tile = sharedObj.tileUpdates[i];
-						updTile.push({
-							tileX,
-							tileY,
-							tile
-						});
-					}
-					prepareTileUpdateMessage(updTile, world, data.channel);
+	cids[call_id].responseData = [false, false];
+	cids[call_id].total = 1;
+	var sharedObj = {
+		editLog: [],
+		tile: null
+	};
+	cids[call_id].completionCall = function() {
+		if(sharedObj.tile) {
+			prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
+			if(!data.no_log_edits && editlog_cell_props) {
+				var linkArch = {
+					kind: "link",
+					charX: data.charX,
+					charY: data.charY
+				};
+				if(data.type == "url") {
+					linkArch.link_type = 0;
+					linkArch.link_tileX = null;
+					linkArch.link_tileY = null;
+					linkArch.url = data.url;
+				} else if(data.type == "coord") {
+					linkArch.link_type = 1;
+					linkArch.link_tileX = data.link_tileX;
+					linkArch.link_tileY = data.link_tileY;
+					linkArch.url = "";
 				}
-				if(!data.no_log_edits) {
-					var tileGroups = {};
-					for(var i = 0; i < sharedObj.editLog.length; i++) {
-						var edit = sharedObj.editLog[i];
-						var tileX = edit[1];
-						var tileY = edit[0];
-						if(!tileGroups[tileY + "," + tileX]) tileGroups[tileY + "," + tileX] = [];
-						tileGroups[tileY + "," + tileX].push(edit);
-					}
-					for(var i in tileGroups) {
-						var pos = i.split(",");
-						var tileX = parseInt(pos[1]);
-						var tileY = parseInt(pos[0]);
-						appendToEditLogQueue(tileX, tileY, 0, JSON.stringify(tileGroups[i]), world.id, tileGroups[i][0][4]);
-					}
-				}
+				var editData = "@" + JSON.stringify(linkArch);
+				appendToEditLogQueue(tileX, tileY, 0, editData, world.id, Date.now());
 			}
-			for(var i in buckets) {
-				var tup = i.split(",");
-				var tileY = parseInt(tup[0]);
-				var tileX = parseInt(tup[1]);
-				var edits = buckets[i];
-				var tile = getCachedTile(world.id, tileX, tileY);
-				if(tile) {
-					tileWriteEdits(call_id, tile, data, sharedObj, edits);
-				} else {
-					appendToUnloadedTileCache(world.id, tileX, tileY, [types.write, call_id, data, sharedObj, edits]);
-				}
-			}
-			break;
-		case types.link:
-			var world = data.world;
-			var tileX = data.tileX;
-			var tileY = data.tileY;
+		}
+	}
+	var tile = getCachedTile(world.id, tileX, tileY);
+	if(tile) {
+		tileWriteLinks(call_id, tile, data);
+	} else {
+		appendToUnloadedTileCache(world.id, tileX, tileY, [types.link, call_id, data]);
+	}
+}
 
-			cids[call_id].responseData = [false, false];
-			cids[call_id].total = 1;
-			var sharedObj = {
-				editLog: [],
-				tile: null
-			};
-			cids[call_id].completionCall = function() {
-				if(sharedObj.tile) {
-					prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
-					if(!data.no_log_edits && editlog_cell_props) {
-						var linkArch = {
-							kind: "link",
-							charX: data.charX,
-							charY: data.charY
-						};
-						if(data.type == "url") {
-							linkArch.link_type = 0;
-							linkArch.link_tileX = null;
-							linkArch.link_tileY = null;
-							linkArch.url = data.url;
-						} else if(data.type == "coord") {
-							linkArch.link_type = 1;
-							linkArch.link_tileX = data.link_tileX;
-							linkArch.link_tileY = data.link_tileY;
-							linkArch.url = "";
-						}
-						var editData = "@" + JSON.stringify(linkArch);
-						appendToEditLogQueue(tileX, tileY, 0, editData, world.id, Date.now());
-					}
-				}
-			}
-			var tile = getCachedTile(world.id, tileX, tileY);
-			if(tile) {
-				tileWriteLinks(call_id, tile, data, sharedObj);
-			} else {
-				appendToUnloadedTileCache(world.id, tileX, tileY, [types.link, call_id, data, sharedObj]);
-			}
-			break;
-		case types.protect:
-			var world = data.world;
-			var tileX = data.tileX;
-			var tileY = data.tileY;
+function processTileProtectRequest(call_id, data) {
+	var world = data.world;
+	var tileX = data.tileX;
+	var tileY = data.tileY;
 
-			cids[call_id].responseData = [false, false];
-			cids[call_id].total = 1;
-			var sharedObj = {
-				editLog: [],
-				tile: null
-			};
-			cids[call_id].completionCall = function() {
-				if(sharedObj.tile) {
-					prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
-					if(!data.no_log_edits && editlog_cell_props) {
-						var protArch = {
-							kind: "protect",
-							protect_type: data.protect_type,
-							precise: !!data.precise,
-							charX: data.charX,
-							charY: data.charY
-						};
-						var editData = "@" + JSON.stringify(protArch);
-						appendToEditLogQueue(tileX, tileY, 0, editData, world.id, Date.now());
-					}
-				}
+	cids[call_id].responseData = [false, false];
+	cids[call_id].total = 1;
+	var sharedObj = {
+		editLog: [],
+		tile: null
+	};
+	cids[call_id].completionCall = function() {
+		if(sharedObj.tile) {
+			prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, data.channel);
+			if(!data.no_log_edits && editlog_cell_props) {
+				var protArch = {
+					kind: "protect",
+					protect_type: data.protect_type,
+					precise: !!data.precise,
+					charX: data.charX,
+					charY: data.charY
+				};
+				var editData = "@" + JSON.stringify(protArch);
+				appendToEditLogQueue(tileX, tileY, 0, editData, world.id, Date.now());
 			}
-			var tile = getCachedTile(world.id, tileX, tileY);
-			if(tile) {
-				tileWriteProtections(call_id, tile, data, sharedObj);
-			} else {
-				appendToUnloadedTileCache(world.id, tileX, tileY, [types.protect, call_id, data, sharedObj]);
-			}
-			break;
-		case types.clear:
-			var tileX = data.tileX;
-			var tileY = data.tileY;
-			var world = data.world;
+		}
+	}
+	var tile = getCachedTile(world.id, tileX, tileY);
+	if(tile) {
+		tileWriteProtections(call_id, tile, data);
+	} else {
+		appendToUnloadedTileCache(world.id, tileX, tileY, [types.protect, call_id, data]);
+	}
+}
 
-			cids[call_id].total = 1;
-			var sharedObj = {
-				tile: null
-			};
-			cids[call_id].completionCall = function() {
-				prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, null);
-				if(!data.no_log_edits) {
-					appendToEditLogQueue(tileX, tileY, 0, "@{\"kind\":\"clear_tile\"}", world.id, Date.now());
-				}
-			}
-			var tile = getCachedTile(world.id, tileX, tileY);
-			if(tile) {
-				tileWriteClear(call_id, tile, data, sharedObj);
-			} else {
-				appendToUnloadedTileCache(world.id, tileX, tileY, [types.clear, call_id, data, sharedObj]);
-			}
-			break;
+function processTileClearRequest(call_id, data) {
+	var tileX = data.tileX;
+	var tileY = data.tileY;
+	var world = data.world;
+
+	cids[call_id].total = 1;
+	var sharedObj = {
+		tile: null
+	};
+	cids[call_id].completionCall = function() {
+		prepareTileUpdateMessage([{tileX, tileY, tile: sharedObj.tile}], world, null);
+		if(!data.no_log_edits) {
+			appendToEditLogQueue(tileX, tileY, 0, "@{\"kind\":\"clear_tile\"}", world.id, Date.now());
+		}
+	}
+	var tile = getCachedTile(world.id, tileX, tileY);
+	if(tile) {
+		tileWriteClear(call_id, tile, data);
+	} else {
+		appendToUnloadedTileCache(world.id, tileX, tileY, [types.clear, call_id, data]);
 	}
 }
 
@@ -1698,49 +1696,49 @@ function appendToTileIterationsQueue(world, callID, type, user) {
 	}
 }
 
-function processTileIteration(call_id, type, data) {
-	if(type == types.publicclear) {
-		var world = data.world;
-		var user = data.user;
-		if(!user.superuser) {
-			if(check_ratelimit("world_clear", world.id)) {
-				IOProgress(call_id);
-				return;
-			}
-			set_ratelimit("world_clear", world.id, 1000 * 60 * 2);
+function processPublicClearIteration(call_id, data) {
+	var world = data.world;
+	var user = data.user;
+	if(!user.superuser) {
+		if(check_ratelimit("world_clear", world.id)) {
+			IOProgress(call_id);
+			return;
 		}
-		// if any tile iteration operation is occuring, cancel
-		for(var i = 0; i < activeTileIterationsQueue.length; i++) {
-			var queue = activeTileIterationsQueue[i];
-			if(queue.world.id == world.id) {
-				IOProgress(call_id);
-				return;
-			}
-		}
-		appendToTileIterationsQueue(world, call_id, types.publicclear, user);
-	} else if(type == types.eraseworld) {
-		var world = data.world;
-		var user = data.user;
-		if(!user.superuser) {
-			if(check_ratelimit("world_clear", world.id)) {
-				IOProgress(call_id);
-				return;
-			}
-			set_ratelimit("world_clear", world.id, 1000 * 60 * 2);
-		}
-		// cancel if full-world erasing is in operation. suspend any public clear operation.
-		for(var i = 0; i < activeTileIterationsQueue.length; i++) {
-			var queue = activeTileIterationsQueue[i];
-			if(queue.world.id == world.id) {
-				if(queue.type == types.publicclear) {
-					queue.suspended = true;
-				} else {
-					return IOProgress(call_id);
-				}
-			}
-		}
-		appendToTileIterationsQueue(world, call_id, types.eraseworld, user);
+		set_ratelimit("world_clear", world.id, 1000 * 60 * 2);
 	}
+	// if any tile iteration operation is occuring, cancel
+	for(var i = 0; i < activeTileIterationsQueue.length; i++) {
+		var queue = activeTileIterationsQueue[i];
+		if(queue.world.id == world.id) {
+			IOProgress(call_id);
+			return;
+		}
+	}
+	appendToTileIterationsQueue(world, call_id, types.publicclear, user);
+}
+
+function processEraseWorldIteration(call_id, data) {
+	var world = data.world;
+	var user = data.user;
+	if(!user.superuser) {
+		if(check_ratelimit("world_clear", world.id)) {
+			IOProgress(call_id);
+			return;
+		}
+		set_ratelimit("world_clear", world.id, 1000 * 60 * 2);
+	}
+	// cancel if full-world erasing is in operation. suspend any public clear operation.
+	for(var i = 0; i < activeTileIterationsQueue.length; i++) {
+		var queue = activeTileIterationsQueue[i];
+		if(queue.world.id == world.id) {
+			if(queue.type == types.publicclear) {
+				queue.suspended = true;
+			} else {
+				return IOProgress(call_id);
+			}
+		}
+	}
+	appendToTileIterationsQueue(world, call_id, types.eraseworld, user);
 }
 
 function reserveCallId(id) {
@@ -1790,14 +1788,22 @@ module.exports.write = function(type, data) {
 		case types.none:
 			break;
 		case types.write:
+			processTileWriteRequest(call_id, data);
+			break;
 		case types.link:
+			processTileLinkRequest(call_id, data);
+			break;
 		case types.protect:
+			processTileProtectRequest(call_id, data);
+			break;
 		case types.clear:
-			processTileIORequest(call_id, type, data);
+			processTileClearRequest(call_id, data);
 			break;
 		case types.publicclear:
+			processPublicClearIteration(call_id, data);
+			break;
 		case types.eraseworld:
-			processTileIteration(call_id, type, data);
+			processEraseWorldIteration(call_id, type, data);
 			break;
 		default:
 			break;
