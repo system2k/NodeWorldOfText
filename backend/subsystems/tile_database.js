@@ -604,7 +604,7 @@ function tileWriteEdits(callID, tile, options, editData) {
 			accepted.push(editID);
 			sharedData.updatedTiles[tileY + "," + tileX] = tile;
 			if(charUpdated && !no_log_edits) {
-				var ar = [tileY, tileX, charY, charX, Date.now(), char, editID];
+				var ar = [tileY, tileX, charY, charX, 0, char, editID];
 				if(color) ar.push(color);
 				if(bgcolor != -1) {
 					if(!color) ar.push(0);
@@ -1264,7 +1264,7 @@ function processTileWriteRequest(call_id, data) {
 				var pos = i.split(",");
 				var tileX = parseInt(pos[1]);
 				var tileY = parseInt(pos[0]);
-				appendToEditLogQueue(tileX, tileY, 0, JSON.stringify(tileGroups[i]), world.id, tileGroups[i][0][4]);
+				appendToEditLogQueue(tileX, tileY, 0, JSON.stringify(tileGroups[i]), world.id, Date.now());
 			}
 		}
 	}
