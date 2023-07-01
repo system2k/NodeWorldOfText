@@ -771,10 +771,10 @@ function tileWriteProtections(callID, tile, options) {
 
 	var has_modified = false;
 
-	if(!charWidth) charWidth = 1;
-	if(!charHeight) charHeight = 1;
-	if(charWidth > 16) charWidth = 16;
-	if(charHeight > 8) charHeight > 8;
+	if(!charWidth || charWidth < 0) charWidth = 1;
+	if(!charHeight || charHeight < 0) charHeight = 1;
+	if(charWidth > CONST.tileCols) charWidth = CONST.tileCols;
+	if(charHeight > CONST.tileRows) charHeight > CONST.tileRows;
 
 	if(precise) {
 		// We are unprotecting a cell. The cell's protection level must then
