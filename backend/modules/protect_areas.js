@@ -27,6 +27,8 @@ module.exports = async function(data, server, params) {
 	var tileY = san_nbr(data.tileY);
 	var charX = san_nbr(data.charX);
 	var charY = san_nbr(data.charY);
+	var charWidth = san_nbr(data.charWidth);
+	var charHeight = san_nbr(data.charHeight);
 	var precise = data.precise;
 	var type = data.type;
 
@@ -82,7 +84,9 @@ module.exports = async function(data, server, params) {
 	}
 
 	var resp = await tile_database.write(tile_database.types.protect, {
-		tileX, tileY, charX, charY,
+		tileX, tileY,
+		charX, charY,
+		charWidth, charHeight,
 		user, world, is_member, is_owner,
 		type, precise, protect_type,
 		channel, no_log_edits

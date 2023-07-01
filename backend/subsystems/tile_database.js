@@ -715,6 +715,35 @@ function tileWriteLinks(callID, tile, options) {
 	IOProgress(callID);
 }
 
+function setCellProtection(tile, charX, charY, protectType, defaultWritability, canOwner, canMember) {
+	var has_modified = false;
+	var idx = charY * CONST.tileCols + charX;
+	var char_writability = tile.prop_char[idx];
+	if(char_writability == null) char_writability = defaultWritability;
+	var area_perm = canOwner || (canMember && char_writability < 2);
+	if(protectType == 2 && area_perm && canOwner) {
+		tile.prop_char[idx] = 2;
+		tile.props_updated = true;
+		has_modified = true;
+	}
+	if(protectType == 1 && area_perm && canMember) {
+		tile.prop_char[idx] = 1;
+		tile.props_updated = true;
+		has_modified = true;
+	}
+	if(protectType == 0 && area_perm && canMember) {
+		tile.prop_char[idx] = 0;
+		tile.props_updated = true;
+		has_modified = true;
+	}
+	if(protectType == null && area_perm && canMember) {
+		tile.prop_char[idx] = null;
+		has_modified = true;
+		tile.props_updated = true;
+	}
+	return has_modified;
+}
+
 function tileWriteProtections(callID, tile, options) {
 	var respData = cids[callID].responseData;
 	var sharedData = cids[callID].sharedData;
@@ -723,6 +752,8 @@ function tileWriteProtections(callID, tile, options) {
 	var tileY = options.tileY;
 	var charX = options.charX;
 	var charY = options.charY;
+	var charWidth = options.charWidth;
+	var charHeight = options.charHeight;
 	var user = options.user;
 	var world = options.world;
 	var precise = options.precise;
@@ -740,26 +771,18 @@ function tileWriteProtections(callID, tile, options) {
 
 	var has_modified = false;
 
+	if(!charWidth) charWidth = 1;
+	if(!charHeight) charHeight = 1;
+	if(charWidth > 16) charWidth = 16;
+	if(charHeight > 8) charHeight > 8;
+
 	if(precise) {
+		// We are unprotecting a cell. The cell's protection level must then
+		// match the world's writability, not the tile's.
 		var idx = charY * CONST.tileCols + charX;
 		var char_writability = tile.prop_char[idx];
 		if(char_writability == null) char_writability = tile_writability;
 		var area_perm = can_owner || (can_member && char_writability < 2);
-		if(protect_type == 2 && area_perm && can_owner) {
-			tile.prop_char[idx] = 2;
-			tile.props_updated = true;
-			has_modified = true;
-		}
-		if(protect_type == 1 && area_perm && can_member) {
-			tile.prop_char[idx] = 1;
-			tile.props_updated = true;
-			has_modified = true;
-		}
-		if(protect_type == 0 && area_perm && can_member) {
-			tile.prop_char[idx] = 0;
-			tile.props_updated = true;
-			has_modified = true;
-		}
 		if(protect_type == null && area_perm && can_member) {
 			if(tile.writability != null) {
 				for(var n = 0; n < tile.prop_char.length; n++) {
@@ -771,10 +794,23 @@ function tileWriteProtections(callID, tile, options) {
 				tile.writability_updated = true;
 				tile.props_updated = true;
 			}
-			tile.prop_char[idx] = null;
-			has_modified = true;
-			tile.props_updated = true;
 		}
+		// we may be protecting a range of cells.
+		// a single cell counts as a 1x1 region.
+		for(var y = 0; y < charHeight; y++) {
+			var curCharY = charY + y;
+			if(charY >= CONST.tileRows) break;
+			for(var x = 0; x < charWidth; x++) {
+				var curCharX = charX + x;
+				if(charX >= CONST.tileCols) break;
+				var stat = setCellProtection(tile, curCharX, curCharY, protect_type, tile_writability, can_owner, can_member);
+				if(stat) {
+					has_modified = true;
+				}
+			}
+		}
+		// all the cells have the same protection level.
+		// we can make the tile's writability that value.
 		if(tile.prop_char[0] != null && is_consistent(tile.prop_char)) {
 			tile.writability = tile.prop_char[0];
 			for(var i = 0; i < tile.prop_char.length; i++) {
@@ -786,6 +822,8 @@ function tileWriteProtections(callID, tile, options) {
 		}
 	} else {
 		var full_protection_complete = true;
+		// despite the fact we are setting the protection of a full tile,
+		// there may be certain cells that the user doesn't have permission to modify.
 		for(var i = 0; i < CONST.tileArea; i++) {
 			var char_writability = tile.prop_char[i];
 			if(char_writability == null) char_writability = tile_writability;
@@ -827,8 +865,9 @@ function tileWriteProtections(callID, tile, options) {
 				}
 			}
 		}
+		// since the protection level of every cell changed,
+		// then all we have to do is change the writability and discard our cell values.
 		if(full_protection_complete) {
-			// user can change protection of all chars in the tile, so change the protection of the tile itself
 			for(var i = 0; i < tile.prop_char.length; i++) {
 				tile.prop_char[i] = null;
 			}

@@ -4293,7 +4293,6 @@ function protectSelectionStart(start, end, width, height) {
 	var charX2 = end[2];
 	var charY2 = end[3];
 	var tileList = [];
-	var charList = {};
 	if(protectPrecision == 0) {
 		// only tiles
 		for(var y = tileY1; y <= tileY2; y++) {
@@ -4311,45 +4310,29 @@ function protectSelectionStart(start, end, width, height) {
 		if(charY1) ty1++;
 		if(charX2 < 15) tx2--;
 		if(charY2 < 7) ty2--;
-		// full tiles
-		for(var y = ty1; y <= ty2; y++) {
-			for(var x = tx1; x <= tx2; x++) {
-				tileList.push([x, y]);
-				autoTotal++;
-			}
-		}
-		var tw = tx2 - tx1 + 1;
-		var th = ty2 - ty1 + 1;
 
-		var tx = tileX1;
-		var ty = tileY1;
-		var cx = charX1;
-		var cy = charY1;
-		for(var y = 0; y < height; y++) {
-			for(var x = 0; x < width; x++) {
-				// skip over gap
-				if(tw && ty >= ty1 && ty <= ty2 && tx >= tx1 && tx <= tx2) {
-					tx = tx2 + 1;
-					x += tw * tileC - 1;
-					continue;
-				}
-				var pos = ty + "," + tx;
-				if(!charList[pos]) charList[pos] = [];
-				charList[pos].push([cx, cy]);
-				autoTotal++;
-				cx++;
-				if(cx >= tileC) {
-					cx = 0;
-					tx++;
+		for(var y = tileY1; y <= tileY2; y++) {
+			for(var x = tileX1; x <= tileX2; x++) {
+				var leftEdge = x == tileX1 && charX1 > 0;
+				var topEdge = y == tileY1 && charY1 > 0;
+				var rightEdge = x == tileX2 && charX2 < (tileC - 1);
+				var bottomEdge = y == tileY2 && charY2 < (tileR - 1);
+				var cx1 = 0;
+				var cy1 = 0;
+				var cx2 = tileC - 1;
+				var cy2 = tileR - 1;
+				if(leftEdge || topEdge || rightEdge || bottomEdge) {
+					if(leftEdge) cx1 = charX1;
+					if(topEdge) cy1 = charY1;
+					if(rightEdge) cx2 = charX2;
+					if(bottomEdge) cy2 = charY2;
+					tileList.push([x, y, [cx1, cy1, cx2 - cx1 + 1, cy2 - cy1 + 1]]);
+					autoTotal++;
+				} else {
+					tileList.push([x, y]);
+					autoTotal++;
 				}
 			}
-			cy++;
-			if(cy >= tileR) {
-				cy = 0;
-				ty++;
-			}
-			tx = tileX1;
-			cx = charX1;
 		}
 	}
 
@@ -4362,36 +4345,6 @@ function protectSelectionStart(start, end, width, height) {
 	}
 
 	updateAutoProg();
-	var keys = Object.keys(charList);
-	var keyIdx = -1;
-	var keyPos = [];
-	var itemIdx = 0;
-	// character-precision
-	var cprot = setInterval(function() {
-		var list = charList[keys[keyIdx]];
-		if(keyIdx == -1 || itemIdx >= list.length) {
-			itemIdx = 0;
-			keyIdx++;
-			if(keyIdx >= keys.length) {
-				clearInterval(cprot);
-				return;
-			}
-			keyPos = keys[keyIdx].split(",").reverse().map(Number);
-			return;
-		}
-		var item = list[itemIdx];
-		var tileX = keyPos[0];
-		var tileY = keyPos[1];
-		var charX = item[0];
-		var charY = item[1];
-		network.protect({
-			tileX: tileX, tileY: tileY,
-			charX: charX, charY: charY
-		}, protType);
-		autoTotal--;
-		updateAutoProg();
-		itemIdx++;
-	}, 1000 / 270);
 
 	// full tiles
 	var tidx = 0;
@@ -4403,10 +4356,22 @@ function protectSelectionStart(start, end, width, height) {
 		var pos = tileList[tidx];
 		var tileX = pos[0];
 		var tileY = pos[1];
-		network.protect({
-			tileX: tileX,
-			tileY: tileY
-		}, protType);
+		var charRange = pos[2];
+		if(charRange) {
+			network.protect({
+				tileX: tileX,
+				tileY: tileY,
+				charX: charRange[0],
+				charY: charRange[1],
+				charWidth: charRange[2],
+				charHeight: charRange[3]
+			}, protType);
+		} else {
+			network.protect({
+				tileX: tileX,
+				tileY: tileY
+			}, protType);
+		}
 		tidx++;
 		autoTotal--;
 		updateAutoProg();
@@ -4905,7 +4870,7 @@ var network = {
 		}
 	},
 	protect: function(position, type) {
-		// position: {tileX, tileY, [charX, charY]}
+		// position: {tileX, tileY, [charX, charY, [width, height]]]}
 		// type: <unprotect, public, member-only, owner-only>
 		var isPrecise = "charX" in position && "charY" in position;
 		var data = {
@@ -4921,6 +4886,10 @@ var network = {
 				data.tileY = Math.floor(data.charY / tileR);
 				data.charX = data.charX - Math.floor(data.charX / tileC) * tileC;
 				data.charY = data.charY - Math.floor(data.charY / tileR) * tileR;
+			}
+			if("charWidth" in position && "charHeight" in position) {
+				data.charWidth = position.charWidth;
+				data.charHeight = position.charHeight;
 			}
 			data.precise = true;
 		}

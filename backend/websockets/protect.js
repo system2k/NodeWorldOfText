@@ -9,6 +9,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var tileY = sData.tileY;
 	var charX = sData.charX;
 	var charY = sData.charY;
+	var charWidth = sData.charWidth;
+	var charHeight = sData.charHeight;
 	var precise = sData.precise;
 	var type = sData.type;
 
@@ -16,6 +18,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		action,
 		tileX, tileY,
 		charX, charY,
+		charWidth, charHeight,
 		precise,
 		type
 	}, server, {
