@@ -258,6 +258,9 @@ a:visited {
 	padding: 2px;
 	contain: strict;
 }
+.chatfield > div {
+	overflow: hidden;
+}
 .unread_bar {
 	background-color: red;
 	width: 100%;
