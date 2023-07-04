@@ -472,7 +472,7 @@ function setupZipLog() {
 		var file = fs.readFileSync(settings.paths.log);
 		if(file.length > 0) {
 			var log_data = fs.readFileSync(settings.paths.log);
-			zip_file.addFile("NWOT_LOG_" + Date.now() + ".txt", log_data, "", 0644);
+			zip_file.addFile("NWOT_LOG_" + Date.now() + ".txt", log_data, "", 0o644);
 			fs.truncateSync(settings.paths.log);
 		}
 	}
