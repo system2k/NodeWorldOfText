@@ -220,6 +220,8 @@ a:visited {
 #usr_online {
 	padding-left: 16px;
 	display: inline-block;
+	cursor: default;
+	user-select: none;
 }
 #chatsend {
 	padding: 1px 6px 1px 6px;

@@ -39,7 +39,8 @@ defineElements({ // elm[<name>]
 	usr_online: byId("usr_online"),
 	total_unread: byId("total_unread"),
 	page_unread: byId("page_unread"),
-	global_unread: byId("global_unread")
+	global_unread: byId("global_unread"),
+	chat_upper: byId("chat_upper")
 });
 
 if(Permissions.can_chat(state.userModel, state.worldModel)) {
@@ -67,7 +68,8 @@ if(!canChat) {
 if(state.worldModel.no_chat_global) {
 	elm.chat_page_tab.style.display = "none";
 	elm.chat_global_tab.style.display = "none";
-	elm.usr_online.style.paddingLeft = "5px";
+	elm.usr_online.style.paddingLeft = "0px";
+	elm.chat_upper.style.textAlign = "center";
 }
 
 function api_chat_send(message, opts) {
