@@ -61,7 +61,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 			charRate: world.opts.charRate,
 			writeInt: world.opts.writeInt,
 			desc: world.opts.desc,
-			noGlobalChat: world.opts.noGlobalChat
+			noChatGlobal: world.opts.noChatGlobal
 		},
 		background: {
 			url: world.background.url,
