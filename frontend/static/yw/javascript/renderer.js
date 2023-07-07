@@ -1110,7 +1110,7 @@ function drawTile(tileX, tileY) {
 	var clampH = Math.floor(clamp[1]) - offsetY;
 
 	if(transparentBackground) {
-		textRenderCtx.clearRect(0, 0, textRenderCanvas.width, textRenderCanvas.width);
+		textRenderCtx.clearRect(0, 0, textRenderCanvas.width, textRenderCanvas.height);
 	} else {
 		var cursorVisibility = cursorRenderingEnabled && cursorCoords && cursorCoords[0] == tileX && cursorCoords[1] == tileY;
 		var dBack = renderTileBackground(textRenderCtx, 0, 0, tile, tileX, tileY, cursorVisibility);
