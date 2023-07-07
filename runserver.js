@@ -2185,6 +2185,7 @@ function ws_broadcast(data, world_id, opts) {
 			// world_id is optional - setting it to undefined will broadcast to all clients
 			if(world_id == void 0 || client.sdata.world.id == world_id) {
 				if(opts.isChat) {
+					if(client.sdata.world.opts.noChatGlobal && opts.location == "global") return;
 					var isOwner = client.sdata.world.ownerId == client.sdata.user.id;
 					var isMember = !!client.sdata.world.members.map[client.sdata.user.id];
 					var chatPerm = client.sdata.world.feature.chat;

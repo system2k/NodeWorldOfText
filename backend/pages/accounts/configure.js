@@ -228,6 +228,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		page_is_nsfw: world.opts.nsfw,
 		square_chars,
 		no_log_edits: world.opts.noLogEdits,
+		no_chat_global: world.opts.noChatGlobal,
 		half_chars,
 		mixed_chars,
 
@@ -589,6 +590,12 @@ module.exports.POST = async function(req, write, server, ctx) {
 			modifyWorldProp(world, "opts/noLogEdits", true);
 		} else {
 			modifyWorldProp(world, "opts/noLogEdits", false);
+		}
+
+		if(post_data.no_chat_global == "on") {
+			modifyWorldProp(world, "opts/noChatGlobal", true);
+		} else {
+			modifyWorldProp(world, "opts/noChatGlobal", false);
 		}
 
 		if("ratelim_val" in post_data && "ratelim_per" in post_data) {

@@ -120,7 +120,8 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 				color_cell: world.feature.colorCell,
 				show_cursor: world.feature.showCursor,
 				char_rate: char_rate,
-				write_interval: write_int
+				write_interval: write_int,
+				no_chat_global: world.opts.noChatGlobal
 			}
 		};
 		if(CONST.tileRows != 8) {

@@ -864,6 +864,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var chatOpts = {
 		// Global and Page updates should not appear in worlds with chat disabled
 		isChat: true,
+		location,
 		clientId,
 		username: user.authenticated ? username_to_display.toUpperCase() : null
 	};

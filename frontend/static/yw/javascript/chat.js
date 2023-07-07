@@ -64,6 +64,12 @@ if(!canChat) {
 	elm.chat_open.style.display = "";
 }
 
+if(state.worldModel.no_chat_global) {
+	elm.chat_page_tab.style.display = "none";
+	elm.chat_global_tab.style.display = "none";
+	elm.usr_online.style.paddingLeft = "5px";
+}
+
 function api_chat_send(message, opts) {
 	if(!message) return;
 	if(!opts) opts = {};
@@ -241,7 +247,7 @@ function event_on_chat(data) {
 	if((!chatOpen || selectedChatTab == 1) && data.location == "page") {
 		chatPageUnread++;
 	}
-	if((!chatOpen || selectedChatTab == 0) && data.location == "global") {
+	if((!chatOpen || selectedChatTab == 0) && data.location == "global" && !state.worldModel.no_chat_global) {
 		chatGlobalUnread++;
 	}
 	updateUnread();

@@ -71,6 +71,7 @@ var world_default_props = {
 	page_is_nsfw: false,
 	square_chars: false,
 	no_log_edits: false,
+	no_chat_global: false,
 	half_chars: false,
 	char_rate: "",
 	mem_key: "",
@@ -186,6 +187,7 @@ function makeWorldObject() {
 			nsfw: false,
 			squareChars: false,
 			noLogEdits: false,
+			noChatGlobal: false,
 			halfChars: false,
 			charRate: "",
 			writeInt: 0,
@@ -280,6 +282,7 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.opts.nsfw = getAndProcWorldProp(wprops, "page_is_nsfw");
 	wobj.opts.squareChars = getAndProcWorldProp(wprops, "square_chars");
 	wobj.opts.noLogEdits = getAndProcWorldProp(wprops, "no_log_edits");
+	wobj.opts.noChatGlobal = getAndProcWorldProp(wprops, "no_chat_global");
 	wobj.opts.halfChars = getAndProcWorldProp(wprops, "half_chars");
 	wobj.opts.charRate = getAndProcWorldProp(wprops, "char_rate");
 	wobj.opts.memKey = getAndProcWorldProp(wprops, "mem_key");
@@ -433,6 +436,7 @@ async function commitWorld(world) {
 		"opts/nsfw",
 		"opts/squareChars",
 		"opts/noLogEdits",
+		"opts/noChatGlobal",
 		"opts/halfChars",
 		"opts/charRate",
 		"opts/memKey",
@@ -462,6 +466,7 @@ async function commitWorld(world) {
 		page_is_nsfw: world.opts.nsfw,
 		square_chars: world.opts.squareChars,
 		no_log_edits: world.opts.noLogEdits,
+		no_chat_global: world.opts.noChatGlobal,
 		half_chars: world.opts.halfChars,
 		char_rate: world.opts.charRate,
 		mem_key: world.opts.memKey,
