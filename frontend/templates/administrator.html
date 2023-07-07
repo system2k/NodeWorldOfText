@@ -296,23 +296,6 @@
 	</div>
 
 	<div class="content_set">
-		<div class="content_set_title">ACME Verification</div>
-		<div class="content_set_content">
-			{% if acme_update_msg %}
-			<span style="font-size:80%"><i>{{ acme_update_msg }}</i></span>
-			{% endif %}
-			<form method="POST" action=".">
-				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
-				ACME Enabled: {{ acme_enabled }}<br>
-				ACME Password:
-				<input type="text" name="set_acme_pass" id="set_acme_pass" value="{{ acme_pass }}" style="width: 100%;">
-				<input type="submit" value="Enable ACME" name="acme_enable">
-				<input type="submit" value="Disable ACME" name="acme_disable">
-			</form>
-		</div>
-	</div>
-
-	<div class="content_set">
 		<div class="content_set_title">Server Uptime</div>
 		<div class="content_set_content">
 			<span>{{ uptime }}</span>

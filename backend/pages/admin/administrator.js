@@ -13,7 +13,6 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var db_misc = server.db_misc;
 	var uvias = server.uvias;
 	var accountSystem = server.accountSystem;
-	var acme = server.acme;
 	var createCSRF = server.createCSRF;
 	var getClientVersion = server.getClientVersion;
 
@@ -80,13 +79,10 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		announcement: loadString("announcement"),
 		announcement_update_msg: params.announcement_update_msg,
 		cons_update_msg: params.cons_update_msg,
-		acme_update_msg: params.acme_update_msg,
 		uptime: uptime(),
 		machine_uptime: uptime(process.hrtime()[0] * 1000),
 		client_num,
 		custom_ranks,
-		acme_enabled: acme.enabled,
-		acme_pass: acme.enabled ? (acme.pass ? acme.pass : "") : "",
 		client_version: getClientVersion(),
 		csrftoken
 	};
@@ -104,7 +100,6 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var db_misc = server.db_misc;
 	var db_edits = server.db_edits;
 	var stopServer = server.stopServer;
-	var acme = server.acme;
 	var checkCSRF = server.checkCSRF;
 	var setClientVersion = server.setClientVersion;
 
@@ -117,26 +112,6 @@ module.exports.POST = async function(req, write, server, ctx) {
 		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
-	if("set_acme_pass" in post_data) {
-		var new_acme_pass = post_data.set_acme_pass;
-		var acme_update_msg = "";
-		if(post_data.acme_enable) {
-			if(typeof new_acme_pass == "string" && new_acme_pass.length >= 1) {
-				acme.pass = new_acme_pass;
-				acme.enabled = true;
-				acme_update_msg = "Updated ACME password and enabled ACME";
-			} else {
-				acme_update_msg = "Invalid ACME password";
-			}
-		} else if(post_data.acme_disable) {
-			acme.pass = null;
-			acme.enabled = false;
-			acme_update_msg = "ACME disabled";
-		}
-		return await callPage("admin/administrator", {
-			acme_update_msg
-		}, req, write, server, ctx);
-	}
 	if("set_cli_version" in post_data) {
 		var new_cli_version = post_data.set_cli_version;
 		if(setClientVersion(new_cli_version)) {
