@@ -660,7 +660,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			return serverChatResponse(idstr, location);
 		},
 		stats: function() {
-			if(world.name != "" && world.name.toLowerCase() != "main" && world.name.toLowerCase() != "owot" && !is_owner && !user.superuser) return;
 			var stat = "Stats for world<br>";
 			stat += "Creation date: " + html_tag_esc(create_date(world.creationDate)) + "<br>";
 			stat += "View count: " + html_tag_esc(world.views);
