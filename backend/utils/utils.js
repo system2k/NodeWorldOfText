@@ -235,60 +235,39 @@ function tile_coord(coord) {
 
 // todo: move to server
 var start_time = Date.now();
-var _time_ago = ["millisecond", "second", "minute", "hour", "day", "month", "year"];
 function uptime(custom_ms_ago) {
 	// (milliseconds ago)
 	var difference = custom_ms_ago || (Date.now() - start_time);
-	var milliseconds_ago = difference;
-	var _data = _time_ago[0];
-	var show_minutes = true; // EG: ... and 20 minutes
-	var divided = 1;
-	if(milliseconds_ago >= 30067200000) {
-		_data = _time_ago[6];
-		divided = 30067200000;
-		milliseconds_ago = Math.floor(milliseconds_ago / divided);
-	} else if(milliseconds_ago >= 2505600000) {
-		_data = _time_ago[5];
-		divided = 2505600000;
-		milliseconds_ago = Math.floor(milliseconds_ago / divided);
-	} else if(milliseconds_ago >= 86400000) {
-		_data = _time_ago[4];
-		divided = 86400000;
-		milliseconds_ago = Math.floor(milliseconds_ago / divided);
-	} else if(milliseconds_ago >= 3600000) {
-		_data = _time_ago[3];
-		divided = 3600000;
-		milliseconds_ago = Math.floor(milliseconds_ago / divided);
-	} else if(milliseconds_ago >= 60000) {
-		_data = _time_ago[2];
-		divided = 60000;
-		show_minutes = false;
-		milliseconds_ago = Math.floor(milliseconds_ago / divided);
-	} else if(milliseconds_ago >= 1000) {
-		_data = _time_ago[1];
-		divided = 1000;
-		show_minutes = false;
-		milliseconds_ago = Math.floor(milliseconds_ago / divided);
-	} else {
-		show_minutes = false;
+
+	var str = "";
+
+	var days = Math.floor(difference / 86400000);
+	difference -= days * 86400000;
+	var hours = Math.floor(difference / 3600000);
+	difference -= hours * 3600000;
+	var minutes = Math.floor(difference / 60000);
+	difference -= minutes * 60000;
+	var seconds = Math.floor(difference / 1000);
+	difference -= seconds * 1000;
+
+	if(days > 0) {
+		if(str) str += ", ";
+		str += days + " day" + (days != 1 ? "s" : "");
 	}
-	if(milliseconds_ago !== 1) {
-		_data += "s";
+	if(hours > 0) {
+		if(str) str += ", ";
+		str += hours + " hour" + (hours != 1 ? "s" : "");
 	}
-	var extra = "";
-	if(show_minutes) {
-		var t_difference = difference;
-		t_difference -= divided;
-		if(t_difference > 0) {
-			t_difference %= divided;
-			t_difference = Math.floor(t_difference / 60000);
-			if(t_difference > 0) {
-				extra = " and " + t_difference + " minute";
-				if(t_difference != 1) extra += "s";
-			}
-		}
+	if(minutes > 0) {
+		if(str) str += ", ";
+		str += minutes + " minute" + (minutes != 1 ? "s" : "");
 	}
-	return milliseconds_ago + " " + _data + extra;
+	if(seconds > 0) {
+		if(str) str += ", ";
+		str += seconds + " second" + (seconds != 1 ? "s" : "");
+	}
+
+	return str;
 }
 
 // recursive directory dumper
