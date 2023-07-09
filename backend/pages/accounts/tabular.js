@@ -31,7 +31,8 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 			members: member_total,
 			name: world.name,
 			views,
-			created: world.creationDate
+			created: world.creationDate,
+			claimed: world.ownershipChangeDate
 		});
 	}
 

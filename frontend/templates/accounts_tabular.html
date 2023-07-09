@@ -59,6 +59,10 @@
 					Creation Date
 					<img src="/static/sort_arrows.png" class="table_sort_arrows" id="sort_created">
 				</th>
+				<th>
+					Claim Date
+					<img src="/static/sort_arrows.png" class="table_sort_arrows" id="sort_claimed">
+				</th>
 			</tr>
 		</tbody>
 	</table>
@@ -70,7 +74,7 @@
 	var rowNum = 0;
 	var rows = {};
 	var sortData = [];
-	function addRow(name, write, read, members, views, created) {
+	function addRow(name, write, read, members, views, created, claimed) {
 		var row = document.createElement("tr");
 		var col_name = document.createElement("td");
 		var col_write = document.createElement("td");
@@ -78,12 +82,14 @@
 		var col_members = document.createElement("td");
 		var col_views = document.createElement("td");
 		var col_created = document.createElement("td");
+		var col_claimed = document.createElement("td");
 		col_name.innerText = name;
 		col_write.innerText = write;
 		col_read.innerText = read;
 		col_members.innerText = members;
 		col_views.innerText = views;
 		col_created.innerText = format_date(created);
+		col_claimed.innerText = format_date(claimed);
 		col_name.className = "table_worldname";
 		row.id = "row_num_" + rowNum;
 		rows[rowNum] = {
@@ -93,7 +99,8 @@
 			read: read,
 			members: members,
 			views: views,
-			created: created
+			created: created,
+			claimed: claimed
 		};
 		sortData.push(rows[rowNum]);
 		rowNum++;
@@ -103,6 +110,7 @@
 		row.appendChild(col_members);
 		row.appendChild(col_views);
 		row.appendChild(col_created);
+		row.appendChild(col_claimed);
 		worlds.appendChild(row);
 	}
 
@@ -112,7 +120,8 @@
 		read: 0,
 		members: 0,
 		views: 0,
-		created: 0
+		created: 0,
+		claimed: 0
 	};
 
 	function doSort(mode) {
@@ -149,6 +158,7 @@
 
 	var months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 	function format_date(time) {
+		if(time == 0) return "N/A";
 		var date = new Date(time);
 		var offsetStr = date.getTimezoneOffset() / 60;
 		if(offsetStr < 0) {
@@ -217,7 +227,11 @@
 		doSort("created");
 	}
 
-	{% for world in worlds_owned %}addRow("{{world.name}}", {{world.writability}}, {{world.readability}}, {{world.members}}, {{world.views}}, {{world.created}});
+	sort_claimed.onclick = function() {
+		doSort("claimed");
+	}
+
+	{% for world in worlds_owned %}addRow("{{world.name}}", {{world.writability}}, {{world.readability}}, {{world.members}}, {{world.views}}, {{world.created}}, {{world.claimed}});
 	{% endfor %}
 </script>
 {% endblock %}
