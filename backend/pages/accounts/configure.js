@@ -334,7 +334,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 			}, req, write, server, ctx);
 		}
 
-		if(world.members.map.length >= 3000) {
+		if(Object.keys(world.members.map).length >= 3000) {
 			return await callPage("accounts/configure", {
 				message: "There are too many members on this world"
 			}, req, write, server, ctx);
