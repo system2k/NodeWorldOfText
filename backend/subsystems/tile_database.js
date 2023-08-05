@@ -602,7 +602,6 @@ function tileWriteEdits(callID, tile, options, editData) {
 			rejected[editID] = enums.write.noWritePerm;
 		} else {
 			accepted.push(editID);
-			sharedData.updatedTiles[tileY + "," + tileX] = tile;
 			if(charUpdated && !no_log_edits) {
 				var ar = [tileY, tileX, charY, charX, 0, char, editID];
 				if(color) ar.push(color);
@@ -614,6 +613,7 @@ function tileWriteEdits(callID, tile, options, editData) {
 			}
 			if(charUpdated) {
 				tile.last_accessed = Date.now();
+				sharedData.updatedTiles[tileY + "," + tileX] = tile;
 			}
 		}
 	}
