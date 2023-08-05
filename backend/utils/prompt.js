@@ -3,6 +3,7 @@ var Writable = require("stream").Writable;
 
 var passMode = false;
 var isAsking = false;
+var lastPassInputSize = 0;
 
 var output = new Writable({
 	write: function(chunk, encoding, callback) {
@@ -13,8 +14,6 @@ var output = new Writable({
 				var chr = str[i];
 				if(chr == "\n" || chr == "\r") {
 					res += chr;
-				} else {
-					res += "*";
 				}
 			}
 			process.stdout.write(res);
@@ -31,6 +30,15 @@ var interface = readline.createInterface({
 	terminal: true
 });
 
+interface.input.on("keypress", function () {
+	if(passMode) {
+		readline.moveCursor(process.stdout, -(lastPassInputSize), 0);
+		readline.clearLine(process.stdout, 1);
+		lastPassInputSize = interface.line.length;
+		process.stdout.write("*".repeat(interface.line.length));
+	}
+});
+
 interface.on("SIGINT", function() {
 	process.emit("SIGINT");
 });
@@ -42,6 +50,7 @@ async function ask(question, isPassword) {
 		interface.question(question, function(data) {
 			isAsking = false;
 			passMode = false;
+			lastPassInputSize = 0;
 			res(data);
 		});
 		passMode = Boolean(isPassword);
