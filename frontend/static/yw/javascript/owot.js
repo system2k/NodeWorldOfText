@@ -2505,6 +2505,9 @@ function textcode_parser(value, coords, defaultColor, defaultBgColor) {
 				if(hCode == "x") {
 					cCol = "000000";
 					pasteBgColor = -1;
+					if(defaultBgColor != void 0) {
+						pasteBgColor = defaultBgColor;
+					}
 					index += 2;
 				} else { // we use 'F' now, which indicates a length of 6.
 					var code = hex.indexOf(hCode);
