@@ -1,6 +1,6 @@
 var world_mgr = require("../subsystems/world_mgr.js");
 var releaseWorld = world_mgr.releaseWorld;
-var getOrCreateWorld = world_mgr.getOrCreateWorld;
+var getWorld = world_mgr.getWorld;
 var canViewWorld = world_mgr.canViewWorld;
 
 module.exports.GET = async function(req, write, server, ctx) {
@@ -9,7 +9,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 	var setCallback = ctx.setCallback;
 	
 	if(typeof query_data.world != "string") return write(null, 400);
-	var world = await getOrCreateWorld(query_data.world);
+	var world = await getWorld(query_data.world);
 	if(!world) {
 		return write(null, 404);
 	}
