@@ -1,4 +1,0 @@
-Binary Format
-
-JSON takes time to parse and serialize. it may also create big packets and slow down requests.
-this format will encode packets in a way that reduces the size significantly and doesn't cause a load.

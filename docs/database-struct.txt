@@ -1,19 +1,8 @@
-The "properties" column of the "world" table is as follows:
-{
-    views: number,
-    chat_permission: number,
-    color_text: number,
-    custom_menu_color: string,
-    page_is_nsfw: bool,
-    square_chars: bool,
-    no_log_edits: bool,
-    half_chars: bool,
-    background: string,
-    background_x: number,
-    background_y: number,
-    background_w: number,
-    background_h: number,
-    background_rmod: number,
-    background_alpha: number,
-    meta_desc: string
-}
+OWOT uses Sqlite3 to store data. Sqlite3 stores data in a single file for every database.
+
+OWOT utilizes the following databases:
+nwot.sqlite : The primary database used for storing accounts, sessions, registration tokens, worlds, members, scripts, old edits, and tiles.
+edits.sqlite : The primary database for logging all new edits, whether for restoring worlds or saving history.
+chat_history.sqlite : The primary database for storing all chats.
+images.sqlite : Stores uploaded images, primarily for use as backgrounds.
+misc.sqlite : Used as an extension for the primary database to avoid having to migrate the database. Currently stores ranks and custom ranks.

@@ -1,8 +1,0 @@
-Custom Roles Feature
-
-There exist 3 states for users - Public, Member, Owner
-In order for a user to have a role, it must be a member of a world.
-Configurations on the world config page override all settings.
-Custom permissions can be set to each role, including managing roles, managing world, etc.
-Tile protections can be set to only one role type. Properties can be managed, such as who can type.
-Precise char requires special encoding for roles.
