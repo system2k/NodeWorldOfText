@@ -1455,6 +1455,11 @@ Tile.visible = function(tileX, tileY) {
 	return true;
 }
 
+function isTileStale(tileX, tileY) {
+	var tile = Tile.get(tileX, tileY);
+	return tile ? !!tile.stale : false;
+}
+
 var poolCleanupInterval = setInterval(function() {
 	if(w.periodDeletedTiles < 50) return;
 	w.periodDeletedTiles = 0;
@@ -3756,6 +3761,21 @@ function updateRemoteBoundary() {
 	remoteBoundary.maxY = y2;
 
 	network.boundary(centerX, centerY, x1, y1, x2, y2);
+
+	// (!) has possible performance penalties, but testing shows it's not an issue in most cases.
+	// optimization solutions are too complicated for now.
+	for(var i in tiles) {
+		var pos = getPos(i);
+		var tileX = pos[1];
+		var tileY = pos[0];
+		var tile = tiles[i];
+		if(!tile) continue;
+
+		var dist = (centerX - tileX) ** 2 + (centerY - tileY) ** 2;
+		if(dist > 128 * 128) {
+			tile.stale = true;
+		}
+	}
 }
 
 function clearRemoteBoundary() {
@@ -3789,7 +3809,7 @@ function getAndFetchTiles() {
 	var map = [];
 	for(var y = startY; y <= endY; y++) {
 		for(var x = startX; x <= endX; x++) {
-			map.push(Tile.exists(x, y));
+			map.push(Tile.exists(x, y) && !isTileStale(x, y));
 		}
 	}
 	var ranges = cullRanges(map, viewWidth, viewHeight);
