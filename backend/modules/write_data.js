@@ -128,6 +128,13 @@ module.exports = async function(data, server, params) {
 		}
 	}
 
+	var auto_text_prot = world.opts.autoTextProt;
+	if(auto_text_prot) {
+		auto_text_prot = auto_text_prot.split(";").map(Number);
+	} else {
+		auto_text_prot = null;
+	}
+
 	var httpWriteDenied = isHTTP && rate_limiter.checkHTTPWriteRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name);
 
 	var totalEdits = 0;
@@ -258,6 +265,7 @@ module.exports = async function(data, server, params) {
 		user, world, is_owner, is_member,
 		can_color_text, can_color_cell,
 		public_only, no_log_edits, preserve_links,
+		auto_text_prot,
 		channel,
 		rejected
 	});

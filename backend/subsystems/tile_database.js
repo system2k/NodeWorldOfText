@@ -580,6 +580,7 @@ function tileWriteEdits(callID, tile, options, editData) {
 	var can_color_text = options.can_color_text;
 	var can_color_cell = options.can_color_cell;
 	var no_log_edits = options.no_log_edits;
+	var auto_text_prot = options.auto_text_prot;
 
 	var is_owner = options.is_owner;
 	var is_member = options.is_member;
@@ -615,9 +616,69 @@ function tileWriteEdits(callID, tile, options, editData) {
 				tile.last_accessed = Date.now();
 				sharedData.updatedTiles[tileY + "," + tileX] = tile;
 			}
+			if(auto_text_prot) {
+				var areaType = auto_text_prot[0];
+				var minutesSched = auto_text_prot[1];
+				scheduleCharProtection(world, tile, tileX, tileY, charX, charY, char, areaType, minutesSched);
+			}
 		}
 	}
 	IOProgress(callID);
+}
+
+function createBitfield(len) {
+	return new Uint8Array(Math.ceil(len / 8));
+}
+function bitfieldSet(bitfield, pos) {
+	bitfield[pos >> 3] |= 1 << (pos & 7);
+}
+function bitfieldClear(bitfield, pos) {
+	bitfield[pos >> 3] &= 255 - (1 << (pos & 7));
+}
+function bitfieldGet(bitfield, pos) {
+	return bitfield[pos >> 3] >> (pos & 7) & 1;
+}
+
+charSched = {};
+function scheduleCharProtection(world, tile, tileX, tileY, charX, charY, char, areaType, minutesSched) {
+	//console.log(world, tile, charX, charY, char, areaType, minutesSched)
+	var worldID = world.id;
+	if(!charSched[worldID]) {
+		charSched[worldID] = {};
+	}
+	if(!charSched[worldID][tileY + "," + tileX]) {
+		charSched[worldID][tileY + "," + tileX] = {
+			char: createBitfield(CONST.tileArea),
+			space: createBitfield(CONST.tileArea)
+		};
+	}
+	var tileSched = charSched[worldID][tileY + "," + tileX];
+	var idx = charY * CONST.tileCols + charX;
+	if(char == " ") {
+		bitfieldSet(tileSched.space, idx);
+	} else {
+		bitfieldSet(tileSched.char, idx);
+	}
+}
+
+charSchedSweep = async function() {
+	for(let wid in charSched) {
+		for(let tpos in charSched[wid]) {
+			let tile = charSched[wid][tpos];
+			let pos = tpos.split(",");
+			let tileX = parseInt(pos[1]);
+			let tileY = parseInt(pos[0]);
+			for(let i = 0; i < CONST.tileArea; i++) {
+				let charX = i % CONST.tileCols;
+				let charY = Math.floor(i / CONST.tileCols);
+				let charStat = bitfieldGet(tile.char, i);
+				let spaceStat = bitfieldGet(tile.space, i);
+				if(charStat) {
+					console.log("Protect", wid, tileX, tileY, charX, charY)
+				}
+			}
+		}
+	}
 }
 
 function tileWriteLinks(callID, tile, options) {
