@@ -84,6 +84,7 @@ var world_default_props = {
 	background_alpha: 1,
 	meta_desc: "",
 	priv_note: "",
+	auto_text_prot: "",
 	write_int: -1,
 	ownership_change_date: 0
 };
@@ -190,6 +191,7 @@ function makeWorldObject() {
 			noChatGlobal: false,
 			halfChars: false,
 			charRate: "",
+			autoTextProt: "",
 			writeInt: 0,
 			memKey: "",
 			privNote: "",
@@ -285,6 +287,7 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.opts.noChatGlobal = getAndProcWorldProp(wprops, "no_chat_global");
 	wobj.opts.halfChars = getAndProcWorldProp(wprops, "half_chars");
 	wobj.opts.charRate = getAndProcWorldProp(wprops, "char_rate");
+	wobj.opts.autoTextProt = getAndProcWorldProp(wprops, "auto_text_prot");
 	wobj.opts.memKey = getAndProcWorldProp(wprops, "mem_key");
 	wobj.opts.desc = getAndProcWorldProp(wprops, "meta_desc");
 	wobj.opts.privNote = getAndProcWorldProp(wprops, "priv_note");
@@ -439,6 +442,7 @@ async function commitWorld(world) {
 		"opts/noChatGlobal",
 		"opts/halfChars",
 		"opts/charRate",
+		"opts/autoTextProt",
 		"opts/memKey",
 		"opts/desc",
 		"opts/privNote",
@@ -469,6 +473,7 @@ async function commitWorld(world) {
 		no_chat_global: world.opts.noChatGlobal,
 		half_chars: world.opts.halfChars,
 		char_rate: world.opts.charRate,
+		auto_text_prot: world.opts.autoTextProt,
 		mem_key: world.opts.memKey,
 		meta_desc: world.opts.desc,
 		priv_note: world.opts.privNote,

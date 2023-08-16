@@ -167,6 +167,12 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		ratelim_val = ratelim_raw[0];
 		ratelim_per = ratelim_raw[1];
 	}
+
+	var atp_val = 0;
+	if(world.opts.autoTextProt) {
+		atp_val = world.opts.autoTextProt.split(";").map(Number); // "area_type;minutes"
+		atp_val = atp_val[1];
+	}
 	
 	var write_int = world.opts.writeInt;
 	if(write_int == -1) {
@@ -237,6 +243,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		is_memkey_enabled,
 		memkey_value: world.opts.memKey,
 		writeinterval_val: write_int,
+		atp_val,
 
 		background_path: world.background.url,
 		background_x: world.background.x,
@@ -625,6 +632,19 @@ module.exports.POST = async function(req, write, server, ctx) {
 					charrateUpdated = true;
 					newCharrate = [ratelim_val, ratelim_per];
 				}
+			}
+		}
+
+		if("atp_val" in post_data) {
+			var atp_val = san_nbr(post_data.atp_val);
+			if(atp_val < 0) atp_val = 0;
+			if(atp_val > 60 * 3) atp_val = 60 * 3;
+			var areaType = 2; // owner
+			var minutes = atp_val;
+			if(minutes == 0) {
+				modifyWorldProp(world, "opts/autoTextProt", "");
+			} else {
+				modifyWorldProp(world, "opts/autoTextProt", areaType + ";" + minutes);
 			}
 		}
 

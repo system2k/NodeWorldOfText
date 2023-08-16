@@ -14,12 +14,17 @@
 	var rl_512; // 512 chars/sec
 	var rl_32; // 32 chars/sec
 	var rl_x; // custom (the actual form input)
+	// automatic text protection toggles
+	var atp_off;
+	var atp_x;
 	window.onload = function() {
 		var miscform = document.getElementById("miscform");
 		rl_0 = document.getElementById("rl_0");
 		rl_512 = document.getElementById("rl_512");
 		rl_32 = document.getElementById("rl_32");
 		rl_x = document.getElementById("rl_x");
+		atp_off = document.getElementById("atp_off");
+		atp_x = document.getElementById("atp_x");
 
 		unclaim.onclick = function() { actionMethod = "unclaim" };
 		clear_public.onclick = function() { actionMethod = "clear_public" };
@@ -46,13 +51,19 @@
 		rl_x.onclick = updateRatelimBox;
 		updateRatelimBox();
 
+		atp_off.onclick = updateATPBox;
+		atp_x.onclick = updateATPBox;
+		updateATPBox();
+
 		miscform.onsubmit = function() {
 			var writeint = document.getElementById("writeinterval_val");
 			var ratelimVal = document.getElementById("ratelim_val");
 			var ratelimPer = document.getElementById("ratelim_per");
+			var atpVal = document.getElementById("atp_val");
 			writeint.disabled = false;
 			ratelimVal.disabled = false;
 			ratelimPer.disabled = false;
+			atpVal.disabled = false;
 		}
 	}
 	function action_confirm() {
@@ -87,7 +98,7 @@
 		var ratelimVal = document.getElementById("ratelim_val");
 		var ratelimPer = document.getElementById("ratelim_per");
 
-		if(!e) {
+		if(!e) { // initialize
 			if(ratelimVal.value == "0" && ratelimPer.value == "0") {
 				rl_0.checked = true;
 			} else if(ratelimVal.value == "512" && ratelimPer.value == "1000") {
@@ -122,6 +133,33 @@
 		} else {
 			ratelimVal.disabled = false;
 			ratelimPer.disabled = false;
+		}
+	}
+
+	function updateATPBox(e) {
+		var atpVal = document.getElementById("atp_val");
+
+		if(!e) { // initialize
+			if(atpVal.value == "0") {
+				atp_off.checked = true;
+			} else {
+				atp_x.checked = true;
+			}
+		} else {
+			var type = e.target.value;
+			if(type == "off") {
+				atpVal.value = "0";
+			} else if(type == "custom") {
+				if(atpVal.value == "0") {
+					atpVal.value = "30";
+				}
+			}
+		}
+
+		if(!atp_x.checked) {
+			atpVal.disabled = true;
+		} else {
+			atpVal.disabled = false;
 		}
 	}
 
@@ -582,6 +620,19 @@
 							per
 							<input id="ratelim_per" name="ratelim_per" value="{{ratelim_per}}" style="width: 60px;">
 							ms 
+						</div>
+					</div>
+					<div>
+						<b>Automatic text protection</b>
+						<div>
+							<input type="radio" name="atp" id="atp_off" value="off">
+							Disabled
+						</div>
+						<div>
+							<input type="radio" name="atp" id="atp_x" value="custom">
+							Owner protection - every
+							<input id="atp_val" name="atp_val" value="{{atp_val}}" style="width: 60px;">
+							minute(s)
 						</div>
 					</div>
 					<div>
