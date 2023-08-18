@@ -13,7 +13,6 @@ const fs          = require("fs");
 const http        = require("http");
 const https       = require("https");
 const isIP        = require("net").isIP;
-const nodemailer  = require("nodemailer");
 const path        = require("path");
 const pg          = require("pg");
 const querystring = require("querystring");
@@ -25,13 +24,10 @@ const worker      = require("node:worker_threads");
 const zip         = require("adm-zip");
 const zlib        = require("zlib");
 
-const bin_packet   = require("./backend/utils/bin_packet.js");
 const utils        = require("./backend/utils/utils.js");
 const templates    = require("./backend/utils/templates.js");
-const rate_limiter = require("./backend/utils/rate_limiter.js");
 const ipaddress    = require("./backend/utils/ipaddress.js");
 const prompt       = require("./backend/utils/prompt.js");
-const restrictions = require("./backend/utils/restrictions.js");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -375,16 +371,10 @@ function log_error(err) {
 }
 
 var database,
-	edits_db,
-	chat_history,
-	image_db,
-	misc_db;
+	chat_history;
 function setupDatabases() {
 	database = new sql.Database(serverDB);
-	edits_db = new sql.Database(editsDB);
 	chat_history = new sql.Database(chatDB);
-	image_db = new sql.Database(imageDB);
-	misc_db = new sql.Database(miscDB);
 }
 
 var staticShortcuts = {};
@@ -478,87 +468,21 @@ function setupZipLog() {
 console.log("Loading page files");
 
 var pages = {
-	accounts: {
-		configure: require("./backend/pages/accounts/configure.js"),
-		download: require("./backend/pages/accounts/download.js"),
-		login: require("./backend/pages/accounts/login.js"),
-		logout: require("./backend/pages/accounts/logout.js"),
-		member_autocomplete: require("./backend/pages/accounts/member_autocomplete.js"),
-		nsfw: require("./backend/pages/accounts/nsfw.js"),
-		password_change: require("./backend/pages/accounts/password_change.js"),
-		password_change_done: require("./backend/pages/accounts/password_change_done.js"),
-		private: require("./backend/pages/accounts/private.js"),
-		profile: require("./backend/pages/accounts/profile.js"),
-		register: require("./backend/pages/accounts/register.js"),
-		register_complete: require("./backend/pages/accounts/register_complete.js"),
-		sso: require("./backend/pages/accounts/sso.js"),
-		tabular: require("./backend/pages/accounts/tabular.js"),
-		verify: require("./backend/pages/accounts/verify.js"),
-		verify_email: require("./backend/pages/accounts/verify_email.js")
-	},
-	admin: {
-		administrator: require("./backend/pages/admin/administrator.js"),
-		backgrounds: require("./backend/pages/admin/backgrounds.js"),
-		manage_ranks: require("./backend/pages/admin/manage_ranks.js"),
-		set_custom_rank: require("./backend/pages/admin/set_custom_rank.js"),
-		user: require("./backend/pages/admin/user.js"),
-		user_list: require("./backend/pages/admin/user_list.js"),
-		users_by_id: require("./backend/pages/admin/users_by_id.js"),
-		users_by_username: require("./backend/pages/admin/users_by_username.js"),
-		restrictions: require("./backend/pages/admin/restrictions.js"),
-		shell: require("./backend/pages/admin/shell.js")
-	},
-	other: {
-		ipaddress: require("./backend/pages/other/ipaddress.js"),
-		load_backgrounds: require("./backend/pages/other/load_backgrounds.js"),
-		random_color: require("./backend/pages/other/random_color.js"),
-		test: require("./backend/pages/other/test.js")
-	},
 	"404": require("./backend/pages/404.js"),
-	activate_complete: require("./backend/pages/activate_complete.js"),
-	coordlink: require("./backend/pages/coordlink.js"),
-	home: require("./backend/pages/home.js"),
-	protect: require("./backend/pages/protect.js"),
-	protect_char: require("./backend/pages/protect_char.js"),
-	register_failed: require("./backend/pages/register_failed.js"),
-	script_edit: require("./backend/pages/script_edit.js"),
-	script_manager: require("./backend/pages/script_manager.js"),
-	script_view: require("./backend/pages/script_view.js"),
 	static: require("./backend/pages/static.js"),
-	unprotect: require("./backend/pages/unprotect.js"),
-	unprotect_char: require("./backend/pages/unprotect_char.js"),
-	urllink: require("./backend/pages/urllink.js"),
-	world_props: require("./backend/pages/world_props.js"),
-	world_style: require("./backend/pages/world_style.js"),
 	yourworld: require("./backend/pages/yourworld.js")
 };
 
 var websockets = {
 	chat: require("./backend/websockets/chat.js"),
 	chathistory: require("./backend/websockets/chathistory.js"),
-	clear_tile: require("./backend/websockets/clear_tile.js"),
 	cmd: require("./backend/websockets/cmd.js"),
 	cmd_opt: require("./backend/websockets/cmd_opt.js"),
-	cursor: require("./backend/websockets/cursor.js"),
-	fetch: require("./backend/websockets/fetch.js"),
-	link: require("./backend/websockets/link.js"),
-	protect: require("./backend/websockets/protect.js"),
-	write: require("./backend/websockets/write.js"),
-	config: require("./backend/websockets/config.js"),
-	boundary: require("./backend/websockets/boundary.js")
-};
-
-var modules = {
-	fetch_tiles: require("./backend/modules/fetch_tiles.js"),
-	protect_areas: require("./backend/modules/protect_areas.js"),
-	write_data: require("./backend/modules/write_data.js"),
-	write_links: require("./backend/modules/write_links.js")
+	config: require("./backend/websockets/config.js")
 };
 
 var subsystems = {
 	chat_mgr: require("./backend/subsystems/chat_mgr.js"),
-	tile_database: require("./backend/subsystems/tile_database.js"),
-	tile_fetcher: require("./backend/subsystems/tile_fetcher.js"),
 	world_mgr: require("./backend/subsystems/world_mgr.js")
 };
 
@@ -675,78 +599,12 @@ function asyncDbSystem(database) {
 }
 
 var db,
-	db_edits,
-	db_ch,
-	db_img,
-	db_misc
+	db_ch;
 function loadDbSystems() {
 	db = asyncDbSystem(database);
-	db_edits = asyncDbSystem(edits_db);
 	db_ch = asyncDbSystem(chat_history);
-	db_img = asyncDbSystem(image_db);
-	db_misc = asyncDbSystem(misc_db);
 }
 
-var transporter;
-var email_available = true;
-
-async function loadEmail() {
-	if(!settings.email.enabled) return;
-	try {
-		if(isTestServer) throw "This is a test server";
-		transporter = nodemailer.createTransport({
-			service: "gmail",
-			auth: {
-				user: settings.email.username,
-				pass: settings.email.password
-			}
-		});
-	} catch(e) {
-		handle_error(e);
-		email_available = false;
-		console.log("\x1b[31;1mEmail disabled. Error message: " + JSON.stringify(process_error_arg(e)) + "\x1b[0m");
-	}
-	try {
-		if(email_available) {
-			await transporter.verify();
-		}
-	} catch(e) {
-		handle_error(e);
-		email_available = false;
-		console.log("\x1b[31;1mEmail is disabled because the verification failed (credentials possibly incorrect)" + JSON.stringify(process_error_arg(e)) + "\x1b[0m");
-	}
-	if(email_available) {
-		console.log("Logged into email");
-	}
-}
-
-async function send_email(destination, subject, text) {
-	var testEmailAddress = "test@localhost";
-	if(accountSystem != "local") return;
-	if(isTestServer || subject == testEmailAddress) {
-		console.log("To:", destination);
-		console.log("Subject:", subject);
-		console.log("Body:", text);
-		console.log("================");
-		return null;
-	}
-	if(!email_available) return false;
-	var options = {
-		from: settings.email.display_email,
-		to: destination,
-		subject: subject,
-		html: text
-	}
-	return new Promise(function(resolve) {
-		transporter.sendMail(options, function(error, info) {
-			if (error) {
-				resolve("error");
-			} else {
-				resolve(info);
-			}
-		});
-	});
-}
 
 async function fetchCloudflareIPs(ip_type) {
 	if(ip_type == 4) {
@@ -787,23 +645,11 @@ async function initialize_server() {
 	manage_https();
 	setupHTTPServer();
 
-	await initialize_misc_db();
-	await initialize_ranks_db();
-	await initialize_edits_db();
-	await initialize_image_db();
-
 	global_data.db = db;
-	global_data.db_img = db_img;
-	global_data.db_misc = db_misc;
-	global_data.db_edits = db_edits;
 	global_data.db_ch = db_ch;
 	
 	if(accountSystem == "uvias") {
 		await uvias_init();
-	}
-
-	if(accountSystem == "local") {
-		await loadEmail();
 	}
 	
 	if(!await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='server_info'")) {
@@ -823,11 +669,7 @@ async function initialize_server() {
 		await db.exec(indexes);
 
 		init = true;
-		if(accountSystem == "local") {
-			account_prompt();
-		} else if(accountSystem == "uvias") {
-			account_prompt(true);
-		}
+		start_server();
 	}
 	if(!init) {
 		start_server();
@@ -839,65 +681,12 @@ function sendProcMsg(msg) {
 		process.send(msg);
 	}
 }
-
-async function initialize_misc_db() {
-	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='properties'")) {
-		await db_misc.run("CREATE TABLE 'properties' (key BLOB, value BLOB)");
-	}
-}
-
-async function initialize_edits_db() {
-	if(!await db_edits.get("SELECT name FROM sqlite_master WHERE type='table' AND name='edit'")) {
-		await db_edits.exec(fs.readFileSync(sql_edits_init).toString());
-	}
-}
-
-async function initialize_image_db() {
-	if(!await db_img.get("SELECT name FROM sqlite_master WHERE type='table' AND name='images'")) {
-		await db_img.run("CREATE TABLE 'images' (id INTEGER NOT NULL PRIMARY KEY, name TEXT, date_created INTEGER, mime TEXT, data BLOB)");
-	}
-}
-
 /*
 	TODO: scrap this & rename to 'chat tag'
 	proposed change:
 	- global tags; world tags
 */
-async function initialize_ranks_db() {
-	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='ranks'")) {
-		await db_misc.run("CREATE TABLE 'ranks' (id INTEGER, level INTEGER, name TEXT, props TEXT)");
-		await db_misc.run("CREATE TABLE 'user_ranks' (userid INTEGER, rank INTEGER)");
-		await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["max_rank_id", 0]);
-		await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["rank_next_level", 4]);
-	}
-	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='admin_ranks'")) {
-		await db_misc.run("CREATE TABLE 'admin_ranks' (id INTEGER, level INTEGER)");
-	}
-	var ranks = await db_misc.all("SELECT * FROM ranks");
-	var user_ranks = await db_misc.all("SELECT * FROM user_ranks");
-	ranks_cache.ids = [];
-	for(var i = 0; i < ranks.length; i++) {
-		var rank = ranks[i];
-		
-		var id = rank.id;
-		var level = rank.level;
-		var name = rank.name;
-		var props = JSON.parse(rank.props);
 
-		ranks_cache[id] = {
-			id,
-			level,
-			name,
-			chat_color: props.chat_color
-		};
-		ranks_cache.ids.push(id);
-	}
-	ranks_cache.count = ranks.length;
-	for(var i = 0; i < user_ranks.length; i++) {
-		var ur = user_ranks[i];
-		ranks_cache.users[ur.userid] = ur.rank;
-	}
-}
 
 function encryptHash(pass, salt) {
 	if(!salt) {
@@ -916,56 +705,6 @@ function checkHash(hash, pass) {
 	return encryptHash(pass, hash[1]) === hash.join("$");
 }
 
-async function account_prompt(isUvias) {
-	var question = "You've just installed the server,\nwhich means you don\'t have any superusers defined.\nWould you like to create one now? (yes/no): ";
-	var resp = await prompt.ask(question);
-	if(resp.toLowerCase() == "yes") {
-		if(!isUvias) {
-			var user = await prompt.ask("Username: ");
-			user = user.trim();
-			if(!user.length) {
-				console.log("Username is too short.");
-				return account_prompt(isUvias);
-			}
-			var pass1 = (await prompt.ask("Password: ", true)).trim();
-			var pass2 = (await prompt.ask("Password (again): ", true)).trim();
-			if(pass1 != pass2) {
-				console.log("Your passwords didn't match.");
-				return account_prompt(isUvias);
-			}
-			if(!pass1) {
-				console.log("Your password is too short.");
-				return account_prompt(isUvias);
-			}
-			var date = Date.now();
-			var passHash = encryptHash(pass1);
-			db.run("INSERT INTO auth_user VALUES(null, ?, '', ?, 1, 3, ?, ?)", [user, passHash, date, date]);
-			console.log("Superuser created successfully.\n");
-		} else {
-			var user = await prompt.ask("Uvias Display Name: ");
-			user = user.trim();
-			if(!user.length) {
-				console.log("Username is too short.");
-				return account_prompt(isUvias);
-			}
-			var db_user = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", user);
-			if(!db_user) {
-				console.log("User not found.");
-				return account_prompt(isUvias);
-			}
-			var uid = "x" + db_user.uid;
-			await db_misc.run("INSERT INTO admin_ranks VALUES(?, ?)", [uid, 3]);
-			console.log("Account successfully set as superuser.\n");
-		}
-		start_server();
-	} else if(resp.toLowerCase() == "no") {
-		start_server();
-		return;
-	} else {
-		console.log("Please enter either \"yes\" or \"no\" (not case sensitive).");
-		return account_prompt(isUvias);
-	}
-}
 
 var prompt_stopped = false;
 async function command_prompt() {
@@ -1011,26 +750,8 @@ var ms = {
 };
 
 var http_rate_limits = [ // function ; hold limit ; [method]
-	[pages.accounts.login, 2],
-	[pages.accounts.logout, 2],
-	[pages.accounts.register, 1],
-	[pages.accounts.profile, 2, "GET"],
-	[pages.accounts.profile, 10, "POST"],
-	[pages.accounts.configure, 2],
-	[pages.accounts.member_autocomplete, 4],
-	[pages.accounts.download, 2],
-	[pages.accounts.tabular, 2],
-	[pages.accounts.sso, 3],
-	[pages.protect, 16],
-	[pages.unprotect, 16],
-	[pages.protect_char, 16],
-	[pages.unprotect_char, 16],
-	[pages.coordlink, 16],
-	[pages.urllink, 16],
 	[pages.yourworld, 16, "POST"],
-	[pages.yourworld, 6, "GET"],
-	[pages.world_style, 2],
-	[pages.world_props, 2]
+	[pages.yourworld, 6, "GET"]
 ];
 
 var http_req_holds = {}; // ip/identifier -> {"<index>": {holds: <number>, resp: [<promises>,...]},...}
@@ -1127,55 +848,6 @@ function createEndpoints() {
 	registerEndpoint("robots.txt", "/static/robots.txt", { no_login: true });
 	registerEndpoint("home", pages.home);
 	registerEndpoint(".well-known/*", null);
-
-	registerEndpoint("accounts/login", pages.accounts.login);
-	registerEndpoint("accounts/logout", pages.accounts.logout);
-	registerEndpoint("accounts/register", pages.accounts.register);
-	registerEndpoint("accounts/profile$", "/accounts/profile/"); // ensure there is always an ending slash
-	registerEndpoint("accounts/profile", pages.accounts.profile);
-	registerEndpoint("accounts/private", pages.accounts.private);
-	registerEndpoint("accounts/configure/*", pages.accounts.configure);
-	registerEndpoint("accounts/member_autocomplete", pages.accounts.member_autocomplete);
-	registerEndpoint("accounts/register/complete", pages.accounts.register_complete);
-	registerEndpoint("accounts/verify/*", pages.accounts.verify);
-	registerEndpoint("accounts/download/*", pages.accounts.download);
-	registerEndpoint("accounts/password_change", pages.accounts.password_change);
-	registerEndpoint("accounts/password_change/done", pages.accounts.password_change_done);
-	registerEndpoint("accounts/nsfw/*", pages.accounts.nsfw);
-	registerEndpoint("accounts/tabular", pages.accounts.tabular);
-	registerEndpoint("accounts/verify_email/*", pages.accounts.verify_email);
-	registerEndpoint("accounts/sso", pages.accounts.sso);
-
-	registerEndpoint("ajax/protect", pages.protect);
-	registerEndpoint("ajax/unprotect", pages.unprotect);
-	registerEndpoint("ajax/protect/char", pages.protect_char);
-	registerEndpoint("ajax/unprotect/char", pages.unprotect_char);
-	registerEndpoint("ajax/coordlink", pages.coordlink);
-	registerEndpoint("ajax/urllink", pages.urllink);
-
-	registerEndpoint("administrator/", pages.admin.administrator);
-	registerEndpoint("administrator/user/*", pages.admin.user);
-	registerEndpoint("administrator/users/by_username/*", pages.admin.users_by_username);
-	registerEndpoint("administrator/users/by_id/*", pages.admin.users_by_id);
-	registerEndpoint("administrator/backgrounds", pages.admin.backgrounds, { binary_post_data: true });
-	registerEndpoint("administrator/manage_ranks", pages.admin.manage_ranks);
-	registerEndpoint("administrator/set_custom_rank/*", pages.admin.set_custom_rank);
-	registerEndpoint("administrator/user_list", pages.admin.user_list);
-	registerEndpoint("administrator/monitor/", (settings && settings.monitor && settings.monitor.redirect) ? settings.monitor.redirect : null);
-	registerEndpoint("administrator/shell", pages.admin.shell);
-	registerEndpoint("administrator/restrictions", pages.admin.restrictions, { binary_post_data: true });
-
-	registerEndpoint("script_manager/", pages.script_manager);
-	registerEndpoint("script_manager/edit/*", pages.script_edit);
-	registerEndpoint("script_manager/view/*", pages.script_view);
-
-	registerEndpoint("world_style", pages.world_style);
-	registerEndpoint("world_props", pages.world_props);
-
-	registerEndpoint("other/random_color", pages.other.random_color, { no_login: true });
-	registerEndpoint("other/backgrounds/*", pages.other.load_backgrounds, { no_login: true });
-	registerEndpoint("other/test/*", pages.other.test, { no_login: true });
-	registerEndpoint("other/ipaddress", pages.other.ipaddress);
 
 	registerEndpoint("static/*", pages.static, { no_login: true });
 	registerEndpoint("static", pages.static, { no_login: true });
@@ -1362,135 +1034,7 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 		email: "",
 		uv_rank: 0
 	};
-	if(accountSystem == "local" && cookies.sessionid) {
-		// user data from session
-		var s_data = await db.get("SELECT * FROM auth_session WHERE session_key=?", cookies.sessionid);
-		if(s_data) {
-			user = JSON.parse(s_data.session_data);
-			if(cookies.csrftoken == user.csrftoken) { // verify csrftoken
-				user.authenticated = true;
-				var userauth = (await db.get("SELECT level, is_active, email FROM auth_user WHERE id=?", user.id));
-				var level = userauth.level;
-				user.is_active = !!userauth.is_active;
-				user.email = userauth.email;
-
-				user.operator = level == 3;
-				user.superuser = level == 2 || level == 3;
-				user.staff = level == 1 || level == 2 || level == 3;
-
-				if(user.staff && !is_websocket) {
-					user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id);
-				} else {
-					user.scripts = [];
-				}
-			}
-			user.session_key = s_data.session_key;
-		}
-	}
-
-	if(accountSystem == "uvias" && cookies.token) {
-		var parsed = await uvias.get("SELECT * FROM accounts.parse_token($1::text)", [cookies.token]);
-		var success = false;
-		var has_refreshed = false;
-		if(parsed) {
-			var uid = parsed.uid;
-			var session_id = parsed.session_id;
-			// check if this session id belongs to a user
-			var session = await uvias.get("SELECT * FROM accounts.get_session($1::bigint, $2::bytea)", [uid, session_id]);
-			if(session) {
-				// both guests and users are included
-				var user_account = await uvias.get("SELECT to_hex(uid) as uid, username, rank_id FROM accounts.users WHERE uid=$1::bigint", uid);
-				if(user_account) {
-					success = true;
-					var session_expire = session.expires.getTime();
-					var session_halfway = session_expire - (ms.day * 3.5);
-					if(date >= session_halfway) { // refresh token if it is about to expire
-						var ref_res = await uvias.get("SELECT * FROM accounts.refresh_session($1::bigint, $2::bytea)", [uid, session_id]);
-						if(ref_res) {
-							has_refreshed = true;
-							var new_expiry_time = ref_res.new_expiry_time;
-							var is_persistent = ref_res.is_persistent;
-						}
-					}
-					// only users, not guests
-					var links_local = await uvias.get("SELECT to_hex(uid) as uid, login_name, email, email_verified FROM accounts.links_local WHERE uid=$1::bigint", uid);
-					user.authenticated = true;
-					user.display_username = user_account.username;
-					user.uv_rank = user_account.rank_id;
-					if(links_local) {
-						user.is_active = links_local.email_verified;
-						user.email = links_local.email;
-						user.username = links_local.login_name;
-						user.id = "x" + links_local.uid;
-					} else {
-						user.username = user_account.username;
-						user.id = "x" + user_account.uid;
-					}
-
-					// no data yet
-					user.operator = false;
-					user.superuser = false;
-					user.staff = false;
-					
-					var rank_data = await db_misc.get("SELECT level FROM admin_ranks WHERE id=?", user.id);
-					if(rank_data) {
-						var level = rank_data.level;
-
-						user.operator = level == 3;
-						user.superuser = level == 2 || level == 3;
-						user.staff = level == 1 || level == 2 || level == 3;
-					}
-
-					// TODO: might want to add a public script repository for OWOT and remove/change this
-					if(user.staff && !is_websocket) {
-						user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id);
-					} else {
-						user.scripts = [];
-					}
-
-					user.csrftoken = new_token(32);
-					user.session_key = cookies.token;
-				}
-			}
-		}
-		/*if(!success) {
-			// if the token is invalid, delete the cookie
-			if(dispatch) {
-				dispatch.addCookie("token=; expires=" + http_time(0) + "; path=/");
-			}
-		}*/
-	}
 	return user;
-}
-
-function checkHTTPRestr(list, ipVal, ipFam) {
-	var resp = {
-		siteAccess: false,
-		siteAccessNote: null
-	};
-	if(!list) return resp;
-	for(var i = 0; i < list.length; i++) {
-		var item = list[i];
-
-		var ip = item.ip;
-		if(ip) {
-			var riRange = ip[0];
-			var riFam = ip[1];
-			if(riFam != ipFam) continue;
-			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
-		} else {
-			continue;
-		}
-
-		var type = item.type;
-		var mode = item.mode;
-		if(type == "daccess" && mode == "site") {
-			var note = item.note;
-			resp.siteAccessNote = note;
-			resp.siteAccess = true;
-		}
-	}
-	return resp;
 }
 
 process.on("unhandledRejection", function(reason) {
@@ -1547,21 +1091,6 @@ function setupHTTPServer() {
 		socket.on("close", function() {
 			delete HTTPSockets[sockID];
 		});
-	});
-}
-
-function setupMonitorServer() {
-	if(typeof settings.monitor.port != "number") return;
-	monitorWorker = new worker.Worker("./backend/monitor/monitor.js", {
-		workerData: {
-			port: settings.monitor.port,
-			ip: settings.monitor.ip,
-			user: settings.monitor.credentials.user,
-			pass: settings.monitor.credentials.pass
-		}
-	});
-	monitorWorker.on("error", function(e) {
-		handle_error(e);
 	});
 }
 
@@ -1729,19 +1258,6 @@ async function process_request(req, res, compCallbacks) {
 	var ipAddressFam = evalIp[1];
 	var ipAddressVal = evalIp[2];
 
-	var restr = restrictions.getRestrictions();
-	var deniedPages = checkHTTPRestr(restr, ipAddressVal, ipAddressFam);
-	if(deniedPages.siteAccess) {
-		var deny_notes = "None";
-		if(deniedPages.siteAccessNote) {
-			deny_notes = deniedPages.siteAccessNote;
-		}
-		res.writeHead(403);
-		return res.end(templates.execute(templates.getFile("denied.html"), {
-			deny_notes
-		}));
-	}
-
 	var dispatch = createDispatcher(res, {
 		encoding: acceptEncoding,
 		gzip: gzipEnabled
@@ -1780,22 +1296,7 @@ async function process_request(req, res, compCallbacks) {
 		var post_data = {};
 		var query_data = querystring.parse(url.parse(req.url).query);
 		var cookies = parseCookie(req.headers.cookie);
-		var user;
-		if(no_login) {
-			user = {};
-		} else {
-			user = await get_user_info(cookies, false, dispatch);
-			// check if user is logged in
-			if(!cookies.csrftoken) {
-				var token = new_token(32);
-				var date = Date.now();
-				// TODO: introduce only for forms
-				dispatch.addCookie("csrftoken=" + token + "; expires=" + http_time(date + ms.year) + "; path=/;");
-				user.csrftoken = token;
-			} else {
-				user.csrftoken = cookies.csrftoken;
-			}
-		}
+		var user = await get_user_info();
 		if(method == "POST") {
 			var dat = await wait_response_data(req, dispatch, binary_post_data, user.superuser);
 			if(dat) {
@@ -1903,39 +1404,6 @@ function loadString(type) {
 			return restr_cg1_cache;
 	}
 	return null;
-}
-
-function loadRestrictionsList() {
-	try {
-		restr_cache = fs.readFileSync(restrPath).toString("utf8");
-	} catch(e) {};
-	try {
-		restr_cg1_cache = fs.readFileSync(restrCg1Path).toString("utf8");
-	} catch(e) {};
-	try {
-		if(restr_cache) {
-			var list = restr_cache.toString("utf8").replace(/\r\n/g, "\n").split("\n");
-			var result = restrictions.procRest(list);
-			restrictions.setRestrictions(result.data);
-		}
-		if(restr_cg1_cache) {
-			var list = restr_cg1_cache.toString("utf8").replace(/\r\n/g, "\n").split("\n");
-			var result = restrictions.procCoal(list);
-			restrictions.setCoalition(result.data);
-		}
-	} catch(e) {
-		handle_error(e);
-	}
-}
-
-function saveRestrictions(type, data) {
-	if(type == "main") {
-		restr_cache = data;
-		fs.writeFileSync(restrPath, data);
-	} else if(type == "cg1") {
-		restr_cg1_cache = data;
-		fs.writeFileSync(restrCg1Path, data);
-	}
 }
 
 async function loadAnnouncement() {
@@ -2207,17 +1675,6 @@ function ws_broadcast(data, world_id, opts) {
 			handle_error(e);
 		}
 	});
-}
-
-function broadcastMonitorEvent(type, data) {
-	if(!settings.monitor || !settings.monitor.enabled) return;
-	try {
-		if(type == "raw") {
-			monitorWorker.postMessage(data);
-		} else {
-			monitorWorker.postMessage("[" + type + "] " + data);
-		}
-	} catch(e) {}
 }
 
 // todo: fix this
@@ -2588,8 +2045,6 @@ async function manageWebsocketConnection(ws, req) {
 		block_all: false
 	};
 
-	broadcastMonitorEvent("Connect", ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + world.name + "', " + world.id + "]");
-
 	var sentClientId = clientId;
 	if(!can_chat) sentClientId = -1;
 	send_ws(JSON.stringify({
@@ -2707,7 +2162,6 @@ async function manageWebsocketConnection(ws, req) {
 
 async function start_server() {
 	await loadAnnouncement();
-	loadRestrictionsList();
 	
 	if(accountSystem == "local") {
 		await clear_expired_sessions();
@@ -2716,25 +2170,6 @@ async function start_server() {
 	intv.userCount = setInterval(function() {
 		broadcastUserCount();
 	}, 2000);
-
-	intv.traff_mon_net_interval = setInterval(function() {
-		if(periodHTTPOutboundBytes || periodHTTPInboundBytes) {
-			broadcastMonitorEvent("Network", "HTTP stream: " + periodHTTPOutboundBytes + " (out); " + periodHTTPInboundBytes + " (in)");
-			periodHTTPOutboundBytes = 0;
-			periodHTTPInboundBytes = 0;
-		}
-		if(periodWSOutboundBytes || periodWSInboundBytes) {
-			broadcastMonitorEvent("Network", "WebSocket: " + periodWSOutboundBytes + " (out); " + periodWSInboundBytes + " (in)");
-			periodWSOutboundBytes = 0;
-			periodWSInboundBytes = 0;
-			wss.clients.forEach(function(ws) {
-				if(!ws.sdata) return;
-				if(ws.sdata.messageBackpressure > 1) {
-					broadcastMonitorEvent("Backpressure", "Warning - backpressure of " + ws.sdata.messageBackpressure + " (" + ws.sdata.ipAddress + ")");
-				}
-			});
-		}
-	}, 1000);
 
 	initClearClosedClientsInterval();
 
@@ -2774,18 +2209,12 @@ async function start_server() {
 	await sysLoad(); // initialize the subsystems (tile database; chat manager)
 	serverLoaded = true;
 
-	if(settings.monitor && settings.monitor.enabled) {
-		setupMonitorServer();
-	}
 }
 
 // the server context
 var global_data = {
 	website: settings.website,
 	db: null,
-	db_img: null,
-	db_misc: null,
-	db_edits: null,
 	db_ch: null,
 	wsSend,
 	ws_broadcast,
@@ -2795,7 +2224,6 @@ var global_data = {
 	isTestServer,
 	shellEnabled,
 	loadString,
-	saveRestrictions,
 	uvias,
 	accountSystem,
 	callPage,
@@ -2805,28 +2233,22 @@ var global_data = {
 	new_token,
 	querystring,
 	url,
-	send_email,
 	get_user_info,
-	modules,
 	announce: modifyAnnouncement,
 	wss, // this is undefined by default, but will get a value once wss is initialized
 	topActiveWorlds,
 	handle_error,
 	client_ips,
-	tile_database: subsystems.tile_database,
-	tile_fetcher: subsystems.tile_fetcher,
 	chat_mgr: subsystems.chat_mgr,
 	intv,
 	ranks_cache,
 	static_data,
 	stopServer,
-	broadcastMonitorEvent,
 	uviasSendIdentifier,
 	client_cursor_pos,
 	loadShellFile,
 	runShellScript,
 	loadPlugin,
-	rate_limiter,
 	getClientVersion,
 	setClientVersion,
 	staticShortcuts

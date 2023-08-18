@@ -2,13 +2,11 @@ var db_ch;
 var intv;
 var handle_error;
 var db;
-var broadcastMonitorEvent;
 module.exports.main = async function(server) {
 	db_ch = server.db_ch;
 	intv = server.intv;
 	handle_error = server.handle_error;
 	db = server.db;
-	broadcastMonitorEvent = server.broadcastMonitorEvent;
 
 	await init_chat_history();
 
@@ -297,7 +295,6 @@ async function chatDatabaseClock(serverExit) {
 		if(gc_len > 0 || wc_len > 0 || cc_len > 0 || cd_len > 0) {
 			await doUpdateChatLogData();
 		}
-		broadcastMonitorEvent("Chat", "Clock cycle executed");
 	} catch(e) {
 		handle_error(e);
 	}

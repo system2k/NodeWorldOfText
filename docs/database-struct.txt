@@ -1,8 +1,0 @@
-OWOT uses Sqlite3 to store data. Sqlite3 stores data in a single file for every database.
-
-OWOT utilizes the following databases:
-nwot.sqlite : The primary database used for storing accounts, sessions, registration tokens, worlds, members, scripts, old edits, and tiles.
-edits.sqlite : The primary database for logging all new edits, whether for restoring worlds or saving history.
-chat_history.sqlite : The primary database for storing all chats.
-images.sqlite : Stores uploaded images, primarily for use as backgrounds.
-misc.sqlite : Used as an extension for the primary database to avoid having to migrate the database. Currently stores ranks and custom ranks.

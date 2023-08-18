@@ -51,7 +51,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var accountSystem = server.accountSystem;
 	var client_ips = server.client_ips;
 	var wsSend = server.wsSend;
-	var broadcastMonitorEvent = server.broadcastMonitorEvent;
 	var loadPlugin = server.loadPlugin;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
@@ -182,13 +181,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		// operator
 		[3, "uptime", null, "get uptime of server", null],
 
-		// superuser
-		[2, "worlds", null, "list all worlds", null],
-
-		// staff
-		[1, "channel", null, "get info about a chat channel"],
-		[1, "delete", ["id", "timestamp"], "delete a chat message"],
-
 		// general
 		[0, "help", null, "list all commands", null],
 		[0, "nick", ["nickname"], "change your nickname", "JohnDoe"], // client-side
@@ -200,12 +192,10 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "unblock", ["id"], "unblock someone by id", "1220"],
 		[0, "unblockuser", ["username"], "unblock someone by username", "JohnDoe"],
 		[0, "unblockall", null, "unblock all users", null],
-		[0, "mute", ["id", "seconds"], "mute a user for everyone", "1220 9999"], // check for permission
-		[0, "clearmutes", null, "unmute all clients"], // check for permission
 		[0, "color", ["color code"], "change your text color", "#FF00FF"], // client-side
 		[0, "chatcolor", ["color code"], "change your chat color", "#FF00FF"], // client-side
-		[0, "night", null, "enable night mode", null], // client-side
-		[0, "day", null, "disable night mode", null], // client-side
+		//[0, "night", null, "enable night mode", null], // client-side
+		//[0, "day", null, "disable night mode", null], // client-side
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
 		[0, "whoami", null, "display your identity"],
 		[0, "test", null, "preview your appearance"]
@@ -568,7 +558,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			if(clientIpObj && location == "global") {
 				clientIpObj[3] = Date.now();
 			}
-			broadcastMonitorEvent("TellSpam", "Tell from " + clientId + " (" + ipHeaderAddr + ") to " + id + ", first 4 chars: [" + message.slice(0, 4) + "]");
 		},
 		channel: async function() {
 			if(!user.staff) return;

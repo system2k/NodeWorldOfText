@@ -3,7 +3,6 @@ var crypto = require("crypto");
 var intv;
 var handle_error;
 var db;
-var broadcastMonitorEvent;
 
 var server_exiting = false;
 
@@ -11,7 +10,6 @@ module.exports.main = async function(server) {
 	intv = server.intv;
 	handle_error = server.handle_error;
 	db = server.db;
-	broadcastMonitorEvent = server.broadcastMonitorEvent;
 
 	intv.worldCacheInvalidation = setInterval(function() {
 		invalidateWorldCache();
@@ -33,7 +31,6 @@ async function worldDatabaseClock(serverExit) {
 	worldDatabaseBusy = true;
 	try {
 		await commitAllWorlds();
-		broadcastMonitorEvent("Worlds", "Committed world metadata (" + worldsCommittedInPeriod + " worlds)");
 		worldsCommittedInPeriod = 0;
 	} catch(e) {
 		handle_error(e, true);

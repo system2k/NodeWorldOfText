@@ -28,41 +28,28 @@ if(isNaN(defaultChatColor)) {
 
 defineElements({ // elm[<name>]
 	chat_window: byId("chat_window"),
-	chat_open: byId("chat_open"),
 	chatsend: byId("chatsend"),
 	chatbar: byId("chatbar"),
-	chat_close: byId("chat_close"),
 	page_chatfield: byId("page_chatfield"),
 	global_chatfield: byId("global_chatfield"),
 	chat_page_tab: byId("chat_page_tab"),
 	chat_global_tab: byId("chat_global_tab"),
 	usr_online: byId("usr_online"),
-	total_unread: byId("total_unread"),
 	page_unread: byId("page_unread"),
 	global_unread: byId("global_unread"),
 	chat_upper: byId("chat_upper")
 });
 
-if(Permissions.can_chat(state.userModel, state.worldModel)) {
-	OWOT.on("chat", function(e) {
-		w.emit("chatMod", e);
-		if(e.hide) return;
-		event_on_chat(e);
-	});
-}
+OWOT.on("chat", function(e) {
+	w.emit("chatMod", e);
+	if(e.hide) return;
+	event_on_chat(e);
+});
 
 if(state.userModel.is_staff) {
 	elm.chatbar.maxLength = 3030;
 } else {
 	elm.chatbar.maxLength = 400;
-}
-
-var canChat = Permissions.can_chat(state.userModel, state.worldModel);
-if(!canChat) {
-	selectedChatTab = 1;
-	elm.chat_window.style.display = "none";
-} else {
-	elm.chat_open.style.display = "";
 }
 
 if(state.worldModel.no_chat_global) {
@@ -148,24 +135,6 @@ var client_commands = {
 			clientChatResponse("Ping: " + pingMs + " MS");
 		});
 	},
-	gridsize: function (args) {
-		var size = args[0];
-		if(!size) size = "10x18";
-		size = size.split("x");
-		var width = parseInt(size[0]);
-		var height = parseInt(size[1]);
-		if(!width || isNaN(width) || !isFinite(width)) width = 10;
-		if(!height || isNaN(height) || !isFinite(height)) height = 18;
-		if(width < 4) width = 4;
-		if(width > 160) width = 160;
-		if(height < 4) height = 4;
-		if(height > 144) height = 144;
-		defaultSizes.cellW = width;
-		defaultSizes.cellH = height;
-		updateScaleConsts();
-		w.reloadRenderer();
-		clientChatResponse("Changed grid size to " + width + "x" + height);
-	},
 	color: function(args) {
 		var color = args.join(" ");
 		color = resolveColorValue(color);
@@ -206,10 +175,10 @@ var client_commands = {
 		clientChatResponse("Switching to world: \"" + address + "\"");
 	},
 	night: function() {
-		w.night();
+		//w.night();
 	},
 	day: function() {
-		w.day(true);
+		//w.day(true);
 	}
 }
 
@@ -223,28 +192,6 @@ function sendChat() {
 	api_chat_send(chatText, opts);
 }
 
-function updateUnread() {
-	var total = elm.total_unread;
-	var page = elm.page_unread;
-	var global = elm.global_unread;
-	var totalCount = chatPageUnread + chatGlobalUnread;
-	total.style.display = "none";
-	global.style.display = "none";
-	page.style.display = "none";
-	if(totalCount) {
-		total.style.display = "";
-		total.innerText = totalCount > 99 ? "99+" : "(" + totalCount + ")";
-	}
-	if(chatPageUnread) {
-		page.style.display = "";
-		page.innerText = chatPageUnread > 99 ? "99+" : "(" + chatPageUnread + ")";
-	}
-	if(chatGlobalUnread) {
-		global.style.display = "";
-		global.innerText = chatGlobalUnread > 99 ? "99+" : "(" + chatGlobalUnread + ")";
-	}
-}
-
 function event_on_chat(data) {
 	if((!chatOpen || selectedChatTab == 1) && data.location == "page") {
 		chatPageUnread++;
@@ -252,7 +199,6 @@ function event_on_chat(data) {
 	if((!chatOpen || selectedChatTab == 0) && data.location == "global" && !state.worldModel.no_chat_global) {
 		chatGlobalUnread++;
 	}
-	updateUnread();
 	addChat(data.location, data.id, data.type,
 		data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, data.date || Date.now(), data.dataObj);
 }
@@ -325,43 +271,6 @@ elm.chatbar.addEventListener("keydown", function(e) {
 	}
 });
 
-elm.chat_close.addEventListener("click", function() {
-	w.emit("chatClose");
-	elm.chat_window.style.display = "none";
-	elm.chat_open.style.display = "";
-	chatOpen = false;
-});
-
-elm.chat_open.addEventListener("click", function() {
-	w.emit("chatOpen");
-	elm.chat_window.style.display = "";
-	elm.chat_open.style.display = "none";
-	chatOpen = true;
-	if(selectedChatTab == 0) {
-		chatPageUnread = 0;
-		updateUnread();
-		if(!initPageTabOpen) {
-			initPageTabOpen = true;
-			elm.page_chatfield.scrollTop = elm.page_chatfield.scrollHeight;
-		}
-	} else {
-		chatGlobalUnread = 0;
-		updateUnread();
-		if(!initGlobalTabOpen) {
-			initGlobalTabOpen = true;
-			elm.global_chatfield.scrollTop = elm.global_chatfield.scrollHeight;
-		}
-	}
-	var chatWidth = chat_window.offsetWidth - 2;
-	var chatHeight = chat_window.offsetHeight - 2;
-	var screenRatio = window.devicePixelRatio;
-	if(!screenRatio) screenRatio = 1;
-	var virtWidth = owotWidth / screenRatio;
-	if(chatWidth > virtWidth) {
-		resizeChat(virtWidth - 2, chatHeight);
-	}
-});
-
 elm.chat_page_tab.addEventListener("click", function() {
 	elm.chat_page_tab.classList.add("chat_tab_selected");
 	elm.chat_global_tab.classList.remove("chat_tab_selected");
@@ -370,7 +279,6 @@ elm.chat_page_tab.addEventListener("click", function() {
 	elm.page_chatfield.style.display = "";
 	selectedChatTab = 0;
 	chatPageUnread = 0;
-	updateUnread();
 	if(!initPageTabOpen) {
 		initPageTabOpen = true;
 		elm.page_chatfield.scrollTop = elm.page_chatfield.scrollHeight;
@@ -385,7 +293,6 @@ elm.chat_global_tab.addEventListener("click", function() {
 	elm.page_chatfield.style.display = "none";
 	selectedChatTab = 1;
 	chatGlobalUnread = 0;
-	updateUnread();
 	if(!initGlobalTabOpen) {
 		initGlobalTabOpen = true;
 		elm.global_chatfield.scrollTop = elm.global_chatfield.scrollHeight;

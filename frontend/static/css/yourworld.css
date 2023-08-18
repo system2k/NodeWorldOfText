@@ -197,26 +197,6 @@ a:visited {
 	text-align: center;
 	color: white;
 }
-#chat_open {
-	position: absolute;
-	bottom: 0px;
-	left: 0px;
-	width: 70px;
-	text-align: center;
-	background-color: #003399;
-	color: white;
-	height: 20px;
-	border-style: solid;
-	border-width: 1px;
-	border-color: #000033;
-	cursor: default;
-}
-#chat_open:hover {
-	background-color: #2763dc;
-}
-#chat_open:active {
-	background-color: #0e2961;
-}
 #usr_online {
 	padding-left: 16px;
 	display: inline-block;
@@ -291,21 +271,10 @@ a:visited {
 #chat_window {
 	position: absolute;
 	background-color: #e0e0e0;
-	border: solid 1px black;
 	display: flex;
 	flex-flow: column;
-}
-#chat_close {
-	background-color: red;
-	width: 20px;
-	height: 20px;
-	text-align: center;
-	color: white;
-	border: solid 1px black;
-	font-family: monospace;
-	font-size: 16px;
-	cursor: default;
-	float: right;
+	width: 100%;
+	height: 100%;
 }
 #confirm_js {
 	width: 441px;
