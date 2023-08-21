@@ -3597,12 +3597,10 @@ function createSocket(getChatHist) {
 	socket.onopen = function(msg) {
 		console.log("Connected socket");
 		clearAllGuestCursors();
-		if(!initiallyFetched) {
-			for(var tile in tiles) {
-				if(tiles[tile] == null) {
-					delete tiles[tile];
-					w.tile.count--;
-				}
+		for(var tile in tiles) {
+			if(tiles[tile] == null) {
+				delete tiles[tile];
+				w.tile.count--;
 			}
 		}
 		clearRemoteBoundary();
