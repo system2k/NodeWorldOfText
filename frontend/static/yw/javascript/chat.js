@@ -231,6 +231,11 @@ function updateUnread() {
 	total.style.display = "none";
 	global.style.display = "none";
 	page.style.display = "none";
+	if(!value || value.toLowerCase() == "main" || value.toLowerCase() == "owot") {
+        	document.title = "(" + (totalCount > 99 ? "99+" : totalCount) + ") Our World of Text";
+    	} else {
+        	document.title = "(" + (totalCount > 99 ? "99+" : totalCount) + ") " + state.worldModel.pathname;
+    	}
 	if(totalCount) {
 		total.style.display = "";
 		total.innerText = totalCount > 99 ? "99+" : "(" + totalCount + ")";
