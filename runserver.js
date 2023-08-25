@@ -2200,7 +2200,7 @@ function ws_broadcast(data, world_id, opts) {
 					if ((client.sdata.chat_blocks.block_all && opts.clientId != 0) ||
 						client.sdata.chat_blocks.id.includes(opts.clientId) ||
 						(opts.username && client.sdata.chat_blocks.user.includes(opts.username)) || 
-					        (client.sdata.chat_blocks.no_anon == true && client.sdata.user.authenticated == false)) return;
+					        (client.sdata.chat_blocks.no_anon == true && opts.username === null)) return;
 				}
 				wsSend(client, data);
 			}
