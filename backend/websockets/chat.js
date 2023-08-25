@@ -351,6 +351,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			case "tell":
 				blocks.no_tell = true;
 				break;
+			case "anon":
+				blocks.no_anon = true;
+				break;
 			default:
 				id = san_nbr(id);
 				if (id < 0) return;
@@ -406,6 +409,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			case "tell":
 				blocks.no_tell = false;
 				break;
+			case "anon":
+				blocks.no_anon = false;
+				break;
 			default:
 				id = san_nbr(id);
 				if(id < 0) return;
@@ -449,6 +455,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			ws.sdata.chat_blocks.user.splice(0);
 			ws.sdata.chat_blocks.block_all = false;
 			ws.sdata.chat_blocks.no_tell = false;
+			ws.sdata.chat_blocks.no_anon = false;
 			
 			var tblocks = tell_blocks[ipHeaderAddr];
 			if(tblocks) {
