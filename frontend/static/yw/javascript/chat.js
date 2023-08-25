@@ -232,9 +232,9 @@ function updateUnread() {
 	global.style.display = "none";
 	page.style.display = "none";
 	if(!value || value.toLowerCase() == "main" || value.toLowerCase() == "owot") {
-        	document.title = "(" + (totalCount > 99 ? "99+" : totalCount) + ") Our World of Text";
+        	document.title = (totalCount ? ("(" + (totalCount > 99 ? "99+" : totalCount) + ") ") : "") + "Our World of Text";
     	} else {
-        	document.title = "(" + (totalCount > 99 ? "99+" : totalCount) + ") " + state.worldModel.pathname;
+        	document.title = (totalCount ? ("(" + (totalCount > 99 ? "99+" : totalCount) + ") ") : "") + state.worldModel.pathname;
     	}
 	if(totalCount) {
 		total.style.display = "";
