@@ -2585,6 +2585,7 @@ async function manageWebsocketConnection(ws, req) {
 		id: [],
 		user: [],
 		no_tell: false,
+		no_anon: false,
 		block_all: false
 	};
 
