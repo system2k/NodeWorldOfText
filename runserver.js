@@ -2199,7 +2199,8 @@ function ws_broadcast(data, world_id, opts) {
 					// check if user has blocked this client
 					if ((client.sdata.chat_blocks.block_all && opts.clientId != 0) ||
 						client.sdata.chat_blocks.id.includes(opts.clientId) ||
-						(opts.username && client.sdata.chat_blocks.user.includes(opts.username))) return;
+						(opts.username && client.sdata.chat_blocks.user.includes(opts.username)) || 
+					        (client.sdata.chat_blocks.no_anon == true && client.sdata.user.authenticated == false)) return;
 				}
 				wsSend(client, data);
 			}
