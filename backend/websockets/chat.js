@@ -187,7 +187,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 		// staff
 		[1, "channel", null, "get info about a chat channel"],
-		[1, "delete", ["id", "timestamp"], "delete a chat message"],
 
 		// general
 		[0, "help", null, "list all commands", null],
@@ -202,6 +201,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "unblockall", null, "unblock all users", null],
 		[0, "mute", ["id", "seconds"], "mute a user for everyone", "1220 9999"], // check for permission
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
+		[0, "delete", ["id", "timestamp"], "delete a chat message", "1220 1693032103"], // check for permission
 		[0, "color", ["color code"], "change your text color", "#FF00FF"], // client-side
 		[0, "chatcolor", ["color code"], "change your chat color", "#FF00FF"], // client-side
 		[0, "night", null, "enable night mode", null], // client-side
@@ -243,7 +243,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			var desc = row[3];
 			var example = row[4];
 
-			if(command == "mute" || command == "clearmutes") {
+			if(command == "mute" || command == "clearmutes" || command == "delete") {
 				if(!user.staff && !is_owner) {
 					continue;
 				}
@@ -673,10 +673,16 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			return serverChatResponse(stat, location);
 		},
 		delete: async function(id, timestamp) {
+			if(!is_owner && !user.staff) return;
 			id = san_nbr(id);
 			timestamp = san_nbr(timestamp);
 			var wid = world.id;
-			if(location == "global") wid = 0;
+			if(location == "global") {
+				if(!user.staff) {
+					return serverChatResponse("You do not have permission to delete messages on global", location);
+				}
+				wid = 0;
+			}
 			var res = await remove_from_chatlog(wid, id, timestamp);
 			if(res == 0) {
 				return serverChatResponse("No messages deleted", location);
@@ -807,7 +813,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				com.stats();
 				return;
 			case "delete":
-				if(staff) com.delete(commandArgs[1], commandArgs[2]);
+				com.delete(commandArgs[1], commandArgs[2]);
 				return;
 			case "passive":
 				com.passive(commandArgs[1]);
