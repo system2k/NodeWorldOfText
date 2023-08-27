@@ -178,7 +178,10 @@ var keyConfig = {
 	centerTeleport: "HOME",
 	undo: "CTRL+Z",
 	redo: ["CTRL+Y", "CTRL+SHIFT+Z"],
-	showTextDeco: ["CTRL+Q", "ALT+Q", "CTRL+SHIFT+F"]
+	showTextDeco: ["CTRL+Q", "ALT+Q", "CTRL+SHIFT+F"],
+	zoomIn: ["CTRL+EQUALS"],
+	zoomOut: ["CTRL+MINUS"],
+	zoomReset: ["CTRL+0"]
 };
 
 window.addEventListener("load", function() {
@@ -2860,6 +2863,19 @@ function autoArrowKeyMoveStop(dir) {
 }
 
 function event_keydown(e) {
+	if(checkKeyPress(e, keyConfig.zoomIn)) {
+		changeZoom((userZoom * 100) * 1.5);
+		e.preventDefault();
+	}
+	if(checkKeyPress(e, keyConfig.zoomOut)) {
+		changeZoom((userZoom * 100) / 1.5);
+		e.preventDefault();
+	}
+	if(checkKeyPress(e, keyConfig.zoomReset)) {
+		changeZoom(100);
+		e.preventDefault();
+	}
+	
 	var actElm = document.activeElement;
 	if(!worldFocused) return;
 	if(Modal.isOpen) {
@@ -3470,6 +3486,58 @@ function event_wheel(e) {
 }
 document.addEventListener("wheel", event_wheel);
 
+function event_wheel_zoom(e) {
+	if(Modal.isOpen) return;
+	if(closest(e.target, getChatfield())) return;
+	if(closest(e.target, elm.confirm_js)) return;
+
+	var pageX = e.pageX * zoomRatio;
+	var pageY = e.pageY * zoomRatio;
+
+	var LINE_HEIGHT = 40;
+	var PAGE_HEIGHT = 800;
+
+	var deltaY = 0;
+  
+	if("detail" in e) deltaY = e.detail;
+	if("wheelDelta" in e) deltaY = -e.wheelDelta / 120;
+	if("wheelDeltaY" in e) deltaY = -e.wheelDeltaY / 120;
+  
+	if("deltaY" in e) deltaY = e.deltaY;
+  
+	if(deltaY && e.deltaMode) {
+		if(e.deltaMode == 1) {
+			pY *= LINE_HEIGHT;
+		} else {
+			pY *= PAGE_HEIGHT;
+		}
+	}
+
+	if(e.ctrlKey) {
+		positionX += owotWidth / 2 - pageX;
+		positionY += owotHeight / 2 - pageY;
+		positionX /= zoom;
+		positionY /= zoom;
+		
+		if(deltaY < 0) {
+			// zoom in
+			changeZoom((userZoom * 100) * (1.2 ** (-deltaY / 90)), true);
+		} else {
+			// zoom out
+			changeZoom((userZoom * 100) / (1.2 ** (deltaY / 90)), true);
+		}
+		positionX *= zoom;
+		positionY *= zoom;
+		positionX -= owotWidth / 2 - pageX;
+		positionY -= owotHeight / 2 - pageY;
+		e.preventDefault();
+		zoomGarbageCollect();
+	}
+}
+document.addEventListener("wheel", event_wheel_zoom, {
+	passive: false
+});
+
 function convertKeyCode(key) {
 	switch(key) {
 		case "ESC": return "Escape";
@@ -3488,6 +3556,7 @@ function convertKeyCode(key) {
 		case "DELETE": return "Delete";
 		case "PLUS": return "+";
 		case "MINUS": return "-";
+		case "EQUALS": return "=";
 		case "ENTER": return "Enter";
 		case "BACKSPACE": return "Backspace";
 		case "COMMAND": return "Meta";
