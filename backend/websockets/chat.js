@@ -201,7 +201,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "unblockall", null, "unblock all users", null],
 		[0, "mute", ["id", "seconds"], "mute a user for everyone", "1220 9999"], // check for permission
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
-		[0, "delete", ["id", "timestamp"], "delete a chat message", "1220 1693032103"], // check for permission
+		[0, "delete", ["id", "timestamp"], "delete a chat message", "1220 1693147307895"], // check for permission
 		[0, "color", ["color code"], "change your text color", "#FF00FF"], // client-side
 		[0, "chatcolor", ["color code"], "change your chat color", "#FF00FF"], // client-side
 		[0, "night", null, "enable night mode", null], // client-side
