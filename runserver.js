@@ -2197,10 +2197,11 @@ function ws_broadcast(data, world_id, opts) {
 					// -1: unavailable to all
 					if(chatPerm == -1) return;
 					// check if user has blocked this client
-					if ((client.sdata.chat_blocks.block_all && opts.clientId != 0) ||
-						client.sdata.chat_blocks.id.includes(opts.clientId) ||
-						(opts.username && client.sdata.chat_blocks.user.includes(opts.username)) || 
-					        (client.sdata.chat_blocks.no_anon == true && opts.username === null)) return;
+					if(client.sdata.chat_blocks.block_all && opts.clientId != 0) return;
+					if(client.sdata.chat_blocks.id.includes(opts.clientId)) return;
+					if(opts.username && client.sdata.chat_blocks.user.includes(opts.username)) return;
+					if(client.sdata.chat_blocks.no_anon && opts.username === null) return;
+					if(client.sdata.chat_blocks.no_reg && opts.username !== null) return;
 				}
 				wsSend(client, data);
 			}
@@ -2587,6 +2588,7 @@ async function manageWebsocketConnection(ws, req) {
 		user: [],
 		no_tell: false,
 		no_anon: false,
+		no_reg: false,
 		block_all: false
 	};
 

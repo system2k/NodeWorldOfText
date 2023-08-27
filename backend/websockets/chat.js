@@ -354,6 +354,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			case "anon":
 				blocks.no_anon = true;
 				break;
+			case "reg":
+				blocks.no_reg = true;
+				break;
 			default:
 				id = san_nbr(id);
 				if (id < 0) return;
@@ -412,6 +415,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			case "anon":
 				blocks.no_anon = false;
 				break;
+			case "reg":
+				blocks.no_reg = false;
 			default:
 				id = san_nbr(id);
 				if(id < 0) return;
@@ -456,6 +461,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			ws.sdata.chat_blocks.block_all = false;
 			ws.sdata.chat_blocks.no_tell = false;
 			ws.sdata.chat_blocks.no_anon = false;
+			ws.sdata.chat_blocks.no_reg = false;
 			
 			var tblocks = tell_blocks[ipHeaderAddr];
 			if(tblocks) {
@@ -555,9 +561,11 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				privateMessage: "from_me"
 			});
 			// if user has blocked TELLs, don't let the /tell-er know
-			if(client.sdata.chat_blocks[id] && (client.sdata.chat_blocks.id.includes(clientId) || // is ID of the /tell sender? (not destination)
-				(client.sdata.chat_blocks.block_all && opts.clientId != 0)) ||
-				(client.sdata.chat_blocks.no_tell)) return;
+			if(client.sdata.chat_blocks[id] && (client.sdata.chat_blocks.id.includes(clientId))) return; // is ID of the /tell sender? (not destination)
+			if(client.sdata.chat_blocks.block_all && opts.clientId != 0) return;
+			if(client.sdata.chat_blocks.no_tell) return;
+			if(client.sdata.chat_blocks.no_anon && !user.authenticated) return;
+			if(client.sdata.chat_blocks.no_reg && user.authenticated) return;
 				
 			// user has blocked the TELLer by IP
 			var tellblock = tell_blocks[client.sdata.ipAddress];
