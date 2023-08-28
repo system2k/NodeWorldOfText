@@ -245,6 +245,9 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		background_h: world.background.h,
 		background_rmod: world.background.rmod,
 		background_alpha: world.background.alpha,
+
+		default_script_path: world.opts.defaultScriptPath,
+
 		priv_note: world.opts.privNote,
 		meta_desc: world.opts.desc
 	};
@@ -577,6 +580,15 @@ module.exports.POST = async function(req, write, server, ctx) {
 				modifyWorldProp(world, "background/alpha", 1);
 			} else {
 				modifyWorldProp(world, "background/alpha", san_dp(post_data.background_alpha)); // can be -1
+			}
+
+			if(!post_data.default_script_path) {
+				modifyWorldProp(world, "opts/defaultScriptPath", "");
+			} else {
+				var defPath = post_data.default_script_path;
+				if(typeof defPath == "string" && defPath.length <= 512) {
+					modifyWorldProp(world, "opts/defaultScriptPath", defPath);
+				}
 			}
 		}
 

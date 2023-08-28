@@ -82,6 +82,7 @@ var world_default_props = {
 	background_h: 0,
 	background_rmod: 0,
 	background_alpha: 1,
+	default_script_path: "",
 	meta_desc: "",
 	priv_note: "",
 	write_int: -1,
@@ -193,7 +194,8 @@ function makeWorldObject() {
 			writeInt: 0,
 			memKey: "",
 			privNote: "",
-			desc: ""
+			desc: "",
+			defaultScriptPath: ""
 		},
 		background: {
 			url: "",
@@ -289,6 +291,7 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.opts.desc = getAndProcWorldProp(wprops, "meta_desc");
 	wobj.opts.privNote = getAndProcWorldProp(wprops, "priv_note");
 	wobj.opts.writeInt = getAndProcWorldProp(wprops, "write_int");
+	wobj.opts.defaultScriptPath = getAndProcWorldProp(wprops, "default_script_path");
 
 	wobj.background.url = getAndProcWorldProp(wprops, "background");
 	wobj.background.x = getAndProcWorldProp(wprops, "background_x");
@@ -443,6 +446,7 @@ async function commitWorld(world) {
 		"opts/desc",
 		"opts/privNote",
 		"opts/writeInt",
+		"opts/defaultScriptPath",
 		"background/url",
 		"background/x",
 		"background/y",
@@ -480,6 +484,7 @@ async function commitWorld(world) {
 		background_h: world.background.h,
 		background_rmod: world.background.rmod,
 		background_alpha: world.background.alpha,
+		default_script_path: world.opts.defaultScriptPath,
 		views: world.views,
 		ownership_change_date: world.ownershipChangeDate
 	};

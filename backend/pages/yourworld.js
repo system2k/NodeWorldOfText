@@ -139,6 +139,9 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		if(world.opts.halfChars) {
 			state.worldModel.half_chars = true;
 		}
+		if(world.opts.defaultScriptPath) {
+			state.worldModel.default_script_path = world.opts.defaultScriptPath;
+		}
 		if(announcement) {
 			state.announce = announcement;
 		}

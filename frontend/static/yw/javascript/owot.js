@@ -6013,6 +6013,13 @@ if(state.userModel.is_superuser) {
 	w.loadScript("/static/yw/javascript/world_tools.js");
 }
 
+if(state.worldModel.default_script_path && window.URL) {
+	let url = new URL(state.worldModel.default_script_path, window.location.origin);
+	if(url.origin == window.location.origin) { // static file must be from the same website!
+		w.loadScript(url.pathname);
+	}
+}
+
 if(state.background) {
 	w.backgroundInfo.x = ("x" in state.background) ? state.background.x : 0;
 	w.backgroundInfo.y = ("y" in state.background) ? state.background.y : 0;
