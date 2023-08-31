@@ -67,7 +67,6 @@ var chatResizing           = false;
 var tiles                  = {}; // All loaded tiles
 var images                 = {}; // { name: [data RGBA, width, height] }
 var keysPressed            = {};
-var previousErase          = 0;
 var verticalEnterPos       = [0, 0]; // position to go when pressing enter (tileX, charX)
 var lastX                  = verticalEnterPos; // Deprecated; temp compat
 var imgPatterns            = {};
@@ -86,6 +85,7 @@ var clientGuestCursorPos   = { tileX: 0, tileY: 0, charX: 0, charY: 0, hidden: f
 var disconnectTimeout      = null;
 var menuOptions            = {};
 var undoBuffer             = new CircularBuffer(2048);
+var compositionBuffer      = ""; // composition buffer for Android-based keyboards
 var textDecorationOffset   = 0x20F0;
 var textDecorationModes    = { bold: false, italic: false, under: false, strike: false };
 var fontTemplate           = "$px 'Courier New', monospace";
@@ -101,6 +101,9 @@ var specialClientHookMap   = 0; // bitfield (starts at 0): [before char renderin
 var bgImageHasChanged      = false;
 var remoteBoundary         = { centerX: 0, centerY: 0, minX: 0, minY: 0, maxX: 0, maxY: 0 };
 var boundaryStatus         = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+var write_busy             = false; // currently pasting
+var pasteInterval          = 0;
+var linkQueue              = [];
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -1919,6 +1922,8 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 
 	if(closest(e.target, elm.main_view) && canShowMobileKeyboard) {
 		elm.textInput.focus();
+		elm.textInput.value = "";
+		compositionBuffer = "";
 	}
 
 	// set cursor
@@ -2035,6 +2040,13 @@ function isCharLatestInUndoBuffer(tileX, tileY, charX, charY) {
 	if(!undoBuffer.top()) return false;
 	var latest = undoBuffer.top();
 	return (latest[0] == tileX & latest[1] == tileY && latest[2] == charX && latest[3] == charY);
+}
+
+function doBackspace() {
+	if(state.worldModel.char_rate[0] > 0 || state.userModel.is_member) {
+		moveCursor("left", true);
+		writeChar("\x08", true, null, false, 1);
+	}
 }
 
 // place a character
@@ -2600,148 +2612,155 @@ function textcode_parser(value, coords, defaultColor, defaultBgColor) {
 	};
 }
 
-function stabilizeTextInput() {
-	elm.textInput.selectionEnd = elm.textInput.value.length;
-	elm.textInput.selectionStart = elm.textInput.selectionEnd;
-}
-
 function event_input(e) {
-	if(e.inputType == "deleteContentBackward") {
-		if(getDate() - previousErase > 25 || !previousErase) {
-			moveCursor("left", true);
-			writeChar("\x08", true, null, false, 1);
+	if(e.inputType == "insertFromPaste") {
+		var value = w.split(elm.textInput.value.replace(/\r\n/g, "\n"));
+		elm.textInput.value = "";
+		var pastePerm = Permissions.can_paste(state.userModel, state.worldModel);
+		if(!cursorCoords) {
+			return;
 		}
-		previousErase = getDate();
+		var parser = textcode_parser(value, {
+			tileX: cursorCoords[0],
+			tileY: cursorCoords[1],
+			charX: cursorCoords[2],
+			charY: cursorCoords[3]
+		}, YourWorld.Color, YourWorld.BgColor);
+	
+		if(!pastePerm) {
+			cyclePaste(parser);
+			return;
+		}
+	
+		write_busy = true;
+	
+		var yieldItem;
+		var rate = state.worldModel.char_rate;
+		var base = rate[1];
+		if(base > 60 * 1000) base = 60 * 1000;
+		var speed = Math.floor(1000 / base * rate[0]) - 1;
+		if(speed < 1) speed = 1;
+		if(speed > 280) speed = 280;
+		if(state.userModel.is_member || state.userModel.is_owner) speed = 280;
+	
+		if(pasteInterval) clearInterval(pasteInterval);
+		pasteInterval = setInterval(function() {
+			var res;
+			if(yieldItem) {
+				res = cyclePaste(null, yieldItem);
+				yieldItem = null;
+			} else {
+				res = cyclePaste(parser);
+			}
+			if(!res || cursorCoords == null) {
+				clearInterval(pasteInterval);
+				write_busy = false;
+			} else if(typeof res == "object") {
+				yieldItem = res;
+			}
+		}, Math.floor(1000 / speed));
+	} else if(e.inputType == "deleteContentBackward") {
+		doBackspace();
+		return; // !
+	} else if(e.inputType == "deleteWordBackward") {
+		doBackspace();
+		elm.textInput.value = "";
+		return; // !
+	} else if(e.inputType == "insertCompositionText") {
+		if(typeof e.data == "string") {
+			return;
+		} else { // emit backspace - will be called under certain circumstances. based on observations, if DOM is manipulated after backspacing, this won't be called.
+			if(compositionBuffer.length == 0) { // pressing enter while there's text will result in extraneous backspace
+				doBackspace();
+			}
+		}
+	} else if(e.inputType == "insertLineBreak") {
+		return;
+	} else if(typeof e.data == "string") {
+		writeChar(e.data);
+		if(e.data == " ") { // the purpose is to disable dot after double-typing spaces on Android
+			elm.textInput.value = ".";
+			return;
+		}
 	}
+	elm.textInput.value = "\x7F".repeat(5);
 }
 
-elm.textInput.addEventListener("keydown", stabilizeTextInput);
 elm.textInput.addEventListener("input", event_input);
 
-var write_busy = false; // currently pasting
-var pasteInterval;
-var linkQueue = [];
-var char_input_check = setInterval(function() {
-	if(Modal.isOpen) return;
-	if(write_busy) return;
-	if(state.worldModel.char_rate[0] == 0 && !state.userModel.is_member) {
-		elm.textInput.value = "";
-		return;
+elm.textInput.addEventListener("compositionstart", function(e) {
+	compositionBuffer = "";
+});
+
+elm.textInput.addEventListener("compositionupdate", function(e) {
+	var bLen = compositionBuffer.length;
+	if(e.data.length > bLen) { // data added
+		var newChars = e.data.slice(bLen, e.data.length);
+		writeChar(newChars);
+	} else if(e.data.length < bLen && e.data.length > 0) { // data removed - maybe backspace
+		doBackspace();
 	}
-	var value = elm.textInput.value;
-	if(!value || value == "\x7F") {
-		if(value != "\x7F") {
-			elm.textInput.value = "\x7F";
-		}
-		return;
-	}
-	stabilizeTextInput();
-	value = w.split(value.replace(/\r\n/g, "\n").replace(/\x7F/g, ""));
-	if(value.length == 1) {
-		writeChar(value[0]);
-		elm.textInput.value = "";
-		return;
-	}
-	clearInterval(pasteInterval);
-	var pastePerm = Permissions.can_paste(state.userModel, state.worldModel);
-	var requestNextItem = true;
-	if(!cursorCoords) {
-		elm.textInput.value = "";
-		return;
-	}
-	var parser = textcode_parser(value, {
-		tileX: cursorCoords[0],
-		tileY: cursorCoords[1],
-		charX: cursorCoords[2],
-		charY: cursorCoords[3]
-	}, YourWorld.Color, YourWorld.BgColor);
+	compositionBuffer = e.data;
+});
+
+document.body.addEventListener("paste", function() {
+	// this fires before any content gets added from the paste.
+	// we must first clear out all the mess added to the input by the browser.
 	elm.textInput.value = "";
-	var item;
-	var charCount = 0;
-	var pasteFunc = function() {
-		if(requestNextItem) {
-			item = parser.nextItem();
-		} else {
-			requestNextItem = true;
-		}
-		if(item == -1)  {
-			return -1;
-		}
-		if(item.type == "char") {
-			if(item.writable) {
-				if(item.char == "\x7F") {
-					return true;
-				}
-				var res = writeChar(item.char, false, item.color, !item.newline, 0, item.bgColor);
-				if(res === null) {
-					// pause until tile loads
-					requestNextItem = false;
-					return false;
-				}
-				charCount++;
-			} else {
-				moveCursor("right");
-			}
-		} else if(item.type == "link") {
-			var undoTop = undoBuffer.top();
-			if(item.linkType == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
-				linkQueue.push(["url", item.tileX, item.tileY, item.charX, item.charY, item.url]);
-			} else if(item.linkType == "coord" && Permissions.can_coordlink(state.userModel, state.worldModel)) {
-				linkQueue.push(["coord", item.tileX, item.tileY, item.charX, item.charY, item.coord_tileX, item.coord_tileY]);
-			}
-			// a link was potentially put over a character that was changed to an identical character,
-			// meaning it did not get added to the undo buffer.
-			if(!isCharLatestInUndoBuffer(item.tileX, item.tileY, item.charX, item.charY)) {
-				markCharacterAsUndoable(item.tileX, item.tileY, item.charX, item.charY);
-			}
-		} else if(item.type == "protect") {
-			var protType = item.protType;
-			var canProtect = true;
-			if(protType <= 1) { // public, member
-				if(!Permissions.can_protect_tiles(state.userModel, state.worldModel)) canProtect = false;
-			}
-			if(protType == 2) { // owner
-				if(!Permissions.can_admin(state.userModel, state.worldModel)) protType = 1; // member
-			}
-			if(canProtect) {
-				network.protect({
-					tileY: item.tileY,
-					tileX: item.tileX,
-					charY: item.charY,
-					charX: item.charX
-				}, ["public", "member-only", "owner-only"][protType]);
-			}
-		}
-		return true;
-	};
-	if(!pastePerm) {
-		while(true) {
-			var res = pasteFunc();
-			if(!res || res == -1 || charCount >= 4) break;
-		}
-		elm.textInput.value = "";
-		return;
+});
+
+function cyclePaste(parser, yieldItem) {
+	var item = parser ? parser.nextItem() : yieldItem;
+	if(item == -1)  {
+		return false;
 	}
-	write_busy = true;
-	var rate = state.worldModel.char_rate;
-	var base = rate[1];
-	if(base > 60 * 1000) base = 60 * 1000;
-	var speed = Math.floor(1000 / base * rate[0]) - 1;
-	if(speed < 1) speed = 1;
-	if(speed > 280) speed = 280;
-	if(state.userModel.is_member || state.userModel.is_owner) speed = 280;
-	pasteInterval = setInterval(function() {
-		var res = pasteFunc();
-		if(res == -1) {
-			clearInterval(pasteInterval);
-			write_busy = false;
-			elm.textInput.value = "";
+	if(item.type == "char") {
+		if(item.writable) {
+			if(item.char == "\x7F") {
+				return true;
+			}
+			var res = writeChar(item.char, false, item.color, !item.newline, 0, item.bgColor);
+			if(res === null) {
+				// pause until tile loads
+				return item;
+			}
+		} else {
+			moveCursor("right");
 		}
-	}, Math.floor(1000 / speed));
-}, 10);
+	} else if(item.type == "link") {
+		var undoTop = undoBuffer.top();
+		if(item.linkType == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
+			linkQueue.push(["url", item.tileX, item.tileY, item.charX, item.charY, item.url]);
+		} else if(item.linkType == "coord" && Permissions.can_coordlink(state.userModel, state.worldModel)) {
+			linkQueue.push(["coord", item.tileX, item.tileY, item.charX, item.charY, item.coord_tileX, item.coord_tileY]);
+		}
+		// a link was potentially put over a character that was changed to an identical character,
+		// meaning it did not get added to the undo buffer.
+		if(!isCharLatestInUndoBuffer(item.tileX, item.tileY, item.charX, item.charY)) {
+			markCharacterAsUndoable(item.tileX, item.tileY, item.charX, item.charY);
+		}
+	} else if(item.type == "protect") {
+		var protType = item.protType;
+		var canProtect = true;
+		if(protType <= 1) { // public, member
+			if(!Permissions.can_protect_tiles(state.userModel, state.worldModel)) canProtect = false;
+		}
+		if(protType == 2) { // owner
+			if(!Permissions.can_admin(state.userModel, state.worldModel)) protType = 1; // member
+		}
+		if(canProtect) {
+			network.protect({
+				tileY: item.tileY,
+				tileX: item.tileX,
+				charY: item.charY,
+				charX: item.charX
+			}, ["public", "member-only", "owner-only"][protType]);
+		}
+	}
+	return true;
+};
 
 function stopPasting() {
-	if(write_busy) elm.textInput.value = "";
 	clearInterval(pasteInterval);
 	write_busy = false;
 }
@@ -2918,14 +2937,17 @@ function event_keydown(e) {
 		linkAuto.active = false;
 	}
 	if(checkKeyPress(e, "CTRL+ENTER")) {
+		elm.textInput.value = "";
+		writeChar("\n");
+	}
+	if(checkKeyPress(e, "ENTER")) {
+		elm.textInput.value = "";
 		writeChar("\n");
 	}
 	if(checkKeyPress(e, keyConfig.erase)) { // erase character
-		if(state.worldModel.char_rate[0] > 0 || state.userModel.is_member) {
-			moveCursor("left", true);
-			writeChar("\x08", true, null, false, 1);
-			previousErase = getDate();
-		}
+		e.preventDefault();
+		doBackspace();
+		elm.textInput.value = "\x7F".repeat(5);
 	}
 	if(checkKeyPress(e, keyConfig.cellErase)) {
 		if(state.worldModel.char_rate[0] > 0) {
