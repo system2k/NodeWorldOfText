@@ -2614,12 +2614,25 @@ function textcode_parser(value, coords, defaultColor, defaultBgColor) {
 
 function event_input(e) {
 	if(e.inputType == "insertFromPaste") {
-		var value = w.split(elm.textInput.value.replace(/\r\n/g, "\n"));
+		var pasteValue = elm.textInput.value;
+		var value = w.split(pasteValue.replace(/\r\n/g, "\n"));
 		elm.textInput.value = "";
 		var pastePerm = Permissions.can_paste(state.userModel, state.worldModel);
 		if(!cursorCoords) {
 			return;
 		}
+
+		var pasteEvent = {
+			text: pasteValue,
+			tileX: cursorCoords[0],
+			tileY: cursorCoords[1],
+			charX: cursorCoords[2],
+			charY: cursorCoords[3],
+			cancel: false
+		};
+		w.emit("paste", pasteEvent);
+		if(pasteEvent.cancel) return;
+
 		var parser = textcode_parser(value, {
 			tileX: cursorCoords[0],
 			tileY: cursorCoords[1],
@@ -2659,6 +2672,7 @@ function event_input(e) {
 				yieldItem = res;
 			}
 		}, Math.floor(1000 / speed));
+		return;
 	} else if(e.inputType == "deleteContentBackward") {
 		doBackspace();
 		return; // !
