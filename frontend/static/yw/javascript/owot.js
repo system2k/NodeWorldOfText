@@ -2709,12 +2709,23 @@ elm.textInput.addEventListener("compositionstart", function(e) {
 elm.textInput.addEventListener("compositionupdate", function(e) {
 	var bLen = compositionBuffer.length;
 	if(e.data.length > bLen) { // data added
-		var newChars = e.data.slice(bLen, e.data.length);
-		writeChar(newChars);
+		if(!e.data.endsWith(" ")) { // do not add chars if we detect that this is an autocompletion addition
+			var newChars = w.split(e.data.slice(bLen, e.data.length));
+			for(var i = 0; i < newChars.length; i++) {
+				writeChar(newChars[i]);
+			}
+		} else { // this is an autocompletion addition, add the last space
+			writeChar(" ");
+		}
 	} else if(e.data.length < bLen && e.data.length > 0) { // data removed - maybe backspace
 		doBackspace();
 	}
 	compositionBuffer = e.data;
+});
+
+elm.textInput.addEventListener("compositionend", function(e) {
+	// only necessary to prevent growth of text input
+	elm.textInput.value = "";
 });
 
 document.body.addEventListener("paste", function() {
