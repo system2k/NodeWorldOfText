@@ -2674,16 +2674,18 @@ function event_input(e) {
 		}, Math.floor(1000 / speed));
 		return;
 	} else if(e.inputType == "deleteContentBackward") {
+		// any deletion
 		doBackspace();
-		return; // !
+		return;
 	} else if(e.inputType == "deleteWordBackward") {
+		// delete entire word - we will erase a single char anyway
 		doBackspace();
 		elm.textInput.value = "";
-		return; // !
+		return;
 	} else if(e.inputType == "insertCompositionText") {
-		if(typeof e.data == "string") {
+		if(typeof e.data == "string") { // this'll be handled by the composition(start/update/end) events
 			return;
-		} else { // emit backspace - will be called under certain circumstances. based on observations, if DOM is manipulated after backspacing, this won't be called.
+		} else { // e.data is null, so it could be a text composition cancelation - treat as deletion
 			if(compositionBuffer.length == 0) { // pressing enter while there's text will result in extraneous backspace
 				doBackspace();
 			}
