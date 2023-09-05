@@ -4,7 +4,6 @@ var args = process.argv.slice(2);
 var fork = require("child_process").fork;
 var serverPath = "./runserver.js";
 
-// server used for maintenance message
 var http = require("http");
 var maintenance_port = null;
 
