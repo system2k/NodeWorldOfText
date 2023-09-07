@@ -612,7 +612,7 @@
 		<div class="content_set_content">
 			{% if members %}
 				<ul>
-					<form method="POST" action=".">
+					<form method="POST" action="">
 						<div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" /></div>
 						<input type="hidden" name="form" value="remove_member">
 						{% for member in members %}
@@ -625,7 +625,7 @@
 			{% endif %}
 			{% if add_member_message %}<div><i>{{ add_member_message }}</i></div>{% endif %}
 			<div style="margin-top:.3em">
-				<form method="POST" action=".">
+				<form method="POST" action="">
 					<div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" /></div>
 					<label for="choose_member">Add a member: </label>
 					<input id="choose_member" type="text" name="add_member" value="">
@@ -636,7 +636,7 @@
 		</div>
 	</div>
 
-	<form method="POST" action="." id="action_form" onsubmit="return action_confirm();">
+	<form method="POST" action="" id="action_form" onsubmit="return action_confirm();">
 		<input type="hidden" name="form" value="action">
 		<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 		<table>
