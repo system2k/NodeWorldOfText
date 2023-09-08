@@ -1703,6 +1703,18 @@ function doProtect() {
 	network.protect(position, action);
 }
 
+function resetUI() {
+	stopLinkUI();
+	stopTileUI();
+	for(var i = 0; i < regionSelections.length; i++) {
+		regionSelections[i].stopSelectionUI();
+	}
+	removeCursor();
+	tileProtectAuto.active = false;
+	tileProtectAuto.lastPos = null;
+	linkAuto.active = false;
+}
+
 function triggerUIClick() {
 	stopPasting();
 	if(w.isLinking) {
@@ -2953,15 +2965,7 @@ function event_keydown(e) {
 	}
 	if(checkKeyPress(e, keyConfig.reset)) { // esc
 		w.emit("esc");
-		stopLinkUI();
-		stopTileUI();
-		for(var i = 0; i < regionSelections.length; i++) {
-			regionSelections[i].stopSelectionUI();
-		}
-		removeCursor();
-		tileProtectAuto.active = false;
-		tileProtectAuto.lastPos = null;
-		linkAuto.active = false;
+		resetUI();
 	}
 	if(checkKeyPress(e, "CTRL+ENTER")) {
 		elm.textInput.value = "";
@@ -6106,6 +6110,78 @@ function tile_offset_object(data, tileOffX, tileOffY) {
 	}
 }
 
+function updateWorldName() {
+	var name = state.worldModel.name;
+	if(!name || name.toLowerCase() == "main" || name.toLowerCase() == "owot") {
+		document.title = "Our World of Text";
+	} else {
+		document.title = state.worldModel.pathname;
+	}
+	if(window.history && window.history.replaceState) {
+		var newPath = state.worldModel.pathname + window.location.search + window.location.hash;
+		if(!newPath) newPath = "/";
+		history.replaceState({}, "", newPath);
+	}
+}
+
+function reapplyProperties(props) {
+	var theme = props.theme;
+	var themeDefaults = defaultStyles();
+	styles.member = theme.tileMember || themeDefaults.member;
+	styles.owner = theme.tileOwner || themeDefaults.owner;
+	styles.public = theme.bg || themeDefaults.public;
+	styles.text = theme.color || themeDefaults.text;
+	styles.menu = theme.menu || themeDefaults.menu;
+	styles.cursor = theme.cursor || themeDefaults.cursor;
+	styles.guestCursor = theme.guestCursor || themeDefaults.guestCursor;
+	styles.public_text = theme.publicText || themeDefaults.public_text;
+	styles.member_text = theme.memberText || themeDefaults.member_text;
+	styles.owner_text = theme.ownerText || themeDefaults.owner_text;
+
+	menu_color(styles.menu);
+
+	state.worldModel.writability = props.writability;
+	state.worldModel.readability = props.readability;
+
+	state.worldModel.color_cell = props.feature.colorCell;
+	state.worldModel.color_text = props.feature.colorText;
+	state.worldModel.feature_coord_link = props.feature.coordLink;
+	state.worldModel.feature_go_to_coord = props.feature.goToCoord;
+	state.worldModel.feature_membertiles_addremove = props.feature.memberTilesAddRemove;
+	state.worldModel.feature_paste = props.feature.paste;
+	state.worldModel.feature_url_link = props.feature.urlLink;
+	state.worldModel.show_cursor = props.feature.showCursor;
+	state.worldModel.square_chars = props.opts.squareChars;
+	state.worldModel.half_chars = props.opts.halfChars;
+
+	if(state.worldModel.square_chars) {
+		defaultSizes.cellW = 18;
+	} else {
+		defaultSizes.cellW = 10;
+	}
+	if(state.worldModel.half_chars) {
+		defaultSizes.cellH = 20;
+	} else {
+		defaultSizes.cellH = 18;
+	}
+
+	state.worldModel.write_interval = props.opts.writeInt;
+
+	state.worldModel.name = props.name;
+	state.worldModel.pathname = props.name ? "/" + props.name : "";
+	if(props.opts.charRate) {
+		state.worldModel.char_rate = props.opts.charRate.split("/").map(Number);
+	}
+
+	updateScaleConsts();
+	resetColorModalVisibility();
+	updateMenuEntryVisiblity();
+	updateWorldName();
+
+	w.reloadRenderer();
+	w.setFlushInterval(state.worldModel.write_interval);
+}
+
 var ws_functions = {
 	fetch: function(data) {
 		var id = 0;
@@ -6429,15 +6505,8 @@ var ws_functions = {
 				case "name":
 					state.worldModel.name = value;
 					state.worldModel.pathname = value ? "/" + value : "";
-					if(!value || value.toLowerCase() == "main" || value.toLowerCase() == "owot") {
-						document.title = "Our World of Text";
-					} else {
-						document.title = state.worldModel.pathname;
-					}
 					ws_path = createWsPath();
-					if(window.history && window.history.replaceState) {
-						history.replaceState({}, "", state.worldModel.pathname + window.location.search + window.location.hash);
-					}
+					updateWorldName();
 					break;
 				case "charRate":
 					state.worldModel.char_rate = value;

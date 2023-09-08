@@ -189,19 +189,18 @@ var client_commands = {
 		if(!address) address = "";
 		positionX = 0;
 		positionY = 0;
+		writeBuffer = [];
+		tellEdit = [];
+		resetUI();
+		stopPasting();
 		if(address.charAt(0) == "/") address = address.substr(1);
 		state.worldModel.pathname = "/" + address;
 		ws_path = createWsPath();
 		w.changeSocket(ws_path, true);
-		getWorldProps(address, "style", function(style, error) {
+		getWorldProps(address, "props", function(props, error) {
 			if(!error) {
-				styles.member = style.member;
-				styles.owner = style.owner;
-				styles.public = style.public;
-				styles.text = style.text;
+				reapplyProperties(props);
 			}
-			menu_color(styles.menu);
-			w.redraw();
 		});
 		clientChatResponse("Switching to world: \"" + address + "\"");
 	},
