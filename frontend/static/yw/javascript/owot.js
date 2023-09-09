@@ -5151,8 +5151,10 @@ var network = {
 	clear_tile: function(x, y) {
 		network.transmit({
 			kind: "clear_tile",
-			tileX: x,
-			tileY: y
+			data: {
+				tileX: x,
+				tileY: y
+			}
 		});
 	},
 	cursor: function(tileX, tileY, charX, charY, hidden) {

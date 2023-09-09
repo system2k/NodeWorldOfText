@@ -1,22 +1,22 @@
-var utils = require("../utils/utils.js");
-var san_nbr = utils.san_nbr;
-
 module.exports = async function(ws, data, send, broadcast, server, ctx) {
-	var user = ctx.user;
-	var world = ctx.world;
+	var modules = server.modules;
 
-	var db = server.db;
-	var tile_database = server.tile_database;
+	var sData = data.data;
+	if(!sData) return;
 
-	if(!user.superuser) return;
+	var tileX = sData.tileX;
+	var tileY = sData.tileY;
 
-	var tileX = san_nbr(data.tileX);
-	var tileY = san_nbr(data.tileY);
+	var charRange = sData.charRange;
 
-	var no_log_edits = world.opts.noLogEdits;
-
-	await tile_database.write(tile_database.types.clear, {
-		tileX, tileY, user, world,
-		date: Date.now(), no_log_edits
+	await modules.clear_areas({
+		tileX, tileY,
+		charRange
+	}, server, {
+		user: ctx.user,
+		channel: ctx.channel,
+		world: ctx.world,
+		keyQuery: ctx.keyQuery,
+		ws: ws
 	});
 }

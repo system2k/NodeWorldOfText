@@ -552,7 +552,8 @@ var modules = {
 	fetch_tiles: require("./backend/modules/fetch_tiles.js"),
 	protect_areas: require("./backend/modules/protect_areas.js"),
 	write_data: require("./backend/modules/write_data.js"),
-	write_links: require("./backend/modules/write_links.js")
+	write_links: require("./backend/modules/write_links.js"),
+	clear_areas: require("./backend/modules/clear_areas.js")
 };
 
 var subsystems = {
@@ -2289,7 +2290,7 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	chat:			[256, 1000, 0], // rate-limiting handled separately
 	chathistory:	[4, 500, 0],
-	clear_tile:		[1000, 1000, 0],
+	clear_tile:		[256, 1000, 0],
 	cmd_opt:		[10, 1000, 0],
 	cmd:			[256, 1000, 0],
 	debug:			[10, 1000, 0],

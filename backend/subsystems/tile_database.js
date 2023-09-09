@@ -896,20 +896,57 @@ function tileWriteProtections(callID, tile, options) {
 function tileWriteClear(callID, tile, options) {
 	var sharedData = cids[callID].sharedData;
 
-	for(var x = 0; x < CONST.tileArea; x++) {
-		tile.content[x] = " ";
-		tile.prop_color[x] = 0;
-	}
-	tile.prop_bgcolor = null;
+	var charRange = options.charRange;
 
-	for(var d in tile.prop_cell_props) {
-		delete tile.prop_cell_props[d];
+	if(!charRange) {
+		for(var x = 0; x < CONST.tileArea; x++) {
+			tile.content[x] = " ";
+			tile.prop_color[x] = 0;
+		}
+		tile.prop_bgcolor = null;
+	
+		for(var d in tile.prop_cell_props) {
+			delete tile.prop_cell_props[d];
+		}
+		tile.url_cells = 0;
+		tile.url_bytes = 0;
+		tile.content_updated = true;
+		tile.props_updated = true;
+	} else {
+		// validated via clear_areas module
+		var charX1 = charRange[0];
+		var charY1 = charRange[1];
+		var charX2 = charRange[2];
+		var charY2 = charRange[3];
+		for(var y = charY1; y <= charY2; y++) {
+			for(var x = charX1; x <= charX2; x++) {
+				var idx = y * CONST.tileCols + x;
+				tile.content[idx] = " ";
+				tile.prop_color[idx] = 0;
+				if(tile.prop_bgcolor !== null) {
+					tile.prop_bgcolor[idx] = -1;
+				}
+				if(tile.prop_cell_props[y]) {
+					if(tile.prop_cell_props[y][x]) {
+						var link = tile.prop_cell_props[y][x].link;
+						if(link && link.type == "url") {
+							tile.url_cells--;
+							tile.url_bytes -= Buffer.byteLength(link.url);
+						}
+						delete tile.prop_cell_props[y][x];
+					}
+				}
+				
+			}
+		}
+		if(tile.prop_bgcolor !== null && arrayIsEntirely(tile.prop_bgcolor, -1)) {
+			tile.prop_bgcolor = null;
+		}
 	}
-	tile.url_cells = 0;
-	tile.url_bytes = 0;
 
 	tile.content_updated = true;
 	tile.props_updated = true;
+
 	tile.last_accessed = Date.now();
 
 	sharedData.updatedTile = tile;
@@ -1414,7 +1451,11 @@ function processTileClearRequest(call_id, data) {
 		if(updatedTile) {
 			prepareTileUpdateMessage([{tileX, tileY, tile: updatedTile}], world, null);
 			if(!data.no_log_edits) {
-				appendToEditLogQueue(tileX, tileY, 0, "@{\"kind\":\"clear_tile\"}", world.id, Date.now());
+				var editData = "@" + JSON.stringify({
+					kind: "clear_tile",
+					charRange: data.charRange || void 0
+				});
+				appendToEditLogQueue(tileX, tileY, 0, editData, world.id, Date.now());
 			}
 		}
 	}
