@@ -1716,10 +1716,21 @@ function stopLinkUI() {
 
 function startEraseUI() {
 	elm.erase_region.style.display = "";
+	if((eraseRegionMode == 0 || eraseRegionMode == 1) && !w.eraseSelect.isSelecting) {
+		w.eraseSelect.startSelection();
+	} else if(eraseRegionMode == 2 && !admclr.activated) {
+		admclr.activate();
+	}
 }
 
 function stopEraseUI() {
 	elm.erase_region.style.display = "none";
+	if(w.eraseSelect.isSelecting) {
+		w.eraseSelect.stopSelectionUI();
+	}
+	if(admclr.activated) {
+		admclr.deactivate();
+	}
 }
 
 function removeTileProtectHighlight() {
@@ -4781,10 +4792,7 @@ function buildMenu() {
 		return w.doProtect("public");
 	});
 	menuOptions.resetArea = menu.addOption("Default area protection", w.doUnprotect);
-	menuOptions.eraseArea = menu.addOption("Erase an area", function() {
-		startEraseUI();
-		w.eraseSelect.startSelection();
-	});
+	menuOptions.eraseArea = menu.addOption("Erase an area", startEraseUI);
 
 	menuOptions.grid = menu.addCheckboxOption("Toggle grid", function() {
 		gridEnabled = true;
