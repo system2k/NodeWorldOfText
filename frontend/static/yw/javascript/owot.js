@@ -6910,7 +6910,6 @@ function begin() {
 	w.protectSelect.tiled = true;
 
 	w.eraseSelect.onselection(eraseSelectionStart);
-	//w.eraseSelect.oncancel(eraseSelectionCancel);
 
 	w.fetchUnloadedTiles();
 	w.fixFonts("legacycomputing");

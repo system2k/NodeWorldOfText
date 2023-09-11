@@ -47,6 +47,15 @@ module.exports = async function(data, server, params) {
 
 	var no_log_edits = world.opts.noLogEdits;
 
+	// the x position going from 0 - 127 may be used at times
+	var charIdx = charY * CONST.tileCols + charX;
+	charX = charIdx % CONST.tileCols;
+	charY = Math.floor(charIdx / CONST.tileCols);
+
+	if(charIdx < 0 || charIdx >= CONST.tileArea) { // out of range coords
+		return [true, "PARAM"];
+	}
+
 	if(!rate_limiter.setHold(idLabel, world.id, tileX, tileY)) {
 		return [true, "RATE"];
 	}
