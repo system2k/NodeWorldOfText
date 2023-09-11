@@ -4781,7 +4781,7 @@ function buildMenu() {
 		return w.doProtect("public");
 	});
 	menuOptions.resetArea = menu.addOption("Default area protection", w.doUnprotect);
-	menuOptions.clearArea = menu.addOption("Clear an area", function() {
+	menuOptions.eraseArea = menu.addOption("Erase an area", function() {
 		startEraseUI();
 		w.eraseSelect.startSelection();
 	});
@@ -4858,6 +4858,7 @@ function updateMenuEntryVisiblity() {
 	var permUrlLink = Permissions.can_urllink(state.userModel, state.worldModel);
 	var permOwnerArea = Permissions.can_admin(state.userModel, state.worldModel);
 	var permMemberArea = Permissions.can_protect_tiles(state.userModel, state.worldModel);
+	var permEraseArea = Permissions.can_erase(state.userModel, state.worldModel);
 	w.menu.setEntryVisibility(menuOptions.changeColor, permColorText || permColorCell);
 	w.menu.setEntryVisibility(menuOptions.goToCoords, permGoToCoord);
 	w.menu.setEntryVisibility(menuOptions.coordLink, permCoordLink);
@@ -4866,6 +4867,7 @@ function updateMenuEntryVisiblity() {
 	w.menu.setEntryVisibility(menuOptions.memberArea, permMemberArea);
 	w.menu.setEntryVisibility(menuOptions.publicArea, permMemberArea);
 	w.menu.setEntryVisibility(menuOptions.resetArea, permMemberArea);
+	w.menu.setEntryVisibility(menuOptions.eraseArea, permEraseArea);
 }
 
 function regionSelectionsActive() {

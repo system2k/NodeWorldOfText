@@ -38,6 +38,10 @@ var Permissions = {
 		if(user.is_owner) return true;
 		return world.feature_membertiles_addremove && user.is_member;
 	},
+	can_erase: function(user, world) {
+		if(user.is_owner) return true;
+		return false;
+	},
 	can_read: function(user, world) {
 		return Permissions.user_matches_perm(user, world, world.readability);
 	},
