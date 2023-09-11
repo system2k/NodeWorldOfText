@@ -19,6 +19,7 @@ function init_dom() {
 	linkDiv = elm.link_div;
 	updateCoordDisplay();
 	initTextDecoBar();
+	initEraseRegionBar();
 	defineElements({
 		owot: owot,
 		textInput: textInput
@@ -104,6 +105,7 @@ var boundaryStatus         = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 var write_busy             = false; // currently pasting
 var pasteInterval          = 0;
 var linkQueue              = [];
+var eraseRegionMode        = 0;
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -202,6 +204,7 @@ defineElements({ // elm[<name>]
 	chatbar: byId("chatbar"),
 	color_input_form_input: byId("color_input_form_input"),
 	protect_precision: byId("protect_precision"),
+	erase_region: byId("erase_region"),
 	announce_container: byId("announce_container"),
 	tile_choice: byId("tile_choice"),
 	char_choice: byId("char_choice"),
@@ -224,7 +227,11 @@ defineElements({ // elm[<name>]
 	text_deco_b: byId("text_deco_b"),
 	text_deco_i: byId("text_deco_i"),
 	text_deco_u: byId("text_deco_u"),
-	text_deco_s: byId("text_deco_s")
+	text_deco_s: byId("text_deco_s"),
+	erase_region_once: byId("erase_region_once"),
+	erase_region_mult: byId("erase_region_mult"),
+	erase_region_ctrl: byId("erase_region_ctrl"),
+	erase_region_snap: byId("erase_region_snap")
 });
 
 function setRGBColorPicker(r, g, b) {
@@ -1140,6 +1147,87 @@ function keydown_linkAuto(e) {
 }
 document.body.addEventListener("keydown", keydown_linkAuto);
 
+var admclr = {
+	activated: false,
+	lastPos: null,
+	ctrlDown: false,
+	color: "#FF5959",
+	renderTile: function(preserveLastPos) {
+		var tile = Tile.get(currentPosition[0], currentPosition[1]);
+		if(tile) {
+			// change color to red
+			tile.backgroundColor = admclr.color;
+			if(!preserveLastPos)
+				admclr.lastPos = [currentPosition[0], currentPosition[1]];
+			// re-render the tile
+			w.setTileRender(currentPosition[0], currentPosition[1]);
+		}
+	},
+	handleClear: function(x, y) {
+		network.clear_tile({
+			tileX: x,
+			tileY: y
+		});
+	},
+	activate: function() {
+		admclr.activated = true;
+	},
+	deactivate: function() {
+		admclr.activated = false;
+		tiles[currentPosition[1] + "," + currentPosition[0]].backgroundColor = "";
+		w.setTileRedraw(currentPosition[0], currentPosition[1]);
+	}
+};
+
+function keydown_admclr(e) {
+	if(!admclr.activated) return;
+	if(admclr.ctrlDown) return;
+	if(e.ctrlKey) {
+		admclr.ctrlDown = true;
+		admclr.color = "#FF0000";
+		admclr.renderTile(true);
+		admclr.handleClear(currentPosition[0], currentPosition[1]);
+	}
+}
+document.body.addEventListener("keydown", keydown_admclr);
+
+function mousemove_admclr(e) {
+	if(!admclr.activated) return;
+	if(admclr.lastPos) {
+		var tile = Tile.get(admclr.lastPos[0], admclr.lastPos[1]);
+		// do not re-render if the cursor moved but is still inside the same tile
+		if(admclr.lastPos[0] == currentPosition[0] && admclr.lastPos[1] == currentPosition[1]) {
+			return;
+		}
+		if(tile) tile.backgroundColor = "";
+		// re-render the tile
+		w.setTileRender(admclr.lastPos[0], admclr.lastPos[1]);
+	}
+	// if tile exists
+	admclr.renderTile();
+	if(admclr.ctrlDown) {
+		admclr.handleClear(currentPosition[0], currentPosition[1]);
+	}
+}
+document.body.addEventListener("mousemove", mousemove_admclr);
+
+function keyup_admclr(e) {
+	if(!admclr.activated) return;
+	admclr.ctrlDown = false;
+	admclr.color = "#FF5959";
+	var tile = Tile.get(currentPosition[0], currentPosition[1]);
+	// remove color of tile
+	if(admclr.lastPos) {
+		tile.backgroundColor = "";
+		// re-render the tile
+		w.setTileRender(admclr.lastPos[0], admclr.lastPos[1]);
+	}
+	tile.backgroundColor = "";
+	w.setTileRender(currentPosition[0], currentPosition[1]);
+	admclr.lastPos = null;
+}
+document.body.addEventListener("keyup", keyup_admclr);
+
 function onKeyUp(e) {
 	var sel = checkKeyPress(e, keyConfig.autoSelect);
 	var des = checkKeyPress(e, keyConfig.autoDeselect);
@@ -1626,6 +1714,14 @@ function stopLinkUI() {
 	w.setTileRedraw(tileX, tileY, true);
 }
 
+function startEraseUI() {
+	elm.erase_region.style.display = "";
+}
+
+function stopEraseUI() {
+	elm.erase_region.style.display = "none";
+}
+
 function removeTileProtectHighlight() {
 	if(!lastTileHover) return;
 	var precision = lastTileHover[0];
@@ -1706,6 +1802,7 @@ function doProtect() {
 function resetUI() {
 	stopLinkUI();
 	stopTileUI();
+	stopEraseUI();
 	for(var i = 0; i < regionSelections.length; i++) {
 		regionSelections[i].stopSelectionUI();
 	}
@@ -4396,7 +4493,6 @@ function protectPrecisionOption(option) {
 	elm.tile_choice.style.backgroundColor = tileChoiceColor;
 	elm.char_choice.style.backgroundColor = charChoiceColor;
 }
-protectPrecisionOption(protectPrecision);
 
 function toggleTextDecoBar() {
 	if(elm.text_decorations.style.display == "") {
@@ -4429,6 +4525,45 @@ function initTextDecoBar() {
 	}
 }
 
+function initEraseRegionBar() {
+	function evt_oninput() {
+		if(elm.erase_region_once.checked) {
+			if(eraseRegionMode == 2 && !w.eraseSelect.isSelecting) { // Ctrl selection -> Region selection
+				w.eraseSelect.startSelection();
+				admclr.deactivate();
+			}
+			eraseRegionMode = 0;
+		}
+		if(elm.erase_region_mult.checked) {
+			if(eraseRegionMode == 2 && !w.eraseSelect.isSelecting) {
+				w.eraseSelect.startSelection();
+				admclr.deactivate();
+			}
+			eraseRegionMode = 1;
+		}
+		if(elm.erase_region_ctrl.checked) {
+			eraseRegionMode = 2;
+			elm.erase_region_snap.disabled = true;
+			if(w.eraseSelect.isSelecting) { // Region selection -> Ctrl selection
+				w.eraseSelect.stopSelectionUI();
+			}
+			admclr.activate();
+		} else {
+			elm.erase_region_snap.disabled = false;
+		}
+	}
+	elm.erase_region_once.oninput = evt_oninput;
+	elm.erase_region_mult.oninput = evt_oninput;
+	elm.erase_region_ctrl.oninput = evt_oninput;
+	elm.erase_region_snap.oninput = function() {
+		if(elm.erase_region_snap.checked) {
+			w.eraseSelect.tiled = true;
+		} else {
+			w.eraseSelect.tiled = false;
+		}
+	};
+}
+
 function protectSelectionStart(start, end, width, height) {
 	var tileX1 = start[0];
 	var tileY1 = start[1];
@@ -4454,8 +4589,8 @@ function protectSelectionStart(start, end, width, height) {
 		var ty2 = tileY2;
 		if(charX1) tx1++;
 		if(charY1) ty1++;
-		if(charX2 < 15) tx2--;
-		if(charY2 < 7) ty2--;
+		if(charX2 < tileC - 1) tx2--;
+		if(charY2 < tileR - 1) ty2--;
 
 		for(var y = tileY1; y <= tileY2; y++) {
 			for(var x = tileX1; x <= tileX2; x++) {
@@ -4525,6 +4660,81 @@ function protectSelectionStart(start, end, width, height) {
 	w.protectSelect.startSelection();
 }
 
+function eraseSelectionStart(start, end, width, height) {
+	var tileX1 = start[0];
+	var tileY1 = start[1];
+	var charX1 = start[2];
+	var charY1 = start[3];
+	var tileX2 = end[0];
+	var tileY2 = end[1];
+	var charX2 = end[2];
+	var charY2 = end[3];
+
+	var tx1 = tileX1;
+	var ty1 = tileY1;
+	var tx2 = tileX2;
+	var ty2 = tileY2;
+	if(charX1) tx1++;
+	if(charY1) ty1++;
+	if(charX2 < tileC - 1) tx2--;
+	if(charY2 < tileR - 1) ty2--;
+
+	var tileList = [];
+
+	for(var y = tileY1; y <= tileY2; y++) {
+		for(var x = tileX1; x <= tileX2; x++) {
+			var leftEdge = x == tileX1 && charX1 > 0;
+			var topEdge = y == tileY1 && charY1 > 0;
+			var rightEdge = x == tileX2 && charX2 < (tileC - 1);
+			var bottomEdge = y == tileY2 && charY2 < (tileR - 1);
+			var cx1 = 0;
+			var cy1 = 0;
+			var cx2 = tileC - 1;
+			var cy2 = tileR - 1;
+			if(leftEdge || topEdge || rightEdge || bottomEdge) {
+				if(leftEdge) cx1 = charX1;
+				if(topEdge) cy1 = charY1;
+				if(rightEdge) cx2 = charX2;
+				if(bottomEdge) cy2 = charY2;
+				tileList.push([x, y, [cx1, cy1, cx2 - cx1 + 1, cy2 - cy1 + 1]]);
+			} else {
+				tileList.push([x, y]);
+			}
+		}
+	}
+
+	// full tiles
+	var tidx = 0;
+	var tprot = setInterval(function() {
+		if(tidx >= tileList.length) {
+			clearInterval(tprot);
+			return;
+		}
+		var pos = tileList[tidx];
+		var tileX = pos[0];
+		var tileY = pos[1];
+		var charRange = pos[2];
+		var pkt = {
+			tileX: tileX,
+			tileY: tileY
+		};
+		if(charRange) {
+			pkt.charX = charRange[0];
+			pkt.charY = charRange[1];
+			pkt.charWidth = charRange[2];
+			pkt.charHeight = charRange[3];
+		}
+		network.clear_tile(pkt);
+		tidx++;
+	}, 1000 / 80);
+
+	if(eraseRegionMode == 0) {
+		stopEraseUI();
+	} else if(eraseRegionMode == 1) {
+		w.eraseSelect.startSelection();
+	}
+}
+
 function protectSelectionCancel() {
 	elm.protect_selection.style.color = "";
 }
@@ -4571,6 +4781,10 @@ function buildMenu() {
 		return w.doProtect("public");
 	});
 	menuOptions.resetArea = menu.addOption("Default area protection", w.doUnprotect);
+	menuOptions.clearArea = menu.addOption("Clear an area", function() {
+		startEraseUI();
+		w.eraseSelect.startSelection();
+	});
 
 	menuOptions.grid = menu.addCheckboxOption("Toggle grid", function() {
 		gridEnabled = true;
@@ -4763,6 +4977,12 @@ function RegionSelection() {
 			this.setSelection(this.regionCoordA, this.regionCoordB);
 			var coordA = this.regionCoordA.slice(0);
 			var coordB = this.regionCoordB.slice(0);
+			if(this.tiled) {
+				coordA[2] = 0;
+				coordA[3] = 0;
+				coordB[2] = tileC - 1;
+				coordB[3] = tileR - 1;
+			}
 			orderRangeABCoords(coordA, coordB);
 			var regWidth = (coordB[0] - coordA[0]) * tileC + coordB[2] - coordA[2] + 1;
 			var regHeight = (coordB[1] - coordA[1]) * tileR + coordB[3] - coordA[3] + 1;
@@ -4772,6 +4992,7 @@ function RegionSelection() {
 			this.stopSelectionUI(true);
 		} else {
 			// the selection has been immediately restarted after the event has been fired
+			this.restartSelection = false;
 			this.regionCoordA = null;
 			this.regionCoordB = null;
 			this.hide();
@@ -5016,7 +5237,7 @@ var network = {
 		}
 	},
 	protect: function(position, type) {
-		// position: {tileX, tileY, [charX, charY, [width, height]]]}
+		// position: {tileX, tileY, [charX, charY, [charWidth, charHeight]]]}
 		// type: <unprotect, public, member-only, owner-only>
 		var isPrecise = "charX" in position && "charY" in position;
 		var data = {
@@ -5148,14 +5369,32 @@ var network = {
 			id: cb_id // optional: number
 		});
 	},
-	clear_tile: function(x, y) {
-		network.transmit({
-			kind: "clear_tile",
-			data: {
-				tileX: x,
-				tileY: y
+	clear_tile: function(position) {
+		// position: {tileX, tileY, [charX, charY, [width, height]]]}
+		var data = {
+			tileX: position.tileX,
+			tileY: position.tileY
+		};
+		var isPrecise = "charX" in position || "charY" in position || "charWidth" in position || "charHeight" in position;
+		if(isPrecise) {
+			data.charX = position.charX;
+			data.charY = position.charY;
+			if(!("tileX" in position || "tileY" in position)) {
+				data.tileX = Math.floor(data.charX / tileC);
+				data.tileY = Math.floor(data.charY / tileR);
+				data.charX = data.charX - Math.floor(data.charX / tileC) * tileC;
+				data.charY = data.charY - Math.floor(data.charY / tileR) * tileR;
 			}
-		});
+			if("charWidth" in position && "charHeight" in position) {
+				data.charWidth = position.charWidth;
+				data.charHeight = position.charHeight;
+			}
+		}
+		var req = {
+			kind: "clear_tile",
+			data: data
+		};
+		network.transmit(req);
 	},
 	cursor: function(tileX, tileY, charX, charY, hidden) {
 		var data = {
@@ -5269,6 +5508,7 @@ Object.assign(w, {
 	},
 	regionSelect: new RegionSelection(),
 	protectSelect: new RegionSelection(),
+	eraseSelect: new RegionSelection(),
 	color: function() {
 		w.ui.colorModal.open();
 	},
@@ -6669,12 +6909,17 @@ function begin() {
 	w.protectSelect.oncancel(protectSelectionCancel);
 	w.protectSelect.tiled = true;
 
+	w.eraseSelect.onselection(eraseSelectionStart);
+	//w.eraseSelect.oncancel(eraseSelectionCancel);
+
 	w.fetchUnloadedTiles();
 	w.fixFonts("legacycomputing");
 
 	browserZoomAdjust(true);
-
 	manageCoordHash();
+
+	protectPrecisionOption(protectPrecision);
+
 	getWorldProps(state.worldModel.name, "style", function(style, error) {
 		if(error) {
 			console.warn("An error occurred while loading the world style");

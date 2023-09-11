@@ -23,26 +23,10 @@ module.exports = async function(data, server, params) {
 
 	var tileX = san_nbr(data.tileX);
 	var tileY = san_nbr(data.tileY);
-	var charRange = data.charRange;
-	if(charRange) {
-		// reject request if char range is invalid
-		if(!Array.isArray(charRange)) return;
-		if(charRange.length != 4) return;
-		charRange = [
-			san_nbr(charRange[0]),
-			san_nbr(charRange[1]),
-			san_nbr(charRange[2]),
-			san_nbr(charRange[3])
-		];
-		if(charRange[0] < 0 || charRange[1] < 0 || charRange[2] < 0 || charRange[2] < 0) return;
-		if(charRange[0] >= CONST.tileCols || charRange[1] >= CONST.tileRows) return;
-		if(charRange[2] >= CONST.tileCols || charRange[3] >= CONST.tileRows) return;
-		// important - don't cause an infinite loop
-		if(charRange[0] > charRange[2]) return;
-		if(charRange[1] > charRange[3]) return;
-	} else {
-		charRange = null;
-	}
+	var charX = san_nbr(data.charX);
+	var charY = san_nbr(data.charY);
+	var charWidth = san_nbr(data.charWidth);
+	var charHeight = san_nbr(data.charHeight);
 
 	var ipAddress;
 	var ipAddressVal;
@@ -69,7 +53,8 @@ module.exports = async function(data, server, params) {
 
 	await tile_database.write(tile_database.types.clear, {
 		tileX, tileY,
-		charRange,
+		charX, charY,
+		charWidth, charHeight,
 		user, world, is_owner,
 		channel, no_log_edits
 	});

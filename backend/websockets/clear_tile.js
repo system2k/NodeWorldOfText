@@ -6,12 +6,15 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 	var tileX = sData.tileX;
 	var tileY = sData.tileY;
-
-	var charRange = sData.charRange;
+	var charX = sData.charX;
+	var charY = sData.charY;
+	var charWidth = sData.charWidth;
+	var charHeight = sData.charHeight;
 
 	await modules.clear_areas({
 		tileX, tileY,
-		charRange
+		charX, charY,
+		charWidth, charHeight
 	}, server, {
 		user: ctx.user,
 		channel: ctx.channel,

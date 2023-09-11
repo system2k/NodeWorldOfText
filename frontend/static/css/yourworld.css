@@ -478,6 +478,26 @@ a:visited {
 	vertical-align: middle;
 	display: inline-block;
 }
+#erase_region {
+	background-color: #E5E5FF;
+	padding: 3px;
+	margin-bottom: 3px;
+	font-family: Verdana, Arial;
+	font-size: 12px;
+}
+#erase_region_cancel {
+	display: block;
+	text-decoration: underline;
+	color: blue;
+	text-align: center;
+	cursor: pointer;
+}
+#erase_region_cancel:hover {
+	color: #F3DB65;
+}
+#erase_region_cancel:active {
+	color: #917c17;
+}
 #text_decorations {
 	background-color: #E5E5FF;
 	padding: 3px;

@@ -63,6 +63,25 @@
 				<div class="text_deco_btn" id="text_deco_s" title="Strikethrough">A</div>
 			</div>
 			<br>
+			<div id="erase_region" style="display: none">
+				<div style="padding-bottom: 3px; font-weight: bold; text-align: center;">
+					Erase region
+				</div>
+				<label style="display: block;">
+					<input type="radio" name="erase_region_opt" id="erase_region_once" checked> Only once
+				</label>
+				<label style="display: block;">
+					<input type="radio" name="erase_region_opt" id="erase_region_mult"> Multiple
+				</label>
+				<label style="display: block;">
+					<input type="radio" name="erase_region_opt" id="erase_region_ctrl"> Hold Ctrl
+				</label>
+				<hr>
+				<label style="display: block;">
+					<input type="checkbox" id="erase_region_snap"> Snap to grid
+				</label>
+				<a id="erase_region_cancel" onclick="protectSelection();">Cancel</a>
+			</div>
 			<div id="protect_precision" style="display: none;">
 				<div style="padding-bottom: 3px;">
 					Protect type:
