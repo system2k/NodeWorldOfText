@@ -40,7 +40,7 @@ var Permissions = {
 	},
 	can_erase: function(user, world) {
 		if(user.is_owner) return true;
-		return false;
+		return Permissions.user_matches_perm(user, world, world.quick_erase);
 	},
 	can_read: function(user, world) {
 		return Permissions.user_matches_perm(user, world, world.readability);

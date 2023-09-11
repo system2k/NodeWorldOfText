@@ -17,9 +17,7 @@ module.exports = async function(data, server, params) {
 	var memkeyAccess = world.opts.memKey && world.opts.memKey == params.keyQuery;
 
 	var is_owner = user.id == world.ownerId || (user.superuser && isMainPage(world.name));
-	var is_member = !!world.members.map[user.id] || memkeyAccess || (user.superuser && isMainPage(world.name));
-
-	if(!is_owner) return;
+	var is_member = !!world.members.map[user.id] || memkeyAccess || (user.superuser && isMainPage(world.name)) || is_owner;
 
 	var tileX = san_nbr(data.tileX);
 	var tileY = san_nbr(data.tileY);
@@ -64,7 +62,7 @@ module.exports = async function(data, server, params) {
 		tileX, tileY,
 		charX, charY,
 		charWidth, charHeight,
-		user, world, is_owner,
+		user, world, is_owner, is_member,
 		channel, no_log_edits
 	});
 

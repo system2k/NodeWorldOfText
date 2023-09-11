@@ -6745,6 +6745,9 @@ var ws_functions = {
 					state.worldModel.color_cell = value;
 					resetColorModalVisibility();
 					break;
+				case "quickErase":
+					state.worldModel.quick_erase = value;
+					break;
 				case "memberTilesAddRemove":
 					state.worldModel.feature_membertiles_addremove = value;
 					break;

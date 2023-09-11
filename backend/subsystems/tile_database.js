@@ -901,6 +901,24 @@ function tileWriteClear(callID, tile, options) {
 	var charWidth = options.charWidth;
 	var charHeight = options.charHeight;
 
+	var is_owner = options.is_owner;
+	var is_member = options.is_member;
+	var world = options.world;
+
+	var feature_perm = world.feature.quickErase;
+
+	if(!is_owner && !is_member) {
+		IOProgress(callID);
+		return;
+	}
+	if(feature_perm == 2 && !is_owner) {
+		IOProgress(callID);
+		return;
+	} else if(feature_perm == 1 && !is_member) {
+		IOProgress(callID);
+		return;
+	}
+
 	if(charWidth == 0 && charHeight == 0) {
 		charWidth = CONST.tileCols;
 		charHeight = CONST.tileRows;
@@ -918,6 +936,10 @@ function tileWriteClear(callID, tile, options) {
 			var cx = x + charX;
 			if(cx >= CONST.tileCols) break;
 			var idx = cy * CONST.tileCols + cx;
+			var char_writability = tile.prop_char[idx];
+			if(char_writability == null) char_writability = tile.writability;
+			if(char_writability == null) char_writability = world.writability;
+			if(char_writability == 2 && !is_owner) continue;
 			tile.content[idx] = " ";
 			tile.prop_color[idx] = 0;
 			if(tile.prop_bgcolor !== null) {

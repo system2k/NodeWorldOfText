@@ -118,6 +118,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 				chat_permission: world.feature.chat,
 				color_text: world.feature.colorText,
 				color_cell: world.feature.colorCell,
+				quick_erase: world.feature.quickErase,
 				show_cursor: world.feature.showCursor,
 				char_rate: char_rate,
 				write_interval: write_int,

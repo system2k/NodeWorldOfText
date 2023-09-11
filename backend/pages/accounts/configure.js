@@ -210,6 +210,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		chat_permission: world.feature.chat,
 		color_text: world.feature.colorText,
 		color_cell: world.feature.colorCell,
+		quick_erase: world.feature.quickErase,
 		show_cursor: world.feature.showCursor,
 
 		color,
@@ -440,6 +441,8 @@ module.exports.POST = async function(req, write, server, ctx) {
 		var show_cursor = validatePerms(post_data.show_cursor, 2, true);
 		var color_text = validatePerms(post_data.color_text, 2);
 		var color_cell = validatePerms(post_data.color_cell, 2, true);
+		var quick_erase = validatePerms(post_data.quick_erase, 2);
+		if(quick_erase == 0) quick_erase = 2; // we do not allow public access to quick erase
 		var membertiles_addremove = post_data.membertiles_addremove;
 		if(membertiles_addremove == "false") {
 			membertiles_addremove = 0;
@@ -474,6 +477,9 @@ module.exports.POST = async function(req, write, server, ctx) {
 		}
 		if(modifyWorldProp(world, "feature/colorCell", color_cell)) {
 			featureUpdates.push({type: "colorCell", value: color_cell});
+		}
+		if(modifyWorldProp(world, "feature/quickErase", quick_erase)) {
+			featureUpdates.push({type: "quickErase", value: quick_erase});
 		}
 		if(modifyWorldProp(world, "feature/memberTilesAddRemove", Boolean(membertiles_addremove))) {
 			featureUpdates.push({type: "memberTilesAddRemove", value: Boolean(membertiles_addremove)});

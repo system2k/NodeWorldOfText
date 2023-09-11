@@ -64,6 +64,7 @@ var world_default_props = {
 	show_cursor: -1,
 	color_cell: -1,
 	color_text: 0,
+	quick_erase: 2,
 	custom_menu_color: "",
 	custom_public_text_color: "",
 	custom_member_text_color: "",
@@ -170,7 +171,8 @@ function makeWorldObject() {
 			chat: 0,
 			showCursor: 0,
 			colorText: 0,
-			colorCell: 0
+			colorCell: 0,
+			quickErase: 0
 		},
 		theme: {
 			bg: "",
@@ -269,6 +271,7 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.feature.showCursor = getAndProcWorldProp(wprops, "show_cursor");
 	wobj.feature.colorText = getAndProcWorldProp(wprops, "color_text");
 	wobj.feature.colorCell = getAndProcWorldProp(wprops, "color_cell");
+	wobj.feature.quickErase = getAndProcWorldProp(wprops, "quick_erase");
 
 	wobj.theme.bg = world.custom_bg;
 	wobj.theme.cursor = world.custom_cursor;
@@ -432,6 +435,7 @@ async function commitWorld(world) {
 		"feature/showCursor",
 		"feature/colorText",
 		"feature/colorCell",
+		"feature/quickErase",
 		"theme/menu",
 		"theme/publicText",
 		"theme/memberText",
@@ -463,6 +467,7 @@ async function commitWorld(world) {
 		show_cursor: world.feature.showCursor,
 		color_text: world.feature.colorText,
 		color_cell: world.feature.colorCell,
+		quick_erase: world.feature.quickErase,
 		custom_menu_color: world.theme.menu,
 		custom_public_text_color: world.theme.publicText,
 		custom_member_text_color: world.theme.memberText,
