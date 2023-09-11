@@ -671,6 +671,12 @@ function tileWriteLinks(callID, tile, options) {
 		var maxBytesGuarantee = 100;
 		var linkBytesMax = 10000;
 
+		var existingLink = cellProps[charY][charX].link;
+		if(existingLink && existingLink.type == "url") {
+			tile.url_cells--;
+			tile.url_bytes -= Buffer.byteLength(existingLink.url);
+		}
+
 		var newByteLen = byteLen;
 		if(byteLen > linkBytesMax) newByteLen = linkBytesMax;
 		tile.url_cells++;
