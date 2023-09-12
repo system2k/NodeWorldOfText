@@ -764,7 +764,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 				if(!e.sdata.userClient) return;
 				if(e.sdata.world.id == world.id) {
 					var readability = world.readability;
-					var memkeyAccess = world.opts.memKey && world.opts.memKey == e.sdata.keyQuery;
+					var memkeyAccess = Boolean(world.opts.memKey) && world.opts.memKey == e.sdata.keyQuery;
 					var isOwner = world.ownerId == e.sdata.user.id;
 					var isMember = !!world.members.map[e.sdata.user.id] || memkeyAccess;
 					if(readability == 1 && !isMember && !isOwner) {
