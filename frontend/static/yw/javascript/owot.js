@@ -1151,7 +1151,9 @@ var admclr = {
 	activated: false,
 	lastPos: null,
 	ctrlDown: false,
-	color: "#FF5959",
+	selectionColor: "#FF5959",
+	activeColor: "#FF0000",
+	color: "",
 	renderTile: function(preserveLastPos) {
 		var tile = Tile.get(currentPosition[0], currentPosition[1]);
 		if(tile) {
@@ -1171,6 +1173,7 @@ var admclr = {
 	},
 	activate: function() {
 		admclr.activated = true;
+		admclr.color = admclr.selectionColor;
 	},
 	deactivate: function() {
 		admclr.activated = false;
@@ -1184,7 +1187,7 @@ function keydown_admclr(e) {
 	if(admclr.ctrlDown) return;
 	if(e.ctrlKey) {
 		admclr.ctrlDown = true;
-		admclr.color = "#FF0000";
+		admclr.color = admclr.activeColor;
 		admclr.renderTile(true);
 		admclr.handleClear(currentPosition[0], currentPosition[1]);
 	}
@@ -1214,17 +1217,17 @@ document.body.addEventListener("mousemove", mousemove_admclr);
 function keyup_admclr(e) {
 	if(!admclr.activated) return;
 	admclr.ctrlDown = false;
-	admclr.color = "#FF5959";
+	admclr.color = admclr.selectionColor;
 	var tile = Tile.get(currentPosition[0], currentPosition[1]);
 	// remove color of tile
 	if(admclr.lastPos) {
-		tile.backgroundColor = "";
+		var prevTile = Tile.get(admclr.lastPos[0], admclr.lastPos[1]);
+		if(prevTile) prevTile.backgroundColor = "";
 		// re-render the tile
 		w.setTileRender(admclr.lastPos[0], admclr.lastPos[1]);
 	}
-	tile.backgroundColor = "";
+	if(tile) tile.backgroundColor = admclr.selectionColor;
 	w.setTileRender(currentPosition[0], currentPosition[1]);
-	admclr.lastPos = null;
 }
 document.body.addEventListener("keyup", keyup_admclr);
 
@@ -5014,6 +5017,7 @@ function RegionSelection() {
 		}
 		this.isSelecting = true;
 		elm.owot.style.cursor = "cell";
+		this.selection.style.backgroundColor = this.color;
 	}
 	this.destroy = function() {
 		for(var i = 0; i < regionSelections.length; i++) {
@@ -6923,6 +6927,8 @@ function begin() {
 	w.protectSelect.tiled = true;
 
 	w.eraseSelect.onselection(eraseSelectionStart);
+	w.eraseSelect.charColor = "red";
+	w.eraseSelect.color = "rgb(239 176 176 / 50%)";
 
 	w.fetchUnloadedTiles();
 	w.fixFonts("legacycomputing");
