@@ -529,6 +529,7 @@ function keydown_regionSelect(e) {
 	if(!checkKeyPress(e, keyConfig.copyRegion) || regionSelectionsActive()) return;
 	if(Modal.isOpen) return;
 	if(!worldFocused) return;
+	if(!Permissions.can_copy(state.userModel, state.worldModel)) return;
 	e.preventDefault();
 	w.regionSelect.startSelection();
 }
@@ -6409,6 +6410,8 @@ function reapplyProperties(props) {
 	state.worldModel.show_cursor = props.feature.showCursor;
 	state.worldModel.square_chars = props.opts.squareChars;
 	state.worldModel.half_chars = props.opts.halfChars;
+	state.worldModel.no_copy = props.opts.noCopy;
+	state.worldModel.quick_erase = props.opts.quickErase;
 
 	if(state.worldModel.square_chars) {
 		defaultSizes.cellW = 18;
@@ -6733,6 +6736,9 @@ var ws_functions = {
 					break;
 				case "paste":
 					state.worldModel.feature_paste = value;
+					break;
+				case "noCopy":
+					state.worldModel.no_copy = value;
 					break;
 				case "chat":
 					state.worldModel.chat_permission = value;

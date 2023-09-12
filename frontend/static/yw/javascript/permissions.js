@@ -34,6 +34,10 @@ var Permissions = {
 	can_paste: function(user, world) {
 		return Permissions.user_matches_perm(user, world, world.feature_paste);
 	},
+	can_copy: function(user, world) {
+		if(user.is_owner || user.is_member) return true;
+		return !world.no_copy;
+	},
 	can_protect_tiles: function(user, world) {
 		if(user.is_owner) return true;
 		return world.feature_membertiles_addremove && user.is_member;

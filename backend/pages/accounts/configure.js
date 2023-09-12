@@ -230,6 +230,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		square_chars,
 		no_log_edits: world.opts.noLogEdits,
 		no_chat_global: world.opts.noChatGlobal,
+		no_copy: world.opts.noCopy,
 		half_chars,
 		mixed_chars,
 
@@ -535,6 +536,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 		var memkeyUpdated = false;
 		var charrateUpdated = false;
 		var writeintUpdated = false;
+		var noCopyUpdated = false;
 		var newCharrate = null;
 		if(user.superuser) {
 			if(!post_data.world_background) {
@@ -616,6 +618,12 @@ module.exports.POST = async function(req, write, server, ctx) {
 			modifyWorldProp(world, "opts/noChatGlobal", false);
 		}
 
+		if(post_data.no_copy == "on") {
+			noCopyUpdated = modifyWorldProp(world, "opts/noCopy", true);
+		} else {
+			noCopyUpdated = modifyWorldProp(world, "opts/noCopy", false);
+		}
+
 		if("ratelim_val" in post_data && "ratelim_per" in post_data) {
 			// 0/0 = disabled
 			// 0/1 = not writable
@@ -682,6 +690,18 @@ module.exports.POST = async function(req, write, server, ctx) {
 			}, world.id);
 		}
 
+		if(noCopyUpdated) {
+			ws_broadcast({
+				kind: "propUpdate",
+				props: [
+					{
+						type: "noCopy",
+						value: world.opts.noCopy
+					}
+				]
+			}, world.id);
+		}
+
 		if(post_data.memkey_enabled == "on") {
 			var key = post_data.memkey_value;
 			if(!key || typeof key != "string") {
@@ -696,8 +716,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 				}
 			}
 		} else {
-			modifyWorldProp(world, "opts/memKey", "");
-			memkeyUpdated = true;
+			memkeyUpdated = modifyWorldProp(world, "opts/memKey", "");
 		}
 
 		if(post_data.meta_desc) {
