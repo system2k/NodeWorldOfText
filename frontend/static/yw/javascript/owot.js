@@ -4675,6 +4675,26 @@ function protectSelectionStart(start, end, width, height) {
 	w.protectSelect.startSelection();
 }
 
+function isTileEmpty(x, y) {
+	var tile = Tile.get(x, y);
+	if(!tile) return true;
+	// we don't exclude colored spaces because we are mostly going with the server's definition of an "empty" tile.
+	// area protection values aren't included in this check.
+	var content = tile.content;
+	var color = tile.properties.color;
+	var bgcolor = tile.properties.bgcolor;
+	var cellprops = tile.properties.cell_props;
+	for(var i = 0; i < tileArea; i++) {
+		if(content[i] != " ") return false;
+		if(color && color[i] != 0) return false;
+		if(bgcolor && bgcolor[i] != -1) return false;
+		var cx = i % tileC;
+		var cy = Math.floor(i / tileC);
+		if(cellprops && cellprops[cy] && cellprops[cy][cx] && cellprops[cy][cx].link) return false;
+	}
+	return true;
+}
+
 function eraseSelectionStart(start, end, width, height) {
 	var tileX1 = start[0];
 	var tileY1 = start[1];
@@ -4698,6 +4718,7 @@ function eraseSelectionStart(start, end, width, height) {
 
 	for(var y = tileY1; y <= tileY2; y++) {
 		for(var x = tileX1; x <= tileX2; x++) {
+			if(isTileEmpty(x, y)) continue;
 			var leftEdge = x == tileX1 && charX1 > 0;
 			var topEdge = y == tileY1 && charY1 > 0;
 			var rightEdge = x == tileX2 && charX2 < (tileC - 1);
@@ -4718,6 +4739,9 @@ function eraseSelectionStart(start, end, width, height) {
 		}
 	}
 
+	var tileRatePerSecond = 450;
+	var prevTime = Date.now();
+
 	// full tiles
 	var tidx = 0;
 	var tprot = setInterval(function() {
@@ -4725,22 +4749,28 @@ function eraseSelectionStart(start, end, width, height) {
 			clearInterval(tprot);
 			return;
 		}
-		var pos = tileList[tidx];
-		var tileX = pos[0];
-		var tileY = pos[1];
-		var charRange = pos[2];
-		var pkt = {
-			tileX: tileX,
-			tileY: tileY
-		};
-		if(charRange) {
-			pkt.charX = charRange[0];
-			pkt.charY = charRange[1];
-			pkt.charWidth = charRange[2];
-			pkt.charHeight = charRange[3];
+		var amount = Math.floor((Date.now() - prevTime) / (1000 / tileRatePerSecond));
+		amount = Math.min(tileRatePerSecond, amount);
+		prevTime = Date.now();
+		for(var i = 0; i < amount; i++) {
+			if(tidx >= tileList.length) break;
+			var pos = tileList[tidx];
+			var tileX = pos[0];
+			var tileY = pos[1];
+			var charRange = pos[2];
+			var pkt = {
+				tileX: tileX,
+				tileY: tileY
+			};
+			if(charRange) {
+				pkt.charX = charRange[0];
+				pkt.charY = charRange[1];
+				pkt.charWidth = charRange[2];
+				pkt.charHeight = charRange[3];
+			}
+			network.clear_tile(pkt);
+			tidx++;
 		}
-		network.clear_tile(pkt);
-		tidx++;
 	}, 1000 / 80);
 
 	if(eraseRegionMode == 0) {
