@@ -22,6 +22,11 @@ module.exports = async function(data, server, params) {
 	var is_owner = user.id == world.ownerId || (user.superuser && isMainPage(world.name));
 	var is_member = !!world.members.map[user.id] || memkeyAccess || (user.superuser && isMainPage(world.name));
 
+	var feature_perm = world.feature.memberTilesAddRemove;
+	var can_owner = is_owner;
+	var can_member = (is_member && feature_perm) || is_owner;
+	if(!can_owner && !can_member) return; // redundant check (areas checked in tile_database.js)
+
 	var action = data.action;
 	var tileX = san_nbr(data.tileX);
 	var tileY = san_nbr(data.tileY);
