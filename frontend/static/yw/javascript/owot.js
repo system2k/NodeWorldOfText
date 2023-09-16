@@ -5021,13 +5021,13 @@ function RegionSelection() {
 			this.setSelection(this.regionCoordA, this.regionCoordB);
 			var coordA = this.regionCoordA.slice(0);
 			var coordB = this.regionCoordB.slice(0);
+			orderRangeABCoords(coordA, coordB);
 			if(this.tiled) {
 				coordA[2] = 0;
 				coordA[3] = 0;
 				coordB[2] = tileC - 1;
 				coordB[3] = tileR - 1;
 			}
-			orderRangeABCoords(coordA, coordB);
 			var regWidth = (coordB[0] - coordA[0]) * tileC + coordB[2] - coordA[2] + 1;
 			var regHeight = (coordB[1] - coordA[1]) * tileR + coordB[3] - coordA[3] + 1;
 			func(coordA, coordB, regWidth, regHeight);
