@@ -3083,6 +3083,10 @@ function event_keydown(e) {
 		elm.textInput.value = "";
 		writeChar("\n");
 	}
+	if(checkKeyPress(e, "SHIFT+ENTER")) {
+		elm.textInput.value = "";
+		writeChar("\n");
+	}
 	if(checkKeyPress(e, "ENTER")) {
 		elm.textInput.value = "";
 		writeChar("\n");
