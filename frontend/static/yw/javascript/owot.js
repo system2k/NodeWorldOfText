@@ -1,4 +1,4 @@
-﻿var YourWorld = {
+var YourWorld = {
 	Color: window.localStorage ? +localStorage.getItem("color") : 0,
 	BgColor: -1,
 	Nickname: state.userModel.username
@@ -4829,6 +4829,13 @@ function buildMenu() {
 	menuOptions.publicArea = menu.addOption("Make an area public", function() {
 		return w.doProtect("public");
 	});
+	
+	menuOptions.darkMode = menu.addCheckboxOption("Dark mode", function() {
+		w.night();
+	}, function() {
+		w.day();
+	}, false);
+
 	menuOptions.resetArea = menu.addOption("Default area protection", w.doUnprotect);
 	menuOptions.eraseArea = menu.addOption("Erase an area", startEraseUI);
 
@@ -5812,6 +5819,20 @@ Object.assign(w, {
 		w.redraw();
 	},
 	night: function(ignoreUnloadedPattern) {
+		var chatElements = document.querySelectorAll('#chat_window > *');
+		chatElements.forEach(function(element) {
+			element.style.backgroundColor = '#111';
+			element.style.color = '#FFF';
+		});
+		
+		document.getElementById('nav').childNodes[1].childNodes.forEach(function(element) {
+			element.style.border = "solid 1px #111";
+			element.style.backgroundColor = '#111';
+			element.style.color = '#FFF';
+		});
+		
+		document.getElementById('menu').style.backgroundColor = '#111';
+
 		styles.member = "#111";
 		styles.owner = "#222";
 		styles.public = "#000";
@@ -5826,6 +5847,20 @@ Object.assign(w, {
 	},
 	day: function(reloadStyle) {
 		w.nightMode = 0;
+		var chatElements = document.querySelectorAll('#chat_window > *');
+		chatElements.forEach(function(element) {
+			element.style.backgroundColor = '#FFF';
+			element.style.color = '#000';
+		});
+
+		document.getElementById('nav').childNodes[1].childNodes.forEach(function(element) {
+			element.style.border = "";
+			element.style.backgroundColor = '';
+			element.style.color = '';
+		});
+
+		document.getElementById('menu').style.backgroundColor = '';
+
 		if(elm.owot.classList.contains("nightmode")) {
 			elm.owot.classList.remove("nightmode");
 		}
