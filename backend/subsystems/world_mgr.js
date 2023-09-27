@@ -931,6 +931,12 @@ async function validateWorldClaim(worldname, user, isRenaming) {
 					message: "Worldname contains empty segments (make sure the name does not begin or end with /)"
 				};
 			}
+			if(worldnamePath[i] == "." || worldnamePath[i] == "..") {
+				return {
+					error: true,
+					message: "Worldname segments cannot be . or .."
+				};
+			}
 		}
 	}
 	if(worldnamePath.length == 1) {
