@@ -775,17 +775,24 @@ async function claimWorldByName(worldName, user) {
 }
 
 async function renameWorld(world, newName, user) {
-	var target = await getWorld(newName, false);
 	var nameUpdates = [];
 
 	var renameCheck = await validateWorldClaim(newName, user, true);
 	if(renameCheck.error) {
-		releaseWorld(target);
 		return {
 			error: true,
 			message: renameCheck.message
 		}
 	}
+	newName = renameCheck.name;
+	if(!newName) {
+		return {
+			error: true,
+			message: "Unexpected error"
+		};
+	}
+
+	var target = await getWorld(newName, false);
 
 	// if the destination worldname already exists, then swap names
 	if(target && target.ownerId != null && target.ownerId != user.id) {
@@ -861,7 +868,8 @@ async function renameWorld(world, newName, user) {
 	}
 	releaseWorld(target);
 	return {
-		success: true,
+		error: false,
+		name: newName,
 		message: "Successfully renamed the world",
 		list: nameUpdates
 	}
@@ -935,6 +943,7 @@ async function validateWorldClaim(worldname, user, isRenaming) {
 		}
 		if(isRenaming) {
 			return {
+				name: newname,
 				error: false
 			};
 		}
@@ -942,6 +951,8 @@ async function validateWorldClaim(worldname, user, isRenaming) {
 		if(world) {
 			if(world.ownerId == null) {
 				return {
+					error: false,
+					name: newname,
 					world: world,
 					message: "Successfully claimed the world"
 				};
@@ -973,6 +984,7 @@ async function validateWorldClaim(worldname, user, isRenaming) {
 		var fullWorldname = worldnamePath.join("/");
 		if(isRenaming) {
 			return {
+				name: fullWorldname,
 				error: false
 			};
 		}
@@ -987,6 +999,8 @@ async function validateWorldClaim(worldname, user, isRenaming) {
 		}
 		// subworld is created, now claim it
 		return {
+			error: false,
+			name: fullWorldname,
 			world: subWorld,
 			message: "Successfully claimed the subdirectory world"
 		};

@@ -797,8 +797,8 @@ module.exports.POST = async function(req, write, server, ctx) {
 				return await callPage("accounts/configure", {
 					misc_message: stat.message
 				}, req, write, server, ctx);
-			} else if(stat.success) {
-				new_world_name = new_name;
+			} else {
+				new_world_name = stat.name;
 				var idUpdList = stat.list;
 				for(var l = 0; l < idUpdList.length; l++) {
 					var upd = idUpdList[l];
