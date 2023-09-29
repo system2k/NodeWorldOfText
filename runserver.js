@@ -2410,6 +2410,21 @@ async function manageWebsocketConnection(ws, req) {
 	ws.sdata.ipAddress = evalIp[0];
 	ws.sdata.ipAddressFam = evalIp[1];
 	ws.sdata.ipAddressVal = evalIp[2];
+	
+	var restr = restrictions.getRestrictions();
+	
+	var deniedPages = checkHTTPRestr(restr, ws.sdata.ipAddressVal, ws.sdata.ipAddressFam);
+	if(deniedPages.siteAccess) {
+		var deny_notes = "None";
+		if(deniedPages.siteAccessNote) {
+			deny_notes = deniedPages.siteAccessNote;
+		}
+		ws.send("Site access denied, note: "+deny_notes);
+		ws.close();
+		return;
+	}
+	
+
 
 	// must be at the top before any async calls (errors may otherwise occur before the event declaration)
 	ws.on("error", function(err) {
