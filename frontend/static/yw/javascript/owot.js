@@ -864,6 +864,7 @@ function updateAutoProg() {
 
 // Fast tile protecting
 function mousemove_tileProtectAuto() {
+	if(Modal.isOpen) return;
 	if(!tileProtectAuto.active) return;
 	var tile = Tile.get(currentPosition[0], currentPosition[1]);
 	if(!tile) return;
@@ -956,6 +957,7 @@ function mousemove_tileProtectAuto() {
 document.addEventListener("mousemove", mousemove_tileProtectAuto);
 
 function keydown_tileProtectAuto(e) {
+	if(Modal.isOpen) return;
 	if(!worldFocused) return;
 	if(checkKeyPress(e, keyConfig.autoApply)) { // Alt/Ctrl + S to protect tiles
 		var selected = tileProtectAuto.selected;
@@ -1024,6 +1026,7 @@ document.body.addEventListener("keydown", keydown_tileProtectAuto);
 
 // Fast linking
 function mousemove_linkAuto() {
+	if(Modal.isOpen) return;
 	if(!linkAuto.active) return;
 	var tile = Tile.get(currentPosition[0], currentPosition[1]);
 	if(!tile) return;
@@ -1086,6 +1089,7 @@ function mousemove_linkAuto() {
 document.addEventListener("mousemove", mousemove_linkAuto);
 
 function keydown_linkAuto(e) {
+	if(Modal.isOpen) return;
 	if(!worldFocused) return;
 	if(checkKeyPress(e, keyConfig.autoApply)) { // Alt/Ctrl + S to add links
 		var selected = linkAuto.selected;
@@ -1184,6 +1188,7 @@ var admclr = {
 };
 
 function keydown_admclr(e) {
+	if(Modal.isOpen) return;
 	if(!admclr.activated) return;
 	if(admclr.ctrlDown) return;
 	if(e.ctrlKey) {
@@ -1196,6 +1201,7 @@ function keydown_admclr(e) {
 document.body.addEventListener("keydown", keydown_admclr);
 
 function mousemove_admclr(e) {
+	if(Modal.isOpen) return;
 	if(!admclr.activated) return;
 	if(admclr.lastPos) {
 		var tile = Tile.get(admclr.lastPos[0], admclr.lastPos[1]);
@@ -1440,6 +1446,7 @@ document.addEventListener("keydown", event_keydown_copy_char);
 
 // color picker
 function event_keydown_copy_color(e) {
+	if(Modal.isOpen) return;
 	if(!worldFocused) return;
 	var keyCopyColor = checkKeyPress(e, keyConfig.copyColor);
 	var keyCopyBgColor = checkKeyPress(e, keyConfig.copyBgColor);
@@ -5579,13 +5586,16 @@ Object.assign(w, {
 		linkAuto.mode = 0;
 		linkAuto.url = url;
 
-		if(w.isLinking || w.isProtecting) return;
+		if(w.isLinking || w.isProtecting) {
+			stopLinkUI();
+		}
 		w.url_input = url;
 		elm.owot.style.cursor = "pointer";
 		w.isLinking = true;
 		w.link_input_type = 0;
 	},
 	urlLink: function() {
+		stopLinkUI();
 		w.ui.urlModal.open();
 	},
 	doCoordLink: function(y, x) {
