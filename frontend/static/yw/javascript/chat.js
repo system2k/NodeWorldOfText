@@ -4,6 +4,7 @@ var chatPageUnread       = 0;
 var chatGlobalUnread     = 0;
 var initPageTabOpen      = false;
 var initGlobalTabOpen    = false;
+var initChatOpen         = false;
 var chatWriteHistory     = []; // history of user's chats
 var chatRecordsPage      = [];
 var chatRecordsGlobal    = [];
@@ -279,6 +280,13 @@ function moveCaretEnd(elm) {
 	}
 }
 
+function setChatTabPadding(elm) {
+	var width = elm.offsetWidth;
+	if(!width) return;
+	width += 16 * 2;
+	elm.style.minWidth = width + "px";
+}
+
 elm.chatbar.addEventListener("keydown", function(e) {
 	var keyCode = e.keyCode;
 	// scroll through chat history that the client sent
@@ -358,6 +366,11 @@ elm.chat_open.addEventListener("click", function() {
 	var virtWidth = owotWidth / screenRatio;
 	if(chatWidth > virtWidth) {
 		resizeChat(virtWidth - 2, chatHeight);
+	}
+	if(!initChatOpen) {
+		initChatOpen = true;
+		setChatTabPadding(elm.chat_page_tab);
+		setChatTabPadding(elm.chat_global_tab);
 	}
 });
 

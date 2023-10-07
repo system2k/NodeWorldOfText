@@ -242,12 +242,6 @@ a:visited {
 	background-color: #8C8C8C;
 	color: white;
 }
-#chat_page_tab {
-	width: 100px;
-}
-#chat_global_tab {
-	width: 80px;
-}
 .chatfield {
 	border: solid 1px black;
 	background-color: white;
