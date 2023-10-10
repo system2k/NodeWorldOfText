@@ -631,17 +631,7 @@ function drawFractionalBlockChar(charCode, textRender, x, y, width, height) {
 	textRender.fillRect(x, y, x2 - x + 1, y2 - y + 1);
 }
 
-function drawBlockChar(charCode, textRender, x, y, clampW, clampH) {
-	// since the char grid varies on other zoom levels, we must account for it to avoid line artifacts
-	var tmpCellW = clampW / tileC;
-	var tmpCellH = clampH / tileR;
-	var sx = Math.floor(x * tmpCellW);
-	var sy = Math.floor(y * tmpCellH);
-	var ex = Math.floor((x + 1) * tmpCellW);
-	var ey = Math.floor((y + 1) * tmpCellH);
-	tmpCellW = ex - sx;
-	tmpCellH = ey - sy;
-
+function drawBlockChar(charCode, textRender, x, y, cellW, cellH) {
 	var isFractionalBlock = (charCode >= 0x2580 && charCode <= 0x2590) ||
 							(charCode >= 0x2594 && charCode <= 0x2595) ||
 							(charCode >= 0x1FB82 && charCode <= 0x1FB8B);
@@ -657,15 +647,15 @@ function drawBlockChar(charCode, textRender, x, y, clampW, clampH) {
 							(is90degTri || isIsoTri);
 
 	if(isFractionalBlock) { // basic fractional blocks (full, half, n/8)
-		drawFractionalBlockChar(charCode, textRender, sx, sy, tmpCellW, tmpCellH);
+		drawFractionalBlockChar(charCode, textRender, x, y, cellW, cellH);
 	} else if(is2by2) { // 2x2 blocks
-		draw2by2Char(charCode, textRender, sx, sy, tmpCellW, tmpCellH);
+		draw2by2Char(charCode, textRender, x, y, cellW, cellH);
 	} else if(is2by3) { // 2x3 blocks
-		draw2by3Char(charCode, textRender, sx, sy, tmpCellW, tmpCellH);
+		draw2by3Char(charCode, textRender, x, y, cellW, cellH);
 	} else if(isTriangleShard) { // LCS shard characters
-		drawTriangleShardChar(charCode, textRender, sx, sy, tmpCellW, tmpCellH);
+		drawTriangleShardChar(charCode, textRender, x, y, cellW, cellH);
 	} else if(is2by4) { // 2x4 LCS octant characters
-		draw2by4Char(charCode, textRender, sx, sy, tmpCellW, tmpCellH);
+		draw2by4Char(charCode, textRender, x, y, cellW, cellH);
 	}
 }
 
@@ -691,18 +681,14 @@ function dispatchCharClientHook(cCode, textRender, tileX, tileY, x, y, clampW, c
 	return false;
 }
 
-function renderChar(textRender, tileX, tileY, x, y, clampW, clampH, cellBg, tile, protectionValue, linkType, offsetX, offsetY, charOverflowMode) {
-	var content = tile.content;
-	var colors = tile.properties.color;
+function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, protectionValue, linkType, highlight, tileX, tileY, isOverflow) {
 	var hasDrawn = false;
 
 	// adjust baseline
 	var textYOffset = cellH - (5 * zoom);
 
-	var fontX = x * cellW + offsetX;
-	var fontY = y * cellH + offsetY;
-
-	var char = content[y * tileC + x] || " ";
+	var fontX = offsetX;
+	var fontY = offsetY;
 
 	var deco = null;
 	if(textDecorationsEnabled) {
@@ -712,7 +698,7 @@ function renderChar(textRender, tileX, tileY, x, y, clampW, clampH, cellBg, tile
 	char = resolveCharEmojiCombinations(char);
 
 	var cCode = char.codePointAt(0);
-	if(charOverflowMode) {
+	if(isOverflow) {
 		if(cCode < 1024 && !deco) return;
 		if(cCode == 0xFDFD) return;
 		if(cCode >= 0x12427 && cCode <= 0x1242B) return;
@@ -720,17 +706,16 @@ function renderChar(textRender, tileX, tileY, x, y, clampW, clampH, cellBg, tile
 
 	// fill background if defined.
 	// this should not be confused with background cell colors.
-	if(cellBg) {
-		if(Array.isArray(cellBg)) {
-			cellBg = cellBg[cellBg.length - 1];
+	if(highlight) {
+		if(Array.isArray(highlight)) {
+			highlight = highlight[highlight.length - 1];
 		}
-		cellBg = colorClasses[cellBg];
-		textRender.fillStyle = cellBg;
+		highlight = colorClasses[highlight];
+		textRender.fillStyle = highlight;
 		textRender.fillRect(fontX, fontY, cellW, cellH);
 		hasDrawn = true;
 	}
 
-	var color = colors ? colors[y * tileC + x] : 0;
 	// initialize link color to default text color in case there's no link to color
 	var linkColor = styles.text;
 	if(textColorOverride) {
@@ -780,7 +765,7 @@ function renderChar(textRender, tileX, tileY, x, y, clampW, clampH, cellBg, tile
 		}
 	}
 
-	if(((specialClientHookMap >> 0) & 1) && !charOverflowMode) {
+	if(((specialClientHookMap >> 0) & 1) && !isOverflow) {
 		var status = dispatchCharClientHook(cCode, textRender, tileX, tileY, x, y, clampW, clampH);
 		if(status) {
 			return true;
@@ -809,8 +794,8 @@ function renderChar(textRender, tileX, tileY, x, y, clampW, clampH, cellBg, tile
 	isSpecial = isSpecial || (cCode >= 0x2500 && cCode <= 0x257F);
 
 	if(ansiBlockFill && isValidSpecialSymbol(cCode) && !(isHalfShard && !isBold)) {
-		if(!charOverflowMode) {
-			drawBlockChar(cCode, textRender, x, y, clampW, clampH);
+		if(!isOverflow) {
+			drawBlockChar(cCode, textRender, fontX, fontY, cellW, cellH);
 			hasDrawn = true;
 		}
 	} else { // character rendering
@@ -1036,9 +1021,11 @@ function clearTile(tileX, tileY) {
 function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, offsetY, bounds, charOverflowMode) {
 	var str = tileY + "," + tileX;
 	var tile = Tile.get(tileX, tileY);
-	if(!tile) return;
+	if(!tile) return false;
 	var cellProps = tile.properties.cell_props;
 	var writability = tile.writability;
+	var tileContent = tile.content;
+	var tileColors = tile.properties.color;
 	var x1 = 0;
 	var y1 = 0;
 	var x2 = tileC - 1;
@@ -1071,7 +1058,22 @@ function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, off
 			}
 			if(protValue == null) protValue = tile.properties.writability;
 			if(protValue == null) protValue = state.worldModel.writability;
-			var dChar = renderChar(textRenderCtx, tileX, tileY, x, y, clampW, clampH, tileColBgCell, tile, protValue, cellLinkType, offsetX, offsetY, charOverflowMode);
+			var char = tileContent[y * tileC + x];
+			var color = tileColors ? tileColors[y * tileC + x] : 0;
+
+			var tmpCellW = clampW / tileC;
+			var tmpCellH = clampH / tileR;
+			var sx = Math.floor(x * tmpCellW);
+			var sy = Math.floor(y * tmpCellH);
+			var ex = Math.floor((x + 1) * tmpCellW);
+			var ey = Math.floor((y + 1) * tmpCellH);
+			tmpCellW = ex - sx;
+			tmpCellH = ey - sy;
+
+			var offX = sx + offsetX;
+			var offY = sy + offsetY;
+
+			var dChar = renderChar(textRenderCtx, offX, offY, char, color, tmpCellW, tmpCellH, protValue, cellLinkType, tileColBgCell, tileX, tileY, charOverflowMode);
 			if(dChar) {
 				hasDrawn = true;
 			}
