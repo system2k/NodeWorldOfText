@@ -669,12 +669,11 @@ function drawBlockChar(charCode, textRender, x, y, clampW, clampH) {
 	}
 }
 
-function dispatchCharClientHook(cCode, textRender, str, x, y, clampW, clampH) {
+function dispatchCharClientHook(cCode, textRender, tileX, tileY, x, y, clampW, clampH) {
 	var funcs = specialClientHooks.renderchar;
 	if(!funcs.length) return false;
 	for(var i = 0; i < funcs.length; i++) {
 		var func = funcs[i];
-		var tilePos = getPos(str);
 		// duplicate from drawBlockChar - needs refactoring
 		var tmpCellW = clampW / tileC;
 		var tmpCellH = clampH / tileR;
@@ -684,7 +683,7 @@ function dispatchCharClientHook(cCode, textRender, str, x, y, clampW, clampH) {
 		var ey = Math.floor((y + 1) * tmpCellH);
 		tmpCellW = ex - sx;
 		tmpCellH = ey - sy;
-		var status = func(cCode, textRender, tilePos[1], tilePos[0], x, y, sx, sy, tmpCellW, tmpCellH);
+		var status = func(cCode, textRender, tileX, tileY, x, y, sx, sy, tmpCellW, tmpCellH);
 		if(status) {
 			return true;
 		}
@@ -692,7 +691,7 @@ function dispatchCharClientHook(cCode, textRender, str, x, y, clampW, clampH) {
 	return false;
 }
 
-function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, props, offsetX, offsetY, charOverflowMode) {
+function renderChar(textRender, tileX, tileY, x, y, clampW, clampH, cellBg, tile, protectionValue, linkType, offsetX, offsetY, charOverflowMode) {
 	var content = tile.content;
 	var colors = tile.properties.color;
 	var hasDrawn = false;
@@ -719,14 +718,14 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 		if(cCode >= 0x12427 && cCode <= 0x1242B) return;
 	}
 
-	// fill background if defined
-	if(coloredChars[str] && coloredChars[str][y] && coloredChars[str][y][x]) {
-		var color = coloredChars[str][y][x];
-		if(Array.isArray(color)) {
-			color = color[color.length - 1];
+	// fill background if defined.
+	// this should not be confused with background cell colors.
+	if(cellBg) {
+		if(Array.isArray(cellBg)) {
+			cellBg = cellBg[cellBg.length - 1];
 		}
-		color = colorClasses[color];
-		textRender.fillStyle = color;
+		cellBg = colorClasses[cellBg];
+		textRender.fillStyle = cellBg;
 		textRender.fillRect(fontX, fontY, cellW, cellH);
 		hasDrawn = true;
 	}
@@ -735,23 +734,20 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 	// initialize link color to default text color in case there's no link to color
 	var linkColor = styles.text;
 	if(textColorOverride) {
-		if(writability == 0 && textColorOverride & 4) linkColor = styles.public_text;
-		if(writability == 1 && textColorOverride & 2) linkColor = styles.member_text;
-		if(writability == 2 && textColorOverride & 1) linkColor = styles.owner_text;
+		if(protectionValue == 0 && textColorOverride & 4) linkColor = styles.public_text;
+		if(protectionValue == 1 && textColorOverride & 2) linkColor = styles.member_text;
+		if(protectionValue == 2 && textColorOverride & 1) linkColor = styles.owner_text;
 	}
 
 	var isLink = false;
 
 	// check if this char is a link
-	if(linksRendered && props[y] && props[y][x]) {
-		var link = props[y][x].link;
-		if(link) {
-			isLink = true;
-			if(link.type == "url") {
-				linkColor = defaultURLLinkColor;
-			} else if(link.type == "coord") {
-				linkColor = defaultCoordLinkColor;
-			}
+	if(linksRendered && linkType) {
+		isLink = true;
+		if(linkType == "url") {
+			linkColor = defaultURLLinkColor;
+		} else if(linkType == "coord") {
+			linkColor = defaultCoordLinkColor;
 		}
 	}
 
@@ -785,7 +781,7 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 	}
 
 	if(((specialClientHookMap >> 0) & 1) && !charOverflowMode) {
-		var status = dispatchCharClientHook(cCode, textRender, str, x, y, clampW, clampH);
+		var status = dispatchCharClientHook(cCode, textRender, tileX, tileY, x, y, clampW, clampH);
 		if(status) {
 			return true;
 		}
@@ -1041,7 +1037,7 @@ function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, off
 	var str = tileY + "," + tileX;
 	var tile = Tile.get(tileX, tileY);
 	if(!tile) return;
-	var props = tile.properties.cell_props || {};
+	var cellProps = tile.properties.cell_props;
 	var writability = tile.writability;
 	var x1 = 0;
 	var y1 = 0;
@@ -1054,15 +1050,28 @@ function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, off
 		y2 = bounds[3];
 	}
 	var hasDrawn = false;
+	var tileBgCells = coloredChars[str];
 	for(var y = y1; y <= y2; y++) {
+		var tileRowBgCells = null;
+		var tileRowProps = null;
+		if(tileBgCells) tileRowBgCells = tileBgCells[y];
+		if(cellProps) tileRowProps = cellProps[y];
 		for(var x = x1; x <= x2; x++) {
+			var tileColBgCell = null;
+			var tileColProps = null;
+			if(tileRowBgCells) tileColBgCell = tileRowBgCells[x];
+			if(tileRowProps) tileColProps = tileRowProps[x];
+			var cellLinkType = null;
+			if(tileColProps && tileColProps.link) {
+				cellLinkType = tileColProps.link.type;
+			}
 			var protValue = writability;
 			if(tile.properties.char) {
 				protValue = tile.properties.char[y * tileC + x];
 			}
 			if(protValue == null) protValue = tile.properties.writability;
 			if(protValue == null) protValue = state.worldModel.writability;
-			var dChar = renderChar(textRenderCtx, x, y, clampW, clampH, str, tile, protValue, props, offsetX, offsetY, charOverflowMode);
+			var dChar = renderChar(textRenderCtx, tileX, tileY, x, y, clampW, clampH, tileColBgCell, tile, protValue, cellLinkType, offsetX, offsetY, charOverflowMode);
 			if(dChar) {
 				hasDrawn = true;
 			}
