@@ -1881,6 +1881,10 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
 	if(target != elm.owot && target != linkDiv) {
 		return;
 	}
+
+	var coords = getTileCoordsFromMouseCoords(pageX, pageY);
+	currentPosition = coords;
+
 	if(draggingEnabled) {
 		dragStartX = pageX;
 		dragStartY = pageY;
