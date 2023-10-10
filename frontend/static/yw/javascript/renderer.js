@@ -765,19 +765,21 @@ function renderChar(textRender, x, y, clampW, clampH, str, tile, writability, pr
 	// x padding of text if the char width is > 10
 	var XPadding = cellWidthPad * zoom;
 
+	var lineDecoHeight = Math.max(Math.round(zoom), 1);
+
 	// underline link
 	if(isLink) {
-		textRender.fillRect(fontX, fontY + textYOffset + zoom, cellW, zoom);
+		textRender.fillRect(fontX, Math.floor(fontY + textYOffset + zoom), cellW, lineDecoHeight);
 		hasDrawn = true;
 	}
 
 	if(deco) {
 		if(deco.under) {
-			textRender.fillRect(fontX, fontY + textYOffset + zoom, cellW, zoom);
+			textRender.fillRect(fontX, Math.floor(fontY + textYOffset + zoom), cellW, lineDecoHeight);
 			hasDrawn = true;
 		}
 		if(deco.strike) {
-			textRender.fillRect(fontX, fontY + Math.floor((16 * zoom) / 2), cellW, zoom);
+			textRender.fillRect(fontX, Math.floor(fontY + Math.floor((16 * zoom) / 2)), cellW, lineDecoHeight);
 			hasDrawn = true;
 		}
 	}
