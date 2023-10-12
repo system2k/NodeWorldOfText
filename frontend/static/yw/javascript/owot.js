@@ -2751,7 +2751,7 @@ function event_input(e) {
 	var inputType = e.inputType;
 	var inputData = e.data;
 	var textareaValue = elm.textInput.value;
-	if(inputType === void 0) { // backwards compatability: use the textInput data instead
+	if(!inputType && !inputData) { // backwards compatability: use the textInput data instead
 		var data = elm.textInput.value.replace(/\x7F/g, "");
 		elm.textInput.value = "";
 		if(!data || data == "\n" || data == "\r") return;
@@ -2854,6 +2854,14 @@ function event_input(e) {
 }
 
 elm.textInput.addEventListener("input", event_input);
+
+elm.textInput.addEventListener("paste", function(e) {
+	// reset all the gunk added by the browser.
+	// failsafe: don't reset if more than 5 chars just in case this clears pasted data
+	if(elm.textInput.value.length < 5) {
+		elm.textInput.value = "";
+	}
+});
 
 elm.textInput.addEventListener("compositionstart", function(e) {
 	compositionBuffer = "";
