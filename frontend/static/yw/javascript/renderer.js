@@ -681,7 +681,7 @@ function dispatchCharClientHook(cCode, textRender, tileX, tileY, x, y, clampW, c
 	return false;
 }
 
-function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, protectionValue, linkType, highlight, tileX, tileY, isOverflow) {
+function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, protectionValue, linkType, highlight, charX, charY, tileX, tileY, isOverflow) {
 	var hasDrawn = false;
 
 	// adjust baseline
@@ -766,7 +766,7 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	}
 
 	if(((specialClientHookMap >> 0) & 1) && !isOverflow) {
-		var status = dispatchCharClientHook(cCode, textRender, tileX, tileY, x, y, clampW, clampH);
+		var status = dispatchCharClientHook(cCode, textRender, tileX, tileY, charX, charY, cellW, cellH);
 		if(status) {
 			return true;
 		}
@@ -1073,7 +1073,7 @@ function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, off
 			var offX = sx + offsetX;
 			var offY = sy + offsetY;
 
-			var dChar = renderChar(textRenderCtx, offX, offY, char, color, tmpCellW, tmpCellH, protValue, cellLinkType, tileColBgCell, tileX, tileY, charOverflowMode);
+			var dChar = renderChar(textRenderCtx, offX, offY, char, color, tmpCellW, tmpCellH, protValue, cellLinkType, tileColBgCell, x, y, tileX, tileY, charOverflowMode);
 			if(dChar) {
 				hasDrawn = true;
 			}
