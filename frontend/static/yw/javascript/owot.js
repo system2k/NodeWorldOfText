@@ -2748,8 +2748,22 @@ function textcode_parser(value, coords, defaultColor, defaultBgColor) {
 }
 
 function event_input(e) {
-	if(e.inputType == "insertFromPaste") {
-		var pasteValue = elm.textInput.value;
+	var inputType = e.inputType;
+	var inputData = e.data;
+	var textareaValue = elm.textInput.value;
+	if(inputType === void 0) { // backwards compatability: use the textInput data instead
+		var data = elm.textInput.value.replace(/\x7F/g, "");
+		elm.textInput.value = "";
+		if(!data || data == "\n" || data == "\r") return;
+		textareaValue = data;
+		if(w.split(data).length > 1) {
+			inputType = "insertFromPaste";
+		} else {
+			inputData = data;
+		}
+	}
+	if(inputType == "insertFromPaste") {
+		var pasteValue = textareaValue;
 		var value = w.split(pasteValue.replace(/\r\n/g, "\n"));
 		elm.textInput.value = "";
 		var pastePerm = Permissions.can_paste(state.userModel, state.worldModel);
@@ -2808,28 +2822,30 @@ function event_input(e) {
 			}
 		}, Math.floor(1000 / speed));
 		return;
-	} else if(e.inputType == "deleteContentBackward") {
+	} else if(inputType == "deleteContentBackward") {
 		// any deletion
 		doBackspace();
 		return;
-	} else if(e.inputType == "deleteWordBackward") {
+	} else if(inputType == "deleteWordBackward") {
 		// delete entire word - we will erase a single char anyway
 		doBackspace();
 		elm.textInput.value = "";
 		return;
-	} else if(e.inputType == "insertCompositionText") {
-		if(typeof e.data == "string") { // this'll be handled by the composition(start/update/end) events
+	} else if(inputType == "insertCompositionText") {
+		if(typeof inputData == "string") { // this'll be handled by the composition(start/update/end) events
 			return;
-		} else { // e.data is null, so it could be a text composition cancelation - treat as deletion
+		} else { // inputData is null, so it could be a text composition cancelation - treat as deletion
 			if(compositionBuffer.length == 0) { // pressing enter while there's text will result in extraneous backspace
 				doBackspace();
 			}
 		}
-	} else if(e.inputType == "insertLineBreak") {
+	} else if(inputType == "insertLineBreak") {
 		return;
-	} else if(typeof e.data == "string") {
-		writeChar(e.data);
-		if(e.data == " ") { // the purpose is to disable dot after double-typing spaces on Android
+	} else if(typeof inputData == "string") {
+		writeChar(inputData);
+		// workaround: disable dot after double-typing spaces on Android
+		// don't use this workaround if using textInput value fallback
+		if(inputData == " " && inputType) {
 			elm.textInput.value = ".";
 			return;
 		}
@@ -3687,9 +3703,9 @@ function event_wheel_zoom(e) {
   
 	if(deltaY && e.deltaMode) {
 		if(e.deltaMode == 1) {
-			pY *= LINE_HEIGHT;
+			deltaY *= LINE_HEIGHT;
 		} else {
-			pY *= PAGE_HEIGHT;
+			deltaY *= PAGE_HEIGHT;
 		}
 	}
 
