@@ -840,15 +840,12 @@ function addUnreadChatBar(chatfield, message, checkSituation) {
 }
 
 function isLongWidthChar(x) {
-	switch(x) {
-		case 0x0BF5: return true;
-		case 0x2E3B: return true;
-		case 0xA9C5: return true;
-		case 0xFDFD: return true;
-		case 0x12219: return true;
-		case 0x1242B: return true;
-	}
-	return false;
+	return [
+		3061, 11835, 65021, 73776, 73795, 73807, 74017, 
+		74022, 74059, 74060, 74065, 74265, 74382, 74588, 
+		74611, 74788, 74791, 74792, 74793, 74794, 74795, 
+		74798, 74801
+	].includes(x);
 }
 
 function filterChatMessage(str) {
