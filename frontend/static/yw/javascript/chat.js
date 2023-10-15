@@ -235,13 +235,15 @@ function updateUnread() {
 		total.style.display = "";
 		total.innerText = totalCount > 99 ? "99+" : "(" + totalCount + ")";
 	}
-	if(chatPageUnread) {
-		page.style.display = "";
-		page.innerText = chatPageUnread > 99 ? "99+" : "(" + chatPageUnread + ")";
-	}
-	if(chatGlobalUnread) {
-		global.style.display = "";
-		global.innerText = chatGlobalUnread > 99 ? "99+" : "(" + chatGlobalUnread + ")";
+	if(chatOpen) { // don't want to stretch tab width before it's initially calculated
+		if(chatPageUnread) {
+			page.style.display = "";
+			page.innerText = chatPageUnread > 99 ? "99+" : "(" + chatPageUnread + ")";
+		}
+		if(chatGlobalUnread) {
+			global.style.display = "";
+			global.innerText = chatGlobalUnread > 99 ? "99+" : "(" + chatGlobalUnread + ")";
+		}
 	}
 }
 
@@ -346,14 +348,12 @@ elm.chat_open.addEventListener("click", function() {
 	chatOpen = true;
 	if(selectedChatTab == 0) {
 		chatPageUnread = 0;
-		updateUnread();
 		if(!initPageTabOpen) {
 			initPageTabOpen = true;
 			elm.page_chatfield.scrollTop = elm.page_chatfield.scrollHeight;
 		}
 	} else {
 		chatGlobalUnread = 0;
-		updateUnread();
 		if(!initGlobalTabOpen) {
 			initGlobalTabOpen = true;
 			elm.global_chatfield.scrollTop = elm.global_chatfield.scrollHeight;
@@ -372,6 +372,7 @@ elm.chat_open.addEventListener("click", function() {
 		setChatTabPadding(elm.chat_page_tab);
 		setChatTabPadding(elm.chat_global_tab);
 	}
+	updateUnread();
 });
 
 elm.chat_page_tab.addEventListener("click", function() {
