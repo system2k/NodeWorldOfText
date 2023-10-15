@@ -4104,7 +4104,12 @@ function getAndFetchTiles() {
 		bounds.maxY = clipIntMax(bounds.maxY);
 		for(var y = bounds.minY; y <= bounds.maxY; y++) {
 			for(var x = bounds.minX; x <= bounds.maxX; x++) {
-				Tile.set(x, y, null);
+				// reserve tile as 'null' to avoid re-fetching same area
+				if(!isTileStale(x, y)) {
+					Tile.set(x, y, null);
+				} else if(Tile.exists(x, y)) {
+					Tile.get(x, y).stale = false;
+				}
 			}
 		}
 	}
