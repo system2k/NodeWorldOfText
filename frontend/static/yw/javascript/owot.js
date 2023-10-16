@@ -2857,10 +2857,7 @@ elm.textInput.addEventListener("input", event_input);
 
 elm.textInput.addEventListener("paste", function(e) {
 	// reset all the gunk added by the browser.
-	// failsafe: don't reset if more than 5 chars just in case this clears pasted data
-	if(elm.textInput.value.length < 5) {
-		elm.textInput.value = "";
-	}
+	elm.textInput.value = "";
 });
 
 elm.textInput.addEventListener("compositionstart", function(e) {
@@ -2886,12 +2883,6 @@ elm.textInput.addEventListener("compositionupdate", function(e) {
 
 elm.textInput.addEventListener("compositionend", function(e) {
 	// only necessary to prevent growth of text input
-	elm.textInput.value = "";
-});
-
-document.body.addEventListener("paste", function() {
-	// this fires before any content gets added from the paste.
-	// we must first clear out all the mess added to the input by the browser.
 	elm.textInput.value = "";
 });
 
