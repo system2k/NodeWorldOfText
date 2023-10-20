@@ -2902,7 +2902,7 @@ function cyclePaste(parser, yieldItem) {
 				return item;
 			}
 		} else {
-			moveCursor("right");
+			moveCursor("right", true);
 		}
 	} else if(item.type == "link") {
 		var undoTop = undoBuffer.top();
