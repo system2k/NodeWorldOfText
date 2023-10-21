@@ -677,10 +677,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			id = san_nbr(id);
 			timestamp = san_nbr(timestamp);
 			var wid = world.id;
-			if(!is_owner && !user.staff) {
-				if(id != clientId) {
-					return serverChatResponse("The message was not sent by you", location);
-				}
+			if(!is_owner && !user.staff && id != clientId) {
+				return serverChatResponse("The message was not sent by you", location);
 			}
 			else if(location == "global") {
 				if(!user.staff) {
