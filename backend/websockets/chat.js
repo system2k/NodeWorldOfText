@@ -674,11 +674,15 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			return serverChatResponse(stat, location);
 		},
 		delete: async function(id, timestamp) {
-			if(!is_owner && !user.staff) return;
 			id = san_nbr(id);
 			timestamp = san_nbr(timestamp);
 			var wid = world.id;
-			if(location == "global") {
+			if(!is_owner && !user.staff) {
+				if(id != clientId) {
+					return serverChatResponse("The message was not sent by you", location);
+				}
+			}
+			else if(location == "global") {
 				if(!user.staff) {
 					return serverChatResponse("You do not have permission to delete messages on global", location);
 				}
