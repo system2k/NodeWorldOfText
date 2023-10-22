@@ -3,6 +3,8 @@ var html_tag_esc = utils.html_tag_esc;
 var san_nbr = utils.san_nbr;
 var uptime = utils.uptime;
 var create_date = utils.create_date;
+var chat_mgr = require("../subsystems/chat_mgr.js");
+var retrieveChatHistory = chat_mgr.retrieveChatHistory;
 
 function sanitizeColor(col) {
 	var masks = ["#XXXXXX", "#XXX"];
@@ -676,15 +678,14 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		delete: async function(id, timestamp) {
 			id = san_nbr(id);
 			timestamp = san_nbr(timestamp);
-			var wid = world.id;
-			if(!is_owner && !user.staff && id != clientId) {
-				return serverChatResponse("The message was not sent by you", location);
+			var wid = location == "global" ? 0 : world.id;
+			var history = await retrieveChatHistory(wid);
+			msg = history.filter(x => x.id == id && x.date == timestamp)[0];
+			if(!user.authenticated) {
+				return serverChatResponse("Anons are not allowed to delete messages");
 			}
-			else if(location == "global") {
-				if(!user.staff) {
-					return serverChatResponse("You do not have permission to delete messages on global", location);
-				}
-				wid = 0;
+			if(!is_owner && !user.staff && msg.realUsername != user.username) {
+				return serverChatResponse("The message was not sent by you", location);
 			}
 			var res = await remove_from_chatlog(wid, id, timestamp);
 			if(res == 0) {
