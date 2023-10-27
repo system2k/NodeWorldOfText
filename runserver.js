@@ -160,9 +160,7 @@ console.log("Loaded libs");
 
 function loadPlugin(reload) {
 	if(!reload) {
-		if(pluginMgr !== null) {
-			return pluginMgr;
-		}
+		return pluginMgr;
 	}
 	try {
 		var pluginPath = DATA_PATH + "plugin.js";
@@ -170,6 +168,7 @@ function loadPlugin(reload) {
 		delete require.cache[modPath];
 		pluginMgr = require(pluginPath);
 	} catch(e) {
+		console.log("Plugin load error:", e);
 		pluginMgr = {};
 	}
 	return pluginMgr;
@@ -2761,7 +2760,6 @@ async function start_server() {
 	// ping clients at a regular interval to ensure they dont disconnect constantly
 	initWebsocketPingInterval();
 
-	loadPlugin(true);
 	createEndpoints();
 
 	server.listen(serverPort, settings.ip, function() {
@@ -2797,6 +2795,8 @@ async function start_server() {
 	if(settings.monitor && settings.monitor.enabled) {
 		setupMonitorServer();
 	}
+
+	loadPlugin(true);
 }
 
 // the server context
@@ -2924,6 +2924,11 @@ function stopServer(restart, maintenance) {
 				if(monitorWorker && settings.monitor && settings.monitor.enabled) {
 					monitorWorker.terminate();
 				}
+			}
+
+			var plugin = loadPlugin();
+			if(plugin && plugin.server_exit) {
+				plugin.server_exit();
 			}
 		} catch(e) {
 			handle_error(e);
