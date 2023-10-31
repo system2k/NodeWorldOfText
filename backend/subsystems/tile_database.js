@@ -18,7 +18,6 @@ var wss;
 var memTileCache;
 var broadcastMonitorEvent;
 var wsSend;
-var loadPlugin;
 
 var server_exiting = false;
 var editlog_cell_props = false;
@@ -51,7 +50,6 @@ module.exports.main = function(server) {
 	memTileCache = server.memTileCache;
 	broadcastMonitorEvent = server.broadcastMonitorEvent;
 	wsSend = server.wsSend;
-	loadPlugin = server.loadPlugin;
 
 	databaseClock();
 	editLogClock();
@@ -585,14 +583,6 @@ function tileWriteEdits(callID, tile, options, editData) {
 
 	var is_owner = options.is_owner;
 	var is_member = options.is_member;
-
-	var plugin = loadPlugin();
-	// ! not future proof !
-	if(plugin && plugin.write) {
-		try {
-			plugin.write(options, tile);
-		} catch(e) {}
-	}
 
 	for(var e = 0; e < editData.length; e++) {
 		var edit = editData[e];

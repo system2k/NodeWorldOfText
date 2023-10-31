@@ -752,11 +752,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				isStaff: user.staff,
 				isAuth: user.authenticated,
 				worldName: world.name,
-				worldId: world.id,
 				location: location,
 				nickname: nick,
-				message: msg,
-				id: clientId
+				message: msg
 			});
 		} catch(e) {
 			check = false;
