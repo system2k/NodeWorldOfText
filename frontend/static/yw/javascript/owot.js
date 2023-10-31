@@ -3193,6 +3193,61 @@ function executeJS(code) {
 	return jsCode();
 }
 
+var modules = {};
+var isModule = false;
+
+function runModule(identifier, code) {
+	modules[identifier] = (new Function("isModule", code))(true);
+}
+
+function normalizeModIdentifer(identifier) {
+	identifier = identifier.toLowerCase();
+	if (/^[\w-]+\/[\w-]+(?:@[\w.-]+)?\/(.+\.js)$/.test(identifier)) {
+		return identifier;
+	}
+	
+	return null;
+}
+
+function isModuleLoaded(identifier, normalize) {
+	if (typeof normalize === "undefined")
+		normalize = true;
+
+	if (normalize) {
+		identifier = normalizeModIdentifer(identifier);
+		if (identifier === null) {
+			console.warn("Invalid module name provided.");
+			return null;
+		}
+	}
+
+	return modules.hasOwnProperty(identifier);
+}
+
+function use(identifier) {
+	identifier = normalizeModIdentifer(identifier);
+	if (identifier === null) {
+		console.warn("Invalid module name provided.");
+		return null;
+	}
+
+	if (isModuleLoaded(identifier, false)) {
+		return modules[identifier];
+	}
+
+	var req = new XMLHttpRequest();
+	req.open("GET", "https://cdn.jsdelivr.net/gh/" + identifier, false);
+	req.send(null);
+
+	if (req.status == 200) {
+		runModule(identifier, req.responseText);
+		return modules[identifier];
+	}
+
+	console.warn("Request to load module " + identifier + "failed.");
+	return null;
+}
+
 function confirmRunJSLink(data) {
 	var preview = data;
 	if(preview.length > 256) {
