@@ -3195,13 +3195,30 @@ function executeJS(code) {
 
 var modules = {};
 var isModule = false;
+var modPrefixes = [[]];
 
-function runModule(identifier, code) {
+function runModule(identifier, code, prefix) {
+	modPrefixes.push(prefix);
 	modules[identifier] = (new Function("isModule", code))(true);
+	modPrefixes.pop();
 }
 
 function normalizeModIdentifer(identifier) {
 	identifier = identifier.toLowerCase();
+	var parts = identifier.split('/');
+	parts = parts.filter(part => part !== '.' && part !== '');
+
+	var result = [...modPrefixes[modPrefixes.length - 1]];
+	for (var i = 0; i < parts.length; ++i) {
+		if (parts[i] === "..") {
+			if (result.length > 0)
+				result.pop();
+		} else {
+			result.push(parts[i]);
+		}
+	}
+
+	identifier = result.join('/');
 	if (/^[\w-]+\/[\w-]+(?:@[\w.-]+)?\/(.+\.js)$/.test(identifier)) {
 		return identifier;
 	}
@@ -3240,7 +3257,9 @@ function use(identifier) {
 	req.send(null);
 
 	if (req.status == 200) {
-		runModule(identifier, req.responseText);
+		var prefix = identifier.split("/").slice(0, -1);
+
+		runModule(identifier, req.responseText, prefix);
 		return modules[identifier];
 	}
 
