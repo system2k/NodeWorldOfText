@@ -3195,16 +3195,39 @@ function executeJS(code) {
 
 var modules = {};
 var isModule = false;
+var modPrefixes = [];
 
-function runModule(identifier, code) {
+function runModule(identifier, code, prefix) {
+	modPrefixes.push(prefix);
 	modules[identifier] = (new Function("isModule", code))(true);
+	modPrefixes.pop();
 }
 
 function normalizeModIdentifer(identifier) {
+	console.log([modPrefixes, identifier]);
 	identifier = identifier.toLowerCase();
 	if (/^[\w-]+\/[\w-]+(?:@[\w.-]+)?\/(.+\.js)$/.test(identifier)) {
 		return identifier;
 	}
+
+	if (identifier.startsWith('./') || identifier.startsWith('../')) {
+        var parts = identifier.split('/');
+        var result = [];
+
+		parts = parts.filter(part => part !== '.' && part !== '');
+
+		var modPrefix = modPrefixes[modPrefixes.length - 1];
+        for (var i = 0; i < parts.length; ++i) {
+            if (parts[i] === "..") {
+                if (modPrefix.length > 2)
+                    modPrefix.pop();
+            } else {
+                result.push(parts[i]);
+            }
+        }
+
+        return modPrefix.concat(result).join('/');
+    }
 	
 	return null;
 }
@@ -3240,7 +3263,9 @@ function use(identifier) {
 	req.send(null);
 
 	if (req.status == 200) {
-		runModule(identifier, req.responseText);
+		var prefix = identifier.split("/").slice(0, -1);
+
+		runModule(identifier, req.responseText, prefix);
 		return modules[identifier];
 	}
 
