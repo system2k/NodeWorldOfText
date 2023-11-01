@@ -3204,29 +3204,28 @@ function runModule(identifier, code, prefix) {
 }
 
 function normalizeModIdentifer(identifier) {
-	console.log([modPrefixes, identifier]);
 	identifier = identifier.toLowerCase();
 	if (/^[\w-]+\/[\w-]+(?:@[\w.-]+)?\/(.+\.js)$/.test(identifier)) {
 		return identifier;
 	}
 
 	if (identifier.startsWith('./') || identifier.startsWith('../')) {
-        var parts = identifier.split('/');
-        var result = [];
+		var parts = identifier.split('/');
+		var result = [];
 
 		parts = parts.filter(part => part !== '.' && part !== '');
 
 		var modPrefix = modPrefixes[modPrefixes.length - 1];
-        for (var i = 0; i < parts.length; ++i) {
-            if (parts[i] === "..") {
-                if (modPrefix.length > 2)
-                    modPrefix.pop();
-            } else {
-                result.push(parts[i]);
-            }
-        }
+			for (var i = 0; i < parts.length; ++i) {
+			if (parts[i] === "..") {
+				if (modPrefix.length > 2)
+					modPrefix.pop();
+			} else {
+				result.push(parts[i]);
+			}
+		}
 
-        return modPrefix.concat(result).join('/');
+		return modPrefix.concat(result).join('/');
     }
 	
 	return null;
