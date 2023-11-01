@@ -3195,7 +3195,7 @@ function executeJS(code) {
 
 var modules = {};
 var isModule = false;
-var modPrefixes = [];
+var modPrefixes = [[]];
 
 function runModule(identifier, code, prefix) {
 	modPrefixes.push(prefix);
@@ -3205,28 +3205,23 @@ function runModule(identifier, code, prefix) {
 
 function normalizeModIdentifer(identifier) {
 	identifier = identifier.toLowerCase();
+	var parts = identifier.split('/');
+	parts = parts.filter(part => part !== '.' && part !== '');
+
+	var result = [...modPrefixes[modPrefixes.length - 1]];
+	for (var i = 0; i < parts.length; ++i) {
+		if (parts[i] === "..") {
+			if (result.length > 0)
+				result.pop();
+		} else {
+			result.push(parts[i]);
+		}
+	}
+
+	identifier = result.join('/');
 	if (/^[\w-]+\/[\w-]+(?:@[\w.-]+)?\/(.+\.js)$/.test(identifier)) {
 		return identifier;
 	}
-
-	if (identifier.startsWith('./') || identifier.startsWith('../')) {
-		var parts = identifier.split('/');
-		var result = [];
-
-		parts = parts.filter(part => part !== '.' && part !== '');
-
-		var modPrefix = modPrefixes[modPrefixes.length - 1];
-			for (var i = 0; i < parts.length; ++i) {
-			if (parts[i] === "..") {
-				if (modPrefix.length > 2)
-					modPrefix.pop();
-			} else {
-				result.push(parts[i]);
-			}
-		}
-
-		return modPrefix.concat(result).join('/');
-    }
 	
 	return null;
 }
