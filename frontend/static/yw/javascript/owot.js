@@ -3214,15 +3214,16 @@ function normalizeModIdentifer(identifier) {
 			if (result.length > 0)
 				result.pop();
 		} else {
+			if  (i < 2 && parts[i].startsWith(".") || parts[i].contains(".."))
+				return null;
 			result.push(parts[i]);
 		}
 	}
 
 	identifier = result.join('/');
-	if (/^[\w-]+\/[\w-]+(?:@[\w.-]+)?\/(.+\.js)$/.test(identifier)) {
+	if (/^[\w.-]+\/[\w.-]+(?:@[\w.-]+)?\/(.+\.js)$/.test(identifier))
 		return identifier;
-	}
-	
+
 	return null;
 }
 
