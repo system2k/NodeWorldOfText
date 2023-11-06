@@ -21,6 +21,7 @@ module.exports = async function(data, server, params) {
 	var tile_database = server.tile_database;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
 	var rate_limiter = server.rate_limiter;
+	var loadPlugin = server.loadPlugin;
 
 	var memkeyAccess = world.opts.memKey && world.opts.memKey == params.keyQuery;
 
@@ -59,8 +60,6 @@ module.exports = async function(data, server, params) {
 	var idLabel = isGrouped ? "cg1" : ipAddress;
 	var linkLimiter = rate_limiter.prepareRateLimiter(rate_limiter.linkRateLimits, 1000, idLabel);
 	var lrate = rate_limiter.checkLinkrateRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name);
-
-	broadcastMonitorEvent("Link", ipAddress + " set 'link' on world '" + world.name + "' (" + world.id + "), coords (" + tileX + ", " + tileY + ")");
 
 	var no_log_edits = world.opts.noLogEdits;
 
@@ -105,6 +104,23 @@ module.exports = async function(data, server, params) {
 	}
 	if(!rate_limiter.setHold(idLabel, world.id, tileX, tileY)) {
 		return [true, "RATE"];
+	}
+
+	broadcastMonitorEvent("Link", ipAddress + " set 'link' on world '" + world.name + "' (" + world.id + "), coords (" + tileX + ", " + tileY + ")");
+
+	var plugin = loadPlugin();
+	// plugin interface is subject to change - use at your own risk
+	if(plugin && plugin.link) {
+		try {
+			plugin.link({
+				ip: ipAddress,
+				is_owner, is_member,
+				tileX, tileY, charX, charY,
+				type,
+				url, link_tileX, link_tileY,
+				user, world
+			});
+		} catch(e) {}
 	}
 
 	var resp = await tile_database.write(tile_database.types.link, {

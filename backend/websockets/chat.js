@@ -738,35 +738,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		}
 	}
 
-	// chat interceptor (e.g. for easy filtering)
-	var chatPlugin = loadPlugin();
-	if(chatPlugin && chatPlugin.chat) {
-		var check = false;
-		try {
-			check = chatPlugin.chat({
-				ip: ipHeaderAddr,
-				isOwner: is_owner,
-				isMember: is_member,
-				isOperator: user.operator,
-				isSuperuser: user.superuser,
-				isStaff: user.staff,
-				isAuth: user.authenticated,
-				worldName: world.name,
-				worldId: world.id,
-				location: location,
-				nickname: nick,
-				message: msg,
-				id: clientId
-			});
-		} catch(e) {
-			check = false;
-		}
-		if(check === true) {
-			serverChatResponse("Message dropped.", location);
-			return;
-		}
-	}
-
 	if(isCommand) {
 		var operator = user.operator;
 		var superuser = user.superuser;
@@ -848,9 +819,36 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		chatData.rankColor = rank.chat_color;
 	}
 
-	var isCommand = false;
-	if(msg.startsWith("/")) {
-		isCommand = true;
+	// chat interceptor (e.g. for easy filtering)
+	// the plugin interface is subject to change - use at your own risk
+	var chatPlugin = loadPlugin();
+	if(chatPlugin && chatPlugin.chat) {
+		var check = false;
+		try {
+			check = chatPlugin.chat({
+				raw: chatData,
+				isCommand,
+				ip: ipHeaderAddr,
+				isOwner: is_owner,
+				isMember: is_member,
+				isOperator: user.operator,
+				isSuperuser: user.superuser,
+				isStaff: user.staff,
+				isAuth: user.authenticated,
+				worldName: world.name,
+				worldId: world.id,
+				location: location,
+				nickname: nick,
+				message: msg,
+				id: clientId
+			});
+		} catch(e) {
+			check = false;
+		}
+		if(check === true) {
+			serverChatResponse("Message dropped.", location);
+			return;
+		}
 	}
 
 	if(!isCommand && !isMuted) {

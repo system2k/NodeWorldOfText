@@ -223,7 +223,7 @@ module.exports = async function(data, server, params) {
 			bgColor = sanitize_color(bgColor);
 		}
 
-		validEdits.push([tileY, tileX, charY, charX, 0, char, editId, color, bgColor]);
+		validEdits.push([tileY, tileX, charY, charX, date, char, editId, color, bgColor]);
 	}
 
 	if(params) {
@@ -259,7 +259,8 @@ module.exports = async function(data, server, params) {
 		can_color_text, can_color_cell,
 		public_only, no_log_edits, preserve_links,
 		channel,
-		rejected
+		rejected,
+		ip: ipAddress
 	});
 
 	rate_limiter.clearHolds(idLabel, tiles);
