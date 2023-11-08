@@ -164,6 +164,10 @@ function loadPlugin(reload) {
 	}
 	try {
 		var pluginPath = DATA_PATH + "plugin.js";
+		if(!fs.existsSync(pluginPath)) {
+			pluginMgr = {};
+			return pluginMgr;
+		}
 		var modPath = require.resolve(pluginPath);
 		delete require.cache[modPath];
 		pluginMgr = require(pluginPath);
