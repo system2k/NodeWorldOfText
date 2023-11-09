@@ -3195,15 +3195,19 @@ function executeJS(code) {
 
 var modules = {};
 var isModule = false;
+var currentModule = null;
 var modPrefixes = [[]];
 
 function runModule(identifier, code, prefix) {
-	modPrefixes.push(prefix);
-	modules[identifier] = (new Function("isModule", code))(true);
+	if (typeof code !== "function")
+		code = new Function("isModule", "currentModule", code);
+
+	modPrefixes.push(prefix || []);
+	modules[identifier] = code(true, identifier);
 	modPrefixes.pop();
 }
 
-function normalizeModIdentifer(identifier) {
+function normalizeModIdentifier(identifier) {
 	identifier = identifier.toLowerCase();
 	var parts = identifier.split('/');
 	parts = parts.filter(part => part !== '.' && part !== '');
@@ -3214,7 +3218,7 @@ function normalizeModIdentifer(identifier) {
 			if (result.length > 0)
 				result.pop();
 		} else {
-			if  (i < 2 && parts[i].startsWith(".") || parts[i].contains(".."))
+			if  (i < 2 && parts[i].startsWith(".") || parts[i].includes(".."))
 				return null;
 			result.push(parts[i]);
 		}
@@ -3232,7 +3236,7 @@ function isModuleLoaded(identifier, normalize) {
 		normalize = true;
 
 	if (normalize) {
-		identifier = normalizeModIdentifer(identifier);
+		identifier = normalizeModIdentifier(identifier);
 		if (identifier === null) {
 			console.warn("Invalid module name provided.");
 			return null;
@@ -3242,27 +3246,29 @@ function isModuleLoaded(identifier, normalize) {
 	return modules.hasOwnProperty(identifier);
 }
 
+function useLocal(code, identifier) {
+	if (isModuleLoaded(identifier, false)) {
+		return modules[identifier];
+	}
+
+	var prefix = identifier.split("/").slice(0, -1);
+	runModule(identifier, code, prefix);
+	return modules[identifier];
+}
+
 function use(identifier) {
-	identifier = normalizeModIdentifer(identifier);
+	identifier = normalizeModIdentifier(identifier);
 	if (identifier === null) {
 		console.warn("Invalid module name provided.");
 		return null;
-	}
-
-	if (isModuleLoaded(identifier, false)) {
-		return modules[identifier];
 	}
 
 	var req = new XMLHttpRequest();
 	req.open("GET", "https://cdn.jsdelivr.net/gh/" + identifier, false);
 	req.send(null);
 
-	if (req.status == 200) {
-		var prefix = identifier.split("/").slice(0, -1);
-
-		runModule(identifier, req.responseText, prefix);
-		return modules[identifier];
-	}
+	if (req.status == 200)
+		return useLocal(req.responseText, identifier);
 
 	console.warn("Request to load module " + identifier + "failed.");
 	return null;
