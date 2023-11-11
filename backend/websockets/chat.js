@@ -383,8 +383,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				return;
 			}
 
-			// Regexp taken from Uvias login page.
-			if (!/^[a-zA-Z0-9_.-]+$/.test(username)) return;
+			if (!/^[^\s\x00-\x20]+$/.test(username)) return;
 
 			// The case-insensitive value to be stored in chat_blocks.
 			var username_value = username.toUpperCase();
@@ -437,9 +436,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				serverChatResponse("Invalid username", location);
 				return;
 			}
-
-			// Regexp taken from Uvias login page.
-			if (!/^[a-zA-Z0-9_.-]+$/.test(username)) return;
 
 			// The case-insensitive value to be stored in chat_blocks.
 			var username_value = username.toUpperCase();
