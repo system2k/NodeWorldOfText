@@ -150,6 +150,8 @@ var ranks_cache = { users: {} };
 var announcement_cache = "";
 var restr_cache = "";
 var restr_cg1_cache = "";
+var restr_update = null;
+var restr_cg1_update = null;
 var worldData = {};
 var client_cursor_pos = {};
 var client_ips = {};
@@ -1934,11 +1936,26 @@ function loadRestrictionsList() {
 
 function saveRestrictions(type, data) {
 	if(type == "main") {
+		if(restr_cache != data) {
+			restr_update = data;
+		}
 		restr_cache = data;
-		fs.writeFileSync(restrPath, data);
 	} else if(type == "cg1") {
+		if(restr_cg1_cache != data) {
+			restr_cg1_update = data;
+		}
 		restr_cg1_cache = data;
-		fs.writeFileSync(restrCg1Path, data);
+	}
+}
+
+async function commitRestrictionsToDisk() {
+	if(restr_update != null) {
+		await fs.promises.writeFile(restrPath, restr_update);
+		restr_update = null;
+	}
+	if(restr_cg1_update != null) {
+		await fs.promises.writeFile(restrCg1Path, restr_cg1_update);
+		restr_cg1_update = null;
 	}
 }
 
@@ -2045,7 +2062,7 @@ function broadcastUserCount() {
 	}
 }
 
-async function clear_expired_sessions(no_timeout) {
+async function loopClearExpiredSessions(no_timeout) {
 	// clear expired sessions
 	await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
 	// clear expired registration keys
@@ -2055,7 +2072,12 @@ async function clear_expired_sessions(no_timeout) {
 		await db.run("DELETE FROM registration_registrationprofile WHERE user_id=?", id);
 	});
 
-	if(!no_timeout) intv.clearExpiredSessions = setTimeout(clear_expired_sessions, ms.minute);
+	if(!no_timeout) intv.clearExpiredSessions = setTimeout(loopClearExpiredSessions, ms.minute);
+}
+
+async function loopCommitRestrictions(no_timeout) {
+	await commitRestrictionsToDisk();
+	if(!no_timeout) intv.commitRestrictionsToDisk = setTimeout(loopCommitRestrictions, ms.second * 5);
 }
 
 function initClearClosedClientsInterval() {
@@ -2733,8 +2755,10 @@ async function start_server() {
 	loadRestrictionsList();
 	
 	if(accountSystem == "local") {
-		await clear_expired_sessions();
+		await loopClearExpiredSessions();
 	}
+
+	await loopCommitRestrictions();
 
 	intv.userCount = setInterval(function() {
 		broadcastUserCount();
@@ -2895,10 +2919,6 @@ function stopServer(restart, maintenance) {
 		}
 
 		try {
-			if(accountSystem == "local") {
-				await clear_expired_sessions(true);
-			}
-
 			if(serverLoaded) {
 				for(var i in pages) {
 					var mod = pages[i];
@@ -2934,6 +2954,12 @@ function stopServer(restart, maintenance) {
 			if(plugin && plugin.server_exit) {
 				plugin.server_exit();
 			}
+
+			if(accountSystem == "local") {
+				await loopClearExpiredSessions(true);
+			}
+
+			await loopCommitRestrictions(true);
 		} catch(e) {
 			handle_error(e);
 			if(!isTestServer) console.log(e);

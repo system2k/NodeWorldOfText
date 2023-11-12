@@ -237,6 +237,46 @@ function procRest(list) {
 		}
 	}
 	
+	return {
+		data: restrictions,
+		raw: rebuildRestrictionsList(restrictions)
+	};
+}
+
+function procCoal(list) {
+	var ranges4 = [];
+	var ranges6 = [];
+	for(var i = 0; i < list.length; i++) {
+		var row = list[i];
+		if(!row) continue;
+		row = row.trim();
+		var ipInfo = procIP(row);
+		if(!ipInfo) continue;
+		var ipRange = ipInfo[0];
+		var ipFam = ipInfo[1];
+		if(ipFam == 4) ranges4.push(ipRange);
+		if(ipFam == 6) ranges6.push(ipRange);
+	}
+	ranges4.sort(function(a, b) {
+		return a[0] - b[0];
+	});
+	ranges6.sort(function(a, b) {
+		if(a[0] > b[0]) return 1;
+		if(a[0] < b[0]) return -1;
+		return 0;
+	});
+	ranges4 = removeOverlaps(ranges4); // must be done after list reconstruction
+	ranges6 = removeOverlaps(ranges6);
+	return {
+		data: {
+			v4: ranges4,
+			v6: ranges6
+		},
+		raw: rebuildCoalitionList(ranges4, ranges6)
+	};
+}
+
+function rebuildRestrictionsList(restrictions) {
 	var rstr = "";
 	for(var i = 0; i < restrictions.length; i++) {
 		var restr = restrictions[i];
@@ -306,34 +346,10 @@ function procRest(list) {
 			rstr += rstrLine.join(";") + "\n";
 		}
 	}
-	return {
-		data: restrictions,
-		raw: rstr
-	};
+	return rstr;
 }
 
-function procCoal(list) {
-	var ranges4 = [];
-	var ranges6 = [];
-	for(var i = 0; i < list.length; i++) {
-		var row = list[i];
-		if(!row) continue;
-		row = row.trim();
-		var ipInfo = procIP(row);
-		if(!ipInfo) continue;
-		var ipRange = ipInfo[0];
-		var ipFam = ipInfo[1];
-		if(ipFam == 4) ranges4.push(ipRange);
-		if(ipFam == 6) ranges6.push(ipRange);
-	}
-	ranges4.sort(function(a, b) {
-		return a[0] - b[0];
-	});
-	ranges6.sort(function(a, b) {
-		if(a[0] > b[0]) return 1;
-		if(a[0] < b[0]) return -1;
-		return 0;
-	});
+function rebuildCoalitionList(ranges4, ranges6) {
 	var cstr = "";
 	for(var i = 0; i < ranges4.length; i++) {
 		cstr += reconIPv4(ranges4[i][0], ranges4[i][1]) + "\n";
@@ -341,16 +357,32 @@ function procCoal(list) {
 	for(var i = 0; i < ranges6.length; i++) {
 		cstr += reconIPv6(ranges6[i][0], ranges6[i][1]) + "\n";
 	}
-	ranges4 = removeOverlaps(ranges4); // must be done after list reconstruction
-	ranges6 = removeOverlaps(ranges6);
-	return {
-		data: {
-			v4: ranges4,
-			v6: ranges6
-		},
-		raw: cstr
-	};
+	return cstr;
 }
+
+function appendRestriction(restrictions, newRestr) {
+	if(Array.isArray(newRestr)) {
+		restrictions.push(...newRestr);
+	} else {
+		restrictions.push(newRestr);
+	}
+}
+
+function prependRestriction(restrictions, newRestr) {
+	if(Array.isArray(newRestr)) {
+		restrictions.unshift(...newRestr);
+	} else {
+		restrictions.unshift(newRestr);
+	}
+}
+
+/*
+	Inserting programmatically:
+	restr = restrictions.procRest(["ip=1.1.1.1;type=charrate;rate=15;world="]).data
+	restrictions.prependRestriction(restrictions.getRestrictions(), restr)
+	rawList = restrictions.rebuildRestrictionsList(restrictions.getRestrictions())
+	saveRestrictions("main", rawList)
+*/
 
 module.exports = {
 	procRest,
@@ -358,5 +390,9 @@ module.exports = {
 	setRestrictions,
 	getRestrictions,
 	setCoalition,
-	checkCoalition
+	checkCoalition,
+	appendRestriction,
+	prependRestriction,
+	rebuildRestrictionsList,
+	rebuildCoalitionList
 };
