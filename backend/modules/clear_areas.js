@@ -13,6 +13,7 @@ module.exports = async function(data, server, params) {
 	var tile_database = server.tile_database;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
 	var rate_limiter = server.rate_limiter;
+	var loadPlugin = server.loadPlugin;
 
 	var memkeyAccess = world.opts.memKey && world.opts.memKey == params.keyQuery;
 
@@ -47,6 +48,19 @@ module.exports = async function(data, server, params) {
 	var idLabel = ipAddress;
 
 	broadcastMonitorEvent("Clear", ipAddress + " set 'clear' on world '" + world.name + "' (" + world.id + "), coords (" + tileX + ", " + tileY + ")");
+
+	var plugin = loadPlugin();
+	// plugin interface is subject to change - use at your own risk
+	if(plugin && plugin.clear) {
+		try {
+			plugin.clear({
+				ip: ipAddress,
+				is_owner, is_member,
+				tileX, tileY, charX, charY, charWidth, charHeight, // unprocessed
+				user, world
+			});
+		} catch(e) {}
+	}
 
 	var no_log_edits = world.opts.noLogEdits;
 
