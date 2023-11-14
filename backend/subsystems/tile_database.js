@@ -590,7 +590,7 @@ function tileWriteEdits(callID, tile, options, editData) {
 	// ! not future proof !
 	if(plugin && plugin.write) {
 		try {
-			plugin.write(options, tile);
+			plugin.write(options, tile, editData);
 		} catch(e) {}
 	}
 
