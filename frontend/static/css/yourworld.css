@@ -201,21 +201,19 @@ a:visited {
 	position: absolute;
 	bottom: 0px;
 	left: 0px;
-	width: 70px;
+	width: 68px;
 	text-align: center;
-	background-color: #003399;
-	color: white;
-	height: 20px;
-	border-style: solid;
-	border-width: 1px;
-	border-color: #000033;
+	height: 18px;
 	cursor: default;
+	display: flex;
+    justify-content: center;
+    align-items: center;
 }
 #chat_open:hover {
-	background-color: #2763dc;
+	background-color: rgba(0, 0, 255, .2);
 }
 #chat_open:active {
-	background-color: #0e2961;
+	background-color: rgba(0, 0, 255, .3);
 }
 #usr_online {
 	padding-left: 16px;
@@ -276,11 +274,13 @@ a:visited {
 	color: red;
 }
 .unread {
+	margin-left: 4px;
 	color: red;
 	font-size: 11px;
 }
 #total_unread {
-	font-size: 15px;
+    font-weight: bold;
+    color: gray;
 }
 #chat_window {
 	position: absolute;
