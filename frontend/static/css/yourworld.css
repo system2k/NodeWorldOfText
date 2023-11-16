@@ -210,10 +210,11 @@ a:visited {
     align-items: center;
 }
 #chat_open:hover {
-	background-color: rgba(0, 0, 255, .2);
+	background-color: #CCCCFF;
 }
 #chat_open:active {
-	background-color: rgba(0, 0, 255, .3);
+	color: white;
+	background-color: #B2B2FF;
 }
 #usr_online {
 	padding-left: 16px;
