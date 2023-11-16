@@ -226,7 +226,8 @@ a:visited {
 }
 .chat_tab_button {
 	height: 20px;
-	border: solid 1px black;
+	border: solid 1px #6c6c6c;
+	border-radius: 2px;
 	text-align: center;
 	font-family: Verdana;
 	font-size: 13px;
@@ -241,7 +242,8 @@ a:visited {
 	color: white;
 }
 .chatfield {
-	border: solid 1px black;
+	border: solid 1px #6c6c6c;
+	border-radius: 2px;
 	background-color: white;
 	overflow: scroll;
 	overflow-x: hidden;
@@ -285,7 +287,8 @@ a:visited {
 #chat_window {
 	position: absolute;
 	background-color: #e0e0e0;
-	border: solid 1px black;
+	border: solid 1px #404040;
+	border-radius: 2px;
 	display: flex;
 	flex-flow: column;
 }
@@ -295,7 +298,8 @@ a:visited {
 	height: 20px;
 	text-align: center;
 	color: white;
-	border: solid 1px black;
+	border: solid 1px #830000;
+	border-radius: 2px;
 	font-family: monospace;
 	font-size: 16px;
 	cursor: default;
