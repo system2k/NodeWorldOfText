@@ -123,6 +123,14 @@ function clientChatResponse(message) {
 }
 
 var client_commands = {
+        clearchat: function(){
+        if(selectedChatTab==0){for(i=0;i<chatRecordsPage.length;i++)
+{chatRecordsPage[i].element.remove();};clientChatResponse("Cleared Chat Locally")
+} 
+else{for(i=0;i<chatRecordsGlobal.length;i++){
+chatRecordsGlobal[i].element.remove();
+};clientChatResponse("Cleared Chat Locally")}
+},
 	nick: function (args) {
 		var newDisplayName = args.join(" ");
 		if(!newDisplayName) {
