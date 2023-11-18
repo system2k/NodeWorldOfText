@@ -518,6 +518,36 @@ function isValidSpecialSymbol(charCode) {
 	return false;
 }
 
+function drawShadeChar(charCode, textRender, x, y, clampW, clampH, flags) {
+    if(charCode >= 0x2591 && charCode <= 0x2593) {
+        let isLight = charCode == 0x2591;
+        let factor = isLight ? 3 : 5;
+        for(let i = 0; i < factor; i++){
+            for(let j = 0; j < 10; j++){
+                textRender.beginPath();
+                textRender.rect(
+                    x + (i * clampW / factor) + (!(j%2)) * (clampW / (factor * 2)),
+                    y + j * clampH/ 10,
+                    clampW / 10,
+                    clampH / 20);
+                textRender.closePath();
+                textRender.fill();
+            }
+        }
+        if(charCode == 0x2593) {
+            for(let j = 0; j < 10; j++){
+                textRender.beginPath();
+                textRender.rect(x, y + clampH / 20 + j * clampH / 10,
+                                clampW, clampH / 20);
+                textRender.closePath();
+                textRender.fill();
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
 function draw2by2Char(charCode, textRender, x, y, width, height) {
 	// relative offset: 0x2596 - 0x259F
 	var pattern = [2, 1, 8, 11, 9, 14, 13, 4, 6, 7][charCode - 0x2596];
@@ -632,6 +662,7 @@ function drawFractionalBlockChar(charCode, textRender, x, y, width, height) {
 }
 
 function drawBlockChar(charCode, textRender, x, y, cellW, cellH) {
+	var isShade = charCode >= 0x2591 && charCode <= 0x2593;
 	var isFractionalBlock = (charCode >= 0x2580 && charCode <= 0x2590) ||
 							(charCode >= 0x2594 && charCode <= 0x2595) ||
 							(charCode >= 0x1FB82 && charCode <= 0x1FB8B);
@@ -656,7 +687,9 @@ function drawBlockChar(charCode, textRender, x, y, cellW, cellH) {
 		drawTriangleShardChar(charCode, textRender, x, y, cellW, cellH);
 	} else if(is2by4) { // 2x4 LCS octant characters
 		draw2by4Char(charCode, textRender, x, y, cellW, cellH);
-	}
+	} else if(isShade) { // shades (light, medium, dark)
+        fillShade(charCode, textRender, x, y, cellW, cellH);
+    }
 }
 
 function dispatchCharClientHook(cCode, textRender, tileX, tileY, x, y, clampW, clampH) {
