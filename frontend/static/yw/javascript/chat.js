@@ -966,7 +966,9 @@ function updateUserCount() {
 		current_unit = units;
 	}
 	elm.usr_online.innerText = count + " " + current_unit + " online";
+        document.title="Our World Of Text ("+count+")"
 }
+
 
 function chatType(registered, nickname, realUsername) {
 	var nickMatches = (nickname + "").toUpperCase() == (realUsername + "").toUpperCase();
