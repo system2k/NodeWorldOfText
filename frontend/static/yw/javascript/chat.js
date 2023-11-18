@@ -212,6 +212,21 @@ var client_commands = {
 	},
 	day: function() {
 		w.day(true);
+	},
+	clear: function() {
+		if(selectedChatTab == 0) {
+			for(var i = 0; i < chatRecordsPage.length; i++) {
+				var rec = chatRecordsPage[i];
+				rec.element.remove();
+			}
+			chatRecordsPage.splice(0);
+		} else if(selectedChatTab == 1) {
+			for(var i = 0; i < chatRecordsGlobal.length; i++) {
+				var rec = chatRecordsGlobal[i];
+				rec.element.remove();
+			}
+			chatRecordsGlobal.splice(0);
+		}
 	}
 }
 
