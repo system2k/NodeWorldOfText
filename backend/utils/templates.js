@@ -333,6 +333,7 @@ function tokenizeControl(input, row, col) {
 }
 
 function sharedConsumeVariablePath(next, back) {
+	var part;
 	var path = [];
 	var stack = [];
 	var head = path;
@@ -402,6 +403,7 @@ function sharedConsumeVariablePath(next, back) {
 
 function organizeIfStmt(tokens) {
 	// the main goal of this function is to validate an if-statement
+	var part;
 	var result = [];
 	var part;
 	var idx = 0;
