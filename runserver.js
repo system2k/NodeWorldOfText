@@ -1041,6 +1041,22 @@ var http_rate_limits = [ // function ; hold limit ; [method]
 
 var http_req_holds = {}; // ip/identifier -> {"<index>": {holds: <number>, resp: [<promises>,...]},...}
 
+intv.release_stuck_requests = setInterval(function() {
+	var currentTime = Date.now();
+	for(var ip in http_req_holds) {
+		for(var http_idx in http_req_holds[ip]) {
+			var rateLimData = http_req_holds[ip][http_idx];
+			var startTimes = rateLimData.startTimeById;
+			for(var id in startTimes) {
+				var start = startTimes[id];
+				if(currentTime - start >= 1000 * 60) {
+					release_http_rate_limit(ip, parseInt(http_idx), parseInt(id));
+				}
+			}
+		}
+	}
+}, 1000 * 60);
+
 function check_http_rate_limit(ip, func, method) {
 	var idx = -1;
 	var max = 0;
@@ -1059,14 +1075,18 @@ function check_http_rate_limit(ip, func, method) {
 	if(!http_req_holds[ip]) {
 		http_req_holds[ip] = {};
 	}
-	holdObj = http_req_holds[ip];
+	var holdObj = http_req_holds[ip];
 	if(!holdObj[idx]) {
 		holdObj[idx] = {
 			holds: 1,
 			max,
-			resp: []
+			resp: [],
+			maxId: 1,
+			startTimeById: {}
 		};
-		return idx;
+		var id = holdObj[idx].maxId++;
+		holdObj[idx].startTimeById[id] = Date.now();
+		return [idx, id];
 	}
 	var obj = holdObj[idx];
 	if(obj.holds >= max) {
@@ -1075,14 +1095,18 @@ function check_http_rate_limit(ip, func, method) {
 		});
 	}
 	obj.holds++;
-	return idx;
+	var id = obj.maxId++;
+	obj.startTimeById[id] = Date.now();
+	return [idx, id];
 }
 
-function release_http_rate_limit(ip, rate_id) {
+function release_http_rate_limit(ip, http_idx, id) {
 	var obj = http_req_holds[ip];
 	if(!obj) return;
-	var lim = obj[rate_id];
+	var lim = obj[http_idx];
 	if(!lim) return;
+	if(!lim.startTimeById[id]) return; // already released
+	delete lim.startTimeById[id];
 	lim.holds--;
 	var diff = lim.max - lim.holds;
 	if(lim.holds <= 0) { // failsafe
@@ -1094,12 +1118,17 @@ function release_http_rate_limit(ip, rate_id) {
 		if(!func) continue;
 		if(lim.holds < lim.max) {
 			lim.holds++;
-			func(rate_id);
+			func([http_idx, id]);
 			lim.resp.splice(0, 1);
 		}
 	}
+	// no holds for this particular HTTP route
 	if(!lim.holds && !lim.resp.length) {
-		delete obj[rate_id];
+		delete obj[http_idx];
+	}
+	// no holds for this IP
+	if(Object.keys(obj).length == 0) {
+		delete http_req_holds[ip];
 	}
 }
 
@@ -1778,9 +1807,9 @@ async function process_request(req, res, compCallbacks) {
 		}
 		var method = req.method.toUpperCase();
 		var rate_id = await check_http_rate_limit(ipAddress, handler, method);
-		if(rate_id != -1) { // release handle when this request finishes
+		if(rate_id !== -1) { // release handle when this request finishes
 			compCallbacks.push(function() {
-				release_http_rate_limit(ipAddress, rate_id);
+				release_http_rate_limit(ipAddress, rate_id[0], rate_id[1]);
 			});
 		}
 		var post_data = {};
