@@ -523,27 +523,23 @@ function drawShadeChar(charCode, textRender, x, y, clampW, clampH, flags) {
 	if(charCode >= 0x2591 && charCode <= 0x2593) {
 		let isLight = charCode == 0x2591;
 		let factor = isLight ? 3 : 5;
-		for(let i = 0; i < factor; i++){
-			for(let j = 0; j < 10; j++){
-				textRender.beginPath();
+		textRender.beginPath();
+		for(let i = 0; i < factor; i++) {
+			for(let j = 0; j < 10; j++) {
 				textRender.rect(
 					x + (i * clampW / factor) + (!(j%2)) * (clampW / (factor * 2)),
 					y + j * clampH/ 10,
 					clampW / 10,
 					clampH / 20);
-				textRender.closePath();
-				textRender.fill();
 			}
 		}
 		if(charCode == 0x2593) {
 			for(let j = 0; j < 10; j++){
-				textRender.beginPath();
 				textRender.rect(x, y + clampH / 20 + j * clampH / 10,
 								clampW, clampH / 20);
-				textRender.closePath();
-				textRender.fill();
 			}
 		}
+		textRender.fill();
 		return true;
 	}
 	return false;
