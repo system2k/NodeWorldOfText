@@ -473,7 +473,7 @@ a:visited {
 }
 .chat_emote {
 	background: url(/static/emotes.png);
-	height: 1em;
+	height: 16px;
 	vertical-align: middle;
 	display: inline-block;
 }

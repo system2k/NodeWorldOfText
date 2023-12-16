@@ -493,6 +493,7 @@ var fracBlockTransforms = [
 
 function isValidSpecialSymbol(charCode) {
 	if(charCode >= 0x2580 && charCode <= 0x2590) return true;
+	if(charCode >= 0x2591 && charCode <= 0x2593) return true;
 	if(charCode >= 0x2594 && charCode <= 0x259F) return true;
 	if(charCode >= 0x25E2 && charCode <= 0x25E5) return true;
 	if(charCode >= 0x1CD00 && charCode <= 0x1CDE5) return true;
@@ -516,6 +517,36 @@ function isValidSpecialSymbol(charCode) {
 	}
 
 	return false;
+}
+
+function drawShadeChar(charCode, textRender, x, y, clampW, clampH, flags) {
+    if(charCode >= 0x2591 && charCode <= 0x2593) {
+        let isLight = charCode == 0x2591;
+        let factor = isLight ? 3 : 5;
+        for(let i = 0; i < factor; i++){
+            for(let j = 0; j < 10; j++){
+                textRender.beginPath();
+                textRender.rect(
+                    x + (i * clampW / factor) + (!(j%2)) * (clampW / (factor * 2)),
+                    y + j * clampH/ 10,
+                    clampW / 10,
+                    clampH / 20);
+                textRender.closePath();
+                textRender.fill();
+            }
+        }
+        if(charCode == 0x2593) {
+            for(let j = 0; j < 10; j++){
+                textRender.beginPath();
+                textRender.rect(x, y + clampH / 20 + j * clampH / 10,
+                                clampW, clampH / 20);
+                textRender.closePath();
+                textRender.fill();
+            }
+        }
+        return true;
+    }
+    return false;
 }
 
 function draw2by2Char(charCode, textRender, x, y, width, height) {
@@ -632,6 +663,7 @@ function drawFractionalBlockChar(charCode, textRender, x, y, width, height) {
 }
 
 function drawBlockChar(charCode, textRender, x, y, cellW, cellH) {
+	var isShade = charCode >= 0x2591 && charCode <= 0x2593;
 	var isFractionalBlock = (charCode >= 0x2580 && charCode <= 0x2590) ||
 							(charCode >= 0x2594 && charCode <= 0x2595) ||
 							(charCode >= 0x1FB82 && charCode <= 0x1FB8B);
@@ -656,7 +688,9 @@ function drawBlockChar(charCode, textRender, x, y, cellW, cellH) {
 		drawTriangleShardChar(charCode, textRender, x, y, cellW, cellH);
 	} else if(is2by4) { // 2x4 LCS octant characters
 		draw2by4Char(charCode, textRender, x, y, cellW, cellH);
-	}
+	} else if(isShade) { // shades (light, medium, dark)
+		drawShadeChar(charCode, textRender, x, y, cellW, cellH);
+    }
 }
 
 function dispatchCharClientHook(cCode, textRender, tileX, tileY, x, y, clampW, clampH) {
@@ -788,12 +822,14 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	var isItalic = deco && deco.italic;
 	var isHalfShard = ((cCode >= 0x25E2 && cCode <= 0x25E5) ||
 						cCode == 0x25B2 || cCode == 0x25C4 || cCode == 0x25BA || cCode == 0x25BC);
+	var isShadeSkipped = (cCode >= 0x2591 && cCode <= 0x2593) && (defaultSizes.cellW == 10 && defaultSizes.cellH == 18);
+
 	var checkIdx = 1;
 	if(char.codePointAt(0) > 65535) checkIdx = 2;
 	var isSpecial = char.codePointAt(checkIdx) != void 0;
 	isSpecial = isSpecial || (cCode >= 0x2500 && cCode <= 0x257F);
 
-	if(ansiBlockFill && isValidSpecialSymbol(cCode) && !(isHalfShard && !isBold)) {
+	if(ansiBlockFill && isValidSpecialSymbol(cCode) && !(isHalfShard && !isBold) && !isShadeSkipped) {
 		if(!isOverflow) {
 			drawBlockChar(cCode, textRender, fontX, fontY, cellW, cellH);
 			hasDrawn = true;
