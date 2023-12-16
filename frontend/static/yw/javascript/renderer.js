@@ -493,6 +493,7 @@ var fracBlockTransforms = [
 
 function isValidSpecialSymbol(charCode) {
 	if(charCode >= 0x2580 && charCode <= 0x2590) return true;
+	if(charCode >= 0x2591 && charCode <= 0x2593) return true;
 	if(charCode >= 0x2594 && charCode <= 0x259F) return true;
 	if(charCode >= 0x25E2 && charCode <= 0x25E5) return true;
 	if(charCode >= 0x1CD00 && charCode <= 0x1CDE5) return true;
@@ -688,7 +689,7 @@ function drawBlockChar(charCode, textRender, x, y, cellW, cellH) {
 	} else if(is2by4) { // 2x4 LCS octant characters
 		draw2by4Char(charCode, textRender, x, y, cellW, cellH);
 	} else if(isShade) { // shades (light, medium, dark)
-        fillShade(charCode, textRender, x, y, cellW, cellH);
+		drawShadeChar(charCode, textRender, x, y, cellW, cellH);
     }
 }
 
@@ -821,12 +822,14 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	var isItalic = deco && deco.italic;
 	var isHalfShard = ((cCode >= 0x25E2 && cCode <= 0x25E5) ||
 						cCode == 0x25B2 || cCode == 0x25C4 || cCode == 0x25BA || cCode == 0x25BC);
+	var isShadeSkipped = (cCode >= 0x2591 && cCode <= 0x2593) && (defaultSizes.cellW == 10 && defaultSizes.cellH == 18);
+
 	var checkIdx = 1;
 	if(char.codePointAt(0) > 65535) checkIdx = 2;
 	var isSpecial = char.codePointAt(checkIdx) != void 0;
 	isSpecial = isSpecial || (cCode >= 0x2500 && cCode <= 0x257F);
 
-	if(ansiBlockFill && isValidSpecialSymbol(cCode) && !(isHalfShard && !isBold)) {
+	if(ansiBlockFill && isValidSpecialSymbol(cCode) && !(isHalfShard && !isBold) && !isShadeSkipped) {
 		if(!isOverflow) {
 			drawBlockChar(cCode, textRender, fontX, fontY, cellW, cellH);
 			hasDrawn = true;
