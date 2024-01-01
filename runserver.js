@@ -1090,8 +1090,14 @@ function check_http_rate_limit(ip, func, method) {
 	}
 	var obj = holdObj[idx];
 	if(obj.holds >= max) {
+		// there are too many requests in queue.
+		// we want this request to wait for those requests to finish first.
+		// since this request hasn't executed yet, we do not increment 'holds'
+		// until this request is ready to be executed.
+		var id = obj.maxId++;
+		obj.startTimeById[id] = Date.now();
 		return new Promise(function(res) {
-			obj.resp.push(res);
+			obj.resp.push([res, idx, id]);
 		});
 	}
 	obj.holds++;
@@ -1114,11 +1120,14 @@ function release_http_rate_limit(ip, http_idx, id) {
 		lim.holds = 0;
 	}
 	for(var i = 0; i < diff; i++) {
-		var func = lim.resp[0];
-		if(!func) continue;
+		var funcData = lim.resp[0];
+		if(!funcData) continue;
+		var func = funcData[0];
+		var funcIdx = funcData[1];
+		var funcId = funcData[2];
 		if(lim.holds < lim.max) {
 			lim.holds++;
-			func([http_idx, id]);
+			func([funcIdx, funcId]);
 			lim.resp.splice(0, 1);
 		}
 	}
