@@ -297,23 +297,35 @@ if(accountSystem == "uvias") {
 	pg.defaults.database = settings.pg_db.database || "uvias";
 }
 
-var uvias = {};
+var uvias = {
+	stats: {
+		runningAll: 0,
+		runningGet: 0,
+		runningRun: 0
+	}
+};
 
 uvias.all = async function(query, data) {
 	if(data != void 0 && !Array.isArray(data)) data = [data];
+	uvias.stats.runningAll++;
 	var result = await pgConn.query(query, data);
+	uvias.stats.runningAll--;
 	return result.rows;
 }
 
 uvias.get = async function(query, data) {
 	if(data != void 0 && !Array.isArray(data)) data = [data];
+	uvias.stats.runningGet++;
 	var result = await pgConn.query(query, data);
+	uvias.stats.runningGet--;
 	return result.rows[0];
 }
 
 uvias.run = async function(query, data) {
 	if(data != void 0 && !Array.isArray(data)) data = [data];
+	uvias.stats.runningRun++;
 	await pgConn.query(query, data);
+	uvias.stats.runningRun--;
 }
 
 if(testUviasIds) {
