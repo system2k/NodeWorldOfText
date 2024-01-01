@@ -1049,6 +1049,7 @@ intv.release_stuck_requests = setInterval(function() {
 			var startTimes = rateLimData.startTimeById;
 			for(var id in startTimes) {
 				var start = startTimes[id];
+				if(start == -1) continue;
 				if(currentTime - start >= 1000 * 60) {
 					release_http_rate_limit(ip, parseInt(http_idx), parseInt(id));
 				}
@@ -1095,7 +1096,7 @@ function check_http_rate_limit(ip, func, method) {
 		// since this request hasn't executed yet, we do not increment 'holds'
 		// until this request is ready to be executed.
 		var id = obj.maxId++;
-		obj.startTimeById[id] = Date.now();
+		obj.startTimeById[id] = -1;
 		return new Promise(function(res) {
 			obj.resp.push([res, idx, id]);
 		});
@@ -1127,6 +1128,7 @@ function release_http_rate_limit(ip, http_idx, id) {
 		var funcId = funcData[2];
 		if(lim.holds < lim.max) {
 			lim.holds++;
+			lim.startTimeById[funcId] = Date.now();
 			func([funcIdx, funcId]);
 			lim.resp.splice(0, 1);
 		}
