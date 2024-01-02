@@ -87,6 +87,7 @@ var disconnectTimeout      = null;
 var menuOptions            = {};
 var undoBuffer             = new CircularBuffer(2048);
 var compositionBuffer      = ""; // composition buffer for Android-based keyboards
+var compositionSuppress    = false;
 var textDecorationOffset   = 0x20F0;
 var textDecorationModes    = { bold: false, italic: false, under: false, strike: false };
 var fontTemplate           = "$px 'Courier New', monospace";
@@ -104,6 +105,7 @@ var remoteBoundary         = { centerX: 0, centerY: 0, minX: 0, minY: 0, maxX: 0
 var boundaryStatus         = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 var write_busy             = false; // currently pasting
 var pasteInterval          = 0;
+var writeInterval          = 0;
 var linkQueue              = [];
 var eraseRegionMode        = 0;
 
@@ -2114,7 +2116,6 @@ function flushWrites() {
 	network.write(writeBuffer.splice(0, 512));
 }
 
-var writeInterval;
 function setWriteInterval() {
 	clearInterval(writeInterval);
 	writeInterval = setInterval(function() {
@@ -2862,9 +2863,17 @@ elm.textInput.addEventListener("paste", function(e) {
 
 elm.textInput.addEventListener("compositionstart", function(e) {
 	compositionBuffer = "";
+	compositionSuppress = false;
 });
 
 elm.textInput.addEventListener("compositionupdate", function(e) {
+	if(compositionSuppress) return;
+	if(e.data.charAt(0) == "\x7F") {
+		// we detected a deletion marker in our composition.
+		// on Swiftkey for Android, this lets us detect double-writes.
+		compositionSuppress = true;
+		return;
+	}
 	var bLen = compositionBuffer.length;
 	if(e.data.length > bLen) { // data added
 		if(!e.data.endsWith(" ")) { // do not add chars if we detect that this is an autocompletion addition
@@ -2884,6 +2893,8 @@ elm.textInput.addEventListener("compositionupdate", function(e) {
 elm.textInput.addEventListener("compositionend", function(e) {
 	// only necessary to prevent growth of text input
 	elm.textInput.value = "";
+	compositionBuffer = "";
+	compositionSuppress = false;
 });
 
 function cyclePaste(parser, yieldItem) {
