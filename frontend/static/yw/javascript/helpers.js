@@ -109,6 +109,26 @@ function orderRangeABCoords(coordA, coordB) {
 	}
 }
 
+function compareABCoords(coordA, coordB) {
+	var cmpX = 0;
+	var cmpY = 0;
+	if(coordA[0] > coordB[0]) {
+		cmpX = 1;
+	} else if(coordA[0] == coordB[0] && coordA[2] > coordB[2]) {
+		cmpX = 1;
+	} else if(coordA[0] < coordB[0] || coordA[2] < coordB[2]) {
+		cmpX = -1;
+	}
+	if(coordA[1] > coordB[1]) {
+		cmpY = 1;
+	} else if(coordA[1] == coordB[1] && coordA[3] > coordB[3]) {
+		cmpY = 1;
+	} else if(coordA[1] < coordB[1] || coordA[3] < coordB[3]) {
+		cmpY = -1;
+	}
+	return [cmpX, cmpY];
+}
+
 function ajaxRequest(settings) {
 	var req = new XMLHttpRequest();
 
@@ -573,7 +593,7 @@ var safeLinkHosts = [
 	"ourworldofpixels.com",
 	"ourworldoftext.com",
 	"dir.ourworldoftext.com",
-	"testserver1.ourworldoftext.com",
+	"test.ourworldoftext.com",
 	"spooks.me",
 	"youtube.com",
 	"discord.com",

@@ -98,6 +98,7 @@ var initiallyFetched       = false;
 var lastLinkHover          = null; // [tileX, tileY, charX, charY]
 var lastTileHover          = null; // [type, tileX, tileY, (charX, charY)]
 var regionSelections       = [];
+var mobileSelections       = [];
 var specialClientHooks     = {};
 var specialClientHookMap   = 0; // bitfield (starts at 0): [before char rendering, (future expansion)]
 var bgImageHasChanged      = false;
@@ -106,8 +107,14 @@ var boundaryStatus         = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 var write_busy             = false; // currently pasting
 var pasteInterval          = 0;
 var writeInterval          = 0;
+var flashAnimateInterval   = 0;
+var fetchInterval          = 0;
 var linkQueue              = [];
 var eraseRegionMode        = 0;
+var longpressStartTime     = 0;
+var longpressPosition      = [0, 0];
+var tellEdit               = [];
+var timesConnected         = 0;
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -163,6 +170,7 @@ var bufferLargeChars       = true; // prevents certain large characters from bei
 var cursorOutlineEnabled   = false;
 var showCursorCoordinates  = false; // show cursor coords in coordinate bar
 var textDecorationsEnabled = true; // bold, italic, underline, and strikethrough
+var longpressInterval      = 800; // how many milliseconds to wait until mobile touch is registered as a longpress
 
 var keyConfig = {
 	reset: "ESC",
@@ -289,9 +297,6 @@ function updateCoordDisplay() {
 	}
 }
 
-w.on("cursorMove", updateCoordDisplay);
-w.on("cursorHide", updateCoordDisplay);
-
 elm.coords.onclick = function() {
 	showCursorCoordinates = !showCursorCoordinates;
 	if(showCursorCoordinates) {
@@ -367,8 +372,6 @@ function addColorShortcuts() {
 	}
 	colorShortcutsBg.appendChild(bgNone);
 }
-
-init_dom(); // TODO: put this elsewhere
 
 var draggable_element_mousemove = [];
 var draggable_element_mouseup = [];
@@ -625,6 +628,35 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 		a: coordA,
 		b: coordB
 	});
+}
+
+function handleMobileRegionSelection(start, width, height, actionType) {
+	var str = "";
+	var tileX = start[0];
+	var tileY = start[1];
+	var charX = start[2];
+	var charY = start[3];
+	for(var y = 0; y < height; y++) {
+		if(y != 0) str += "\n";
+		for(var x = 0; x < width; x++) {
+			var char = getChar(tileX, tileY, charX, charY);
+			char = char.replace(/\r|\n|\x1b/g, " ");
+			str += char;
+			charX++;
+			if(charX >= tileC) {
+				charX = 0;
+				tileX++;
+			}
+		}
+		charY++;
+		if(charY >= tileR) {
+			charY = 0;
+			tileY++;
+		}
+		tileX = start[0];
+		charX = start[2];
+	}
+	w.clipboard.copy(str);
 }
 
 var defaultSizes = {
@@ -2055,6 +2087,14 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 			foundActiveSelection = true;
 		}
 	}
+	for(var i = 0; i < mobileSelections.length; i++) {
+		var reg = mobileSelections[i];
+		if(reg.isPreselecting) {
+			reg.setEndCoordByScreenCoord(pageX, pageY);
+			reg.stopPreselecting();
+			foundActiveSelection = true;
+		}
+	}
 	if(foundActiveSelection) return;
 
 	if(closest(e.target, elm.main_view) && canShowMobileKeyboard) {
@@ -2854,48 +2894,50 @@ function event_input(e) {
 	elm.textInput.value = "\x7F".repeat(5);
 }
 
-elm.textInput.addEventListener("input", event_input);
+function setupInputSystem() {
+	elm.textInput.addEventListener("input", event_input);
 
-elm.textInput.addEventListener("paste", function(e) {
-	// reset all the gunk added by the browser.
-	elm.textInput.value = "";
-});
+	elm.textInput.addEventListener("paste", function(e) {
+		// reset all the gunk added by the browser.
+		elm.textInput.value = "";
+	});
 
-elm.textInput.addEventListener("compositionstart", function(e) {
-	compositionBuffer = "";
-	compositionSuppress = false;
-});
+	elm.textInput.addEventListener("compositionstart", function(e) {
+		compositionBuffer = "";
+		compositionSuppress = false;
+	});
 
-elm.textInput.addEventListener("compositionupdate", function(e) {
-	if(compositionSuppress) return;
-	if(e.data.charAt(0) == "\x7F") {
-		// we detected a deletion marker in our composition.
-		// on Swiftkey for Android, this lets us detect double-writes.
-		compositionSuppress = true;
-		return;
-	}
-	var bLen = compositionBuffer.length;
-	if(e.data.length > bLen) { // data added
-		if(!e.data.endsWith(" ")) { // do not add chars if we detect that this is an autocompletion addition
-			var newChars = w.split(e.data.slice(bLen, e.data.length));
-			for(var i = 0; i < newChars.length; i++) {
-				writeChar(newChars[i]);
-			}
-		} else { // this is an autocompletion addition, add the last space
-			writeChar(" ");
+	elm.textInput.addEventListener("compositionupdate", function(e) {
+		if(compositionSuppress) return;
+		if(e.data.charAt(0) == "\x7F") {
+			// we detected a deletion marker in our composition.
+			// on Swiftkey for Android, this lets us detect double-writes.
+			compositionSuppress = true;
+			return;
 		}
-	} else if(e.data.length < bLen && e.data.length > 0) { // data removed - maybe backspace
-		doBackspace();
-	}
-	compositionBuffer = e.data;
-});
+		var bLen = compositionBuffer.length;
+		if(e.data.length > bLen) { // data added
+			if(!e.data.endsWith(" ")) { // do not add chars if we detect that this is an autocompletion addition
+				var newChars = w.split(e.data.slice(bLen, e.data.length));
+				for(var i = 0; i < newChars.length; i++) {
+					writeChar(newChars[i]);
+				}
+			} else { // this is an autocompletion addition, add the last space
+				writeChar(" ");
+			}
+		} else if(e.data.length < bLen && e.data.length > 0) { // data removed - maybe backspace
+			doBackspace();
+		}
+		compositionBuffer = e.data;
+	});
 
-elm.textInput.addEventListener("compositionend", function(e) {
-	// only necessary to prevent growth of text input
-	elm.textInput.value = "";
-	compositionBuffer = "";
-	compositionSuppress = false;
-});
+	elm.textInput.addEventListener("compositionend", function(e) {
+		// only necessary to prevent growth of text input
+		elm.textInput.value = "";
+		compositionBuffer = "";
+		compositionSuppress = false;
+	});
+}
 
 function cyclePaste(parser, yieldItem) {
 	var item = parser ? parser.nextItem() : yieldItem;
@@ -3310,59 +3352,63 @@ var linkParams = {
 	host: "",
 	coord: false
 };
-linkDiv.style.width = (cellW / zoomRatio) + "px";
-linkDiv.style.height = (cellH / zoomRatio) + "px";
-linkElm.style.top = "-1000px";
-linkElm.style.left = "-1000px";
-linkElm.ondragstart = function() {
-	return false;
-}
-linkElm.onclick = function(e) {
-	if(linkParams.coord) {
-		coord_link_click(e);
-		return;
-	}
-	var lTileX = currentSelectedLinkCoords[0];
-	var lTileY = currentSelectedLinkCoords[1];
-	var lCharX = currentSelectedLinkCoords[2];
-	var lCharY = currentSelectedLinkCoords[3];
-	var charInfo = getCharInfo(lTileX, lTileY, lCharX, lCharY);
 
-	var linkEvent = url_link_click(e);
-	var prot = linkParams.protocol;
-	var url = linkParams.url;
-
-	if(prot == "javascript") {
-		runJSLink(url, isMainPage() && charInfo.protection == 0);
-		return false;
-	} else if(prot == "com") {
-		w.broadcastCommand(url);
-		return false;
-	} else if(prot == "comu") {
-		w.broadcastCommand(url, true);
+function setupLinkElement() {
+	linkDiv.style.width = (cellW / zoomRatio) + "px";
+	linkDiv.style.height = (cellH / zoomRatio) + "px";
+	linkElm.style.top = "-1000px";
+	linkElm.style.left = "-1000px";
+	linkElm.ondragstart = function() {
 		return false;
 	}
-	if(secureLink && !e.ctrlKey) {
-		if((isMainPage() && charInfo.protection == 0) && !isSafeHostname(linkParams.host)) {
-			var acpt = confirm("Are you sure you want to visit this link?\n" + url);
-			if(!acpt) {
+	linkElm.onclick = function(e) {
+		if(linkParams.coord) {
+			coord_link_click(e);
+			return;
+		}
+		var lTileX = currentSelectedLinkCoords[0];
+		var lTileY = currentSelectedLinkCoords[1];
+		var lCharX = currentSelectedLinkCoords[2];
+		var lCharY = currentSelectedLinkCoords[3];
+		var charInfo = getCharInfo(lTileX, lTileY, lCharX, lCharY);
+	
+		var linkEvent = url_link_click(e);
+		var prot = linkParams.protocol;
+		var url = linkParams.url;
+	
+		if(prot == "javascript") {
+			runJSLink(url, isMainPage() && charInfo.protection == 0);
+			return false;
+		} else if(prot == "com") {
+			w.broadcastCommand(url);
+			return false;
+		} else if(prot == "comu") {
+			w.broadcastCommand(url, true);
+			return false;
+		}
+		if(secureLink && !e.ctrlKey) {
+			if((isMainPage() && charInfo.protection == 0) && !isSafeHostname(linkParams.host)) {
+				var acpt = confirm("Are you sure you want to visit this link?\n" + url);
+				if(!acpt) {
+					return false;
+				}
+			}
+		}
+		if(linkEvent && linkEvent[0]) {
+			return linkEvent[0];
+		}
+	}
+	linkElm.onauxclick = function(e) {
+		if(e.which == 2) {
+			var prot = linkParams.protocol;
+			if(prot == "javascript") {
+				e.preventDefault();
 				return false;
 			}
 		}
 	}
-	if(linkEvent && linkEvent[0]) {
-		return linkEvent[0];
-	}
 }
-linkElm.onauxclick = function(e) {
-	if(e.which == 2) {
-		var prot = linkParams.protocol;
-		if(prot == "javascript") {
-			e.preventDefault();
-			return false;
-		}
-	}
-}
+
 var currentSelectedLink = null;
 var currentSelectedLinkCoords = null; // [tileX, tileY, charX, charY]
 
@@ -3533,7 +3579,13 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 			w.setTileRedraw(newTileX, newTileY, true);
 		}
 		reg.regionCoordB = currentPosition;
-		if(reg.regionCoordA && reg.regionCoordB) reg.setSelection(reg.regionCoordA, reg.regionCoordB);
+		reg.updateSelection();
+	}
+	for(var i = 0; i < mobileSelections.length; i++) {
+		var reg = mobileSelections[i];
+		if(!reg.isPreselecting) continue;
+		reg.setEndCoordByScreenCoord(pageX, pageY);
+		reg.updateSelection();
 	}
 
 	// url/coordinate linking
@@ -3640,6 +3692,17 @@ function event_touchstart(e) {
 		return;
 	}
 
+	// if this is the beginning of a potential longpress, mark the start time
+	if(touches.length == 1) {
+		longpressStartTime = Date.now();
+		longpressPosition = [
+			touches[0].clientX * zoomRatio,
+			touches[0].clientY * zoomRatio
+		];
+	} else {
+		longpressStartTime = 0;
+	}
+
 	if(touches.length) {
 		event_mousemove(e, touches[0].pageX * zoomRatio, touches[0].pageY * zoomRatio);
 	}
@@ -3667,6 +3730,7 @@ function event_touchstart(e) {
 }
 function event_touchend(e) {
 	var touches = e.touches;
+	longpressStartTime = 0;
 	if(touches.length == 0) {
 		if(touchPrev && touchPrev.length) {
 			event_mouseup(e, touchPrev[0].pageX * zoomRatio, touchPrev[0].pageY * zoomRatio);
@@ -3687,7 +3751,9 @@ function event_touchmove(e) {
 	var touches = e.touches;
 	touchPrev = touches;
 
-	if(!isDragging) {
+	longpressStartTime = 0;
+
+	if(!isDragging || regionSelectionsActive()) {
 		var pos = touch_pagePos(e);
 		if(closest(e.target, elm.main_view) || Modal.isOpen) {
 			e.preventDefault();
@@ -3933,8 +3999,7 @@ function createWsPath() {
 	return "ws" + (window.location.protocol == "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/" + search;
 }
 
-var fetchInterval;
-var timesConnected = 0;
+
 function createSocket(getChatHist) {
 	getChatHist = !!getChatHist;
 	socket = new ReconnectingWebSocket(ws_path);
@@ -4290,48 +4355,50 @@ function highlight(positions, unlimited, color) {
 	}
 }
 
-var flashAnimateInterval = setInterval(function() {
-	if(!highlightCount) return;
-	var tileGroup = {}; // tiles to re-render after highlight
-	var flashDuration = 500;
-	for(var tile in highlightFlash) {
-		for(var charY in highlightFlash[tile]) {
-			for(var charX in highlightFlash[tile][charY]) {
-				var data = highlightFlash[tile][charY][charX];
-				var time = data[0];
-				var diff = getDate() - time;
-				// duration of 500 milliseconds
-				if(diff >= flashDuration) {
-					delete highlightFlash[tile][charY][charX];
-					if(!Object.keys(highlightFlash[tile][charY]).length) {
-						delete highlightFlash[tile][charY];
+function setupFlashAnimation() {
+	flashAnimateInterval = setInterval(function() {
+		if(!highlightCount) return;
+		var tileGroup = {}; // tiles to re-render after highlight
+		var flashDuration = 500;
+		for(var tile in highlightFlash) {
+			for(var charY in highlightFlash[tile]) {
+				for(var charX in highlightFlash[tile][charY]) {
+					var data = highlightFlash[tile][charY][charX];
+					var time = data[0];
+					var diff = getDate() - time;
+					// duration of 500 milliseconds
+					if(diff >= flashDuration) {
+						delete highlightFlash[tile][charY][charX];
+						if(!Object.keys(highlightFlash[tile][charY]).length) {
+							delete highlightFlash[tile][charY];
+						}
+						if(!Object.keys(highlightFlash[tile]).length) {
+							delete highlightFlash[tile];
+						}
+						highlightCount--;
+					} else {
+						var pos = easeOutQuad(diff, 0, 1, flashDuration);
+						var flashColor = highlightFlash[tile][charY][charX][2];
+						var r = flashColor[0];
+						var g = flashColor[1];
+						var b = flashColor[2];
+						var flashRGB = highlightFlash[tile][charY][charX][1];
+						flashRGB[0] = r + (255 - r) * pos;
+						flashRGB[1] = g + (255 - g) * pos;
+						flashRGB[2] = b + (255 - b) * pos;
 					}
-					if(!Object.keys(highlightFlash[tile]).length) {
-						delete highlightFlash[tile];
-					}
-					highlightCount--;
-				} else {
-					var pos = easeOutQuad(diff, 0, 1, flashDuration);
-					var flashColor = highlightFlash[tile][charY][charX][2];
-					var r = flashColor[0];
-					var g = flashColor[1];
-					var b = flashColor[2];
-					var flashRGB = highlightFlash[tile][charY][charX][1];
-					flashRGB[0] = r + (255 - r) * pos;
-					flashRGB[1] = g + (255 - g) * pos;
-					flashRGB[2] = b + (255 - b) * pos;
+					// mark tile to re-render
+					tileGroup[tile] = 1;
 				}
-				// mark tile to re-render
-				tileGroup[tile] = 1;
 			}
 		}
-	}
-	// re-render tiles
-	for(var i in tileGroup) {
-		var pos = getPos(i);
-		w.setTileRender(pos[1], pos[0]);
-	}
-}, 1000 / 60);
+		// re-render tiles
+		for(var i in tileGroup) {
+			var pos = getPos(i);
+			w.setTileRender(pos[1], pos[0]);
+		}
+	}, 1000 / 60);
+}
 
 function blankTile() {
 	var newTile = {
@@ -4618,6 +4685,13 @@ function renderLoop() {
 	if(!writeBuffer.length) sendCursorPosition();
 	renderNextTilesInQueue();
 	requestAnimationFrame(renderLoop);
+	if(longpressStartTime && Date.now() - longpressStartTime >= longpressInterval) {
+		longpressStartTime = 0;
+		w.emit("longpress", {
+			x: longpressPosition[0],
+			y: longpressPosition[1]
+		});
+	}
 }
 
 function protectPrecisionOption(option) {
@@ -5043,6 +5117,9 @@ function regionSelectionsActive() {
 	for(var i = 0; i < regionSelections.length; i++) {
 		if(regionSelections[i].isSelecting) return true;
 	}
+	for(var i = 0; i < mobileSelections.length; i++) {
+		if(mobileSelections[i].isPreselecting) return true;
+	}
 	return false;
 }
 function RegionSelection() {
@@ -5057,13 +5134,15 @@ function RegionSelection() {
 	this.lastSelectionHover = null; // [tileX, tileY, charX, charY]
 	this.lastSelectionTiled = this.tiled;
 	this.restartSelection = false;
+	var onselectionEvents = [];
+	var oncancelEvents = [];
 	this.init = function() {
 		if(this.selection) return;
 		var div = document.createElement("div");
 		div.className = "region_selection";
 		div.style.display = "none";
 		div.style.backgroundColor = this.color;
-		document.body.appendChild(div);
+		elm.main_view.appendChild(div);
 		this.selection = div;
 	}
 	this.setSelection = function(start, end) {
@@ -5086,8 +5165,8 @@ function RegionSelection() {
 		}
 		var pxCoordA = tileAndCharsToWindowCoords(tileX1, tileY1, charX1, charY1);
 		var pxCoordB = tileAndCharsToWindowCoords(tileX2, tileY2, charX2, charY2);
-		var regWidth = pxCoordB[0] - pxCoordA[0] + Math.trunc(cellW / zoomRatio) - 2;
-		var regHeight = pxCoordB[1] - pxCoordA[1] + Math.trunc(cellH / zoomRatio) - 2;
+		var regWidth = pxCoordB[0] - pxCoordA[0] + Math.trunc(cellW / zoomRatio);
+		var regHeight = pxCoordB[1] - pxCoordA[1] + Math.trunc(cellH / zoomRatio);
 		var sel = this.selection;
 		sel.style.width = regWidth + "px";
 		sel.style.height = regHeight + "px";
@@ -5132,8 +5211,6 @@ function RegionSelection() {
 		w.setTileRedraw(tileX, tileY, true);
 		this.deselect(successful);
 	}
-	var onselectionEvents = [];
-	var oncancelEvents = [];
 	this.onselection = function(func) {
 		onselectionEvents.push(func);
 	}
@@ -5177,6 +5254,11 @@ function RegionSelection() {
 		elm.owot.style.cursor = "cell";
 		this.selection.style.backgroundColor = this.color;
 	}
+	this.updateSelection = function() {
+		if(this.regionCoordA && this.regionCoordB) {
+			this.setSelection(this.regionCoordA, this.regionCoordB);
+		}
+	}
 	this.destroy = function() {
 		for(var i = 0; i < regionSelections.length; i++) {
 			if(regionSelections[i] == this) {
@@ -5184,26 +5266,444 @@ function RegionSelection() {
 				i--;
 			}
 		}
+		if(this.selection) {
+			this.selection.remove();
+		}
 	}
 	regionSelections.push(this);
 	this.init();
 	return this;
 }
 
-w.on("tilesRendered", function() {
-	for(var i = 0; i < regionSelections.length; i++) {
-		var reg = regionSelections[i];
-		if(reg.regionCoordA && reg.regionCoordB) reg.setSelection(reg.regionCoordA, reg.regionCoordB);
+function MobileSelection() {
+	this.selectionContainer = null;
+	this.selection = null;
+	this.handleA = null;
+	this.handleB = null;
+	this.regionCoordA = null;
+	this.regionCoordB = null;
+	this.isPreselecting = false;
+	this.isSelecting = false;
+	this.handleSize = 16;
+	this.handleDownPos = null;
+	this.selectionDownPos = null;
+	this.optionsBar = null;
+	this.options = [];
+	this.isOptionsFinalized = false;
+	this.tiled = false;
+	this.color = "rgba(0, 0, 255, 0.1)";
+	this.handleColor = "rgb(79 94 201)";
+	var evt_wndMousemove = [];
+	var evt_wndMouseup = [];
+	var evt_wndTouchmove = [];
+	var evt_wndTouchend = [];
+	var onselectionEvents = [];
+	var oncancelEvents = [];
+	this.init = function() {
+		var cont = document.createElement("div");
+		this.selectionContainer = cont;
+		cont.style.position = "absolute";
+
+		var div = document.createElement("div");
+		this.selection = div;
+		div.className = "region_selection";
+		div.style.position = "absolute";
+
+		var hdlA = document.createElement("div");
+		var hdlB = document.createElement("div");
+		hdlA.className = "mobile_selection_handle";
+		hdlB.className = "mobile_selection_handle";
+		this.handleA = hdlA;
+		this.handleB = hdlB;
+
+		var hdlSize = this.handleSize;
+		this.handleA.style.width = hdlSize + "px";
+		this.handleA.style.height = hdlSize + "px";
+		this.handleB.style.width = hdlSize + "px";
+		this.handleB.style.height = hdlSize + "px";
+
+		cont.appendChild(div);
+		cont.appendChild(hdlA);
+		cont.appendChild(hdlB)
+
+		this.setHandleEvent(0);
+		this.setHandleEvent(1);
+		this.buildOptions();
+		elm.main_view.appendChild(cont);
+		this.hide();
 	}
-});
+	this.hideHandles = function() {
+		if(this.handleA) this.handleA.style.display = "none";
+		if(this.handleB) this.handleB.style.display = "none";
+	}
+	this.showHandles = function() {
+		if(this.handleA) this.handleA.style.display = "";
+		if(this.handleB) this.handleB.style.display = "";
+	}
+	this.show = function() {
+		this.selectionContainer.style.display = "";
+	}
+	this.hide = function() {
+		this.selectionContainer.style.display = "none";
+	}
+	this.showOptions = function() {
+		this.optionsBar.style.display = "";
+	}
+	this.hideOptions = function() {
+		this.optionsBar.style.display = "none";
+	}
+	this.deselect = function(successful) {
+		this.isSelecting = false;
+		this.regionSelected = false;
+		this.regionCoordA = null;
+		this.regionCoordB = null;
+		this.hide();
+		if(!successful) {
+			for(var i = 0; i < oncancelEvents.length; i++) {
+				var func = oncancelEvents[i];
+				func();
+			}
+		}
+		if(this.optionsBar) {
+			this.hideOptions();
+		}
+	}
+	this.setSelection = function(start, end) {
+		var coordA = start.slice(0);
+		var coordB = end.slice(0);
+		var cmp = compareABCoords(coordA, coordB);
+		orderRangeABCoords(coordA, coordB);
+		var tileX1 = coordA[0];
+		var tileY1 = coordA[1];
+		var charX1 = coordA[2];
+		var charY1 = coordA[3];
+		var tileX2 = coordB[0];
+		var tileY2 = coordB[1];
+		var charX2 = coordB[2];
+		var charY2 = coordB[3];
+		if(this.tiled) {
+			charX1 = 0;
+			charY1 = 0;
+			charX2 = tileC - 1;
+			charY2 = tileR - 1;
+		}
+		var pxCoordA = tileAndCharsToWindowCoords(tileX1, tileY1, charX1, charY1);
+		var pxCoordB = tileAndCharsToWindowCoords(tileX2, tileY2, charX2, charY2);
+		var regWidth = pxCoordB[0] - pxCoordA[0];
+		var regHeight = pxCoordB[1] - pxCoordA[1];
 
-w.on("cursorMove", function(pos) {
-	setClientGuestCursorPosition(pos.tileX, pos.tileY, pos.charX, pos.charY);
-});
+		var cmp = compareABCoords(this.regionCoordA, this.regionCoordB);
+		var cmpX = cmp[0];
+		var cmpY = cmp[1];
+		var addXB = cmpX <= 0 ? 1 : 0;
+		var addYB = cmpY <= 0 ? 1 : 0;
+		if(cmpX == 1) addXB++;
+		if(cmpY == 1) addYB++;
+		if(this.isPreselecting) {
+			regWidth += addXB * cellW / zoomRatio;
+			regHeight += addYB * cellH / zoomRatio;
+		}
 
-w.on("cursorHide", function() {
-	setClientGuestCursorPosition(0, 0, 0, 0, true);
-});
+		var sel = this.selection;
+		var cont = this.selectionContainer;
+		sel.style.width = regWidth + "px";
+		sel.style.height = regHeight + "px";
+		cont.style.top = pxCoordA[1] + "px";
+		cont.style.left = pxCoordA[0] + "px";
+
+		var hdlRad = Math.floor(this.handleSize / 2);
+		if(cmpX == -1 || cmpX == 0) {
+			this.handleA.style.left = -hdlRad + "px";
+			this.handleB.style.left = regWidth - hdlRad + "px";
+		} else if(cmpX == 1) {
+			this.handleA.style.left = regWidth - hdlRad + "px";
+			this.handleB.style.left = -hdlRad + "px";
+		}
+
+		if(cmpY == -1 || cmpY == 0) {
+			this.handleA.style.top = -hdlRad + "px";
+			this.handleB.style.top = regHeight - hdlRad + "px";
+		} else if(cmpY == 1) {
+			this.handleA.style.top = regHeight - hdlRad + "px";
+			this.handleB.style.top = -hdlRad + "px";
+		}
+	}
+
+	this.preselectShift = function() {
+		var cmp = compareABCoords(this.regionCoordA, this.regionCoordB);
+		var cmpX = cmp[0];
+		var cmpY = cmp[1];
+		var addXB = cmpX <= 0 ? 1 : 0;
+		var addYB = cmpY <= 0 ? 1 : 0;
+		var addXA = cmpX <= 0 ? 0 : 1;
+		var addYA = cmpY <= 0 ? 0 : 1;
+		var ra = this.regionCoordA;
+		var rb = this.regionCoordB;
+		this.regionCoordA = coordinateAdd(ra[0], ra[1], ra[2], ra[3], 0, 0, addXA, addYA);
+		this.regionCoordB = coordinateAdd(rb[0], rb[1], rb[2], rb[3], 0, 0, addXB, addYB);
+		this.updateSelection();
+	}
+	this.setStartCoordByScreenCoord = function(x, y) {
+		var coords = getTileCoordsFromMouseCoords(x, y);
+		this.regionCoordA = coords;
+	}
+	this.setEndCoordByScreenCoord = function(x, y) {
+		var coords = getTileCoordsFromMouseCoords(x, y);
+		this.regionCoordB = coords;
+	}
+	this.stopPreselecting = function() {
+		if(!this.isPreselecting) return;
+		this.isPreselecting = false;
+		this.showHandles();
+		this.preselectShift();
+	}
+	this.setHandleEvent = function(handleType) {
+		var hdl;
+		if(handleType == 0) {
+			hdl = this.handleA;
+		} else if(handleType == 1) {
+			hdl = this.handleB;
+		}
+		var isDown = false;
+		var self = this;
+		var hdlMousedown = function(e) {
+			if(self.isPreselecting) return;
+			var x = e.clientX * zoomRatio + cellW / 2;
+			var y = e.clientY * zoomRatio + cellH / 2;
+			var coords = getTileCoordsFromMouseCoords(x, y);
+			self.handleDownPos = [
+				coords[0] * tileC + coords[2],
+				coords[1] * tileR + coords[3]
+			];
+			if(handleType == 0) {
+				self.selectionDownPos = self.regionCoordA;
+			} else if(handleType == 1) {
+				self.selectionDownPos = self.regionCoordB;
+			}
+			isDown = true;
+		}
+		var wndMousemove = function(e) {
+			if(self.isPreselecting) return;
+			if(!isDown) return;
+			var x = e.clientX * zoomRatio + cellW / 2;
+			var y = e.clientY * zoomRatio + cellH / 2;
+			var coords = getTileCoordsFromMouseCoords(x, y);
+			var ca = self.handleDownPos;
+			var cb = [
+				coords[0] * tileC + coords[2],
+				coords[1] * tileR + coords[3]
+			];
+			var diff = [
+				cb[0] - ca[0],
+				cb[1] - ca[1]
+			];
+			var cc = self.selectionDownPos;
+			if(handleType == 0) {
+				self.regionCoordA = coordinateAdd(cc[0], cc[1], cc[2], cc[3], 0, 0, diff[0], diff[1]);
+			} else if(handleType == 1) {
+				self.regionCoordB = coordinateAdd(cc[0], cc[1], cc[2], cc[3], 0, 0, diff[0], diff[1]);
+			}
+			self.setSelection(self.regionCoordA, self.regionCoordB);
+		}
+		var wndMouseup = function() {
+			isDown = false;
+			self.isPreselecting = false;
+		}
+		var wndTouchmove = function(e) {
+			var x = e.touches[0].clientX;
+			var y = e.touches[0].clientY;
+			wndMousemove({
+				clientX: x,
+				clientY: y
+			});
+		}
+
+		hdl.addEventListener("mousedown", hdlMousedown);
+		window.addEventListener("mousemove", wndMousemove);
+		window.addEventListener("mouseup", wndMouseup);
+
+		hdl.addEventListener("touchstart", function(e) {
+			var x = e.touches[0].clientX;
+			var y = e.touches[0].clientY;
+			hdlMousedown({
+				clientX: x,
+				clientY: y
+			});
+		});
+		window.addEventListener("touchmove", wndTouchmove);
+		window.addEventListener("touchend", wndMouseup);
+
+		// since these are global events, they won't get automatically
+		// removed once the element is destroyed.
+		evt_wndMousemove.push(wndMousemove);
+		evt_wndMouseup.push(wndMouseup);
+		evt_wndTouchmove.push(wndTouchmove);
+		evt_wndTouchend.push(wndMouseup);
+	}
+	this.buildOptions = function() {
+		var div = document.createElement("div");
+		div.className = "longpress-options";
+		div.style.display = "none";
+
+		var cont = document.createElement("div");
+		cont.className = "longpress-container";
+		cont.appendChild(div);
+	
+		document.body.appendChild(cont);
+		this.optionsBar = div;
+	}
+	this.finalizeOptions = function() {
+		this.isOptionsFinalized = true;
+		var hasDefaultOption = false;
+		for(var i = 0; i < this.options.length; i++) {
+			if(this.options[i][1] == "apply") {
+				hasDefaultOption = true;
+			}
+		}
+		if(!hasDefaultOption) {
+			this.addOption("Apply", "apply");
+		}
+		// add close button
+		var close = document.createElement("div");
+		close.innerText = "\u00D7"; // multiplication "x" symbol
+		close.classList.add("longpress-option");
+		close.classList.add("longpress-close");
+		close.onclick = this.deselect.bind(this);
+		this.optionsBar.appendChild(close);
+	}
+	this.addOption = function(text, actionId) {
+		// if action is null, then the default action is to apply the selection.
+		// we're just merely renaming the default text in this case.
+		if(!actionId) actionId = "apply";
+		var opt = document.createElement("div");
+		opt.className = "longpress-option";
+		opt.innerText = text;
+		opt.onclick = function() {
+			this.handleSelection(actionId);
+		}.bind(this);
+		this.optionsBar.appendChild(opt);
+		this.options.push([text, actionId]);
+	}
+	this.onselection = function(func) {
+		onselectionEvents.push(func);
+	}
+	this.oncancel = function(func) {
+		oncancelEvents.push(func);
+	}
+	this.handleSelection = function(actionId) {
+		for(var i = 0; i < onselectionEvents.length; i++) {
+			var func = onselectionEvents[i];
+			if(!this.regionCoordA) continue;
+			var coordA = this.regionCoordA.slice(0);
+			var coordB = this.regionCoordB.slice(0);
+			orderRangeABCoords(coordA, coordB);
+			if(this.tiled) {
+				coordA[2] = 0;
+				coordA[3] = 0;
+				coordB[2] = tileC - 1;
+				coordB[3] = tileR - 1;
+			}
+			var regWidth = (coordB[0] - coordA[0]) * tileC + coordB[2] - coordA[2];
+			var regHeight = (coordB[1] - coordA[1]) * tileR + coordB[3] - coordA[3];
+			func(coordA, regWidth, regHeight, actionId);
+		}
+		this.regionCoordA = null;
+		this.regionCoordB = null;
+		this.deselect();
+	}
+	this.startSelection = function(preselect) {
+		if(this.isSelecting) {
+			this.regionCoordA = null;
+			this.regionCoordB = null;
+			if(preselect) {
+				this.isPreselecting = true;
+				this.hideHandles();
+			}
+			return;
+		}
+		if(!this.isOptionsFinalized) {
+			this.finalizeOptions();
+		}
+		this.isSelecting = true;
+		if(preselect) {
+			this.isPreselecting = true;
+			this.hideHandles();
+		} else {
+			var centerPos = [owotWidth / 2 | 0, owotHeight / 2 | 0];
+			this.regionCoordA = getTileCoordsFromMouseCoords(centerPos[0] - 128, centerPos[1] - 128);
+			this.regionCoordB = getTileCoordsFromMouseCoords(centerPos[0] + 128, centerPos[1] + 128);
+		}
+		this.selection.style.backgroundColor = this.color;
+		if(this.handleA) this.handleA.style.backgroundColor = this.handleColor;
+		if(this.handleB) this.handleB.style.backgroundColor = this.handleColor;
+		this.updateSelection();
+		this.showOptions();
+		this.show();
+	}
+	this.updateSelection = function() {
+		if(this.regionCoordA && this.regionCoordB) {
+			this.setSelection(this.regionCoordA, this.regionCoordB);
+		}
+	}
+	this.destroy = function() {
+		for(var i = 0; i < evt_wndMousemove.length; i++) {
+			window.removeEventListener("mousemove", evt_wndMousemove[i]);
+		}
+		for(var i = 0; i < evt_wndMouseup.length; i++) {
+			window.removeEventListener("mouseup", evt_wndMouseup[i]);
+		}
+		for(var i = 0; i < evt_wndTouchmove.length; i++) {
+			window.removeEventListener("touchmove", evt_wndTouchmove[i]);
+		}
+		for(var i = 0; i < evt_wndTouchend.length; i++) {
+			window.removeEventListener("touchend", evt_wndTouchend[i]);
+		}
+		for(var i = 0; i < mobileSelections.length; i++) {
+			if(mobileSelections[i] == this) {
+				mobileSelections.splice(i, 1);
+				i--;
+			}
+		}
+		if(this.selectionContainer) {
+			this.selectionContainer.remove();
+		}
+	}
+	mobileSelections.push(this);
+	this.init();
+	return this;
+}
+
+
+function setupClientEvents() {
+	w.on("tilesRendered", function() {
+		for(var i = 0; i < regionSelections.length; i++) {
+			var reg = regionSelections[i];
+			reg.updateSelection();
+		}
+		for(var i = 0; i < mobileSelections.length; i++) {
+			var reg = mobileSelections[i];
+			reg.updateSelection();
+		}
+	});
+	
+	w.on("cursorMove", function(pos) {
+		setClientGuestCursorPosition(pos.tileX, pos.tileY, pos.charX, pos.charY);
+	});
+	
+	w.on("cursorHide", function() {
+		setClientGuestCursorPosition(0, 0, 0, 0, true);
+	});
+	
+	w.on("longpress", function(pos) {
+		w.mobileCopySelect.startSelection(true);
+		w.mobileCopySelect.setStartCoordByScreenCoord(pos.x, pos.y);
+		w.mobileCopySelect.setEndCoordByScreenCoord(pos.x, pos.y);
+		w.mobileCopySelect.updateSelection();
+	});
+	
+	w.on("cursorMove", updateCoordDisplay);
+	w.on("cursorHide", updateCoordDisplay);
+}
 
 function setClientGuestCursorPosition(tileX, tileY, charX, charY, hidden) {
 	var pos = clientGuestCursorPos;
@@ -5681,6 +6181,7 @@ Object.assign(w, {
 	regionSelect: new RegionSelection(),
 	protectSelect: new RegionSelection(),
 	eraseSelect: new RegionSelection(),
+	mobileCopySelect: new MobileSelection(),
 	color: function() {
 		w.ui.colorModal.open();
 	},
@@ -6095,31 +6596,33 @@ Object.assign(w, {
 	}
 });
 
-elm.owot.oncontextmenu = function() {
-	if(ignoreCanvasContext) {
-		ignoreCanvasContext = false;
-		elm.owot.style.pointerEvents = "none";
-		setTimeout(function() {
-			ignoreCanvasContext = true;
-			elm.owot.style.pointerEvents = "";
-		}, 1);
+function setupDOMEvents() {
+	elm.owot.oncontextmenu = function() {
+		if(ignoreCanvasContext) {
+			ignoreCanvasContext = false;
+			elm.owot.style.pointerEvents = "none";
+			setTimeout(function() {
+				ignoreCanvasContext = true;
+				elm.owot.style.pointerEvents = "";
+			}, 1);
+		}
 	}
-}
-
-window.onhashchange = function(e) {
-	manageCoordHash();
-}
-
-window.onbeforeunload = function() {
-	if(writeBuffer.length) flushWrites();
-}
-
-document.onselectstart = function(e) {
-	var target = e.target;
-	if(closest(target, getChatfield()) || target == elm.chatbar || closest(target, elm.confirm_js_code) || closest(target, elm.announce_text)) {
-		return true;
+	
+	window.onhashchange = function(e) {
+		manageCoordHash();
 	}
-	return Modal.isOpen;
+	
+	window.onbeforeunload = function() {
+		if(writeBuffer.length) flushWrites();
+	}
+	
+	document.onselectstart = function(e) {
+		var target = e.target;
+		if(closest(target, getChatfield()) || target == elm.chatbar || closest(target, elm.confirm_js_code) || closest(target, elm.announce_text)) {
+			return true;
+		}
+		return Modal.isOpen;
+	}
 }
 
 function disableBgColorPicker() {
@@ -6479,27 +6982,6 @@ function makeSelectionModal() {
 	w.ui.selectionModal = modal;
 }
 
-if(state.userModel.is_superuser) {
-	w.loadScript("/static/yw/javascript/world_tools.js");
-}
-
-if(state.worldModel.default_script_path && window.URL) {
-	let url = new URL(state.worldModel.default_script_path, window.location.origin);
-	if(url.origin == window.location.origin) { // static file must be from the same website!
-		w.loadScript(url.pathname);
-	}
-}
-
-if(state.background) {
-	w.backgroundInfo.x = ("x" in state.background) ? state.background.x : 0;
-	w.backgroundInfo.y = ("y" in state.background) ? state.background.y : 0;
-	w.backgroundInfo.w = ("w" in state.background) ? state.background.w : 0;
-	w.backgroundInfo.h = ("h" in state.background) ? state.background.h : 0;
-	w.backgroundInfo.rmod = ("rmod" in state.background) ? state.background.rmod : 0;
-	w.backgroundInfo.alpha = ("alpha" in state.background) ? state.background.alpha : 1;
-}
-
-var tellEdit = [];
 // tileY, tileX, charY, charX, X, X, editID
 function searchTellEdit(tileX, tileY, charX, charY) {
 	for(var i = 0; i < tellEdit.length; i++) {
@@ -7064,6 +7546,13 @@ var ws_functions = {
 };
 
 function begin() {
+	init_dom();
+	setupInputSystem();
+	setupLinkElement();
+	setupDOMEvents();
+	setupClientEvents();
+	setupFlashAnimation();
+
 	getStoredConfig();
 	getStoredNickname();
 
@@ -7081,7 +7570,8 @@ function begin() {
 	}
 
 	if(window.location.hostname == "www.ourworldoftext.com") {
-		w.doAnnounce("You are currently under the 'www' subdomain. <a href=\"https://ourworldoftext.com\">You may want to go here instead.</a>", "www_warn");
+		var newPath = encodeURI("https://ourworldoftext.com" + window.location.pathname + window.location.search + window.location.hash);
+		w.doAnnounce("You are currently under the 'www' subdomain. <a href=\"" + newPath + "\">You may want to go here instead.</a>", "www_warn");
 	}
 
 	buildMenu();
@@ -7096,6 +7586,9 @@ function begin() {
 	w.eraseSelect.charColor = "red";
 	w.eraseSelect.color = "rgb(239 176 176 / 50%)";
 
+	w.mobileCopySelect.addOption("Copy");
+	w.mobileCopySelect.onselection(handleMobileRegionSelection);
+
 	w.fetchUnloadedTiles();
 	w.fixFonts("legacycomputing");
 
@@ -7103,6 +7596,26 @@ function begin() {
 	manageCoordHash();
 
 	protectPrecisionOption(protectPrecision);
+
+	if(state.userModel.is_superuser) {
+		w.loadScript("/static/yw/javascript/world_tools.js");
+	}
+	
+	if(state.worldModel.default_script_path && window.URL) {
+		let url = new URL(state.worldModel.default_script_path, window.location.origin);
+		if(url.origin == window.location.origin) { // static file must be from the same website!
+			w.loadScript(url.pathname);
+		}
+	}
+	
+	if(state.background) {
+		w.backgroundInfo.x = ("x" in state.background) ? state.background.x : 0;
+		w.backgroundInfo.y = ("y" in state.background) ? state.background.y : 0;
+		w.backgroundInfo.w = ("w" in state.background) ? state.background.w : 0;
+		w.backgroundInfo.h = ("h" in state.background) ? state.background.h : 0;
+		w.backgroundInfo.rmod = ("rmod" in state.background) ? state.background.rmod : 0;
+		w.backgroundInfo.alpha = ("alpha" in state.background) ? state.background.alpha : 1;
+	}
 
 	getWorldProps(state.worldModel.name, "style", function(style, error) {
 		if(error) {

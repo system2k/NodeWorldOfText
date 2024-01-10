@@ -8,9 +8,17 @@ html, body {
 	height: 100%;
 	overscroll-behavior: contain;
 	touch-action: pan-down;
+	-webkit-touch-callout: none;
+}
+#main_view {
+	position: relative;
+	overflow: hidden;
 }
 .screen_canvas {
 	overflow: hidden;
+	user-select: none;
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
 }
 body {
 	background: #ccc;
@@ -206,8 +214,8 @@ a:visited {
 	height: 18px;
 	cursor: default;
 	display: flex;
-    justify-content: center;
-    align-items: center;
+	justify-content: center;
+	align-items: center;
 }
 #chat_open:hover {
 	background-color: #CCCCFF;
@@ -282,8 +290,8 @@ a:visited {
 	font-size: 11px;
 }
 #total_unread {
-    font-weight: bold;
-    color: gray;
+	font-weight: bold;
+	color: gray;
 }
 #chat_window {
 	position: absolute;
@@ -383,6 +391,14 @@ a:visited {
 	position: absolute;
 	border: 1px solid black;
 	pointer-events: none;
+	box-sizing: border-box;
+}
+.mobile_selection_handle {
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background-color: navy;
+	position: absolute;
 }
 #area_results {
 	width: 100%;
@@ -530,4 +546,36 @@ a:visited {
 .menuPin {
 	width: 12px;
 	height: 12px;
+}
+.longpress-container {
+	width: 100%;
+	position: absolute;
+	bottom: 22px;
+	text-align: center;
+	pointer-events: none;
+}
+.longpress-options {
+	background-color: #E5E5FF;
+	padding: 5px;
+	display: inline-block;
+	pointer-events: auto;
+	cursor: default;
+	user-select: none;
+}
+.longpress-option {
+	display: table-cell;
+	color: black;
+	padding: 5px;
+	font-family: Verdana, Arial;
+	vertical-align: middle;
+	user-select: none;
+}
+.longpress-close {
+	font-size: 2em;
+}
+.longpress-option:not(:last-child) {
+	border-right: solid 1px #a7a7a7;
+}
+.longpress-option:active {
+	background-color: #CDCDFF;
 }
