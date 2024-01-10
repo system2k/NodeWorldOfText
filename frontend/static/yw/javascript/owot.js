@@ -123,6 +123,7 @@ var coordSizeX             = 4;
 var coordSizeY             = 4;
 var gridEnabled            = false;
 var subgridEnabled         = false; // character-level grid
+var cursorEnabled          = true;
 var linksEnabled           = true;
 var linksRendered          = true;
 var colorsEnabled          = true;
@@ -294,17 +295,6 @@ function updateCoordDisplay() {
 	     elm.tile_Y.innerText,
 		 elm.char_X.innerText,
 		 elm.char_Y.innerText] = [...cursorCoords];
-	}
-}
-
-elm.coords.onclick = function() {
-	showCursorCoordinates = !showCursorCoordinates;
-	if(showCursorCoordinates) {
-		elm.cursor_coords.style.display = "";
-		updateCoordDisplay();
-	} else {
-		elm.cursor_coords.style.display = "none";
-		updateCoordDisplay();
 	}
 }
 
@@ -2051,7 +2041,6 @@ function stopDragging() {
 	elm.owot.style.cursor = defaultCursor;
 }
 
-var cursorEnabled = true;
 function event_mouseup(e, arg_pageX, arg_pageY) {
 	var pageX = Math.trunc(e.pageX * zoomRatio);
 	var pageY = Math.trunc(e.pageY * zoomRatio);
@@ -6605,6 +6594,17 @@ function setupDOMEvents() {
 				ignoreCanvasContext = true;
 				elm.owot.style.pointerEvents = "";
 			}, 1);
+		}
+	}
+
+	elm.coords.onclick = function() {
+		showCursorCoordinates = !showCursorCoordinates;
+		if(showCursorCoordinates) {
+			elm.cursor_coords.style.display = "";
+			updateCoordDisplay();
+		} else {
+			elm.cursor_coords.style.display = "none";
+			updateCoordDisplay();
 		}
 	}
 	

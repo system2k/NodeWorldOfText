@@ -78,7 +78,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	}
 
 	world_list.sort(function(v1, v2) {
-		return v1.name.localeCompare(v2.name, "en", { sensitivity: "base" });
+		return v1.name.localeCompare(v2.name, "en", { numeric: true, sensitivity: "base" });
 	});
 
 	var memberships = await fetchWorldMembershipsByUserId(user.id);
