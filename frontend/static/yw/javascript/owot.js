@@ -43,18 +43,6 @@ function deviceRatio() {
 	return ratio;
 }
 
-var enums = {};
-function makeEnum(vars) {
-	var enums = {};
-	for(var i = 0; i < vars.length; i++) {
-		enums[vars[i]] = i;
-	}
-	return enums;
-}
-
-enums.edit = makeEnum(["tileY", "tileX", "charY", "charX", "time", "char", "id", "color"]);
-enums.position = makeEnum(["tileX", "tileY", "charX", "charY"]);
-
 var ws_path = createWsPath();
 
 var menu, menuStyle;
@@ -199,10 +187,6 @@ var keyConfig = {
 	zoomOut: ["CTRL+MINUS"],
 	zoomReset: ["CTRL+0"]
 };
-
-window.addEventListener("load", function() {
-	w.emit("clientLoaded");
-});
 
 defineElements({ // elm[<name>]
 	loading: byId("loading"),
@@ -443,17 +427,20 @@ function resizeChat(width, height) {
 	return [width, height];
 }
 
-draggable_element(elm.chat_window, null, [
-	elm.chatbar, elm.chatsend, elm.chat_close, elm.chat_page_tab, elm.chat_global_tab, elm.page_chatfield, elm.global_chatfield
-], function() {
-	if(chatResizing) {
-		return -1;
-	}
-});
-draggable_element(elm.confirm_js, null, [
-	elm.confirm_js_code
-]);
-resizable_chat();
+function makeChatInteractive() {
+	draggable_element(elm.chat_window, null, [
+		elm.chatbar, elm.chatsend, elm.chat_close, elm.chat_page_tab, elm.chat_global_tab, elm.page_chatfield, elm.global_chatfield
+	], function() {
+		if(chatResizing) {
+			return -1;
+		}
+	});
+	draggable_element(elm.confirm_js, null, [
+		elm.confirm_js_code
+	]);
+	// from chat.js
+	resizable_chat();
+}
 
 function getStoredNickname() {
 	var nick = YourWorld.Nickname;
@@ -528,7 +515,6 @@ function keydown_regionSelect(e) {
 	e.preventDefault();
 	w.regionSelect.startSelection();
 }
-document.addEventListener("keydown", keydown_regionSelect);
 
 function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 	var tileX = coordA[0];
@@ -978,7 +964,6 @@ function mousemove_tileProtectAuto() {
 		}
 	}
 }
-document.addEventListener("mousemove", mousemove_tileProtectAuto);
 
 function keydown_tileProtectAuto(e) {
 	if(Modal.isOpen) return;
@@ -1046,7 +1031,6 @@ function keydown_tileProtectAuto(e) {
 		}
 	}
 }
-document.body.addEventListener("keydown", keydown_tileProtectAuto);
 
 // Fast linking
 function mousemove_linkAuto() {
@@ -1110,7 +1094,6 @@ function mousemove_linkAuto() {
 		}
 	}
 }
-document.addEventListener("mousemove", mousemove_linkAuto);
 
 function keydown_linkAuto(e) {
 	if(Modal.isOpen) return;
@@ -1174,7 +1157,6 @@ function keydown_linkAuto(e) {
 		}
 	}
 }
-document.body.addEventListener("keydown", keydown_linkAuto);
 
 var admclr = {
 	activated: false,
@@ -1222,7 +1204,6 @@ function keydown_admclr(e) {
 		admclr.handleClear(currentPosition[0], currentPosition[1]);
 	}
 }
-document.body.addEventListener("keydown", keydown_admclr);
 
 function mousemove_admclr(e) {
 	if(Modal.isOpen) return;
@@ -1243,7 +1224,6 @@ function mousemove_admclr(e) {
 		admclr.handleClear(currentPosition[0], currentPosition[1]);
 	}
 }
-document.body.addEventListener("mousemove", mousemove_admclr);
 
 function keyup_admclr(e) {
 	if(!admclr.activated) return;
@@ -1260,7 +1240,6 @@ function keyup_admclr(e) {
 	if(tile) tile.backgroundColor = admclr.selectionColor;
 	w.setTileRender(currentPosition[0], currentPosition[1]);
 }
-document.body.addEventListener("keyup", keyup_admclr);
 
 function onKeyUp(e) {
 	var sel = checkKeyPress(e, keyConfig.autoSelect);
@@ -1286,7 +1265,6 @@ function onKeyUp(e) {
 		w.doGoToCoord(0, 0);
 	}
 }
-document.body.addEventListener("keyup", onKeyUp);
 
 function adjust_scaling_DOM(ratio) {
 	var window_width = getWndWidth();
@@ -1314,7 +1292,6 @@ function event_resize() {
 	}
 	w.render();
 }
-window.addEventListener("resize", event_resize);
 
 function getChar(tileX, tileY, charX, charY) {
 	if(tileX == void 0 && tileY == void 0 && charX == void 0 && charY == void 0) {
@@ -1466,7 +1443,6 @@ function event_keydown_copy_char(e) {
 	char = char.replace(/\r|\n/g, " ");
 	w.clipboard.copy(char);
 }
-document.addEventListener("keydown", event_keydown_copy_char);
 
 // color picker
 function event_keydown_copy_color(e) {
@@ -1494,7 +1470,6 @@ function event_keydown_copy_color(e) {
 		w.changeBgColor(color);
 	}
 }
-document.addEventListener("keydown", event_keydown_copy_color);
 
 // convert color value to rgb24 int
 function resolveColorValue(val) {
@@ -1930,7 +1905,6 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
 		elm.owot.style.cursor = defaultDragCursor;
 	}
 }
-document.addEventListener("mousedown", event_mousedown);
 
 // change cursor position
 function renderCursor(coords) {
@@ -2115,18 +2089,15 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 	}
 }
 
-document.addEventListener("mouseup", event_mouseup);
-
 function event_mouseleave(e) {
 	event_mousemove(e);
 	w.emit("mouseLeave", e);
 }
-document.addEventListener("mouseleave", event_mouseleave);
+
 function event_mouseenter(e) {
 	event_mousemove(e);
 	w.emit("mouseEnter", e);
 }
-document.addEventListener("mouseenter", event_mouseenter);
 
 function is_link(tileX, tileY, charX, charY) {
 	if(!Tile.get(tileX, tileY)) return;
@@ -2157,7 +2128,6 @@ function setWriteInterval() {
 		}
 	}, writeFlushRate);
 }
-setWriteInterval();
 
 function moveCursor(direction, preserveVertPos, amount) {
 	if(!cursorCoords) return;
@@ -3189,12 +3159,10 @@ function event_keydown(e) {
 	}
 	w.emit("keyDown", e);
 }
-document.addEventListener("keydown", event_keydown);
 
 function event_keyup(e) {
 	w.emit("keyUp", e);
 }
-document.addEventListener("keyup", event_keyup);
 
 function isMainPage() {
 	return state.worldModel.name == "" || state.worldModel.name.toLowerCase() == "main" || state.worldModel.name.toLowerCase() == "owot";
@@ -3646,7 +3614,6 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 	hasDragged = true;
 	w.render();
 }
-document.addEventListener("mousemove", event_mousemove);
 
 function getCenterTouchPosition(touches) {
 	var x = 0;
@@ -3791,10 +3758,6 @@ function event_touchmove(e) {
 	}
 }
 
-document.addEventListener("touchstart", event_touchstart);
-document.addEventListener("touchend", event_touchend);
-document.addEventListener("touchmove", event_touchmove, { passive: false });
-
 // get position from touch event
 function touch_pagePos(e) {
 	var first_touch = e.touches[0];
@@ -3826,7 +3789,6 @@ function event_wheel(e) {
 	});
 	w.render();
 }
-document.addEventListener("wheel", event_wheel);
 
 function event_wheel_zoom(e) {
 	if(Modal.isOpen) return;
@@ -3876,9 +3838,6 @@ function event_wheel_zoom(e) {
 		zoomGarbageCollect();
 	}
 }
-document.addEventListener("wheel", event_wheel_zoom, {
-	passive: false
-});
 
 function convertKeyCode(key) {
 	switch(key) {
@@ -6586,6 +6545,34 @@ Object.assign(w, {
 });
 
 function setupDOMEvents() {
+	document.addEventListener("keydown", keydown_regionSelect);
+	document.addEventListener("mousemove", mousemove_tileProtectAuto);
+	document.body.addEventListener("keydown", keydown_tileProtectAuto);
+	document.addEventListener("mousemove", mousemove_linkAuto);
+	document.body.addEventListener("keydown", keydown_linkAuto);
+	document.body.addEventListener("keydown", keydown_admclr);
+	document.body.addEventListener("mousemove", mousemove_admclr);
+	document.body.addEventListener("keyup", keyup_admclr);
+	document.body.addEventListener("keyup", onKeyUp);
+	window.addEventListener("resize", event_resize);
+	document.addEventListener("keydown", event_keydown_copy_char);
+	document.addEventListener("keydown", event_keydown_copy_color);
+	document.addEventListener("mousedown", event_mousedown);
+	document.addEventListener("touchstart", event_touchstart);
+	document.addEventListener("touchend", event_touchend);
+	document.addEventListener("touchmove", event_touchmove, { passive: false });
+	document.addEventListener("wheel", event_wheel_zoom, { passive: false });
+	document.addEventListener("wheel", event_wheel);
+	document.addEventListener("mousemove", event_mousemove);
+	document.addEventListener("keydown", event_keydown);
+	document.addEventListener("keyup", event_keyup);
+	document.addEventListener("mouseup", event_mouseup);
+	document.addEventListener("mouseenter", event_mouseenter);
+	document.addEventListener("mouseleave", event_mouseleave);
+	window.addEventListener("load", function() {
+		w.emit("clientLoaded");
+	});
+
 	elm.owot.oncontextmenu = function() {
 		if(ignoreCanvasContext) {
 			ignoreCanvasContext = false;
@@ -7547,11 +7534,13 @@ var ws_functions = {
 
 function begin() {
 	init_dom();
+	makeChatInteractive();
 	setupInputSystem();
 	setupLinkElement();
 	setupDOMEvents();
 	setupClientEvents();
 	setupFlashAnimation();
+	setWriteInterval();
 
 	getStoredConfig();
 	getStoredNickname();
