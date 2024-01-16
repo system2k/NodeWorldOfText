@@ -43,9 +43,20 @@ function deviceRatio() {
 	return ratio;
 }
 
-var ws_path = createWsPath();
-
+var textRenderCanvas;
+var textRenderCtx;
+var cellWidthPad, tileW, tileH, cellW, cellH, font, specialCharFont, tileC, tileR, tileArea;
+var tileWidth, tileHeight; // exact tile dimensions for determining rendering size of tiles
+var dTileW, dTileH; // locked tile sizes for background image generation
 var menu, menuStyle;
+
+var cursorCoords = null; // [tileX, tileY, charX, charY]; Coordinates of text cursor. If mouse is deselected, the value is null.
+var cursorCoordsCurrent = [0, 0, 0, 0, -1]; // [tileX, tileY, charX, charY]; cursorCoords that don't reset to null.
+var currentPosition = [0, 0, 0, 0]; // [tileX, tileY, charX, charY]; Tile and char coordinates where mouse cursor is located.
+var currentPositionInitted = false;
+var currentMousePosition = [0, 0, 0, 0]; // [x, y, pageX, pageY]; Position of mouse cursor.
+
+var ws_path                = createWsPath();
 var styles                 = defaultStyles();
 var nextObjId              = 1; // Next edit ID
 var owotWidth              = getWndWidth();
@@ -93,16 +104,20 @@ var bgImageHasChanged      = false;
 var remoteBoundary         = { centerX: 0, centerY: 0, minX: 0, minY: 0, maxX: 0, maxY: 0 };
 var boundaryStatus         = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 var write_busy             = false; // currently pasting
-var pasteInterval          = 0;
-var writeInterval          = 0;
-var flashAnimateInterval   = 0;
-var fetchInterval          = 0;
 var linkQueue              = [];
 var eraseRegionMode        = 0;
 var longpressStartTime     = 0;
 var longpressPosition      = [0, 0];
 var tellEdit               = [];
+var autoTotal              = 0;
 var timesConnected         = 0;
+
+// intervals
+var pasteInterval          = 0;
+var writeInterval          = 0;
+var flashAnimateInterval   = 0;
+var fetchInterval          = 0;
+var poolCleanupInterval    = 0;
 
 // configuration
 var positionX              = 0; // client position in pixels
@@ -187,6 +202,57 @@ var keyConfig = {
 	zoomOut: ["CTRL+MINUS"],
 	zoomReset: ["CTRL+0"]
 };
+
+var defaultSizes = {
+	// in pixels
+	cellW: 10,
+	cellH: 18,
+	// assigned later
+	tileW: null,
+	tileH: null,
+	// in characters
+	tileC: 16, // columns (width)
+	tileR: 8 // rows (height)
+}
+
+var colorClasses = {
+	qprot0: "#DDD", // owner
+	qprot1: "#EEE", // member
+	qprot2: "#FFF", // public
+	qprot3: "#FFF", // default
+	qlink0: "#0000FF", // url
+	qlink1: "#008000", // coord
+	link: "#AAF",
+	prot: "#000",
+	reg: "#00F",
+	err: "#BBC"
+};
+
+var dragStartX = 0;
+var dragStartY = 0;
+// the offset before clicking to drag
+var dragPosX = 0;
+var dragPosY = 0;
+var isDragging = false;
+var hasDragged = false;
+var draggingEnabled = true;
+var touchInitZoom = 0;
+var touchInitDistance = 0;
+var touchPrev = null;
+
+var modules = {};
+var isModule = false;
+var currentModule = null;
+var modPrefixes = [[]];
+
+var linkParams = {
+	protocol: "",
+	url: "",
+	host: "",
+	coord: false
+};
+var currentSelectedLink = null;
+var currentSelectedLinkCoords = null; // [tileX, tileY, charX, charY]
 
 defineElements({ // elm[<name>]
 	loading: byId("loading"),
@@ -635,26 +701,6 @@ function handleMobileRegionSelection(start, width, height, actionType) {
 	w.clipboard.copy(str);
 }
 
-var defaultSizes = {
-	// in pixels
-	cellW: 10,
-	cellH: 18,
-	// assigned later
-	tileW: null,
-	tileH: null,
-	// in characters
-	tileC: 16, // columns (width)
-	tileR: 8 // rows (height)
-}
-if(state.worldModel.square_chars) defaultSizes.cellW = 18;
-if(state.worldModel.half_chars) defaultSizes.cellH = 20;
-if(state.worldModel.tileCols) defaultSizes.tileC = state.worldModel.tileCols;
-if(state.worldModel.tileRows) defaultSizes.tileR = state.worldModel.tileRows;
-
-var cellWidthPad, tileW, tileH, cellW, cellH, font, specialCharFont, tileC, tileR, tileArea;
-var tileWidth, tileHeight; // exact tile dimensions for determining rendering size of tiles
-var dTileW, dTileH; // locked tile sizes for background image generation
-
 function buildFontTemplate(set) {
 	var str = "$px ";
 	for(var i = 0; i < set.length; i++) {
@@ -705,8 +751,6 @@ function updateScaleConsts() {
 	tileArea = tileC * tileR;
 }
 
-var textRenderCanvas;
-var textRenderCtx;
 function setupTextRenderCtx() {
 	if(!textRenderCanvas) {
 		textRenderCanvas = document.createElement("canvas");
@@ -725,9 +769,6 @@ function setupTextRenderCtx() {
 		});
 	}
 }
-
-setupTextRenderCtx();
-updateScaleConsts();
 
 function reloadRenderer() {
 	if(tileCanvasPool.length) {
@@ -862,7 +903,6 @@ var linkAuto = {
 	active: false
 }
 
-var autoTotal = 0;
 function updateAutoProg() {
 	if(autoTotal > 0) {
 		auto_prog.style.display = "";
@@ -1507,12 +1547,6 @@ function resolveColorValue(val) {
 	return 0;
 }
 
-var cursorCoords = null; // [tileX, tileY, charX, charY]; Coordinates of text cursor. If mouse is deselected, the value is null.
-var cursorCoordsCurrent = [0, 0, 0, 0, -1]; // [tileX, tileY, charX, charY]; cursorCoords that don't reset to null.
-var currentPosition = [0, 0, 0, 0]; // [tileX, tileY, charX, charY]; Tile and char coordinates where mouse cursor is located.
-var currentPositionInitted = false;
-var currentMousePosition = [0, 0, 0, 0]; // [x, y, pageX, pageY]; Position of mouse cursor.
-
 var Tile = {};
 Tile.set = function(tileX, tileY, data) {
 	var str = tileY + "," + tileX;
@@ -1564,11 +1598,13 @@ function isTileStale(tileX, tileY) {
 	return tile ? !!tile.stale : false;
 }
 
-var poolCleanupInterval = setInterval(function() {
-	if(w.periodDeletedTiles < 50) return;
-	w.periodDeletedTiles = 0;
-	shiftAllTilesInPools();
-}, 1000 * 10);
+function setupPoolCleanupInterval() {
+	poolCleanupInterval = setInterval(function() {
+		if(w.periodDeletedTiles < 50) return;
+		w.periodDeletedTiles = 0;
+		shiftAllTilesInPools();
+	}, 1000 * 10);
+}
 
 function checkTextColorOverride() {
 	var public = 4;
@@ -1855,14 +1891,6 @@ function triggerUIClick() {
 	return foundActiveSelection;
 }
 
-var dragStartX = 0;
-var dragStartY = 0;
-// the offset before clicking to drag
-var dragPosX = 0;
-var dragPosY = 0;
-var isDragging = false;
-var hasDragged = false;
-var draggingEnabled = true;
 function event_mousedown(e, arg_pageX, arg_pageY) {
 	currentMousePosition[0] = e.pageX;
 	currentMousePosition[1] = e.pageY;
@@ -3203,11 +3231,6 @@ function executeJS(code) {
 	return jsCode();
 }
 
-var modules = {};
-var isModule = false;
-var currentModule = null;
-var modPrefixes = [[]];
-
 function runModule(identifier, code, prefix) {
 	if (typeof code !== "function")
 		code = new Function("isModule", "currentModule", code);
@@ -3303,13 +3326,6 @@ function runJSLink(data, restrict) {
 	}
 }
 
-var linkParams = {
-	protocol: "",
-	url: "",
-	host: "",
-	coord: false
-};
-
 function setupLinkElement() {
 	linkDiv.style.width = (cellW / zoomRatio) + "px";
 	linkDiv.style.height = (cellH / zoomRatio) + "px";
@@ -3365,9 +3381,6 @@ function setupLinkElement() {
 		}
 	}
 }
-
-var currentSelectedLink = null;
-var currentSelectedLinkCoords = null; // [tileX, tileY, charX, charY]
 
 function coord_link_click(evt) {
 	if(!currentSelectedLink) return;
@@ -3629,10 +3642,6 @@ function getCenterTouchPosition(touches) {
 	y *= zoomRatio;
 	return [x, y];
 }
-
-var touchInitZoom = 0;
-var touchInitDistance = 0;
-var touchPrev = null;
 
 function event_touchstart(e) {
 	var touches = e.touches;
@@ -3946,7 +3955,6 @@ function createWsPath() {
 	if(!search) search = "";
 	return "ws" + (window.location.protocol == "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/" + search;
 }
-
 
 function createSocket(getChatHist) {
 	getChatHist = !!getChatHist;
@@ -4360,19 +4368,6 @@ function blankTile() {
 	newTile.properties.color = new Array(tileArea).fill(0);
 	return newTile;
 }
-
-var colorClasses = {
-	qprot0: "#DDD", // owner
-	qprot1: "#EEE", // member
-	qprot2: "#FFF", // public
-	qprot3: "#FFF", // default
-	qlink0: "#0000FF", // url
-	qlink1: "#008000", // coord
-	link: "#AAF",
-	prot: "#000",
-	reg: "#00F",
-	err: "#BBC"
-};
 
 function colorChar(tileX, tileY, charX, charY, colorClass) {
 	var container = coloredChars[tileY + "," + tileX];
@@ -7541,6 +7536,10 @@ function begin() {
 	setupClientEvents();
 	setupFlashAnimation();
 	setWriteInterval();
+	setupPoolCleanupInterval();
+
+	setupTextRenderCtx();
+	updateScaleConsts();
 
 	getStoredConfig();
 	getStoredNickname();
@@ -7605,6 +7604,11 @@ function begin() {
 		w.backgroundInfo.rmod = ("rmod" in state.background) ? state.background.rmod : 0;
 		w.backgroundInfo.alpha = ("alpha" in state.background) ? state.background.alpha : 1;
 	}
+
+	if(state.worldModel.square_chars) defaultSizes.cellW = 18;
+	if(state.worldModel.half_chars) defaultSizes.cellH = 20;
+	if(state.worldModel.tileCols) defaultSizes.tileC = state.worldModel.tileCols;
+	if(state.worldModel.tileRows) defaultSizes.tileR = state.worldModel.tileRows;
 
 	getWorldProps(state.worldModel.name, "style", function(style, error) {
 		if(error) {
