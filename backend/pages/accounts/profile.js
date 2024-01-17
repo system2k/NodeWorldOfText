@@ -158,6 +158,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 			if(typeof worldname != "string") {
 				message = "No world name provided";
 			} else {
+				worldname = worldname.trim();
 				var status = await claimWorldByName(worldname, user);
 				message = status.message;
 				// TODO: what about isMember?
