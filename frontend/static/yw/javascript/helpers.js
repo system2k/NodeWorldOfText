@@ -817,23 +817,23 @@ var w = {
 			throw "Callback is not a function";
 		}
 		type = type.toLowerCase();
-		if(!OWOT.events[type]) {
-			OWOT.events[type] = [];
+		if(!w.events[type]) {
+			w.events[type] = [];
 		}
-		OWOT.events[type].push(call);
+		w.events[type].push(call);
 	},
 	off: function(type, call) {
 		type = type.toLowerCase();
-		if(!OWOT.events[type]) return;
+		if(!w.events[type]) return;
 		while(true) {
-			var idx = OWOT.events[type].indexOf(call);
+			var idx = w.events[type].indexOf(call);
 			if(idx == -1) break;
-			OWOT.events[type].splice(idx, 1);
+			w.events[type].splice(idx, 1);
 		}
 	},
 	emit: function(type, data) {
 		type = type.toLowerCase();
-		var evt = OWOT.events[type];
+		var evt = w.events[type];
 		if(!evt) return;
 		for(var e = 0; e < evt.length; e++) {
 			var func = evt[e];
@@ -842,10 +842,9 @@ var w = {
 	},
 	listening: function(type) {
 		type = type.toLowerCase();
-		return !!OWOT.events[type];
+		return !!w.events[type];
 	},
 	split: advancedSplit
 };
 
-var OWOT = w;
 w.clipboard.init();

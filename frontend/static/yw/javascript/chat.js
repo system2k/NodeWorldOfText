@@ -47,7 +47,7 @@ defineElements({ // elm[<name>]
 });
 
 if(Permissions.can_chat(state.userModel, state.worldModel)) {
-	OWOT.on("chat", function(e) {
+	w.on("chat", function(e) {
 		w.emit("chatMod", e);
 		if(e.hide) return;
 		event_on_chat(e);
@@ -79,7 +79,7 @@ function api_chat_send(message, opts) {
 	if(!message) return;
 	if(!opts) opts = {};
 	var exclude_commands = opts.exclude_commands;
-	var nick = opts.nick || YourWorld.Nickname || state.userModel.username;
+	var nick = opts.nick || OWOT.Nickname || state.userModel.username;
 	var location = opts.location ? opts.location : (selectedChatTab == 0 ? "page" : "global");
 
 	var msgLim = state.userModel.is_staff ? 3030 : 400;
@@ -96,10 +96,10 @@ function api_chat_send(message, opts) {
 
 	var chatColor;
 	if(!opts.color) {
-		if(!YourWorld.Color) {
+		if(!OWOT.Color) {
 			chatColor = assignColor(nick);
 		} else {
-			chatColor = "#" + ("00000" + YourWorld.Color.toString(16)).slice(-6);
+			chatColor = "#" + ("00000" + OWOT.Color.toString(16)).slice(-6);
 		}
 	} else {
 		chatColor = opts.color;
@@ -130,7 +130,7 @@ var client_commands = {
 		}
 		var nickLim = state.userModel.is_staff ? Infinity : 40;
 		newDisplayName = newDisplayName.slice(0, nickLim);
-		YourWorld.Nickname = newDisplayName;
+		OWOT.Nickname = newDisplayName;
 		storeNickname();
 		var nickChangeMsg;
 		if(newDisplayName) {
@@ -172,8 +172,8 @@ var client_commands = {
 	color: function(args) {
 		var color = args.join(" ");
 		color = resolveColorValue(color);
-		YourWorld.Color = color;
-		clientChatResponse("Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase());
+		OWOT.Color = color;
+		clientChatResponse("Changed text color to #" + ("00000" + OWOT.Color.toString(16)).slice(-6).toUpperCase());
 	},
 	chatcolor: function(args) {
 		var color = args.join(" ");

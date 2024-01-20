@@ -1,7 +1,7 @@
-﻿var YourWorld = {
-	Color: window.localStorage ? +localStorage.getItem("color") : 0,
-	BgColor: -1,
-	Nickname: state.userModel.username
+﻿var OWOT = {
+	color: window.localStorage ? +localStorage.getItem("color") : 0,
+	bgColor: -1,
+	nickname: state.userModel.username
 };
 
 var owot, owotCtx, textInput;
@@ -311,16 +311,16 @@ function setColorPickerRandom() {
 }
 
 function updateColorPicker() {
-	var r = (YourWorld.Color >> 16) & 255;
-	var g = (YourWorld.Color >> 8) & 255;
-	var b = YourWorld.Color & 255;
+	var r = (OWOT.color >> 16) & 255;
+	var g = (OWOT.color >> 8) & 255;
+	var b = OWOT.color & 255;
 	setRGBColorPicker(r, g, b);
 }
 
 function updateBgColorPicker() {
-	var r = (YourWorld.BgColor >> 16) & 255;
-	var g = (YourWorld.BgColor >> 8) & 255;
-	var b = YourWorld.BgColor & 255;
+	var r = (OWOT.bgColor >> 16) & 255;
+	var g = (OWOT.bgColor >> 8) & 255;
+	var b = OWOT.bgColor & 255;
 	setRGBBgColorPicker(r, g, b);
 }
 
@@ -408,7 +408,7 @@ function addColorShortcuts() {
 	bgNone.onclick = function() {
 		w.ui.colorModal.close(true); // close + cancel
 		disableBgColorPicker();
-		YourWorld.BgColor = -1;
+		OWOT.bgColor = -1;
 	}
 	colorShortcutsBg.appendChild(bgNone);
 }
@@ -509,16 +509,16 @@ function makeChatInteractive() {
 }
 
 function getStoredNickname() {
-	var nick = YourWorld.Nickname;
+	var nick = OWOT.nickname;
 	if(window.localStorage && localStorage.getItem) {
 		nick = localStorage.getItem("nickname");
 	}
-	if(!nick) nick = YourWorld.Nickname;
-	YourWorld.Nickname = nick;
+	if(!nick) nick = OWOT.nickname;
+	OWOT.nickname = nick;
 }
 function storeNickname() {
 	if(window.localStorage && localStorage.setItem) {
-		localStorage.setItem("nickname", YourWorld.Nickname);
+		localStorage.setItem("nickname", OWOT.nickname);
 	}
 }
 
@@ -2438,8 +2438,8 @@ function writeCharToXY(char, charColor, x, y, charBgColor, dB, dI, dU, dS) {
 // type a character
 function writeChar(char, doNotMoveCursor, color, noNewline, undoCursorOffset, bgColor, dB, dI, dU, dS) {
 	char += "";
-	var charColor = color || YourWorld.Color;
-	var charBgColor = bgColor || YourWorld.BgColor;
+	var charColor = color || OWOT.color;
+	var charBgColor = bgColor || OWOT.bgColor;
 	if(color == 0) charColor = 0;
 	if(bgColor == 0) charBgColor = 0;
 	var cursor = cursorCoords;
@@ -2815,7 +2815,7 @@ function event_input(e) {
 			tileY: cursorCoords[1],
 			charX: cursorCoords[2],
 			charY: cursorCoords[3]
-		}, YourWorld.Color, YourWorld.BgColor);
+		}, OWOT.color, OWOT.bgColor);
 	
 		if(!pastePerm) {
 			cyclePaste(parser);
@@ -6480,7 +6480,7 @@ Object.assign(w, {
 	},
 	changeColor: function(color) {
 		color = resolveColorValue(color);
-		YourWorld.Color = color;
+		OWOT.color = color;
 		localStorage.setItem("color", color);
 		// update color textbox in "change color" menu
 		var rgb = int_to_rgb(color);
@@ -6493,11 +6493,11 @@ Object.assign(w, {
 	},
 	changeBgColor: function(color) {
 		if(color == -1) {
-			YourWorld.BgColor = -1;
+			OWOT.bgColor = -1;
 			return;
 		}
 		color = resolveColorValue(color);
-		YourWorld.BgColor = color;
+		OWOT.bgColor = color;
 		var rgb = int_to_rgb(color);
 		setRGBBgColorPicker(rgb[0], rgb[1], rgb[2]);
 	},

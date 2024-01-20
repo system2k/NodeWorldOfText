@@ -1497,7 +1497,7 @@ function renderGuestCursors(renderCtx, offsetX, offsetY, tile, tileX, tileY) {
 
 function renderCursorOutline(renderCtx, offsetX, offsetY) {
 	if(!cursorCoords) return;
-	var color = YourWorld.Color;
+	var color = OWOT.color;
 	var tileX = cursorCoords[0];
 	var tileY = cursorCoords[1];
 	var charX = cursorCoords[2];
