@@ -731,6 +731,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var msNow = Date.now();
 	var second = Math.floor(msNow / 1000);
 	var chatsEverySecond = 2;
+	if(is_member) chatsEverySecond = 8;
+	if(is_owner) chatsEverySecond = 512;
 	if(isCommand && commandType != "tell") chatsEverySecond = 512;
 
 	if(!chat_ip_limits[ipHeaderAddr]) {

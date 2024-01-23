@@ -213,7 +213,7 @@ var defaultSizes = {
 	// in characters
 	tileC: 16, // columns (width)
 	tileR: 8 // rows (height)
-}
+};
 
 var colorClasses = {
 	qprot0: "#DDD", // owner
