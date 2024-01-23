@@ -25,6 +25,7 @@ function init_dom() {
 		textInput: textInput
 	});
 }
+
 function getWndWidth() {
 	return document.body.clientWidth || window.innerWidth;
 }
