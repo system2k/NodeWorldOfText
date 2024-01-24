@@ -3827,11 +3827,11 @@ function event_wheel_zoom(e) {
 	}
 
 	if(e.ctrlKey) {
+		// start adjusting/normalizing the client position in order to zoom towards the mouse cursor's position
 		positionX += owotWidth / 2 - pageX;
 		positionY += owotHeight / 2 - pageY;
 		positionX /= zoom;
 		positionY /= zoom;
-		
 		if(deltaY < 0) {
 			// zoom in
 			changeZoom((userZoom * 100) * (1.2 ** (-deltaY / 90)), true);
@@ -3843,6 +3843,13 @@ function event_wheel_zoom(e) {
 		positionY *= zoom;
 		positionX -= owotWidth / 2 - pageX;
 		positionY -= owotHeight / 2 - pageY;
+		if(isDragging) {
+			// don't fling user to a far location when dragging and zooming
+			dragPosX = positionX;
+			dragPosY = positionY;
+			dragStartX = pageX;
+			dragStartY = pageY;
+		}
 		e.preventDefault();
 		zoomGarbageCollect();
 	}
