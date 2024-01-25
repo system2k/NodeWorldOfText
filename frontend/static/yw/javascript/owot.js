@@ -7536,6 +7536,9 @@ var ws_functions = {
 
 function begin() {
 	init_dom();
+
+	getStoredConfig();
+	getStoredNickname();
 	makeChatInteractive();
 	setupInputSystem();
 	setupLinkElement();
@@ -7545,20 +7548,21 @@ function begin() {
 	setWriteInterval();
 	setupPoolCleanupInterval();
 
-	setupTextRenderCtx();
-	updateScaleConsts();
-
-	getStoredConfig();
-	getStoredNickname();
-
 	makeCoordLinkModal();
 	makeCoordGotoModal();
 	makeURLModal();
 	makeColorModal();
 	makeSelectionModal();
-
 	addColorShortcuts();
 	updateColorPicker();
+
+	if(state.worldModel.square_chars) defaultSizes.cellW = 18;
+	if(state.worldModel.half_chars) defaultSizes.cellH = 20;
+	if(state.worldModel.tileCols) defaultSizes.tileC = state.worldModel.tileCols;
+	if(state.worldModel.tileRows) defaultSizes.tileR = state.worldModel.tileRows;
+
+	setupTextRenderCtx();
+	updateScaleConsts();
 
 	if(state.announce) {
 		w.doAnnounce(state.announce);
@@ -7611,11 +7615,6 @@ function begin() {
 		w.backgroundInfo.rmod = ("rmod" in state.background) ? state.background.rmod : 0;
 		w.backgroundInfo.alpha = ("alpha" in state.background) ? state.background.alpha : 1;
 	}
-
-	if(state.worldModel.square_chars) defaultSizes.cellW = 18;
-	if(state.worldModel.half_chars) defaultSizes.cellH = 20;
-	if(state.worldModel.tileCols) defaultSizes.tileC = state.worldModel.tileCols;
-	if(state.worldModel.tileRows) defaultSizes.tileR = state.worldModel.tileRows;
 
 	getWorldProps(state.worldModel.name, "style", function(style, error) {
 		if(error) {
