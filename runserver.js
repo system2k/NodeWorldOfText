@@ -72,7 +72,9 @@ var is_cf_ipv4_int = ipaddress.is_cf_ipv4_int;
 var is_cf_ipv6_int = ipaddress.is_cf_ipv6_int;
 
 var DATA_PATH = "../nwotdata/";
+var MIGRATION_PATH = "./backend/migrations/";
 var SETTINGS_PATH = DATA_PATH + "settings.json";
+var databaseVersion = 2;
 
 function initializeDirectoryStruct() {
 	// create the data folder that stores all of the server's data
@@ -794,6 +796,47 @@ function valid_method(mtd) {
 	return valid_methods.indexOf(mtd) > -1;
 }
 
+async function performDatabaseMigrations(startingVersion) {
+	if(!fs.existsSync(MIGRATION_PATH)) {
+		return;
+	}
+	var migrations = fs.readdirSync(MIGRATION_PATH);
+	var sequence = [];
+	for(var i = 0; i < migrations.length; i++) {
+		var migPath = migrations[i];
+		if(!migPath.toLowerCase().endsWith(".js")) {
+			// not a migration script
+			continue;
+		}
+		var migVersion = parseInt(migPath.toLowerCase().split("from-")[1].split(".")[0]);
+		if(migVersion < startingVersion) {
+			// version too early
+			continue;
+		}
+		sequence.push({
+			version: migVersion,
+			path: path.resolve(MIGRATION_PATH, migPath)
+		});
+	}
+	sequence.sort(function(a, b) {
+		return a[0] - b[0];
+	});
+	for(var i = 0; i < sequence.length; i++) {
+		var migration = sequence[0];
+		var migVersion = migration.version;
+		var migPath = migration.path;
+		var migModule = require(migPath);
+		if(!migModule || !migModule.migrate) {
+			console.log(`ERROR: Migration from ${startingVersion} to ${databaseVersion} halted due to invalid scripts`);
+			return;
+		}
+		var currentVersion = parseInt((await db.get("SELECT value FROM server_info WHERE name='db_version'")).value);
+		var migrationFunc = migModule.migrate;
+		console.log(`Applying DB migration from version ${currentVersion} to version ${migVersion + 1}`);
+		await migrationFunc(global_data);
+	}
+}
+
 async function initialize_server() {
 	console.log("Starting server...");
 
@@ -833,6 +876,7 @@ async function initialize_server() {
 		// server is not initialized
 		console.log("Initializing server...");
 		await db.run("INSERT INTO server_info VALUES('initialized', 'true')");
+		await db.run("INSERT INTO server_info VALUES('db_version', ?)", databaseVersion.toString());
 
 		var tables = fs.readFileSync(sql_table_init).toString();
 		var indexes = fs.readFileSync(sql_indexes_init).toString();
@@ -846,6 +890,15 @@ async function initialize_server() {
 		} else if(accountSystem == "uvias") {
 			account_prompt(true);
 		}
+	}
+	if(!await db.get("SELECT value FROM server_info WHERE name='db_version'")) {
+		// this is a server that was created before the database was properly versioned.
+		// we are going to start at version 1 in this case and migrate our way up step by step.
+		await db.run("INSERT INTO server_info VALUES('db_version', ?)", '1');
+	}
+	var currentDatabaseVersion = parseInt((await db.get("SELECT value FROM server_info WHERE name='db_version'")).value);
+	if(databaseVersion > currentDatabaseVersion) {
+		await performDatabaseMigrations(currentDatabaseVersion);
 	}
 	if(!init) {
 		start_server();

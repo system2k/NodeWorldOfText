@@ -30,6 +30,7 @@ CREATE TABLE "tile" (
     "properties" text NOT NULL,
     "writability" integer,
     "created_at" integer NOT NULL,
+    "revision" integer,
     UNIQUE ("world_id", "tileY", "tileX")
 );
 
