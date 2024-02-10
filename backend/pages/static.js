@@ -17,7 +17,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 		if(isNaN(file) || !Number.isInteger(file)) return write(null, 404);
 		if(staticShortcuts.hasOwnProperty(file)) {
 			return write(null, null, {
-				redirect: "/static/files/" + staticShortcuts[file]
+				redirect: staticShortcuts[file]
 			});
 		}
 		return write(null, 404);

@@ -33,7 +33,7 @@
 
 		var csrftoken = "{{csrftoken}}";
 
-		function manageServerCommand(command) {
+		function manageServerCommand(command, callback) {
 			ajaxRequest({
 				type: "POST",
 				data: {
@@ -42,7 +42,11 @@
 				},
 				url: "/administrator/",
 				done: function(e) {
-					alert("Command '" + command + "' has been sent to the server with the response '" + e + "'");
+					if(callback) {
+						callback(e);
+					} else {
+						alert("Command '" + command + "' has been sent to the server with the response '" + e + "'");
+					}
 				}
 			});
 		}
@@ -76,6 +80,16 @@
 					var conf = confirm("Are you sure you want to do this? (Maintenance)");
 					if(!conf) return;
 					manageServerCommand("maintenance");
+				}
+			}
+
+			var action_staticreload = document.getElementById("action_staticreload");
+			if(action_staticreload) {
+				action_staticreload.onclick = function() {
+					action_staticreload.disabled = true;
+					manageServerCommand("staticreload", function() {
+						action_staticreload.disabled = false;
+					});
 				}
 			}
 		}
@@ -301,6 +315,13 @@
 			<span>{{ uptime }}</span>
 			<br>
 			<b>Machine Uptime: </b>{{ machine_uptime }}
+		</div>
+	</div>
+
+	<div class="content_set">
+		<div class="content_set_title">Actions</div>
+		<div class="content_set_content">
+			<button id="action_staticreload">Reload static shortcuts</button>
 		</div>
 	</div>
 

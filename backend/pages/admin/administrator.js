@@ -102,6 +102,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var stopServer = server.stopServer;
 	var checkCSRF = server.checkCSRF;
 	var setClientVersion = server.setClientVersion;
+	var setupStaticShortcuts = server.setupStaticShortcuts;
 
 	if(!user.superuser) {
 		return await callPage("404", null, req, write, server, ctx);
@@ -154,6 +155,10 @@ module.exports.POST = async function(req, write, server, ctx) {
 		if(cmd == "maintenance") {
 			write("SUCCESS");
 			stopServer(false, true);
+		}
+		if(cmd == "staticreload") {
+			setupStaticShortcuts();
+			write("SUCCESS");
 		}
 		return;
 	}

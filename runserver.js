@@ -414,6 +414,9 @@ function setupStaticShortcuts() {
 		// static shortcuts don't exist
 		return;
 	}
+	for(var i in staticShortcuts) {
+		delete staticShortcuts[i];
+	}
 	data = data.toString("utf8").replace(/\r\n/g, "\n").split("\n");
 	for(var i = 0; i < data.length; i++) {
 		var row = data[i].split("\t");
@@ -2935,7 +2938,8 @@ var global_data = {
 	rate_limiter,
 	getClientVersion,
 	setClientVersion,
-	staticShortcuts
+	staticShortcuts,
+	setupStaticShortcuts
 };
 
 async function sysLoad() {
