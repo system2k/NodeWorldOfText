@@ -2775,6 +2775,7 @@ function textcode_parser(value, coords, defaultColor, defaultBgColor) {
 }
 
 function event_input(e) {
+	if(state.worldModel.char_rate[0] == 0 && !state.userModel.is_member) return;
 	var inputType = e.inputType;
 	var inputData = e.data;
 	var textareaValue = elm.textInput.value;
@@ -3162,7 +3163,7 @@ function event_keydown(e) {
 		elm.textInput.value = "\x7F".repeat(5);
 	}
 	if(checkKeyPress(e, keyConfig.cellErase)) {
-		if(state.worldModel.char_rate[0] > 0) {
+		if(state.worldModel.char_rate[0] > 0 || state.userModel.is_member) {
 			writeChar("\x08", true);
 		}
 	}
