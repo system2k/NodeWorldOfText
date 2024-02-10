@@ -3326,6 +3326,84 @@ function runJSLink(data, restrict) {
 	}
 }
 
+function parseClientCommandArgs(string) {
+	if(!string) return {};
+	var result = {};
+	var parseMode = 0;
+	var quoteMode = 0;
+	var kBuffer = "";
+	var vBuffer = "";
+	for(var i = 0; i < string.length; i++) {
+		var char = string[i];
+		if(parseMode == 0) {
+			if(char.trim() == "") continue;
+			if(char == "=") {
+				parseMode = 1;
+				continue;
+			}
+			kBuffer += char;
+		} else if(parseMode == 1) {
+			if(char.trim() == "") continue;
+			quoteMode = 0;
+			if(char == "\"" || char == "'") {
+				parseMode = 2;
+				if(char == "\"") {
+					quoteMode = 1;
+				} else if(char == "'") {
+					quoteMode = 2;
+				}
+				continue;
+			}
+			vBuffer += char;
+		} else if(parseMode == 2) {
+			if(quoteMode == 1 && char == "\"" || quoteMode == 1 && char == "'") {
+				parseMode = 0;
+				if(kBuffer && vBuffer) {
+					result[kBuffer] = vBuffer;
+				}
+				kBuffer = "";
+				vBuffer = "";
+			} else {
+				vBuffer += char;
+			}
+		}
+	}
+	if(kBuffer && vBuffer) {
+		result[kBuffer] = vBuffer;
+	}
+	return result;
+}
+
+function runClientCommand(string, restrict) {
+	if(typeof string != "string") return;
+	var query = string.split(/\s(.+)$/g, 2);
+	var command = query[0].toLowerCase();
+	var args = parseClientCommandArgs(query[1]);
+	if(command == "night") {
+		w.night();
+	} else if(command == "day") {
+		w.day();
+	} else if(command == "theme") {
+		if(restrict) {
+			var acpt = confirm("Do you want to perform this action?\n" + string);
+			if(!acpt) {
+				return false;
+			}
+		}
+		if(args.public) styles.public = args.public;
+		if(args.member) styles.member = args.member;
+		if(args.owner) styles.owner = args.owner;
+		if(args.text) styles.text = args.text;
+		if(args.menu) styles.menu = args.menu;
+		if(args.cursor) styles.cursor = args.cursor;
+		if(args.guestCursor) styles.guestCursor = args.guestCursor;
+		if(args.publicText) styles.public_text = args.publicText;
+		if(args.memberText) styles.member_text = args.memberText;
+		if(args.ownerText) styles.owner_text = args.ownerText;
+		w.redraw();
+	}
+}
+
 function setupLinkElement() {
 	linkDiv.style.width = (cellW / zoomRatio) + "px";
 	linkDiv.style.height = (cellH / zoomRatio) + "px";
@@ -3357,6 +3435,9 @@ function setupLinkElement() {
 			return false;
 		} else if(prot == "comu") {
 			w.broadcastCommand(url, true);
+			return false;
+		} else if(prot == "action") { // built-in client command
+			runClientCommand(url, state.worldModel.name == "" && charInfo.protection == 0);
 			return false;
 		}
 		if(secureLink && !e.ctrlKey) {
@@ -3437,30 +3518,21 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 			var URL_Link = link.url;
 			linkElm.href = URL_Link;
 			linkElm.rel = "noopener noreferrer";
-			var linkProtocol = linkElm.protocol;
+			var linkProtocol = linkElm.protocol.toLowerCase();
 			linkParams.host = "";
-			if(linkProtocol == "javascript:") {
-				linkElm.target = "";
-				linkParams.protocol = "javascript";
+			var validProtocols = ["javascript:", "com:", "comu:", "action:", "http:", "https:"];
+			if(validProtocols.includes(linkProtocol)) {
+				linkParams.protocol = linkProtocol.slice(0, -1);
 				var url = URL_Link.slice(linkProtocol.length);
 				linkParams.url = url;
-			} else if(linkProtocol == "com:") {
-				linkElm.target = "";
-				linkParams.protocol = "com";
-				var url = URL_Link.slice(linkProtocol.length);
-				linkParams.url = url;
-				linkElm.title = "com:" + url;
-			} else if(linkProtocol == "comu:") {
-				linkElm.target = "";
-				linkParams.protocol = "comu";
-				var url = URL_Link.slice(linkProtocol.length);
-				linkParams.url = url;
-				linkElm.title = "comu:" + url;
-			} else {
-				linkParams.protocol = "";
-				linkElm.rel = "noopener noreferrer";
-				linkParams.url = URL_Link;
-				linkParams.host = getBasicHostname(linkElm.host);
+				if(linkProtocol.includes("http")) {
+					linkParams.url = URL_Link;
+					linkElm.rel = "noopener noreferrer";
+					linkParams.host = getBasicHostname(linkElm.host);
+					linkParams.protocol = "";
+				} else {
+					linkElm.target = "";
+				}
 			}
 			if(!linkElm.title) linkElm.title = "Link to URL " + linkElm.href;
 		} else if(link.type == "coord") {
