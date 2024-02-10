@@ -4312,7 +4312,7 @@ function highlight(positions, unlimited, color) {
 			highlightFlash[tileY + "," + tileX][charY] = {};
 		}
 		if(!highlightFlash[tileY + "," + tileX][charY][charX]) {
-			highlightFlash[tileY + "," + tileX][charY][charX] = [getDate(), color, color.slice(0)];
+			highlightFlash[tileY + "," + tileX][charY][charX] = [getDate(), color, "rgba(0, 0, 0, 0)"];
 			highlightCount++;
 		}
 	}
@@ -4341,14 +4341,11 @@ function setupFlashAnimation() {
 						highlightCount--;
 					} else {
 						var pos = easeOutQuad(diff, 0, 1, flashDuration);
-						var flashColor = highlightFlash[tile][charY][charX][2];
+						var flashColor = highlightFlash[tile][charY][charX][1];
 						var r = flashColor[0];
 						var g = flashColor[1];
 						var b = flashColor[2];
-						var flashRGB = highlightFlash[tile][charY][charX][1];
-						flashRGB[0] = r + (255 - r) * pos;
-						flashRGB[1] = g + (255 - g) * pos;
-						flashRGB[2] = b + (255 - b) * pos;
+						highlightFlash[tile][charY][charX][2] = `rgba(${r}, ${g}, ${b}, ${(1 - pos).toFixed(3)})`;
 					}
 					// mark tile to re-render
 					tileGroup[tile] = 1;
