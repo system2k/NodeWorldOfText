@@ -367,6 +367,20 @@ function getPos(ref) {
 	return [parseInt(ref[0]), parseInt(ref[1])];
 }
 
+function tile_offset_object(data, tileOffX, tileOffY) {
+	var refs = {};
+	var tilef;
+	for(var tilef in data) {
+		refs[tilef] = data[tilef];
+		delete data[tilef];
+	}
+	for(var tkp in refs) {
+		var new_key = getPos(tkp);
+		new_key = (new_key[0] - tileOffY) + "," + (new_key[1] - tileOffX);
+		data[new_key] = refs[tkp];
+	}
+}
+
 function html_tag_esc(str, non_breaking_space, newline_br) {
 	str += "";
 	str = str.replace(/\&/g, "&amp;");

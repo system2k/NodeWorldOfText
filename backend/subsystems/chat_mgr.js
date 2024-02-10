@@ -240,9 +240,14 @@ async function doUpdateChatLogData() {
 
 	for(var wid in copy_chatMsgDeletions) {
 		var worldId = parseInt(wid);
-		var def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId);
-		if(!def_channel) continue;
-		def_channel = def_channel.channel_id;
+		var def_channel;
+		if(worldId > 0) {
+			def_channel = await db_ch.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId);
+			if(!def_channel) continue;
+			def_channel = def_channel.channel_id;
+		} else {
+			def_channel = (await db_ch.get("SELECT id FROM channels WHERE name='global'")).id;
+		}
 		var list = copy_chatMsgDeletions[wid];
 		for(var x = 0; x < list.length; x++) {
 			var del = list[x];

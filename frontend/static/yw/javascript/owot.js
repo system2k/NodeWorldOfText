@@ -133,7 +133,6 @@ var colorsEnabled          = true;
 var backgroundEnabled      = true; // render backgrounds if any
 var scrollingEnabled       = true;
 var zoomRatio              = deviceRatio(); // browser's default zoom ratio
-var ws_path                = createWsPath();
 var protectPrecision       = 0; // 0 = tile, 1 = char
 var checkTileFetchInterval = 300; // how often to check for unloaded tiles (ms)
 var zoom                   = decimal(100); // absolute zoom value (product of zoomRatio and userZoom)
@@ -6982,20 +6981,6 @@ function searchTellEdit(tileX, tileY, charX, charY) {
 		}
 	}
 	return false;
-}
-
-function tile_offset_object(data, tileOffX, tileOffY) {
-	var refs = {};
-	var tilef;
-	for(var tilef in data) {
-		refs[tilef] = data[tilef];
-		delete data[tilef];
-	}
-	for(var tkp in refs) {
-		var new_key = getPos(tkp);
-		new_key = (new_key[0] - tileOffY) + "," + (new_key[1] - tileOffX);
-		data[new_key] = refs[tkp];
-	}
 }
 
 function updateWorldName() {
