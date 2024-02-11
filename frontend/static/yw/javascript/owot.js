@@ -6495,6 +6495,8 @@ Object.assign(w, {
 		styles.owner = "#222";
 		styles.public = "#000";
 		styles.text = "#FFF";
+		defaultURLLinkColor = "#1570F0";
+		defaultCoordLinkColor = "#409015";
 		w.nightMode = 1;
 		if(ignoreUnloadedPattern) {
 			w.nightMode = 2;
@@ -6505,6 +6507,8 @@ Object.assign(w, {
 	},
 	day: function(reloadStyle) {
 		w.nightMode = 0;
+		defaultURLLinkColor = "#0000FF";
+		defaultCoordLinkColor = "#008000";
 		if(elm.owot.classList.contains("nightmode")) {
 			elm.owot.classList.remove("nightmode");
 		}
