@@ -3533,6 +3533,9 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 				} else {
 					linkElm.target = "";
 				}
+				if(linkProtocol == "action:") {
+					linkElm.title = "action:" + url;
+				}
 			}
 			if(!linkElm.title) linkElm.title = "Link to URL " + linkElm.href;
 		} else if(link.type == "coord") {
