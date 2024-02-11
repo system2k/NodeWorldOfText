@@ -3424,9 +3424,13 @@ function runClientCommand(string, coords) {
 		if(args.ownerText) styles.owner_text = args.ownerText;
 		w.redraw();
 	} else if(command == "copy") {
-		var char = getChar(coords[0], coords[1], coords[2], coords[3]);
-		w.clipboard.copy(char);
-		highlight([coords], true, [0, 255, 0]);
+		if(args.char) {
+			w.clipboard.copy(w.split(args.char)[0]);
+		} else {
+			var char = getChar(coords[0], coords[1], coords[2], coords[3]);
+			w.clipboard.copy(char);
+			highlight([coords], true, [0, 255, 0]);
+		}
 	}
 }
 
