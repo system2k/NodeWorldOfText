@@ -3335,37 +3335,57 @@ function parseClientCommandArgs(string) {
 	var vBuffer = "";
 	for(var i = 0; i < string.length; i++) {
 		var char = string[i];
-		if(parseMode == 0) {
+		if(parseMode == 0) { // key
 			if(char.trim() == "") continue;
 			if(char == "=") {
 				parseMode = 1;
-				continue;
+			} else {
+				kBuffer += char;
 			}
-			kBuffer += char;
-		} else if(parseMode == 1) {
+		} else if(parseMode == 1) { // start of value
 			if(char.trim() == "") continue;
 			quoteMode = 0;
-			if(char == "\"" || char == "'") {
-				parseMode = 2;
+			parseMode = 2;
+			if(char == "\"" || char == "'") { // quote start
 				if(char == "\"") {
 					quoteMode = 1;
 				} else if(char == "'") {
 					quoteMode = 2;
 				}
-				continue;
+			} else {
+				vBuffer += char;
 			}
-			vBuffer += char;
-		} else if(parseMode == 2) {
-			if(quoteMode == 1 && char == "\"" || quoteMode == 1 && char == "'") {
-				parseMode = 0;
+		} else if(parseMode == 2) { // value
+			if((quoteMode == 1 && char == "\"") || (quoteMode == 2 && char == "'")) { // quote end
+				parseMode = 3;
 				if(kBuffer && vBuffer) {
 					result[kBuffer] = vBuffer;
 				}
 				kBuffer = "";
 				vBuffer = "";
+			} else if(quoteMode == 1 && char == "\\") { // escape
+				parseMode = 4;
 			} else {
-				vBuffer += char;
+				if(quoteMode == 0 && char.trim() == "") { // not in quote and hit a whitespace char
+					parseMode = 0;
+					if(kBuffer && vBuffer) {
+						result[kBuffer] = vBuffer;
+					}
+					kBuffer = "";
+					vBuffer = "";
+				} else {
+					vBuffer += char;
+				}
 			}
+		} else if(parseMode == 3) { // end of value
+			if(char.trim() == "") {
+				parseMode = 0;
+			} else {
+				throw new Error("Action Syntax Error: Unexpected character at offset " + i);
+			}
+		} else if(parseMode == 4) { // char escape
+			vBuffer += char;
+			parseMode = 2;
 		}
 	}
 	if(kBuffer && vBuffer) {
