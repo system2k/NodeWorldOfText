@@ -3394,7 +3394,7 @@ function parseClientCommandArgs(string) {
 	return result;
 }
 
-function runClientCommand(string, restrict) {
+function runClientCommand(string, coords) {
 	if(typeof string != "string") return;
 	var query = string.split(/\s(.+)$/g, 2);
 	var command = query[0].toLowerCase();
@@ -3404,6 +3404,8 @@ function runClientCommand(string, restrict) {
 	} else if(command == "day") {
 		w.day();
 	} else if(command == "theme") {
+		var charInfo = getCharInfo(coords[0], coords[1], coords[2], coords[3]);
+		var restrict = state.worldModel.name == "" && charInfo.protection == 0;
 		if(restrict) {
 			var acpt = confirm("Do you want to perform this action?\n" + string);
 			if(!acpt) {
@@ -3421,6 +3423,10 @@ function runClientCommand(string, restrict) {
 		if(args.memberText) styles.member_text = args.memberText;
 		if(args.ownerText) styles.owner_text = args.ownerText;
 		w.redraw();
+	} else if(command == "copy") {
+		var char = getChar(coords[0], coords[1], coords[2], coords[3]);
+		w.clipboard.copy(char);
+		highlight([coords], true, [0, 255, 0]);
 	}
 }
 
@@ -3457,7 +3463,7 @@ function setupLinkElement() {
 			w.broadcastCommand(url, true);
 			return false;
 		} else if(prot == "action") { // built-in client command
-			runClientCommand(url, state.worldModel.name == "" && charInfo.protection == 0);
+			runClientCommand(url, currentSelectedLinkCoords);
 			return false;
 		}
 		if(secureLink && !e.ctrlKey) {
