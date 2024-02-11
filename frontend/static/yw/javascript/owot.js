@@ -3422,6 +3422,7 @@ function runClientCommand(string, coords) {
 		if(args.publicText) styles.public_text = args.publicText;
 		if(args.memberText) styles.member_text = args.memberText;
 		if(args.ownerText) styles.owner_text = args.ownerText;
+		checkTextColorOverride();
 		w.redraw();
 	} else if(command == "copy") {
 		if(args.char) {
