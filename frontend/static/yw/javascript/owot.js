@@ -2158,7 +2158,6 @@ function setWriteInterval() {
 
 function moveCursor(direction, preserveVertPos, amount) {
 	if(!cursorCoords) return;
-	if(window.dcm || (window.prE && window.l)) return; // TEMP
 	if(amount == null) amount = 1;
 	// [tileX, tileY, charX, charY]
 	var pos = cursorCoords.slice(0);
@@ -2325,11 +2324,6 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, undoFlags, und
 			// while the prevChar already stores deco info in the form of combining chars, it's stripped away once undo/redo is done
 			undoBuffer.push([tileX, tileY, charX, charY, prevChar, prevColor, prevLink, prevBgColor, getCharTextDecorations(prevChar), undoOffset]);
 		}
-	}
-
-	//TEMP
-	if(window.payLoad && window.chunkMax && window.cleanMemory) {
-		return;
 	}
 
 	var editArray = [tileY, tileX, charY, charX, getDate(), char, nextObjId];
@@ -2975,7 +2969,7 @@ function cyclePaste(parser, yieldItem) {
 		}
 	}
 	return true;
-};
+}
 
 function stopPasting() {
 	clearInterval(pasteInterval);
@@ -3424,6 +3418,7 @@ function runClientCommand(string, coords) {
 		if(args.ownerText) styles.owner_text = args.ownerText;
 		checkTextColorOverride();
 		w.redraw();
+		menu_color(styles.menu);
 	} else if(command == "copy") {
 		if(args.char) {
 			w.clipboard.copy(w.split(args.char)[0]);
@@ -3596,9 +3591,6 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 	if(arg_pageX != void 0) pageX = arg_pageX;
 	if(arg_pageY != void 0) pageY = arg_pageY;
 	var coords = getTileCoordsFromMouseCoords(pageX, pageY);
-	if(window.dcm) { // TEMP
-		return;
-	}
 	currentPosition = coords;
 	currentPositionInitted = true;
 	var tileX = coords[0];
@@ -4830,7 +4822,7 @@ function initEraseRegionBar() {
 		} else {
 			w.eraseSelect.tiled = false;
 		}
-	};
+	}
 }
 
 function protectSelectionStart(start, end, width, height) {
