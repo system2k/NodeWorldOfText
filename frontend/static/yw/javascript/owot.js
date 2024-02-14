@@ -3427,6 +3427,8 @@ function runClientCommand(string, coords) {
 			w.clipboard.copy(char);
 			highlight([coords], true, [0, 255, 0]);
 		}
+	} else if(command == "deco") {
+		toggleTextDecoBar();
 	}
 }
 
