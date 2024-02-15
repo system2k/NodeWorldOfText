@@ -722,6 +722,11 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	}
 	char = clearCharTextDecorations(char);
 	char = resolveCharEmojiCombinations(char);
+	var overbarCount = getAndStripOverbarFromChar(char);
+	if(overbarCount) {
+		char = overbarCount[0];
+		overbarCount = overbarCount[1];
+	}
 
 	var cCode = char.codePointAt(0);
 	if(isOverflow) {
@@ -789,6 +794,12 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 			textRender.fillRect(fontX, Math.floor(fontY + Math.floor((16 * zoom) / 2)), cellW, lineDecoHeight);
 			hasDrawn = true;
 		}
+	}
+	if(overbarCount) {
+		for(var i = 0; i < overbarCount; i++) {
+			textRender.fillRect(fontX, Math.floor(fontY + zoom - zoom * i * 2), cellW, lineDecoHeight);
+		}
+		hasDrawn = true;
 	}
 
 	if(((specialClientHookMap >> 0) & 1) && !isOverflow) {

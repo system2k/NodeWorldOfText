@@ -4654,6 +4654,20 @@ function getCharTextDecorations(char) {
 	};
 }
 
+function getAndStripOverbarFromChar(char) {
+	var count = 0;
+	var str = "";
+	for(var i = 0; i < char.length; i++) {
+		if(char.codePointAt(i) == 0x305) {
+			count++;
+		} else {
+			str += char[i];
+		}
+	}
+	if(!count) return null;
+	return [str, Math.min(count, 2)];
+}
+
 function setCharTextDecorations(char, bold, italic, under, strike) {
 	var bitMap = bold << 3 | italic << 2 | under << 1 | strike;
 	char = clearCharTextDecorations(char);
