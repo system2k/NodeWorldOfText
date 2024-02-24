@@ -1522,7 +1522,7 @@ function resolveColorValue(val) {
 	}
 	if(typeof val != "string" || !val) return 0;
 	var orig = val;
-	if(val[0] == "#") val = val.substr(1);
+	if(val[0] == "#") val = val.slice(1);
 	if(isHexString(val)) {
 		if(val.length == 3) {
 			return parseInt(val[0] + val[0] + val[1] + val[1] + val[2] + val[2], 16);
@@ -1592,6 +1592,7 @@ Tile.visible = function(tileX, tileY) {
 	return true;
 }
 
+// if a tile is marked as stale, then the content of the tile is outdated and pending a re-update
 function isTileStale(tileX, tileY) {
 	var tile = Tile.get(tileX, tileY);
 	return tile ? !!tile.stale : false;
