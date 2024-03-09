@@ -620,6 +620,8 @@ var safeLinkHosts = [
 	"ourworldoftext.com",
 	"dir.ourworldoftext.com",
 	"test.ourworldoftext.com",
+	"wiki.ourworldoftext.com",
+	"owot.me",
 	"spooks.me",
 	"youtube.com",
 	"discord.com",
