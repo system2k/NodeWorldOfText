@@ -76,6 +76,16 @@ module.exports.main = function(server) {
 		}
 	}, 1000 * 60 * 3);
 
+	intv.tile_cache_invalidation_rapid = setInterval(function() {
+		if(totalTilesCached <= tileCacheLimit) return;
+		broadcastMonitorEvent("Database", "Too many cached tiles detected");
+		try {
+			performCacheInvalidation(true);
+		} catch(e) {
+			handle_error(e);
+		}
+	}, 1000 * 5);
+
 	sendTileUpdatesToClients();
 }
 
@@ -369,31 +379,16 @@ async function loadTileCacheData(world_id, tileX, tileY) {
 }
 
 // free all in-memory tiles if they haven't been written to in a while
-function performCacheInvalidation() {
+function performCacheInvalidation(disregardAge) {
 	var date = Date.now();
 	for(var worldID in memTileCache) {
 		for(var tileY in memTileCache[worldID]) {
 			for(var tileX in memTileCache[worldID][tileY]) {
 				var tile = memTileCache[worldID][tileY][tileX];
 				if(tile.props_updated || tile.content_updated || tile.writability_updated || tile.inserting) continue;
-				if(date - tile.last_accessed > tileCacheTimeLimit) {
+				if(date - tile.last_accessed > tileCacheTimeLimit || disregardAge)  {
 					deleteCachedTile(worldID, tileX, tileY);
 				}
-			}
-		}
-	}
-}
-
-function handleTooManyCachedTiles() {
-	// free every single tile
-	if(totalTilesCached <= tileCacheLimit) return;
-	broadcastMonitorEvent("Database", "Too many cached tiles detected");
-	for(var worldID in memTileCache) {
-		for(var tileY in memTileCache[worldID]) {
-			for(var tileX in memTileCache[worldID][tileY]) {
-				var tile = memTileCache[worldID][tileY][tileX];
-				if(tile.props_updated || tile.content_updated || tile.writability_updated || tile.inserting) continue;
-				deleteCachedTile(worldID, tileX, tileY);
 			}
 		}
 	}
@@ -1043,7 +1038,6 @@ function doFetchTile(queueArray) {
 		}
 		setCachedTile(world_id, tile_x, tile_y, tile);
 		processPendingEdits(world_id, tile_x, tile_y, pending_edits);
-		handleTooManyCachedTiles();
 	}).catch(function(e) {
 		handle_error(e);
 	});
