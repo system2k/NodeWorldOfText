@@ -19,7 +19,7 @@
     * "You've just installed the server,
 which means you don't have any superusers defined.
 Would you like to create one now? (yes/no):"
-    * A superuser account (i.e. administrator accont) can be used to manage your instance using the web interface.
+    * A superuser account (i.e. administrator account) can be used to manage your instance using the web interface.
 * After everything has been set up, your server may be live at this address:
     * `http://localhost:8080`
 
