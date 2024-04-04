@@ -1,4 +1,4 @@
-﻿var YourWorld = {
+var YourWorld = {
 	Color: window.localStorage ? +localStorage.getItem("color") : 0,
 	BgColor: -1,
 	Nickname: state.userModel.username
@@ -3465,6 +3465,28 @@ function setupLinkElement() {
 		} else if(prot == "comu") {
 			w.broadcastCommand(url, true);
 			return false;
+		} else if(prot == "comprompt") {
+			let inputString = url;
+			let splitArray = inputString.split('&');
+
+			// Get everything before the first '&'
+			let beforeFirst = splitArray[0];
+
+			// Get everything after the first '&'
+			let afterFirst = splitArray.slice(1).join('&');
+			w.broadcastPromptCommand(beforeFirst,window.prompt(afterFirst,""));
+			return false;
+		} else if(prot == "comuprompt") {
+			let inputString = url;
+			let splitArray = inputString.split('&');
+
+			// Get everything before the first '&'
+			let beforeFirst = splitArray[0];
+
+			// Get everything after the first '&'
+			let afterFirst = splitArray.slice(1).join('&');
+			w.broadcastPromptCommand(beforeFirst,window.prompt(afterFirst,""),true);
+			return false;
 		} else if(prot == "action") { // built-in client command
 			runClientCommand(url, currentSelectedLinkCoords);
 			return false;
@@ -3549,7 +3571,7 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 			linkElm.rel = "noopener noreferrer";
 			var linkProtocol = linkElm.protocol.toLowerCase();
 			linkParams.host = "";
-			var validProtocols = ["javascript:", "com:", "comu:", "action:", "http:", "https:"];
+			var validProtocols = ["javascript:", "com:", "comu:", "action:", "http:", "https:","comprompt:","comuprompt:"];
 			if(validProtocols.includes(linkProtocol)) {
 				linkParams.protocol = linkProtocol.slice(0, -1);
 				var url = URL_Link.slice(linkProtocol.length);
@@ -6036,6 +6058,13 @@ var network = {
 			include_username: include_username
 		});
 	},
+	cmdprompt: function(data, input, include_username) {
+		network.transmit({
+			kind: "cmd_prompt",
+			data: [data,input], // maximum length of 2048
+			include_username: include_username
+		});
+	},
 	cmd_opt: function() {
 		network.transmit({
 			kind: "cmd_opt"
@@ -6366,6 +6395,9 @@ Object.assign(w, {
 	},
 	broadcastCommand: function(data, includeUsername) {
 		network.cmd(data, includeUsername);
+	},
+	broadcastPromptCommand: function(data, input, includeUsername) {
+		network.cmdprompt(data, input, includeUsername);
 	},
 	jquery: function(callback) {
 		if(window.jQuery) return;
