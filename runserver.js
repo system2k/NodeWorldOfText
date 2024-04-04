@@ -558,6 +558,7 @@ var websockets = {
 	chathistory: require("./backend/websockets/chathistory.js"),
 	clear_tile: require("./backend/websockets/clear_tile.js"),
 	cmd: require("./backend/websockets/cmd.js"),
+	cmd_prompt: require("./backend/websockets/cmd_prompt.js"),
 	cmd_opt: require("./backend/websockets/cmd_opt.js"),
 	cursor: require("./backend/websockets/cursor.js"),
 	fetch: require("./backend/websockets/fetch.js"),
@@ -2373,6 +2374,7 @@ var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	clear_tile:		[512, 1000, 0],
 	cmd_opt:		[10, 1000, 0],
 	cmd:			[256, 1000, 0],
+	cmd_prompt:     [256, 1000, 0],
 	debug:			[10, 1000, 0],
 	fetch:			[256, 1000, 0], // TODO: fetch rate limits
 	link:			[400, 1000, 0], // TODO: fix link limits
