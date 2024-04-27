@@ -208,7 +208,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 		// hidden by default
 		// "/search Phrase" (client) -> searches for Phrase within a 25 tile radius
-		// "/stats" -> view stats of a world; only available for front page
+		// "/stats" -> view stats of a world
 		// "/passive on/off" -> disable or enable server responses to commands (e.g. /block)
 	];
 
