@@ -4601,6 +4601,7 @@ function decodeCharProt(str) {
 	return res;
 }
 function encodeCharProt(array, encoding) {
+	const base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	/*
 		encodings:
 			0: base64 - only 4 possible values
@@ -5014,6 +5015,7 @@ function eraseSelectionStart(start, end, width, height) {
 		}
 		var amount = Math.floor((Date.now() - prevTime) / (1000 / tileRatePerSecond));
 		amount = Math.min(tileRatePerSecond, amount);
+		if(amount <= 0) amount = 1;
 		prevTime = Date.now();
 		for(var i = 0; i < amount; i++) {
 			if(tidx >= tileList.length) break;
@@ -6357,7 +6359,8 @@ Object.assign(w, {
 		return [-positionY / tileH, -positionX / tileW];
 	},
 	chat: {
-		send: api_chat_send
+		send: api_chat_send,
+		registerCommand: register_chat_comamnd
 	},
 	broadcastReceive: function(force) {
 		if(w.receivingBroadcasts && !force) return;
