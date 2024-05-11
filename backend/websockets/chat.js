@@ -86,9 +86,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			message: message,
 			registered: true,
 			location: location,
-			op: true,
-			admin: true,
-			staff: true,
+			op: false,
+			admin: false,
+			staff: false,
 			color: "",
 			kind: "chat"
 		});
@@ -185,10 +185,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 		// general
 		[0, "help", null, "list all commands", null],
-		[0, "nick", ["nickname"], "change your nickname", "JohnDoe"], // client-side
-		[0, "ping", null, "check the latency", null],
-		[0, "warp", ["world"], "go to another world", "forexample"], // client-side
-		[0, "gridsize", ["WxH"], "change the size of cells", "10x20"], // client-side
+		
 		[0, "block", ["id"], "block someone by id", "1220"],
 		[0, "blockuser", ["username"], "block someone by username", "JohnDoe"],
 		[0, "unblock", ["id"], "unblock someone by id", "1220"],
@@ -197,14 +194,10 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "mute", ["id", "seconds", "[h/d/w/m/y]"], "mute a user completely", "1220 9999"], // check for permission
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
 		[0, "delete", ["id", "timestamp"], "delete a chat message", "1220 1693147307895"], // check for permission
-		[0, "color", ["color code"], "change your text color", "#FF00FF"], // client-side
-		[0, "chatcolor", ["color code"], "change your chat color", "#FF00FF"], // client-side
-		[0, "night", null, "enable night mode", null], // client-side
-		[0, "day", null, "disable night mode", null], // client-side
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
 		[0, "whoami", null, "display your identity"],
 		[0, "test", null, "preview your appearance"],
-		[0, "clear", null, "clear all chat messages locally"]
+		
 
 		// hidden by default
 		// "/search Phrase" (client) -> searches for Phrase within a 25 tile radius
@@ -229,9 +222,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		});
 
 		var html = "";
-		html += "Command list:<br>";
-		html += "<div style=\"background-color: #DADADA; font-family: monospace; font-size: 13px;\">";
-		var cmdIdx = 0;
+		html += "Command list:\n";
 		for(var i = 0; i < list.length; i++) {
 			var row = list[i];
 			var command = row[1];
@@ -245,40 +236,14 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				}
 			}
 
-			// display arguments for this command
-			var arg_desc = "";
-			if(args) {
-				arg_desc += html_tag_esc("<");
-				for(var v = 0; v < args.length; v++) {
-					var arg = args[v];
-					arg_desc += "<span style=\"font-style: italic\">" + html_tag_esc(arg) + "</span>";
-					if(v != args.length - 1) {
-						arg_desc += ", ";
-					}
-				}
-				arg_desc += html_tag_esc(">");
-			}
+			var rawArgs = "";
+			var rawExample = "";
+			if(example) rawExample = " (/" + command + " " + example + ")";
+			if(args) rawArgs = " <" + args.join(",") + ">";
 
-			var exampleElm = "";
-			if(example && args) {
-				exampleElm = "title=\"" + html_tag_esc("Example: /" + command + " " + example) +"\"";
-			}
+			html += `/${command}${rawArgs} -> ${desc}${rawExample}\n`;
 
-			command = "<span " + exampleElm + "style=\"color: #00006F\">" + html_tag_esc(command) + "</span>";
-
-			var help_row = html_tag_esc("-> /") + command + " " + arg_desc + " :: " + html_tag_esc(desc);
-
-			// alternating stripes
-			if(cmdIdx % 2 == 1) {
-				help_row = "<div style=\"background-color: #C3C3C3\">" + help_row + "</div>";
-			}
-
-			html += help_row;
-			cmdIdx++;
 		}
-
-		html += "</div>";
-
 		return html;
 	}
 
@@ -321,20 +286,15 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				if(row[1] == "") {
 					row[1] = "(main)"
 				} else {
-					row[1] = "/" + html_tag_esc(row[1]);
+					row[1] = "/" + row[1];
 				}
 				worldList += "-> " + row[1] + " [" + row[0] + "]";
-				if(i != lst.length - 1) worldList += "<br>"
+				if(i != lst.length - 1) worldList += "\n";
 			}
-			var listWrapper = `
-				<div style="background-color: #DADADA; font-family: monospace;">
-					${worldList}
-				</div>
-			`;
-			serverChatResponse("Currently loaded worlds (top " + topCount + "): " + listWrapper, location);
+			serverChatResponse("Currently loaded worlds (top " + topCount + "):\n" + worldList, location);
 			return;
 		},
-		help: function() {
+		help: function(modifier) {
 			return serverChatResponse(generate_command_list(), location);
 		},
 		block: function(id) {
@@ -395,7 +355,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			if (blocks.user.indexOf(username_value) > -1) return;
 			blocks.user.push(username_value);
 
-			serverChatResponse("Blocked chats from user: " + html_tag_esc(username), location);
+			serverChatResponse("Blocked chats from user: " + username, location);
 		},
 		unblock: function(id) {
 			var blocks = ws.sdata.chat_blocks;
@@ -445,7 +405,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			if(idx == -1) return;
 			blocks.user.splice(idx, 1);
 
-			serverChatResponse("Unblocked chats from user: " + html_tag_esc(username), location);
+			serverChatResponse("Unblocked chats from user: " + username, location);
 		},
 		unblockall: function() {
 			ws.sdata.chat_blocks.id.splice(0);
@@ -582,16 +542,16 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			if(location == "global") worldId = 0;
 			var channels = await db_ch.all("SELECT * FROM channels WHERE world_id=?", worldId);
 			var count = channels.length;
-			var infoLog = "Found " + count + " channel(s) for this world.<br>";
+			var infoLog = "Found " + count + " channel(s) for this world:\n";
 			for(var i = 0; i < count; i++) {
 				var ch = channels[i];
 				var name = ch.name;
 				var desc = ch.description;
 				var date = ch.date_created;
-				infoLog += "<b>Name:</b> " + html_tag_esc(name) + "<br>";
-				infoLog += "<b>Desc:</b> " + html_tag_esc(desc) + "<br>";
-				infoLog += "<b>Created:</b> " + html_tag_esc(create_date(date)) + "<br>";
-				infoLog += "----------------<br>";
+				infoLog += "Name: " + name + "\n";
+				infoLog += "Desc: " + desc + "\n";
+				infoLog += "Created: " + create_date(date) + "\n";
+				infoLog += "----------------\n";
 			}
 			var def = await db_ch.get("SELECT * FROM default_channels WHERE world_id=?", worldId);
 			if(def && def.channel_id) {
@@ -599,7 +559,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			} else {
 				def = "<none>";
 			}
-			infoLog += "<b>Default channel id:</b> " + html_tag_esc(def) + "<br>";
+			infoLog += "Default channel id: " + def;
 			return serverChatResponse(infoLog, location);
 		},
 		mute: function(id, time, flag) {
@@ -642,7 +602,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				}
 				if(!blocked_ips_by_world_id[mute_wid]) blocked_ips_by_world_id[mute_wid] = {};
 				blocked_ips_by_world_id[mute_wid][muted_ip] = [muteDate];
-				return serverChatResponse("Muted client until " + html_tag_esc(create_date(muteDate)), location);
+				return serverChatResponse("Muted client until " + create_date(muteDate), location);
 			} else {
 				return serverChatResponse("Client not found", location);
 			}
@@ -664,7 +624,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			return serverChatResponse("Unmuted " + cnt + " user(s)", location);
 		},
 		whoami: function() {
-			var idstr = "Who Am I:<br>";
+			var idstr = "Who Am I:\n";
 			var user_login = "(anonymous)";
 			var user_disp = "(anonymous)";
 			if(user.authenticated) {
@@ -675,15 +635,15 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 					user_login = user_disp;
 				}
 			}
-			idstr += "Login username: " + user_login + "<br>";
-			idstr += "Display username: " + user_disp + "<br>";
+			idstr += "Login username: " + user_login + "\n";
+			idstr += "Display username: " + user_disp + "\n";
 			idstr += "Chat ID: " + clientId;
 			return serverChatResponse(idstr, location);
 		},
 		stats: function() {
-			var stat = "Stats for world<br>";
-			stat += "Creation date: " + html_tag_esc(create_date(world.creationDate)) + "<br>";
-			stat += "View count: " + html_tag_esc(world.views);
+			var stat = "Stats for world:\n";
+			stat += "Creation date: " + create_date(world.creationDate) + "\n";
+			stat += "View count: " + world.views;
 			return serverChatResponse(stat, location);
 		},
 		delete: async function(id, timestamp) {
@@ -811,7 +771,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				com.test();
 				break;
 			default:
-				serverChatResponse("Invalid command: " + html_tag_esc(msg));
+				serverChatResponse("Invalid command: " + msg);
 		}
 	}
 

@@ -128,6 +128,7 @@ var valid_subdomains = []; // e.g. ["test"]
 var closed_client_limit = 1000 * 60 * 20; // 20 min
 var ws_req_per_second = 1000;
 var pw_encryption = "sha512WithRSAEncryption";
+var connections_per_ip = 50;
 
 var wss; // websocket handler
 var monitorWorker;
@@ -157,6 +158,7 @@ var client_cursor_pos = {};
 var client_ips = {};
 var ip_address_conn_limit = {}; // {ip: count}
 var ip_address_req_limit = {}; // {ip: ws_limits} // TODO: Cleanup objects
+var http_req_holds = {}; // ip/identifier -> {"<index>": {holds: <number>, resp: [<promises>,...]},...}
 
 console.log("Loaded libs");
 
@@ -1054,8 +1056,6 @@ var http_rate_limits = [ // function ; hold limit ; [method]
 	[pages.world_props, 2]
 ];
 
-var http_req_holds = {}; // ip/identifier -> {"<index>": {holds: <number>, resp: [<promises>,...]},...}
-
 intv.release_stuck_requests = setInterval(function() {
 	var currentTime = Date.now();
 	for(var ip in http_req_holds) {
@@ -1271,20 +1271,8 @@ async function callPage(page, params, req, write, server, ctx, method) {
 	await pageObj[method](req, write, server, ctx, params);
 }
 
-// transfer all values from one object to a main object containing all imports
-function objIncludes(defaultObj, include) {
-	var new_obj = {};
-	for(var i in defaultObj) {
-		new_obj[i] = defaultObj[i];
-	}
-	for(var i in include) {
-		new_obj[i] = include[i];
-	}
-	return new_obj;
-}
-
 // wait for the client to upload form data to the server
-function wait_response_data(req, dispatch, binary_post_data, raise_limit) {
+function loadPostData(req, dispatch, binary_post_data, raise_limit) {
 	var sizeLimit = 1000000;
 	if(raise_limit) sizeLimit = 100000000;
 	var queryData;
@@ -1399,7 +1387,7 @@ function parseToken(token) {
 }
 
 // TODO: cache user data (only care about uvias)
-async function get_user_info(cookies, is_websocket, dispatch) {
+async function getUserInfo(cookies, is_websocket, dispatch) {
 	/*
 		User Levels:
 		3: Superuser (Operator)
@@ -1845,7 +1833,7 @@ async function process_request(req, res, compCallbacks) {
 		if(no_login) {
 			user = {};
 		} else {
-			user = await get_user_info(cookies, false, dispatch);
+			user = await getUserInfo(cookies, false, dispatch);
 			// check if user is logged in
 			if(!cookies.csrftoken) {
 				var token = new_token(32);
@@ -1858,7 +1846,7 @@ async function process_request(req, res, compCallbacks) {
 			}
 		}
 		if(method == "POST") {
-			var dat = await wait_response_data(req, dispatch, binary_post_data, user.superuser);
+			var dat = await loadPostData(req, dispatch, binary_post_data, user.superuser);
 			if(dat) {
 				post_data = dat;
 			}
@@ -2412,7 +2400,6 @@ function get_ip_kind_limits(ip) {
 	return obj;
 }
 
-var connections_per_ip = 50;
 function can_connect_ip_address(ip) {
 	if(!ip_address_conn_limit[ip] || !ip || ip == "0.0.0.0") return true;
 	if(ip_address_conn_limit[ip] >= connections_per_ip) return false;
@@ -2619,7 +2606,7 @@ async function manageWebsocketConnection(ws, req) {
 	if(ws.sdata.terminated) return; // in the event of an immediate close
 
 	var cookies = parseCookie(req.headers.cookie);
-	var user = await get_user_info(cookies, true);
+	var user = await getUserInfo(cookies, true);
 	if(ws.sdata.terminated) return;
 	var channel = new_token(7);
 	ws.sdata.channel = channel;
@@ -2757,7 +2744,7 @@ async function manageWebsocketConnection(ws, req) {
 			var res = {
 				kind: "ping",
 				result: "pong"
-			}
+			};
 			if(msg.id != void 0) {
 				res.id = san_nbr(msg.id);
 			}
@@ -2915,7 +2902,7 @@ var global_data = {
 	querystring,
 	url,
 	send_email,
-	get_user_info,
+	getUserInfo,
 	modules,
 	announce: modifyAnnouncement,
 	wss, // this is undefined by default, but will get a value once wss is initialized
