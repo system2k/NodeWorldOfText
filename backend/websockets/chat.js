@@ -197,11 +197,10 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
 		[0, "whoami", null, "display your identity"],
 		[0, "test", null, "preview your appearance"],
-		
+		[0, "stats", null, "view stats of a world"]
 
 		// hidden by default
 		// "/search Phrase" (client) -> searches for Phrase within a 25 tile radius
-		// "/stats" -> view stats of a world; only available for front page
 		// "/passive on/off" -> disable or enable server responses to commands (e.g. /block)
 	];
 
