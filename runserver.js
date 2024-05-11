@@ -2468,6 +2468,12 @@ async function manageWebsocketConnection(ws, req) {
 
 	var bytesWritten = 0;
 	var bytesRead = 0;
+
+	var pre_queue = [];
+	var world = null;
+	var clientId = void 0;
+	var worldObj = null;
+	var hasClientReleasedObjects = false;
 	
 	// process ip address headers from cloudflare/nginx
 	var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
@@ -2491,11 +2497,48 @@ async function manageWebsocketConnection(ws, req) {
 		return;
 	}
 	
-
+	function evictClient() {
+		if(hasClientReleasedObjects) return;
+		hasClientReleasedObjects = true;
+		if(world) {
+			releaseWorld(world);
+		}
+		remove_ip_address_connection(ws.sdata.ipAddress);
+		ws.sdata.terminated = true;
+		if(world && clientId != void 0) {
+			if(client_ips[world.id] && client_ips[world.id][clientId]) {
+				client_ips[world.id][clientId][2] = true;
+				client_ips[world.id][clientId][1] = Date.now();
+			}
+		}
+		if(worldObj && !ws.sdata.hide_user_count) {
+			worldObj.user_count--;
+		}
+		if(world && ws.sdata.hasBroadcastedCursorPosition && !ws.sdata.cursorPositionHidden && ws.sdata.channel) {
+			ws_broadcast({
+				kind: "cursor",
+				hidden: true,
+				channel: ws.sdata.channel
+			}, world.id);
+			var channel = ws.sdata.channel;
+			var worldId = world.id;
+			if(client_cursor_pos[worldId]) {
+				delete client_cursor_pos[worldId][channel];
+				if(Object.keys(client_cursor_pos[worldId]).length == 0) {
+					delete client_cursor_pos[worldId];
+				}
+			}
+		}
+		updateNetworkStats();
+	}
 
 	// must be at the top before any async calls (errors may otherwise occur before the event declaration)
 	ws.on("error", function(err) {
 		handle_error(JSON.stringify(process_error_arg(err)));
+		if(!ws.sdata.terminated) {
+			ws.close();
+		}
+		evictClient();
 	});
 
 	// TODO: may not fire in all cases
@@ -2559,7 +2602,6 @@ async function manageWebsocketConnection(ws, req) {
 	// remove initial slash
 	if(location.at(0) == "/") location = location.slice(1);
 
-	var pre_queue = [];
 	// adds data to a queue. this must be before any async calls and the message event
 	function pre_message(msg) {
 		if(!can_process_req()) return;
@@ -2567,41 +2609,8 @@ async function manageWebsocketConnection(ws, req) {
 	}
 	ws.on("message", pre_message);
 
-	var world = null;
-	var clientId = void 0;
-	var worldObj = null;
-
 	ws.on("close", function() {
-		if(world) {
-			releaseWorld(world);
-		}
-		remove_ip_address_connection(ws.sdata.ipAddress);
-		ws.sdata.terminated = true;
-		if(world && clientId != void 0) {
-			if(client_ips[world.id] && client_ips[world.id][clientId]) {
-				client_ips[world.id][clientId][2] = true;
-				client_ips[world.id][clientId][1] = Date.now();
-			}
-		}
-		if(worldObj && !ws.sdata.hide_user_count) {
-			worldObj.user_count--;
-		}
-		if(world && ws.sdata.hasBroadcastedCursorPosition && !ws.sdata.cursorPositionHidden && ws.sdata.channel) {
-			ws_broadcast({
-				kind: "cursor",
-				hidden: true,
-				channel: ws.sdata.channel
-			}, world.id);
-			var channel = ws.sdata.channel;
-			var worldId = world.id;
-			if(client_cursor_pos[worldId]) {
-				delete client_cursor_pos[worldId][channel];
-				if(Object.keys(client_cursor_pos[worldId]).length == 0) {
-					delete client_cursor_pos[worldId];
-				}
-			}
-		}
-		updateNetworkStats();
+		evictClient();
 	});
 	if(ws.sdata.terminated) return; // in the event of an immediate close
 
@@ -2711,6 +2720,7 @@ async function manageWebsocketConnection(ws, req) {
 	ws.off("message", pre_message);
 	ws.on("message", handle_message);
 	async function handle_message(msg, isBinary) {
+		if(ws.sdata.terminated) return;
 		if(!isBinary) {
 			msg = msg.toString("utf8");
 		}
