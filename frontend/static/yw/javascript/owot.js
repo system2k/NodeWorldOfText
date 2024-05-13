@@ -1607,24 +1607,19 @@ function setupPoolCleanupInterval() {
 }
 
 function checkTextColorOverride() {
+	textColorOverride = 0;
 	var public = 4;
 	var member = 2;
 	var owner = 1;
 	// if custom text color is set to a zone, use that color instead of default
 	if(styles.public_text != "#000" && styles.public_text != "#000000") {
 		textColorOverride |= public;
-	} else {
-		textColorOverride &= textColorOverride ^ public;
-	}
+	} 
 	if(styles.member_text != "#000" && styles.member_text != "#000000") {
 		textColorOverride |= member;
-	} else {
-		textColorOverride &= textColorOverride ^ member;
 	}
 	if(styles.owner_text != "#000" && styles.owner_text != "#000000") {
 		textColorOverride |= owner;
-	} else {
-		textColorOverride &= textColorOverride ^ owner;
 	}
 }
 
@@ -6508,6 +6503,9 @@ Object.assign(w, {
 		styles.owner = "#222";
 		styles.public = "#000";
 		styles.text = "#FFF";
+		styles.member_text = "#000";
+		styles.owner_text = "#000";
+		styles.public_text = "#000";
 		defaultURLLinkColor = "#1570F0";
 		defaultCoordLinkColor = "#409015";
 		w.nightMode = 1;
@@ -6516,6 +6514,7 @@ Object.assign(w, {
 		} else if(!elm.owot.classList.contains("nightmode")) {
 			elm.owot.classList.add("nightmode");
 		}
+		checkTextColorOverride();
 		w.redraw();
 	},
 	day: function(reloadStyle) {
@@ -6532,8 +6531,14 @@ Object.assign(w, {
 					styles.owner = style.owner;
 					styles.public = style.public;
 					styles.text = style.text;
+					styles.public_text = style.public_text;
+					styles.member_text = style.member_text;
+					styles.owner_text = style.owner_text;
+					styles.cursor = style.cursor;
+					styles.guestCursor = style.guestCursor;
 				}
 				menu_color(styles.menu);
+				checkTextColorOverride();
 				w.redraw();
 			});
 		} else {
@@ -6542,6 +6547,12 @@ Object.assign(w, {
 			styles.owner = def.owner;
 			styles.public = def.public;
 			styles.text = def.text;
+			styles.public_text = def.public_text;
+			styles.member_text = def.member_text;
+			styles.owner_text = def.owner_text;
+			styles.cursor = def.cursor;
+			styles.guestCursor = def.guestCursor;
+			checkTextColorOverride();
 			w.redraw();
 		}
 	},
