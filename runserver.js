@@ -46,7 +46,7 @@ var encode_base64        = utils.encode_base64;
 var decode_base64        = utils.decode_base64;
 var process_error_arg    = utils.process_error_arg;
 var tile_coord           = utils.tile_coord;
-var uptime               = utils.uptime;
+var calculateTimeDiff    = utils.calculateTimeDiff;
 var compareNoCase        = utils.compareNoCase;
 var resembles_int_number = utils.resembles_int_number;
 var TerminalMessage      = utils.TerminalMessage;
@@ -92,11 +92,11 @@ initializeDirectoryStruct();
 const settings = require(SETTINGS_PATH);
 
 var serverPort     = settings.port;
-var serverDB       = settings.paths.database;
-var editsDB        = settings.paths.edits;
-var chatDB         = settings.paths.chat_history;
-var imageDB        = settings.paths.images;
-var miscDB         = settings.paths.misc;
+var serverDBPath   = settings.paths.database;
+var editsDBPath    = settings.paths.edits;
+var chatDBPath     = settings.paths.chat_history;
+var imageDBPath    = settings.paths.images;
+var miscDBPath     = settings.paths.misc;
 var staticNumsPath = settings.paths.static_shortcuts;
 var restrPath      = settings.paths.restr;
 var restrCg1Path   = settings.paths.restr_cg1;
@@ -106,6 +106,10 @@ var loginPath = "/accounts/login/";
 var logoutPath = "/accounts/logout/";
 var registerPath = "/accounts/register/";
 var profilePath = "/accounts/profile/";
+
+var sql_table_init = "./backend/default.sql";
+var sql_indexes_init = "./backend/indexes.sql";
+var sql_edits_init = "./backend/edits.sql";
 
 var serverSettings = {
 	announcement: "",
@@ -141,6 +145,14 @@ var clientVersion = "";
 var pgConn; // postgreSQL connection for Uvias
 var intv = {}; // intervals and timeouts
 var pluginMgr = null;
+var serverStartTime = Date.now();
+var transporter;
+var email_available = true;
+var db,
+	db_edits,
+	db_ch,
+	db_img,
+	db_misc;
 
 // Global
 CONST = {};
@@ -199,6 +211,10 @@ function loadShellFile() {
 	return file;
 }
 
+function getServerUptime() {
+	return Date.now() - serverStartTime;
+}
+
 function getClientVersion() {
 	return clientVersion;
 }
@@ -252,6 +268,7 @@ process.argv.forEach(function(a) {
 	}
 });
 
+// only accessible through modifying shell.js in the data directory - no web interface ever used to enter commands
 async function runShellScript(includeColors) {
 	var shellFile = loadShellFile();
 	if(shellFile == null) {
@@ -397,19 +414,6 @@ function log_error(err) {
 	}
 }
 
-var database,
-	edits_db,
-	chat_history,
-	image_db,
-	misc_db;
-function setupDatabases() {
-	database = new sql.Database(serverDB);
-	edits_db = new sql.Database(editsDB);
-	chat_history = new sql.Database(chatDB);
-	image_db = new sql.Database(imageDB);
-	misc_db = new sql.Database(miscDB);
-}
-
 var staticShortcuts = {};
 function setupStaticShortcuts() {
 	if(!staticNumsPath) return;
@@ -477,10 +481,6 @@ function load_static() {
 		templates.addFile(i, template_data[i]);
 	}
 }
-
-var sql_table_init = "./backend/default.sql";
-var sql_indexes_init = "./backend/indexes.sql";
-var sql_edits_init = "./backend/edits.sql";
 
 var zip_file;
 function setupZipLog() {
@@ -603,28 +603,35 @@ var renameWorld = subsystems.world_mgr.renameWorld;
 var canViewWorld = subsystems.world_mgr.canViewWorld;
 var getWorldNameFromCacheById = subsystems.world_mgr.getWorldNameFromCacheById;
 
-function asyncDbSystem(database) {
-	const db = {
-		// gets data from the database (only 1 row at a time)
-		get: function(command, args) {
-			if(args == void 0 || args == null) args = [];
-			return new Promise(function(r, rej) {
-				database.get(command, args, function(err, res) {
-					if(err) {
-						return rej({
-							sqlite_error: process_error_arg(err),
-							input: { command, args }
-						});
-					}
-					r(res);
-				});
+class AsyncDBManager {
+	database = null;
+	constructor(_db) {
+		this.database = _db;
+	}
+
+	// gets data from the database (only 1 row at a time)
+	async get(command, args) {
+		var self = this;
+		if(args == void 0 || args == null) args = [];
+		return new Promise(function(r, rej) {
+			self.database.get(command, args, function(err, res) {
+				if(err) {
+					return rej({
+						sqlite_error: process_error_arg(err),
+						input: { command, args }
+					});
+				}
+				r(res);
 			});
-		},
-		// runs a command (insert, update, etc...) and might return "lastID" if needed
-		run: function(command, args) {
-			if(args == void 0 || args == null) args = [];
+		});
+	}
+
+	// runs a command (insert, update, etc...) and might return "lastID" if needed
+	async run(command, args) {
+		var self = this;
+		if(args == void 0 || args == null) args = [];
 			return new Promise(function(r, rej) {
-				database.run(command, args, function(err, res) {
+				self.database.run(command, args, function(err, res) {
 					if(err) {
 						return rej({
 							sqlite_error: process_error_arg(err),
@@ -638,12 +645,14 @@ function asyncDbSystem(database) {
 					r(info);
 				});
 			});
-		},
-		// gets multiple rows in one command
-		all: function(command, args) {
-			if(args == void 0 || args == null) args = [];
+	}
+
+	// gets multiple rows in one command
+	async all(command, args) {
+		var self = this;
+		if(args == void 0 || args == null) args = [];
 			return new Promise(function(r, rej) {
-				database.all(command, args, function(err, res) {
+				self.database.all(command, args, function(err, res) {
 					if(err) {
 						return rej({
 							sqlite_error: process_error_arg(err),
@@ -653,69 +662,69 @@ function asyncDbSystem(database) {
 					r(res);
 				});
 			});
-		},
-		// get multiple rows but execute a function for every row
-		each: function(command, args, callbacks) {
-			if(typeof args == "function") {
-				callbacks = args;
-				args = [];
-			}
-			var def = callbacks;
-			var callback_error = false;
-			var cb_err_desc = "callback_error";
-			callbacks = function(e, data) {
-				try {
-					def(data);
-				} catch(e) {
-					callback_error = true;
-					cb_err_desc = e;
-				}
-			}
-			return new Promise(function(r, rej) {
-				database.each(command, args, callbacks, function(err, res) {
-					if(err) return rej({
-						sqlite_error: process_error_arg(err),
-						input: { command, args }
-					});
-					if(callback_error) return rej(cb_err_desc);
-					r(res);
-				});
-			});
-		},
-		// like run, but executes the command as a SQL file
-		// (no comments allowed, and must be semicolon separated)
-		exec: function(command) {
-			return new Promise(function(r, rej) {
-				database.exec(command, function(err) {
-					if(err) {
-						return rej({
-							sqlite_error: process_error_arg(err),
-							input: { command }
-						});
-					}
-					r(true);
-				});
-			});
+	}
+
+	// get multiple rows but execute a function for every row
+	async each(command, args, callbacks) {
+		var self = this;
+		if(typeof args == "function") {
+			callbacks = args;
+			args = [];
 		}
-	};
-	return db;
+		var def = callbacks;
+		var callback_error = false;
+		var cb_err_desc = "callback_error";
+		callbacks = function(e, data) {
+			try {
+				def(data);
+			} catch(e) {
+				callback_error = true;
+				cb_err_desc = e;
+			}
+		}
+		return new Promise(function(r, rej) {
+			self.database.each(command, args, callbacks, function(err, res) {
+				if(err) return rej({
+					sqlite_error: process_error_arg(err),
+					input: { command, args }
+				});
+				if(callback_error) return rej(cb_err_desc);
+				r(res);
+			});
+		});
+	}
+
+	// like run, but executes the command as a SQL file
+	// (no comments allowed, and must be semicolon separated)
+	async exec(command) {
+		var self = this;
+		return new Promise(function(r, rej) {
+			self.database.exec(command, function(err) {
+				if(err) {
+					return rej({
+						sqlite_error: process_error_arg(err),
+						input: { command }
+					});
+				}
+				r(true);
+			});
+		});
+	}
 }
 
-var db,
-	db_edits,
-	db_ch,
-	db_img,
-	db_misc
 function loadDbSystems() {
-	db = asyncDbSystem(database);
-	db_edits = asyncDbSystem(edits_db);
-	db_ch = asyncDbSystem(chat_history);
-	db_img = asyncDbSystem(image_db);
-	db_misc = asyncDbSystem(misc_db);
-}
+	var database = new sql.Database(serverDBPath);
+	var edits_db = new sql.Database(editsDBPath);
+	var chat_history = new sql.Database(chatDBPath);
+	var image_db = new sql.Database(imageDBPath);
+	var misc_db = new sql.Database(miscDBPath);
 
-var transporter;
-var email_available = true;
+	db = new AsyncDBManager(database);
+	db_edits = new AsyncDBManager(edits_db);
+	db_ch = new AsyncDBManager(chat_history);
+	db_img = new AsyncDBManager(image_db);
+	db_misc = new AsyncDBManager(misc_db);
+}
 
 async function loadEmail() {
 	if(!settings.email.enabled) return;
@@ -798,19 +807,18 @@ async function fetchCloudflareIPs(ip_type) {
 	});
 }
 
-var valid_methods = ["GET", "POST", "HEAD", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"];
 function valid_method(mtd) {
+	const valid_methods = ["GET", "POST", "HEAD", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"];
 	return valid_methods.indexOf(mtd) > -1;
 }
 
 async function initialize_server() {
 	console.log("Starting server...");
 
-	setupDatabases();
+	loadDbSystems();
 	setupStaticShortcuts();
 	load_static();
 	setupZipLog();
-	loadDbSystems();
 	manage_https();
 	setupHTTPServer();
 
@@ -2958,7 +2966,8 @@ var global_data = {
 	getClientVersion,
 	setClientVersion,
 	staticShortcuts,
-	setupStaticShortcuts
+	setupStaticShortcuts,
+	getServerUptime
 };
 
 async function sysLoad() {

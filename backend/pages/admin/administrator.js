@@ -1,5 +1,5 @@
 var utils = require("../../utils/utils.js");
-var uptime = utils.uptime;
+var calculateTimeDiff = utils.calculateTimeDiff;
 
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var render = ctx.render;
@@ -15,6 +15,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var createCSRF = server.createCSRF;
 	var getClientVersion = server.getClientVersion;
 	var getServerSetting = server.getServerSetting;
+	var getServerUptime = server.getServerUptime;
 
 	// not a superuser...
 	if(!user.superuser) {
@@ -79,8 +80,8 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		announcement: getServerSetting("announcement"),
 		announcement_update_msg: params.announcement_update_msg,
 		cons_update_msg: params.cons_update_msg,
-		uptime: uptime(),
-		machine_uptime: uptime(process.hrtime()[0] * 1000),
+		uptime: calculateTimeDiff(getServerUptime()),
+		machine_uptime: calculateTimeDiff(process.hrtime()[0] * 1000),
 		client_num,
 		custom_ranks,
 		client_version: getClientVersion(),

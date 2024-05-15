@@ -1,7 +1,7 @@
 var utils = require("../utils/utils.js");
 var html_tag_esc = utils.html_tag_esc;
 var san_nbr = utils.san_nbr;
-var uptime = utils.uptime;
+var calculateTimeDiff = utils.calculateTimeDiff;
 var create_date = utils.create_date;
 
 function sanitizeColor(col) {
@@ -54,6 +54,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
 	var loadPlugin = server.loadPlugin;
 	var getServerSetting = server.getServerSetting;
+	var getServerUptime = server.getServerUptime;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
 	var remove_from_chatlog = chat_mgr.remove_from_chatlog;
@@ -431,7 +432,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			serverChatResponse("Cleared all blocks", location);
 		},
 		uptime: function() {
-			serverChatResponse("Server uptime: " + uptime(), location);
+			serverChatResponse("Server uptime: " + calculateTimeDiff(getServerUptime()), location);
 		},
 		tell: function(id, message) {
 			id += "";
@@ -848,7 +849,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 	if(isMuted) {
 		var expTime = muteInfo[0];
-		serverChatResponse("You are temporarily muted (" + uptime(expTime - Date.now()) + ")", location);
+		serverChatResponse("You are temporarily muted (" + calculateTimeDiff(expTime - Date.now()) + ")", location);
 		return;
 	}
 	var websocketChatData = Object.assign({
