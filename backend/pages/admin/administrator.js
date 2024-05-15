@@ -115,8 +115,6 @@ module.exports.POST = async function(req, write, server, ctx) {
 		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
-	console.log(post_data)
-
 	if("set_cli_version" in post_data) {
 		var new_cli_version = post_data.set_cli_version;
 		if(setClientVersion(new_cli_version)) {
