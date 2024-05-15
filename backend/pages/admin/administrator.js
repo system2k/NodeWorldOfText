@@ -7,7 +7,6 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 
 	var callPage = server.callPage;
 	var db = server.db;
-	var loadString = server.loadString;
 	var wss = server.wss;
 	var ranks_cache = server.ranks_cache;
 	var db_misc = server.db_misc;
@@ -15,6 +14,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var accountSystem = server.accountSystem;
 	var createCSRF = server.createCSRF;
 	var getClientVersion = server.getClientVersion;
+	var getServerSetting = server.getServerSetting;
 
 	// not a superuser...
 	if(!user.superuser) {
@@ -76,7 +76,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 
 	var data = {
 		user_ranks,
-		announcement: loadString("announcement"),
+		announcement: getServerSetting("announcement"),
 		announcement_update_msg: params.announcement_update_msg,
 		cons_update_msg: params.cons_update_msg,
 		uptime: uptime(),
@@ -84,7 +84,8 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		client_num,
 		custom_ranks,
 		client_version: getClientVersion(),
-		csrftoken
+		csrftoken,
+		global_chat_enabled: getServerSetting("chatGlobalEnabled") == "1"
 	};
 
 	write(render("administrator.html", data));
@@ -103,6 +104,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var checkCSRF = server.checkCSRF;
 	var setClientVersion = server.setClientVersion;
 	var setupStaticShortcuts = server.setupStaticShortcuts;
+	var updateServerSetting = server.updateServerSetting;
 
 	if(!user.superuser) {
 		return await callPage("404", null, req, write, server, ctx);
@@ -113,6 +115,8 @@ module.exports.POST = async function(req, write, server, ctx) {
 		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
+	console.log(post_data)
+
 	if("set_cli_version" in post_data) {
 		var new_cli_version = post_data.set_cli_version;
 		if(setClientVersion(new_cli_version)) {
@@ -120,6 +124,16 @@ module.exports.POST = async function(req, write, server, ctx) {
 				cons_update_msg: "Client version updated successfully"
 			}, req, write, server, ctx);
 		}
+	}
+	if("set_chat_global_enabled" in post_data) {
+		var isEnabled = post_data.set_chat_global_enabled;
+		if(isEnabled == "on") {
+			updateServerSetting("chatGlobalEnabled", "1");
+			return await callPage("admin/administrator", null, req, write, server, ctx);
+		}
+	} else {
+		updateServerSetting("chatGlobalEnabled", "0");
+		return await callPage("admin/administrator", null, req, write, server, ctx);
 	}
 	if("announcement" in post_data) {
 		var new_announcement = post_data.announcement;

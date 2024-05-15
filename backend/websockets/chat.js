@@ -53,6 +53,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var wsSend = server.wsSend;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
 	var loadPlugin = server.loadPlugin;
+	var getServerSetting = server.getServerSetting;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
 	var remove_from_chatlog = chat_mgr.remove_from_chatlog;
@@ -63,6 +64,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var chat_perm = world.feature.chat;
 	var is_owner = world.ownerId == user.id;
 	var is_member = !!world.members.map[user.id] || is_owner;
+
+	var isGlobalEnabled = getServerSetting("chatGlobalEnabled") == "1";
 
 	var clientIpObj = null;
 	if(client_ips[world.id]) {
@@ -106,7 +109,12 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	location = data.location;
 
 	if(location == "page" && !can_chat) {
-		serverChatResponse("You do not have permission to chat here", "page");
+		serverChatResponse("You do not have permission to chat here", location);
+		return;
+	}
+
+	if(location == "global" && !isGlobalEnabled) {
+		serverChatResponse("The global channel is not available", location);
 		return;
 	}
 

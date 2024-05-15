@@ -283,15 +283,21 @@
 	</div>
 
 	<div class="content_set">
-		<div class="content_set_title">Constants</div>
+		<div class="content_set_title">Settings</div>
 		<div class="content_set_content">
 			{% if cons_update_msg %}
 			<span style="font-size:80%"><i>{{ cons_update_msg }}</i></span>
 			{% endif %}
 			<form method="POST" action=".">
 				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
-				Client version:
-				<input type="text" name="set_cli_version" id="set_cli_version" value="{{ client_version }}" style="width: 100%;">
+				<div>
+					Client version:
+					<input type="text" name="set_cli_version" id="set_cli_version" value="{{ client_version }}" style="width: 100%;">
+				</div>
+				<div>
+					Global chat enabled:
+					<input type="checkbox" name="set_chat_global_enabled" id="set_chat_global_enabled"{%if global_chat_enabled%} checked{%endif%}>
+				</div>
 				<input type="submit" value="Set">
 			</form>
 		</div>

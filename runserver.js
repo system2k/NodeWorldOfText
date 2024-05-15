@@ -3,7 +3,6 @@
 **  Est. May 1, 2016 as Your World of Text Node, and November 19, 2016 as Node World of Text
 **  Reprogrammed September 17, 2017
 **  Released October 8, 2017 as Our World of Text
-**  This is the main file
 */
 
 console.log("Starting up...");
@@ -108,6 +107,12 @@ var logoutPath = "/accounts/logout/";
 var registerPath = "/accounts/register/";
 var profilePath = "/accounts/profile/";
 
+var serverSettings = {
+	announcement: "",
+	chatGlobalEnabled: "1"
+};
+var serverSettingsStatus = {};
+
 if(accountSystem != "uvias" && accountSystem != "local") {
 	console.log("ERROR: Invalid account system: " + accountSystem);
 	sendProcMsg("EXIT");
@@ -148,7 +153,6 @@ CONST.tileArea = CONST.tileCols * CONST.tileRows;
 var memTileCache = {};
 
 var ranks_cache = { users: {} };
-var announcement_cache = "";
 var restr_cache = "";
 var restr_cg1_cache = "";
 var restr_update = null;
@@ -1944,8 +1948,6 @@ async function process_request(req, res, compCallbacks) {
 
 function loadString(type) {
 	switch(type) {
-		case "announcement":
-			return announcement_cache;
 		case "restr":
 			return restr_cache;
 		case "restr_cg1":
@@ -2002,26 +2004,44 @@ async function commitRestrictionsToDisk() {
 	}
 }
 
-async function loadAnnouncement() {
-	announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
-	if(!announcement_cache) {
-		announcement_cache = "";
-	} else {
-		announcement_cache = announcement_cache.value;
+async function loadServerSettings() {
+	for(var option in serverSettings) {
+		var dbValue = await db.get("SELECT value FROM server_info WHERE name=?", option);
+		if(dbValue) {
+			serverSettings[option] = dbValue.value;
+		}
+		serverSettingsStatus[option] = {
+			updating: false
+		};
 	}
 }
 
-async function modifyAnnouncement(text) {
-	if(!text) text = "";
-	text += "";
-	announcement_cache = text;
-
-	var element = await db.get("SELECT value FROM server_info WHERE name='announcement'");
-	if(!element) {
-		await db.run("INSERT INTO server_info values('announcement', ?)", text);
-	} else {
-		await db.run("UPDATE server_info SET value=? WHERE name='announcement'", text);
+async function updateServerSetting(option, value) {
+	if(!(option in serverSettings)) {
+		return false;
 	}
+	if(serverSettingsStatus[option].updating) return false;
+	serverSettingsStatus[option].updating = true;
+	serverSettings[option] = value;
+	var element = await db.get("SELECT value FROM server_info WHERE name=?", option);
+	if(!element) {
+		await db.run("INSERT INTO server_info values(?, ?)", [option, value]);
+	} else {
+		await db.run("UPDATE server_info SET value=? WHERE name=?", [value, option]);
+	}
+	serverSettingsStatus[option].updating = false;
+}
+
+function getServerSetting(option) {
+	if(!(option in serverSettings)) {
+		return null;
+	}
+	return serverSettings[option];
+}
+
+async function modifyAnnouncement(text) {
+	if(typeof text != "string") return false;
+	updateServerSetting("announcement", text);
 	ws_broadcast({
 		kind: "announcement",
 		text: text
@@ -2803,7 +2823,7 @@ async function manageWebsocketConnection(ws, req) {
 }
 
 async function start_server() {
-	await loadAnnouncement();
+	await loadServerSettings();
 	loadRestrictionsList();
 	
 	if(accountSystem == "local") {
@@ -2900,6 +2920,8 @@ var global_data = {
 	isTestServer,
 	shellEnabled,
 	loadString,
+	updateServerSetting,
+	getServerSetting,
 	restrictions,
 	saveRestrictions,
 	uvias,
