@@ -1,5 +1,17 @@
 var fs = require("fs");
 
+function toHex64(n) {
+	var a = new BigUint64Array(1);
+	a[0] = BigInt(n);
+	return a[0].toString(16);
+}
+
+function toInt64(n) {
+	var a = new BigInt64Array(1);
+	a[0] = BigInt("0x" + n);
+	return a[0];
+}
+
 function trimHTML(html) {
 	// ensure all lines are \r\n instead of just \n (consistent)
 	html = html.replace(/\r\n/g, "\n");
@@ -921,5 +933,7 @@ module.exports = {
 	normalizeCacheTile,
 	checkURLParam,
 	trimSlash,
-	checkDuplicateCookie
+	checkDuplicateCookie,
+	toHex64,
+	toInt64
 };

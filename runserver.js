@@ -61,6 +61,8 @@ var normalizeCacheTile   = utils.normalizeCacheTile;
 var checkDuplicateCookie = utils.checkDuplicateCookie;
 var advancedSplit        = utils.advancedSplit;
 var filterEdit           = utils.filterEdit;
+var toHex64              = utils.toHex64;
+var toInt64              = utils.toInt64;
 
 var normalize_ipv6 = ipaddress.normalize_ipv6;
 var ipv4_to_int    = ipaddress.ipv4_to_int;
@@ -123,7 +125,6 @@ if(accountSystem != "uvias" && accountSystem != "local") {
 	process.exit();
 }
 
-Error.stackTraceLimit = 1024;
 var gzipEnabled = false;
 var shellEnabled = true;
 
@@ -138,6 +139,9 @@ var closed_client_limit = 1000 * 60 * 20; // 20 min
 var ws_req_per_second = 1000;
 var pw_encryption = "sha512WithRSAEncryption";
 var connections_per_ip = 50;
+var static_path = "./frontend/static/";
+var static_path_web = "static/";
+var templates_path = "./frontend/templates/";
 
 var wss; // websocket handler
 var monitorWorker;
@@ -150,7 +154,7 @@ var transporter;
 var email_available = true;
 var db,
 	db_edits,
-	db_ch,
+	db_chat,
 	db_img,
 	db_misc;
 
@@ -175,6 +179,9 @@ var client_ips = {};
 var ip_address_conn_limit = {}; // {ip: count}
 var ip_address_req_limit = {}; // {ip: ws_limits} // TODO: Cleanup objects
 var http_req_holds = {}; // ip/identifier -> {"<index>": {holds: <number>, resp: [<promises>,...]},...}
+var staticShortcuts = {};
+var template_data = {}; // data used by the server
+var static_data = {}; // return static server files
 
 console.log("Loaded libs");
 
@@ -386,20 +393,9 @@ if(accountSystem == "uvias") {
 	profilePath = uvias.profilePath;
 }
 
-function toHex64(n) {
-	var a = new BigUint64Array(1);
-	a[0] = BigInt(n);
-	return a[0].toString(16);
-}
-
-function toInt64(n) {
-	var a = new BigInt64Array(1);
-	a[0] = BigInt("0x" + n);
-	return a[0];
-}
-
 if(isTestServer) {
 	serverPort = settings.test_port;
+	Error.stackTraceLimit = 128;
 }
 
 function log_error(err) {
@@ -414,7 +410,6 @@ function log_error(err) {
 	}
 }
 
-var staticShortcuts = {};
 function setupStaticShortcuts() {
 	if(!staticNumsPath) return;
 	var data;
@@ -438,14 +433,6 @@ function setupStaticShortcuts() {
 		staticShortcuts[num] = path;
 	}
 }
-
-var static_path = "./frontend/static/";
-var static_path_web = "static/";
-
-var template_data = {}; // data used by the server
-var templates_path = "./frontend/templates/";
-
-var static_data = {}; // return static server files
 
 templates.registerFilter("plural", function(count, string) {
 	if(!string) return "";
@@ -482,8 +469,8 @@ function load_static() {
 	}
 }
 
-var zip_file;
 function setupZipLog() {
+	var zip_file;
 	if(!fs.existsSync(settings.paths.zip_log)) {
 		zip_file = new zip();
 	} else {
@@ -721,7 +708,7 @@ function loadDbSystems() {
 
 	db = new AsyncDBManager(database);
 	db_edits = new AsyncDBManager(edits_db);
-	db_ch = new AsyncDBManager(chat_history);
+	db_chat = new AsyncDBManager(chat_history);
 	db_img = new AsyncDBManager(image_db);
 	db_misc = new AsyncDBManager(misc_db);
 }
@@ -831,7 +818,7 @@ async function initialize_server() {
 	global_data.db_img = db_img;
 	global_data.db_misc = db_misc;
 	global_data.db_edits = db_edits;
-	global_data.db_ch = db_ch;
+	global_data.db_chat = db_chat;
 	
 	if(accountSystem == "uvias") {
 		await uvias_init();
@@ -1559,6 +1546,7 @@ process.on("unhandledRejection", function(reason) {
 	console.log("Error:", reason);
 });
 
+// these should be part of a Server class
 var periodHTTPOutboundBytes = 0;
 var periodHTTPInboundBytes = 0;
 var periodWSOutboundBytes = 0;
@@ -2919,7 +2907,7 @@ var global_data = {
 	db_img: null,
 	db_misc: null,
 	db_edits: null,
-	db_ch: null,
+	db_chat: null,
 	wsSend,
 	ws_broadcast,
 	createCSRF,

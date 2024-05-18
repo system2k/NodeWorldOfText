@@ -42,7 +42,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var world = ctx.world;
 
 	var db = server.db;
-	var db_ch = server.db_ch;
+	var db_chat = server.db_chat;
 	var ws_broadcast = server.ws_broadcast; // site-wide broadcast
 	var chat_mgr = server.chat_mgr;
 	var topActiveWorlds = server.topActiveWorlds;
@@ -548,7 +548,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			if(!user.staff) return;
 			var worldId = world.id;
 			if(location == "global") worldId = 0;
-			var channels = await db_ch.all("SELECT * FROM channels WHERE world_id=?", worldId);
+			var channels = await db_chat.all("SELECT * FROM channels WHERE world_id=?", worldId);
 			var count = channels.length;
 			var infoLog = "Found " + count + " channel(s) for this world:\n";
 			for(var i = 0; i < count; i++) {
@@ -561,7 +561,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				infoLog += "Created: " + create_date(date) + "\n";
 				infoLog += "----------------\n";
 			}
-			var def = await db_ch.get("SELECT * FROM default_channels WHERE world_id=?", worldId);
+			var def = await db_chat.get("SELECT * FROM default_channels WHERE world_id=?", worldId);
 			if(def && def.channel_id) {
 				def = def.channel_id;
 			} else {

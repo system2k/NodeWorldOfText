@@ -128,11 +128,9 @@ module.exports.POST = async function(req, write, server, ctx) {
 		var isEnabled = post_data.set_chat_global_enabled;
 		if(isEnabled == "on") {
 			updateServerSetting("chatGlobalEnabled", "1");
-			return await callPage("admin/administrator", null, req, write, server, ctx);
 		}
 	} else {
 		updateServerSetting("chatGlobalEnabled", "0");
-		return await callPage("admin/administrator", null, req, write, server, ctx);
 	}
 	if("announcement" in post_data) {
 		var new_announcement = post_data.announcement;
@@ -175,4 +173,5 @@ module.exports.POST = async function(req, write, server, ctx) {
 		}
 		return;
 	}
+	return await callPage("admin/administrator", null, req, write, server, ctx);
 }
