@@ -7037,6 +7037,13 @@ function setupDOMEvents() {
 		w.emit("clientLoaded");
 	});
 
+	document.addEventListener("visibilitychange", function() {
+		if(document.visibilityState == "visible") {
+			owotCtx.fillStyle = "transparent";
+			owotCtx.fillRect(0, 0, 1, 1);
+		}
+	});
+
 	elm.owot.oncontextmenu = function() {
 		if(ignoreCanvasContext) {
 			ignoreCanvasContext = false;
