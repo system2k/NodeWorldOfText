@@ -5,16 +5,16 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var path = ctx.path;
 	var render = ctx.render;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
 	var db = server.db;
-	var callPage = server.callPage;
 	var db_misc = server.db_misc;
 	var uvias = server.uvias;
 	var accountSystem = server.accountSystem;
 	var createCSRF = server.createCSRF;
 
 	if(!user.operator) {
-		return await callPage("404", null, req, write, server, ctx);
+		return await callPage("404");
 	}
 
 	var username = checkURLParam("/administrator/user/:username", path).username;
@@ -23,7 +23,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	if(accountSystem == "uvias") {
 		var db_user = await uvias.get("SELECT to_hex(uid) AS uid, username from accounts.users WHERE lower(username)=lower($1::text)", username);
 		if(!db_user) {
-			return await callPage("404", null, req, write, server, ctx);
+			return await callPage("404");
 		}
 		var uid = db_user.uid;
 		uid = "x" + uid;
@@ -40,7 +40,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	} else if(accountSystem == "local") {
 		user_edit = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
 		if(!user_edit) {
-			return await callPage("404", null, req, write, server, ctx);
+			return await callPage("404");
 		}
 	}
 
@@ -59,10 +59,10 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var post_data = ctx.post_data;
 	var path = ctx.path;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
 	var db = server.db;
 	var db_edits = server.db_edits;
-	var callPage = server.callPage;
 	var url = server.url;
 	var uvias = server.uvias;
 	var db_misc = server.db_misc;
@@ -104,7 +104,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	if(user_edit.id == user.id) {
 		return await callPage("admin/user", {
 			message: "You cannot set your own rank"
-		}, req, write, server, ctx);
+		});
 	}
 
 	if(post_data.form == "rank") {
@@ -143,7 +143,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 		}
 		return await callPage("admin/user", {
 			message: "Successfully set " + user_edit.username + "'s rank to " + ["Default", "Staff", "Superuser", "Operator"][rank]
-		}, req, write, server, ctx);
+		});
 	}
 
 	write(null, null, {

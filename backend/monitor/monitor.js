@@ -10,7 +10,7 @@ const querystring = require("querystring");
 const WebSocket = require("ws");
 const worker = require("node:worker_threads");
 
-var util = require("../utils/utils.js");
+var util = require("../framework/utils.js");
 
 var parentPort = worker.parentPort;
 var workerData = worker.workerData;

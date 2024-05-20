@@ -4,8 +4,8 @@ var checkURLParam = utils.checkURLParam;
 module.exports.GET = async function(req, write, server, ctx) {
 	var path = ctx.path;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
-	var callPage = server.callPage;
 	var db = server.db;
 
 	// not staff

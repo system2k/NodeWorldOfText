@@ -132,9 +132,9 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 module.exports.POST = async function(req, write, server, ctx) {
 	var post_data = ctx.post_data;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
 	var db = server.db;
-	var callPage = server.callPage;
 	var wss = server.wss;
 	var checkCSRF = server.checkCSRF;
 
@@ -152,7 +152,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 		if(user.uv_rank == 3) { // TODO: use rank table in uvias db
 			return await callPage("accounts/profile", {
 				message: "Guests cannot claim worlds"
-			}, req, write, server, ctx);
+			});
 		} else {
 			var worldname = post_data.worldname;
 			if(typeof worldname != "string") {
@@ -182,5 +182,5 @@ module.exports.POST = async function(req, write, server, ctx) {
 	}
 	await callPage("accounts/profile", {
 		message
-	}, req, write, server, ctx);
+	});
 }

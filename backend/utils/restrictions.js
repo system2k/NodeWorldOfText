@@ -1,4 +1,4 @@
-var ipaddress = require("../utils/ipaddress.js");
+var ipaddress = require("../framework/ipaddress.js");
 var ipv4_to_range = ipaddress.ipv4_to_range;
 var ipv6_to_range = ipaddress.ipv6_to_range;
 

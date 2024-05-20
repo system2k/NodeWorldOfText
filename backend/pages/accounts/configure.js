@@ -73,10 +73,10 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var render = ctx.render;
 	var user = ctx.user;
 	var setCallback = ctx.setCallback;
+	var callPage = ctx.callPage;
 
 	var url = server.url;
 	var db = server.db;
-	var callPage = server.callPage;
 	var uvias = server.uvias;
 	var accountSystem = server.accountSystem;
 	var createCSRF = server.createCSRF;
@@ -92,7 +92,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 
 	var world = await getOrCreateWorld(world_name);
 	if(!world) {
-		return await callPage("404", null, req, write, server, ctx);
+		return await callPage("404");
 	}
 
 	setCallback(function() {
@@ -262,9 +262,9 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var path = ctx.path;
 	var user = ctx.user;
 	var setCallback = ctx.setCallback;
+	var callPage = ctx.callPage;
 
 	var db = server.db;
-	var callPage = server.callPage;
 	var url = server.url;
 	var ws_broadcast = server.ws_broadcast;
 	var chat_mgr = server.chat_mgr;
@@ -285,7 +285,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 
 	var world = await getOrCreateWorld(world_name);
 	if(!world) {
-		return await callPage("404", null, req, write, server, ctx);
+		return await callPage("404");
 	}
 
 	setCallback(function() {
@@ -317,7 +317,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 		}
 
 		if(!adduser) {
-			return await callPage("accounts/configure", { message: "User not found" }, req, write, server, ctx);
+			return await callPage("accounts/configure", { message: "User not found" });
 		}
 
 		if(accountSystem == "uvias") {
@@ -329,20 +329,20 @@ module.exports.POST = async function(req, write, server, ctx) {
 		if(user_id == world.ownerId) {
 			return await callPage("accounts/configure", {
 				message: "User is already the owner of \"" + world_name + "\""
-			}, req, write, server, ctx);
+			});
 		}
 
 		var isWhitelisted = world.members.map[user_id];
 		if(isWhitelisted) {
 			return await callPage("accounts/configure", {
 				message: "User is already part of this world"
-			}, req, write, server, ctx);
+			});
 		}
 
 		if(Object.keys(world.members.map).length >= 3000) {
 			return await callPage("accounts/configure", {
 				message: "There are too many members on this world"
-			}, req, write, server, ctx);
+			});
 		}
 
 		if(await promoteMembershipByWorldName(world.name, user_id)) {
@@ -351,7 +351,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 
 		return await callPage("accounts/configure", {
 			message: adduser.username + " is now a member of the \"" + world_name + "\" world"
-		}, req, write, server, ctx);
+		});
 	} else if(post_data.form == "access_perm") {
 		var readability = validatePerms(post_data.readability, 2);
 		var writability = validatePerms(post_data.writability, 2);
@@ -796,7 +796,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 			if(stat.error) {
 				return await callPage("accounts/configure", {
 					misc_message: stat.message
-				}, req, write, server, ctx);
+				});
 			} else {
 				new_world_name = stat.name;
 				var idUpdList = stat.list;
@@ -819,7 +819,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 		if(msgResponseMisc.length) {
 			return await callPage("accounts/configure", {
 				misc_message: msgResponseMisc.join("<br>")
-			}, req, write, server, ctx);
+			});
 		}
 	} else if(post_data.form == "action") {
 		if("unclaim" in post_data) {
