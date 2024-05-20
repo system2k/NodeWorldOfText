@@ -289,6 +289,7 @@
 			<span style="font-size:80%"><i>{{ cons_update_msg }}</i></span>
 			{% endif %}
 			<form method="POST" action=".">
+				<input type="hidden" name="settings_form" value="1">
 				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
 				<div>
 					Client version:

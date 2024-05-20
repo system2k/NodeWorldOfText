@@ -115,22 +115,23 @@ module.exports.POST = async function(req, write, server, ctx) {
 	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
 		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
-
-	if("set_cli_version" in post_data) {
-		var new_cli_version = post_data.set_cli_version;
-		if(setClientVersion(new_cli_version)) {
-			return await callPage("admin/administrator", {
-				cons_update_msg: "Client version updated successfully"
-			}, req, write, server, ctx);
+	if(post_data.settings_form) {
+		if("set_cli_version" in post_data) {
+			var new_cli_version = post_data.set_cli_version;
+			if(setClientVersion(new_cli_version)) {
+				return await callPage("admin/administrator", {
+					cons_update_msg: "Client version updated successfully"
+				});
+			}
 		}
-	}
-	if("set_chat_global_enabled" in post_data) {
-		var isEnabled = post_data.set_chat_global_enabled;
-		if(isEnabled == "on") {
-			updateServerSetting("chatGlobalEnabled", "1");
+		if("set_chat_global_enabled" in post_data) {
+			var isEnabled = post_data.set_chat_global_enabled;
+			if(isEnabled == "on") {
+				updateServerSetting("chatGlobalEnabled", "1");
+			}
+		} else {
+			updateServerSetting("chatGlobalEnabled", "0");
 		}
-	} else {
-		updateServerSetting("chatGlobalEnabled", "0");
 	}
 	if("announcement" in post_data) {
 		var new_announcement = post_data.announcement;
