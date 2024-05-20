@@ -848,6 +848,7 @@ async function initializeServer() {
 	if(accountSystem == "uvias") {
 		setupUvias();
 		await uvias_init();
+		global_data.uvias = uvias;
 	}
 
 	if(accountSystem == "local") {
@@ -1588,7 +1589,10 @@ function initWebsocketPingInterval() {
 
 async function uviasSendIdentifier() {
 	await uvias.run("SELECT accounts.set_service_info($1::text, $2::text, $3::text, $4::text, $5::text, $6::integer, $7::boolean, $8::boolean, $9::text);",
-		[uvias.id, uvias.name, uvias.domain, uvias.sso, uvias.logout, process.pid, uvias.private, uvias.only_verified, uvias.custom_css_file_path]);
+		[
+			uvias.id, uvias.name, uvias.domain,
+			uvias.paths.sso, uvias.paths.logout, process.pid, uvias.private, uvias.only_verified, uvias.custom_css_file_path
+		]);
 	console.log("Sent service identifier");
 }
 
@@ -2315,6 +2319,7 @@ var global_data = {
 	db_misc: null,
 	db_edits: null,
 	db_chat: null,
+	uvias: null,
 	wsSend,
 	ws_broadcast,
 	createCSRF: null,
@@ -2327,7 +2332,6 @@ var global_data = {
 	getServerSetting,
 	restrictions,
 	saveRestrictions,
-	uvias,
 	accountSystem,
 	ms,
 	checkHash,
