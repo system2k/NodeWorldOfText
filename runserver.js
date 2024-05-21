@@ -2269,18 +2269,10 @@ async function start_server() {
 
 	createEndpoints(httpServer);
 
-	await sysLoad(); // initialize the subsystems (tile database; chat manager)
 	serverLoaded = true;
 
 	if(settings.monitor && settings.monitor.enabled) {
 		setupMonitorServer();
-	}
-
-	loadPlugin(true);
-	
-	var plugin = loadPlugin();
-	if(plugin && plugin.main) {
-		plugin.main(global_data);
 	}
 
 	httpServer.listen(settings.ip, function() {
@@ -2309,6 +2301,12 @@ async function start_server() {
 			handle_error(e);
 		}
 	});
+
+	await sysLoad(); // initialize the subsystems (tile database; chat manager)
+	var plugin = loadPlugin(true);
+	if(plugin && plugin.main) {
+		plugin.main(global_data);
+	}
 }
 
 // the server context
