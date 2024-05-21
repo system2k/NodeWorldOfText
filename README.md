@@ -34,4 +34,4 @@ Our World of Text is licensed under the [MIT License](https://github.com/system2
 ## Links
 * [Our World of Text](https://ourworldoftext.com)
 * [Our World of Text Wiki](https://wiki.ourworldoftext.com)
-* [Our World of Text Discord](https://discord.gg/9buMtUt)
+* [Our World of Text Discord](https://discord.gg/aqgH45B6W3)
