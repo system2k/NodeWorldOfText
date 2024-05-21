@@ -26,13 +26,22 @@ class RequestHandler {
 	ipAddress = null;
 	ipAddressFam = null;
 	ipAddressVal = null;
-	compCallbacks = null;
+	callbacks = null;
 	cookies = {};
 	user = {};
 	post_data = {};
 	query_data = {};
 	path = null;
 	referer = null;
+	encoding = null;
+	gzip = false;
+	res = null;
+
+	requestResolved = false;
+	requestStreaming = false;
+	requestEnded = false;
+	requestPromises = [];
+	cookiesToReturn = [];
 	
 	templateData = {};
 
@@ -54,15 +63,25 @@ class RequestHandler {
 		return valid_methods.indexOf(mtd) > -1;
 	}
 
-	constructor(server, dispatcher, req, compCallbacks) {
+	constructor(server, req, res, callbacks, opts) {
+		var self = this;
 		this.server = server;
-		this.dispatcher = dispatcher;
 		this.req = req;
-		this.compCallbacks = compCallbacks;
+		this.res = res;
+		this.callbacks = callbacks;
+		res.on("close", function() {
+			self.requestEnded = true;
+			for(var i = 0; i < self.requestPromises.length; i++) {
+				var prom = self.requestPromises[i];
+				prom();
+			}
+		});
+		this.encoding = opts.encoding || [];
+		this.gzip = !!opts.gzip;
 	}
 
 	setCallback = (callback) => {
-		this.compCallbacks.push(callback);
+		this.callbacks.push(callback);
 	}
 
 	setTemplateData(key, value) {
@@ -101,7 +120,7 @@ class RequestHandler {
 						} else {
 							queryData = "";
 						}
-						self.dispatcher.dispatch("Payload too large", 413);
+						self.dispatch("Payload too large", 413);
 						error = true;
 						resolve(null);
 					}
@@ -128,14 +147,14 @@ class RequestHandler {
 		var hostname = this.parseHostname(this.req.headers.host);
 	
 		var URLparse = new URL(this.req.url, "http://example.com");
-		var URL = URLparse.pathname;
-		if(URL.charAt(0) == "/") { URL = URL.slice(1); }
+		var pagePath = URLparse.pathname;
+		if(pagePath.charAt(0) == "/") { pagePath = pagePath.slice(1); }
 		try {
-			URL = decodeURIComponent(URL);
+			pagePath = decodeURIComponent(pagePath);
 		} catch (e) {}
 	
 		if(hostname.length == 1 && this.server.validSubdomains.indexOf(hostname[0]) > -1) {
-			URL = "other/" + hostname[0] + "/" + URL;
+			pagePath = "other/" + hostname[0] + "/" + pagePath;
 		}
 	
 		var realIp = this.req.headers["X-Real-IP"] || this.req.headers["x-real-ip"];
@@ -153,7 +172,7 @@ class RequestHandler {
 			if(deniedPages.siteAccessNote) {
 				deny_notes = deniedPages.siteAccessNote;
 			}
-			this.dispatcher.dispatch(this.render("denied.html", {
+			this.dispatch(this.render("denied.html", {
 				deny_notes
 			}), 403);
 			return;
@@ -169,11 +188,11 @@ class RequestHandler {
 			var pageRes = pattern[1];
 			var options = pattern[2];
 	
-			if(!URL.match(urlReg)) {
+			if(!pagePath.match(urlReg)) {
 				continue;
 			}
 	
-			var status = await this.processPage(pageRes, options, URL);
+			var status = await this.processPage(pageRes, options, pagePath);
 			if(status == RequestHandler.RESOLVED) {
 				page_resolved = true;
 			} else if(status == RequestHandler.ABORTED) {
@@ -186,10 +205,10 @@ class RequestHandler {
 			return;
 		}
 	
-		if(!this.dispatcher.isResolved()) {
+		if(!this.isResolved()) {
 			var endpoint = this.server.urlErrorEndpoints["404"];
 			if(endpoint) {
-				var status = await this.processPage(endpoint, {}, URL);
+				var status = await this.processPage(endpoint, {}, pagePath);
 				if(status == RequestHandler.RESOLVED) {
 					page_resolved = true;
 				}
@@ -198,11 +217,11 @@ class RequestHandler {
 	
 		// the error page failed to render somehow
 		if(!page_resolved) {
-			return this.dispatcher.dispatch("HTTP 404: The resource cannot be found", 404);
+			return this.dispatch("HTTP 404: The resource cannot be found", 404);
 		}
 	}
 
-	async processPage(handler, options, URL) {
+	async processPage(handler, options, pagePath) {
 		var self = this;
 
 		if(!options) options = {};
@@ -211,11 +230,11 @@ class RequestHandler {
 		var remove_end_slash = options.remove_end_slash;
 
 		if(handler == null) {
-			this.dispatcher.dispatch("No route is available for this page", 404);
+			this.dispatch("No route is available for this page", 404);
 			return RequestHandler.RESOLVED;
 		}
 		if(typeof handler == "string") { // redirection
-			this.dispatcher.dispatch(null, null, { redirect: handler });
+			this.dispatch(null, null, { redirect: handler });
 			return RequestHandler.RESOLVED;
 		}
 		if(typeof handler != "object") { // not a valid page type
@@ -227,21 +246,21 @@ class RequestHandler {
 		var method = this.req.method.toUpperCase();
 		var rate_id = await this.server.checkHTTPRateLimit(this.ipAddress, handler, method);
 		if(rate_id !== -1) { // release handle when this request finishes
-			this.compCallbacks.push(function() {
+			this.callbacks.push(function() {
 				self.server.releaseHTTPRateLimit(self.ipAddress, rate_id[0], rate_id[1]);
 			});
 		}
 		this.query_data = querystring.parse(url.parse(this.req.url).query);
 
 		if(!no_login) {
-			this.user = await this.server.globals.getUserInfo(this.cookies, false, this.dispatcher.dispatch.bind(this.dispatcher));
+			this.user = await this.server.globals.getUserInfo(this.cookies, false, this.dispatch.bind(this));
 			this.setTemplateData("user", this.user);
 			// check if user is logged in
 			if(!this.cookies.csrftoken) {
 				var token = this.server.globals.new_token(32);
 				var date = Date.now();
 				// TODO: introduce only for forms
-				this.dispatcher.addCookie("csrftoken=" + token + "; expires=" + http_time(date + this.server.globals.ms.year) + "; path=/;");
+				this.addCookie("csrftoken=" + token + "; expires=" + http_time(date + this.server.globals.ms.year) + "; path=/;");
 				this.user.csrftoken = token;
 			} else {
 				this.user.csrftoken = this.cookies.csrftoken;
@@ -253,22 +272,22 @@ class RequestHandler {
 				this.post_data = dat;
 			}
 		}
-		var URL_mod = URL; // modified url
+		var pagePathMod = pagePath; // modified url
 		// remove end slash if enabled
 		if(remove_end_slash) {
-			URL_mod = removeLastSlash(URL_mod);
+			pagePathMod = removeLastSlash(pagePathMod);
 		}
-		this.path = URL_mod;
+		this.path = pagePathMod;
 		this.referer = this.req.headers.referer;
 		
 		var pageStat;
 		if(handler[method] && this.isValidMethod(method)) {
 			// Return the page
-			pageStat = await handler[method](this.req, this.dispatcher.dispatch.bind(this.dispatcher), this.server.globals, this, {});
+			pageStat = await handler[method](this.req, this.dispatch.bind(this), this.server.globals, this, {});
 		} else {
-			this.dispatcher.dispatch("Method " + method + " not allowed.", 405);
+			this.dispatch("Method " + method + " not allowed.", 405);
 		}
-		if(!this.dispatcher.isResolved()) return RequestHandler.CONTINUE;
+		if(!this.isResolved()) return RequestHandler.CONTINUE;
 		return RequestHandler.RESOLVED;
 	}
 
@@ -290,7 +309,7 @@ class RequestHandler {
 		for(var i = 0; i < page.length; i++) {
 			pageObj = pageObj[page[i]];
 		}
-		await pageObj[method](this.req, this.dispatcher.dispatch, this.server.globals, this, params);
+		await pageObj[method](this.req, this.dispatch, this.server.globals, this, params);
 	}
 
 	// return compiled HTML pages
@@ -309,6 +328,117 @@ class RequestHandler {
 			data[key] = this.templateData[key];
 		}
 		return templates.execute(template, data);
+	}
+
+	dispatch = (data, status_code, params) => {
+		if(this.requestResolved || this.requestEnded) return; // if request response is already sent
+		if(!this.requestStreaming) {
+			this.requestResolved = true;
+		}
+		/* params: {
+			cookie: the cookie data
+			mime: mime type (ex: text/plain)
+			redirect: url to redirect to
+			download_file: force browser to download this file as .txt. specifies its name
+			headers: header data
+		} (all optional)*/
+		var info = {};
+		if(!params) {
+			params = {};
+		}
+		if(typeof params.cookie == "string") {
+			this.cookiesToReturn.push(params.cookie);
+		} else if(typeof params.cookie == "object") {
+			this.cookiesToReturn = this.cookiesToReturn.concat(params.cookie);
+		}
+		if(this.cookiesToReturn.length == 1) {
+			this.cookiesToReturn = this.cookiesToReturn[0];
+		}
+		if(this.cookiesToReturn.length > 0) {
+			info["Set-Cookie"] = this.cookiesToReturn;
+		}
+		if(params.download_file) {
+			info["Content-disposition"] = "attachment; filename=" + params.download_file;
+		}
+		if(Math.floor(status_code / 100) * 100 == 300 || params.redirect !== void 0) { // 3xx status code
+			if(params.redirect) {
+				if(!status_code) {
+					status_code = 302;
+				}
+				info.Location = params.redirect;
+			}
+		}
+		if(params.mime) {
+			info["Content-Type"] = params.mime;
+		}
+		if(params.headers) {
+			for(var i in params.headers) {
+				info[i] = params.headers[i];
+			}
+		}
+		if(!status_code) {
+			status_code = 200;
+		}
+		if(!data) {
+			data = "";
+		}
+		if(this.gzip && (this.encoding.includes("gzip") || this.encoding.includes("*") && !this.requestStreaming)) {
+			var doNotEncode = false;
+			if(data.length < 1450) {
+				doNotEncode = true;
+			}
+			if(typeof params.mime == "string") {
+				if(params.mime.indexOf("text") == -1 && params.mime.indexOf("javascript") == -1 && params.mime.indexOf("json") == -1) {
+					doNotEncode = true;
+				}
+			} else {
+				doNotEncode = true;
+			}
+			if(!doNotEncode) {
+				info["Content-Encoding"] = "gzip";
+				data = zlib.gzipSync(data);
+			}
+		}
+		if(!this.requestStreaming) info["Content-Length"] = Buffer.byteLength(data);
+		this.res.writeHead(status_code, info);
+		if(!this.requestStreaming) {
+			this.res.write(data);
+			this.res.end();
+			this.periodHTTPOutboundBytes += data.length;
+		}
+	}
+
+	isResolved() {
+		return this.requestResolved;
+	}
+	addCookie(cookie) {
+		this.cookiesToReturn.push(cookie);
+	}
+	startStream() {
+		this.requestStreaming = true;
+	}
+	endStream() {
+		if(this.requestResolved || this.requestEnded) return;
+		this.requestResolved = true;
+		this.res.end();
+	}
+	writeStream(data) {
+		if(this.requestResolved || this.requestEnded) return true;
+		if(!this.requestStreaming) return false;
+		var self = this;
+		return new Promise(function(resolve) {
+			self.requestPromises.push(resolve);
+			self.res.write(data, function() {
+				var loc = self.requestPromises.indexOf(resolve);
+				if(loc > -1) {
+					self.requestPromises.splice(loc, 1);
+				} else {
+					return; // already resolved
+				}
+				resolve(self.requestResolved || self.requestEnded);
+			});
+			self.periodHTTPOutboundBytes += data.length;
+		});
 	}
 }
 
@@ -565,27 +695,26 @@ class HTTPServer {
 		return resp;
 	}
 
-	async processRequest(req, res, compCallbacks) {
+	async processRequest(req, res, callbacks) {
 		if(this.isStopping) return;
 
 		var acceptEncoding = this.parseAcceptEncoding(req.headers["accept-encoding"]);
 
-		var dispatcher = new HTTPDispatcher(res, {
+		var handler = new RequestHandler(this, req, res, callbacks, {
 			encoding: acceptEncoding,
 			gzip: this.gzipEnabled
 		});
-		var handler = new RequestHandler(this, dispatcher, req, compCallbacks);
 		await handler.handleRequest();
 	}
 
 	serverRequestCallback(req, res) {
-		var compCallbacks = [];
+		var callbacks = [];
 		var cbExecuted = false;
 		var self = this;
-		this.processRequest(req, res, compCallbacks).then(function() {
+		this.processRequest(req, res, callbacks).then(function() {
 			cbExecuted = true;
-			for(var i = 0; i < compCallbacks.length; i++) {
-				var cb = compCallbacks[i];
+			for(var i = 0; i < callbacks.length; i++) {
+				var cb = callbacks[i];
 				cb();
 			}
 		}).catch(function(e) {
@@ -596,8 +725,8 @@ class HTTPServer {
 				if(cbExecuted) {
 					console.log("An error has occurred while executing request callbacks");
 				} else {
-					for(var i = 0; i < compCallbacks.length; i++) {
-						var cb = compCallbacks[i];
+					for(var i = 0; i < callbacks.length; i++) {
+						var cb = callbacks[i];
 						cb();
 					}
 				}
@@ -640,149 +769,7 @@ class HTTPServer {
 	}
 }
 
-class HTTPDispatcher {
-	encoding = null;
-	gzip = false;
-	res = null;
-
-	requestResolved = false;
-	requestStreaming = false;
-	requestEnded = false;
-	requestPromises = [];
-	cookiesToReturn = [];
-
-	constructor(res, opts) {
-		this.res = res;
-		this.encoding = opts.encoding;
-		if(!this.encoding) {
-			this.encoding = [];
-		}
-		this.gzip = !!opts.gzip;
-		var self = this;
-		res.on("close", function() {
-			self.requestEnded = true;
-			for(var i = 0; i < self.requestPromises.length; i++) {
-				var prom = self.requestPromises[i];
-				prom();
-			}
-		});
-	}
-
-	dispatch = (data, status_code, params) => {
-		if(this.requestResolved || this.requestEnded) return; // if request response is already sent
-		if(!this.requestStreaming) {
-			this.requestResolved = true;
-		}
-		/* params: {
-			cookie: the cookie data
-			mime: mime type (ex: text/plain)
-			redirect: url to redirect to
-			download_file: force browser to download this file as .txt. specifies its name
-			headers: header data
-		} (all optional)*/
-		var info = {};
-		if(!params) {
-			params = {};
-		}
-		if(typeof params.cookie == "string") {
-			this.cookiesToReturn.push(params.cookie);
-		} else if(typeof params.cookie == "object") {
-			this.cookiesToReturn = this.cookiesToReturn.concat(params.cookie);
-		}
-		if(this.cookiesToReturn.length == 1) {
-			this.cookiesToReturn = this.cookiesToReturn[0];
-		}
-		if(this.cookiesToReturn.length > 0) {
-			info["Set-Cookie"] = this.cookiesToReturn;
-		}
-		if(params.download_file) {
-			info["Content-disposition"] = "attachment; filename=" + params.download_file;
-		}
-		if(Math.floor(status_code / 100) * 100 == 300 || params.redirect !== void 0) { // 3xx status code
-			if(params.redirect) {
-				if(!status_code) {
-					status_code = 302;
-				}
-				info.Location = params.redirect;
-			}
-		}
-		if(params.mime) {
-			info["Content-Type"] = params.mime;
-		}
-		if(params.headers) {
-			for(var i in params.headers) {
-				info[i] = params.headers[i];
-			}
-		}
-		if(!status_code) {
-			status_code = 200;
-		}
-		if(!data) {
-			data = "";
-		}
-		if(this.gzip && (this.encoding.includes("gzip") || this.encoding.includes("*") && !this.requestStreaming)) {
-			var doNotEncode = false;
-			if(data.length < 1450) {
-				doNotEncode = true;
-			}
-			if(typeof params.mime == "string") {
-				if(params.mime.indexOf("text") == -1 && params.mime.indexOf("javascript") == -1 && params.mime.indexOf("json") == -1) {
-					doNotEncode = true;
-				}
-			} else {
-				doNotEncode = true;
-			}
-			if(!doNotEncode) {
-				info["Content-Encoding"] = "gzip";
-				data = zlib.gzipSync(data);
-			}
-		}
-		if(!this.requestStreaming) info["Content-Length"] = Buffer.byteLength(data);
-		this.res.writeHead(status_code, info);
-		if(!this.requestStreaming) {
-			this.res.write(data);
-			this.res.end();
-			this.periodHTTPOutboundBytes += data.length;
-		}
-	}
-
-
-	isResolved() {
-		return this.requestResolved;
-	}
-	addCookie(cookie) {
-		this.cookiesToReturn.push(cookie);
-	}
-	startStream() {
-		this.requestStreaming = true;
-	}
-	endStream() {
-		if(this.requestResolved || this.requestEnded) return;
-		this.requestResolved = true;
-		this.res.end();
-	}
-	writeStream(data) {
-		if(this.requestResolved || this.requestEnded) return true;
-		if(!this.requestStreaming) return false;
-		var self = this;
-		return new Promise(function(resolve) {
-			self.requestPromises.push(resolve);
-			self.res.write(data, function() {
-				var loc = self.requestPromises.indexOf(resolve);
-				if(loc > -1) {
-					self.requestPromises.splice(loc, 1);
-				} else {
-					return; // already resolved
-				}
-				resolve(self.requestResolved || self.requestEnded);
-			});
-			self.periodHTTPOutboundBytes += data.length;
-		});
-	}
-}
-
 module.exports = {
 	RequestHandler,
-	HTTPServer,
-	HTTPDispatcher
+	HTTPServer
 };
