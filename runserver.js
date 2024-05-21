@@ -2269,8 +2269,6 @@ async function start_server() {
 
 	createEndpoints(httpServer);
 
-	serverLoaded = true;
-
 	if(settings.monitor && settings.monitor.enabled) {
 		setupMonitorServer();
 	}
@@ -2303,6 +2301,9 @@ async function start_server() {
 	});
 
 	await sysLoad(); // initialize the subsystems (tile database; chat manager)
+
+	serverLoaded = true;
+
 	var plugin = loadPlugin(true);
 	if(plugin && plugin.main) {
 		plugin.main(global_data);
@@ -2406,13 +2407,6 @@ function stopServer(restart, maintenance) {
 
 		try {
 			if(serverLoaded) {
-				for(var i in pages) {
-					var mod = pages[i];
-					if(mod.server_exit) {
-						await mod.server_exit();
-					}
-				}
-
 				for(var i in subsystems) {
 					var sys = subsystems[i];
 					if(sys.server_exit) {
