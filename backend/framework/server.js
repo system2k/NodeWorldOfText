@@ -4,6 +4,7 @@ const url = require("url");
 const crypto = require("crypto");
 const querystring = require("querystring");
 const isIP = require("net").isIP;
+const zlib = require("zlib");
 
 const templates = require("./templates.js");
 const utils = require("../utils/utils.js");
@@ -126,12 +127,12 @@ class RequestHandler {
 	async handleRequest() {
 		var hostname = this.parseHostname(this.req.headers.host);
 	
-		var URLparse = url.parse(this.req.url);
+		var URLparse = new URL(this.req.url, "http://example.com");
 		var URL = URLparse.pathname;
 		if(URL.charAt(0) == "/") { URL = URL.slice(1); }
 		try {
 			URL = decodeURIComponent(URL);
-		} catch (e) {};
+		} catch (e) {}
 	
 		if(hostname.length == 1 && this.server.validSubdomains.indexOf(hostname[0]) > -1) {
 			URL = "other/" + hostname[0] + "/" + URL;
@@ -152,10 +153,10 @@ class RequestHandler {
 			if(deniedPages.siteAccessNote) {
 				deny_notes = deniedPages.siteAccessNote;
 			}
-			res.writeHead(403);
-			return res.end(templates.execute(templates.getFile("denied.html"), {
+			this.dispatcher.dispatch(this.render("denied.html", {
 				deny_notes
-			}));
+			}), 403);
+			return;
 		}
 
 		this.cookies = parseCookie(this.req.headers.cookie);

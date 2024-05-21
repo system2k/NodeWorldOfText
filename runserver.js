@@ -21,7 +21,6 @@ const util        = require("util");
 const WebSocket   = require("ws");
 const worker      = require("node:worker_threads");
 const zip         = require("adm-zip");
-const zlib        = require("zlib");
 
 const bin_packet   = require("./backend/utils/bin_packet.js");
 const utils        = require("./backend/utils/utils.js");
@@ -1138,7 +1137,8 @@ function createEndpoints(server) {
 	server.registerEndpoint("static/*", pages.static, { no_login: true });
 	server.registerEndpoint("static", pages.static, { no_login: true });
 
-	server.registerEndpoint(/^([\w\/\.\-\~]*)$/g, pages.yourworld, { remove_end_slash: true });
+	// match all ASCII symbols and Unicode-defined letters
+	server.registerEndpoint(/^([\u0021-\u007E\p{L}]*)$/gu, pages.yourworld, { remove_end_slash: true });
 
 	server.registerErrorEndpoint(404, pages["404"]);
 	server.registerErrorEndpoint(500, pages["500"]);
@@ -1880,9 +1880,12 @@ async function manageWebsocketConnection(ws, req) {
 		localFilter: true
 	};
 
-	var parsedURL = url.parse(req.url);
+	var parsedURL = new URL(req.url, "ws://example.com/ws");
 	var location = parsedURL.pathname;
-	var search = querystring.parse(parsedURL.query);
+	try {
+		location = decodeURIComponent(location);
+	} catch(e) {}
+	var search = new URLSearchParams(parsedURL.query);
 
 	var bytesWritten = 0;
 	var bytesRead = 0;
@@ -2040,11 +2043,11 @@ async function manageWebsocketConnection(ws, req) {
 
 	var ctx = {
 		user, channel,
-		keyQuery: search.key,
+		keyQuery: search.get("key"),
 		world: null
 	};
 
-	if(search.hide == "1") {
+	if(search.get("hide") == "1") {
 		ws.sdata.hide_user_count = true;
 	}
 
@@ -2055,7 +2058,7 @@ async function manageWebsocketConnection(ws, req) {
 	}
 
 	var permission = await canViewWorld(world, user, {
-		memKey: search.key
+		memKey: search.get("key")
 	});
 	if(ws.sdata.terminated) return;
 	if(!permission) {
@@ -2063,7 +2066,7 @@ async function manageWebsocketConnection(ws, req) {
 	}
 
 	ws.sdata.userClient = true; // client connection is now initialized
-	ws.sdata.keyQuery = search.key;
+	ws.sdata.keyQuery = search.get("key");
 	
 	ctx.world = world;
 
