@@ -137,6 +137,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var db = server.db;
 	var wss = server.wss;
 	var checkCSRF = server.checkCSRF;
+	var uvias = server.uvias;
 
 	if(!user.authenticated) {
 		return write(null, 403);
@@ -149,7 +150,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 
 	var message = null;
 	if(post_data.form == "claim") {
-		if(user.uv_rank == 3) { // TODO: use rank table in uvias db
+		if(user.uv_rank == uvias.getRankIdByName("guests")) {
 			return await callPage("accounts/profile", {
 				message: "Guests cannot claim worlds"
 			});

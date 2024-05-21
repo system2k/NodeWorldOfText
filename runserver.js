@@ -323,6 +323,8 @@ class UviasClient {
 		runningRun: 0
 	}
 
+	ranksCache = {};
+
 	id = null;
 	name = null;
 	domain = null;
@@ -361,6 +363,21 @@ class UviasClient {
 		uvias.stats.runningRun++;
 		await pgConn.query(query, data);
 		uvias.stats.runningRun--;
+	}
+
+	async loadRanks() {
+		this.ranksCache = {};
+		var data = await this.all("SELECT * FROM accounts.ranks");
+		for(var i = 0; i < data.length; i++) {
+			var rank = data[i];
+			var id = rank.id;
+			var name = rank.name;
+			this.ranksCache[name] = id;
+		}
+	}
+
+	getRankIdByName(name) {
+		return this.ranksCache[name];
 	}
 }
 
@@ -812,7 +829,7 @@ function setupHTTPServer() {
 	httpServer.setDefaultTemplateData("loginPath", loginPath);
 	httpServer.setDefaultTemplateData("logoutPath", logoutPath);
 	httpServer.setDefaultTemplateData("registerPath", registerPath);
-	httpServer.setDefaultTemplateData("loginPath", profilePath);
+	httpServer.setDefaultTemplateData("profilePath", profilePath);
 	httpServer.setDefaultTemplateData("accountSystem", accountSystem);
 	var staticVersion = getClientVersion();
 	if(staticVersion) {
@@ -824,6 +841,12 @@ function setupHTTPServer() {
 
 async function initializeServer() {
 	console.log("Starting server...");
+
+	if(accountSystem == "uvias") {
+		setupUvias();
+		await uvias_init();
+		global_data.uvias = uvias;
+	}
 
 	loadDbSystems();
 	setupStaticShortcuts();
@@ -844,12 +867,6 @@ async function initializeServer() {
 
 	global_data.checkCSRF = httpServer.checkCSRF;
 	global_data.createCSRF = httpServer.createCSRF;
-	
-	if(accountSystem == "uvias") {
-		setupUvias();
-		await uvias_init();
-		global_data.uvias = uvias;
-	}
 
 	if(accountSystem == "local") {
 		await loadEmail();
@@ -1302,36 +1319,6 @@ async function getUserInfo(cookies, is_websocket, dispatch) {
 	}
 	return user;
 }
-/*
-function checkHTTPRestr(list, ipVal, ipFam) {
-	var resp = {
-		siteAccess: false,
-		siteAccessNote: null
-	};
-	if(!list) return resp;
-	for(var i = 0; i < list.length; i++) {
-		var item = list[i];
-
-		var ip = item.ip;
-		if(ip) {
-			var riRange = ip[0];
-			var riFam = ip[1];
-			if(riFam != ipFam) continue;
-			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
-		} else {
-			continue;
-		}
-
-		var type = item.type;
-		var mode = item.mode;
-		if(type == "daccess" && mode == "site") {
-			var note = item.note;
-			resp.siteAccessNote = note;
-			resp.siteAccess = true;
-		}
-	}
-	return resp;
-}*/
 
 process.on("unhandledRejection", function(reason) {
 	console.log("Unhandled promise rejection!\n" + Date.now());
@@ -1608,6 +1595,8 @@ async function uvias_init() {
 		return;
 	}
 	await uviasSendIdentifier();
+
+	await uvias.loadRanks();
 
 	await uvias.run("LISTEN uv_kick");
 	await uvias.run("LISTEN uv_sess_renew");

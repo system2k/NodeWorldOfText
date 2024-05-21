@@ -11,38 +11,12 @@ const frameUtils = require("../framework/utils.js");
 const ipaddress = require("../framework/ipaddress.js");
 const restrictions = require("../utils/restrictions.js");
 
-var removeLastSlash = utils.removeLastSlash;
 var parseCookie = frameUtils.parseCookie;
-var evaluateIpAddress = ipaddress.evaluateIpAddress;
+
+var removeLastSlash = utils.removeLastSlash;
 var http_time = utils.http_time;
 
-
-
-
-/*class AuthManager {
-	hashAlgorithm = "sha512WithRSAEncryption";
-
-	encryptHash(pass, salt) {
-		if(!salt) {
-			salt = crypto.randomBytes(10).toString("hex");
-		}
-		var hsh = crypto.createHmac(this.hashAlgorithm, salt).update(pass).digest("hex");
-		var hash = this.hashAlgorithm + "$" + salt + "$" + hsh;
-		return hash;
-	}
-	
-	checkHash(hash, pass) {
-		if(typeof pass !== "string") return false;
-		if(typeof hash !== "string") return false;
-		hash = hash.split("$");
-		if(hash.length !== 3) return false;
-		return this.encryptHash(pass, hash[1]) === hash.join("$");
-	}
-
-	async localLogin(username, password) {
-
-	}
-}*/
+var evaluateIpAddress = ipaddress.evaluateIpAddress;
 
 class RequestHandler {
 	server = null;
