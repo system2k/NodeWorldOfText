@@ -145,13 +145,13 @@ var httpServer;
 var wss; // websocket handler
 var uvias;
 var monitorWorker;
-var clientVersion = "";
 var pgConn; // postgreSQL connection for Uvias
 var intv = {}; // intervals and timeouts
 var pluginMgr = null;
 var serverStartTime = Date.now();
 var transporter;
 var email_available = true;
+var prompt_stopped = false;
 var db,
 	db_edits,
 	db_chat,
@@ -168,6 +168,7 @@ CONST.tileArea = CONST.tileCols * CONST.tileRows;
 // 3 levels: world_id -> tile_y -> tile_x
 var memTileCache = {};
 
+var clientVersion = "";
 var ranks_cache = { users: {} };
 var restr_cache = "";
 var restr_cg1_cache = "";
@@ -1032,7 +1033,6 @@ async function account_prompt(isUvias) {
 	}
 }
 
-var prompt_stopped = false;
 async function promptCommand() {
 	var input = await prompt.ask(">> ");
 	if(input == "stop") {

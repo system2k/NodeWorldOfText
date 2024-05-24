@@ -215,6 +215,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 		return write(null, 403);
 	}
 
+	// TODO: relocate these declarations
 	ctx.world = world;
 	ctx.isHTTP = true;
 
