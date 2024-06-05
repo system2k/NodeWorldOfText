@@ -344,25 +344,25 @@ class UviasClient {
 
 	async all(query, data) {
 		if(data != void 0 && !Array.isArray(data)) data = [data];
-		uvias.stats.runningAll++;
+		this.stats.runningAll++;
 		var result = await pgConn.query(query, data);
-		uvias.stats.runningAll--;
+		this.stats.runningAll--;
 		return result.rows;
 	}
 	
 	async get(query, data) {
 		if(data != void 0 && !Array.isArray(data)) data = [data];
-		uvias.stats.runningGet++;
+		this.stats.runningGet++;
 		var result = await pgConn.query(query, data);
-		uvias.stats.runningGet--;
+		this.stats.runningGet--;
 		return result.rows[0];
 	}
 	
 	async run(query, data) {
 		if(data != void 0 && !Array.isArray(data)) data = [data];
-		uvias.stats.runningRun++;
+		this.stats.runningRun++;
 		await pgConn.query(query, data);
-		uvias.stats.runningRun--;
+		this.stats.runningRun--;
 	}
 
 	async loadRanks() {

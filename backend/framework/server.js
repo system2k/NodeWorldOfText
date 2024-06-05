@@ -404,7 +404,7 @@ class RequestHandler {
 		if(!this.requestStreaming) {
 			this.res.write(data);
 			this.res.end();
-			this.periodHTTPOutboundBytes += data.length;
+			this.server.periodHTTPOutboundBytes += data.length;
 		}
 	}
 
@@ -437,7 +437,7 @@ class RequestHandler {
 				}
 				resolve(self.requestResolved || self.requestEnded);
 			});
-			self.periodHTTPOutboundBytes += data.length;
+			self.server.periodHTTPOutboundBytes += data.length;
 		});
 	}
 }
