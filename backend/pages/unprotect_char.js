@@ -1,7 +1,7 @@
 module.exports.POST = async function(req, write, server, ctx) {
-	var callPage = server.callPage;
+	var callPage = ctx.callPage;
 	await callPage("protect", {
 		unprotect: true,
 		char: true
-	}, req, write, server, ctx, "POST");
+	}, "POST");
 }

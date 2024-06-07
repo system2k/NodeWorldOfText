@@ -4,8 +4,8 @@ var calculateTimeDiff = utils.calculateTimeDiff;
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var render = ctx.render;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
-	var callPage = server.callPage;
 	var db = server.db;
 	var wss = server.wss;
 	var ranks_cache = server.ranks_cache;
@@ -19,7 +19,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 
 	// not a superuser...
 	if(!user.superuser) {
-		return await callPage("404", null, req, write, server, ctx);
+		return await callPage("404");
 	}
 
 	var client_num = 0;
@@ -95,8 +95,8 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 module.exports.POST = async function(req, write, server, ctx) {
 	var post_data = ctx.post_data;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
-	var callPage = server.callPage;
 	var announce = server.announce;
 	var db = server.db;
 	var db_misc = server.db_misc;
@@ -108,7 +108,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var updateServerSetting = server.updateServerSetting;
 
 	if(!user.superuser) {
-		return await callPage("404", null, req, write, server, ctx);
+		return await callPage("404");
 	}
 
 	var csrftoken = post_data.csrfmiddlewaretoken;
@@ -151,7 +151,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	
 		return await callPage("admin/administrator", {
 			announcement_update_msg: "Announcement updated"
-		}, req, write, server, ctx);
+		});
 	}
 	if("manage_server" in post_data) {
 		if(!user.operator) return;
@@ -174,5 +174,5 @@ module.exports.POST = async function(req, write, server, ctx) {
 		}
 		return;
 	}
-	return await callPage("admin/administrator", null, req, write, server, ctx);
+	return await callPage("admin/administrator");
 }

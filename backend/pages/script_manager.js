@@ -1,14 +1,14 @@
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var render = ctx.render;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
-	var callPage = server.callPage;
 	var db = server.db;
 	var createCSRF = server.createCSRF;
 
 	// not staff
 	if(!user.staff) {
-		return await callPage("404", null, req, write, server, ctx);
+		return await callPage("404");
 	}
 
 	var scripts = [];
@@ -34,9 +34,9 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 module.exports.POST = async function(req, write, server, ctx) {
 	var post_data = ctx.post_data;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
 	var db = server.db;
-	var callPage = server.callPage;
 	var checkCSRF = server.checkCSRF;
 
 	if(!user.staff) {
@@ -56,7 +56,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	if(exists) {
 		return await callPage("script_manager", {
 			message: "The script already exists"
-		}, req, write, server, ctx);
+		});
 	}
 
 	await db.run("INSERT INTO scripts VALUES(null, ?, ?, '', ?, 0)",
@@ -64,5 +64,5 @@ module.exports.POST = async function(req, write, server, ctx) {
 
 	await callPage("script_manager", {
 		message: "Script created successfully"
-	}, req, write, server, ctx);
+	});
 }

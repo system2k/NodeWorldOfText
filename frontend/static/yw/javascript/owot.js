@@ -7482,6 +7482,7 @@ function reapplyProperties(props) {
 	styles.owner_text = theme.ownerText || themeDefaults.owner_text;
 
 	menu_color(styles.menu);
+	checkTextColorOverride();
 
 	state.worldModel.writability = props.writability;
 	state.worldModel.readability = props.readability;

@@ -4,15 +4,15 @@ var create_date = utils.create_date;
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var render = ctx.render;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
 	var db = server.db;
-	var callPage = server.callPage;
 	var uvias = server.uvias;
 	var db_misc = server.db_misc;
 	var accountSystem = server.accountSystem;
 
 	if(!user.operator) {
-		return await callPage("404", null, req, write, server, ctx);
+		return await callPage("404");
 	}
 	
 	var users = [];

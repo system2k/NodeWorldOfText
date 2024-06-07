@@ -5,15 +5,15 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var path = ctx.path;
 	var render = ctx.render;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
 	var db = server.db;
-	var callPage = server.callPage;
 	var uvias = server.uvias;
 	var db_misc = server.db_misc;
 	var accountSystem = server.accountSystem;
 
 	if(!user.superuser) {
-		return await callPage("404", null, req, write, server, ctx);
+		return await callPage("404");
 	}
 
 	var username = checkURLParam("/administrator/users/by_username/:username", path).username;

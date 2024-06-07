@@ -19,6 +19,7 @@ function normalize_ipv6(ip) {
 	return ip.join(":");
 }
 
+// TODO: move this elsewhere
 var cloudflare_ipv4_txt = fs.readFileSync("./backend/cloudflare_ipv4.txt").toString();
 var cloudflare_ipv6_txt = fs.readFileSync("./backend/cloudflare_ipv6.txt").toString();
 
@@ -155,6 +156,72 @@ function is_cf_ipv6_int(num) {
 ipv4_txt_to_int();
 ipv6_txt_to_int();
 
+
+function evaluateIpAddress(remIp, realIp, cfIp) {
+	var ipAddress = remIp;
+	var ipAddressFam = 4;
+	var ipAddressVal = 1;
+	if(!ipAddress) { // ipv4
+		ipAddress = "0.0.0.0";
+	} else {
+		if(ipAddress.indexOf(".") > -1) { // ipv4
+			ipAddress = ipAddress.split(":").slice(-1);
+			ipAddress = ipAddress[0];
+			ipAddressVal = ipv4_to_int(ipAddress);
+		} else { // ipv6
+			ipAddressFam = 6;
+			ipAddress = normalize_ipv6(ipAddress);
+			ipAddressVal = ipv6_to_int(ipAddress);
+		}
+	}
+
+	if(ipAddress == "127.0.0.1" && realIp) {
+		ipAddress = realIp;
+		if(ipAddress.indexOf(".") > -1) {
+			ipAddressFam = 4;
+		} else {
+			ipAddressFam = 6;
+			ipAddress = normalize_ipv6(ipAddress);
+		}
+		if(ipAddressFam == 4) {
+			ipAddressVal = ipv4_to_int(ipAddress);
+			if(is_cf_ipv4_int(ipAddressVal)) {
+				ipAddress = cfIp;
+				if(!ipAddress) {
+					ipAddress = "0.0.0.0";
+				}
+				if(ipAddress.indexOf(".") > -1) {
+					ipAddressFam = 4;
+					ipAddressVal = ipv4_to_int(ipAddress);
+				} else {
+					ipAddressFam = 6;
+					ipAddress = normalize_ipv6(ipAddress);
+					ipAddressVal = ipv6_to_int(ipAddress);
+				}
+			}
+		} else if(ipAddressFam == 6) {
+			ipAddressVal = ipv6_to_int(ipAddress);
+			if(is_cf_ipv6_int(ipAddressVal)) {
+				ipAddress = cfIp;
+				if(!ipAddress) {
+					ipAddress = "0.0.0.0";
+				}
+				if(ipAddress.indexOf(".") > -1) {
+					ipAddressFam = 4;
+					ipAddressVal = ipv4_to_int(ipAddress);
+				} else {
+					ipAddressFam = 6;
+					ipAddress = normalize_ipv6(ipAddress);
+					ipAddressVal = ipv6_to_int(ipAddress);
+				}
+			}
+		}
+	}
+	return [ipAddress, ipAddressFam, ipAddressVal];
+}
+
+
+
 module.exports = {
 	normalize_ipv6,
 	ipv4_to_int,
@@ -162,5 +229,6 @@ module.exports = {
 	ipv4_to_range,
 	ipv6_to_range,
 	is_cf_ipv4_int,
-	is_cf_ipv6_int
+	is_cf_ipv6_int,
+	evaluateIpAddress
 };
