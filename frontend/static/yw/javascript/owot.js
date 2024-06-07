@@ -3509,6 +3509,8 @@ function setupLinkElement() {
 		} else if(prot == "action") { // built-in client command
 			runClientCommand(url, currentSelectedLinkCoords);
 			return false;
+		} else if(prot == "tooltip") { // custom tooltip, do nothing
+			return false;
 		}
 		if(secureLink && !e.ctrlKey) {
 			if((isMainPage() && charInfo.protection == 0) && !isSafeHostname(linkParams.host)) {
@@ -3590,7 +3592,7 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 			linkElm.rel = "noopener noreferrer";
 			var linkProtocol = linkElm.protocol.toLowerCase();
 			linkParams.host = "";
-			var validProtocols = ["javascript:", "com:", "comu:", "action:", "http:", "https:"];
+			var validProtocols = ["javascript:", "com:", "comu:", "action:", "tooltip:", "http:", "https:"];
 			if(validProtocols.includes(linkProtocol)) {
 				linkParams.protocol = linkProtocol.slice(0, -1);
 				var url = URL_Link.slice(linkProtocol.length);
@@ -3605,6 +3607,9 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 				}
 				if(linkProtocol == "action:") {
 					linkElm.title = "action:" + url;
+				}
+				else if(linkProtocol == "tooltip:") {
+					linkElm.title = url;
 				}
 			}
 			if(!linkElm.title) linkElm.title = "Link to URL " + linkElm.href;
