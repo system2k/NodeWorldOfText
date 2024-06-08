@@ -1885,7 +1885,7 @@ async function manageWebsocketConnection(ws, req) {
 	try {
 		location = decodeURIComponent(location);
 	} catch(e) {}
-	var search = new URLSearchParams(parsedURL.query);
+	var search = parsedURL.searchParams;
 
 	var bytesWritten = 0;
 	var bytesRead = 0;
