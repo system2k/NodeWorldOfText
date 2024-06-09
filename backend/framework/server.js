@@ -63,6 +63,23 @@ class RequestHandler {
 		return valid_methods.indexOf(mtd) > -1;
 	}
 
+	countLeadingSlashes(path) {
+		var cnt = 0;
+		for(var i = 0; i < path.length; i++) {
+			if(path.charAt(i) != "/") break;
+			cnt++;
+		}
+		return cnt;
+	}
+
+	normalizePath(path) {
+		if(path.charAt(0) == "/") { path = path.slice(1); }
+		try {
+			path = decodeURIComponent(path);
+		} catch (e) {}
+		return path;
+	}
+
 	constructor(server, req, res, callbacks, opts) {
 		var self = this;
 		this.server = server;
@@ -146,12 +163,14 @@ class RequestHandler {
 	async handleRequest() {
 		var hostname = this.parseHostname(this.req.headers.host);
 	
-		var URLparse = new URL(this.req.url, "http://example.com");
-		var pagePath = URLparse.pathname;
-		if(pagePath.charAt(0) == "/") { pagePath = pagePath.slice(1); }
-		try {
-			pagePath = decodeURIComponent(pagePath);
-		} catch (e) {}
+		var rawUrl = this.req.url;
+		var leadingSlashes = this.countLeadingSlashes(this.req.url);
+		if(leadingSlashes > 1) { 
+			this.dispatch(null, null, { redirect: "/" + rawUrl.slice(leadingSlashes) });
+			return;
+		}
+		var parsedUrl = new URL(this.req.url, "http://example.com");
+		var pagePath = this.normalizePath(parsedUrl.pathname);
 	
 		if(hostname.length == 1 && this.server.validSubdomains.indexOf(hostname[0]) > -1) {
 			pagePath = "other/" + hostname[0] + "/" + pagePath;

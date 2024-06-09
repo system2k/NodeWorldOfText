@@ -1961,6 +1961,9 @@ async function manageWebsocketConnection(ws, req) {
 		}
 		evictClient();
 	});
+	ws.on("close", function() {
+		evictClient();
+	});
 
 	// TODO: may not fire in all cases
 	function updateNetworkStats() {
@@ -2030,9 +2033,6 @@ async function manageWebsocketConnection(ws, req) {
 	}
 	ws.on("message", pre_message);
 
-	ws.on("close", function() {
-		evictClient();
-	});
 	if(ws.sdata.terminated) return; // in the event of an immediate close
 
 	var cookies = parseCookie(req.headers.cookie);
