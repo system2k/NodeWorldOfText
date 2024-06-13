@@ -295,7 +295,8 @@ defineElements({ // elm[<name>]
 	erase_region_once: byId("erase_region_once"),
 	erase_region_mult: byId("erase_region_mult"),
 	erase_region_ctrl: byId("erase_region_ctrl"),
-	erase_region_snap: byId("erase_region_snap")
+	erase_region_snap: byId("erase_region_snap"),
+	link_tooltip: byId("link_tooltip")
 });
 
 function setRGBColorPicker(r, g, b) {
@@ -3509,6 +3510,8 @@ function setupLinkElement() {
 		} else if(prot == "action") { // built-in client command
 			runClientCommand(url, currentSelectedLinkCoords);
 			return false;
+		} else if(prot == "note") {
+			return false;
 		}
 		if(secureLink && !e.ctrlKey) {
 			if((isMainPage() && charInfo.protection == 0) && !isSafeHostname(linkParams.host)) {
@@ -3567,6 +3570,30 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 		if(!closest(evt.target, elm.main_view) && evt.target != linkDiv) return;
 	}
 	var link = getLink(tileX, tileY, charX, charY);
+	if(link && linksEnabled && link.type == "url" && link.url.startsWith("note:")) {
+		var tooltip = link.url.slice("note:".length).trim();
+		elm.link_tooltip.style.display = "";
+		if(elm.link_tooltip.innerText != tooltip) {
+			// there may be performance gains, but we really don't know for sure
+			elm.link_tooltip.innerText = tooltip;
+		}
+		var posX = mouseX + 15;
+		var posY = mouseY + 25;
+		if(posX < 0) posX = 0;
+		if(posY < 0) posY = 0;
+		if(posX + elm.link_tooltip.offsetWidth >= window.innerWidth) {
+			posX = window.innerWidth - elm.link_tooltip.offsetWidth;
+		}
+		if(posY + elm.link_tooltip.offsetHeight >= window.innerHeight) {
+			posY = window.innerHeight - elm.link_tooltip.offsetHeight;
+		}
+		elm.link_tooltip.style.transform = `translate(${posX}px, ${posY}px)`;
+		elm.owot.style.cursor = "help";
+		return;
+	} else {
+		elm.link_tooltip.style.display = "none";
+		elm.owot.style.cursor = defaultCursor;
+	}
 	if(safe) {
 		if(!link) return;
 		if(link.type != "coord") return;
