@@ -215,7 +215,7 @@ register_chat_comamnd("warp", function(args) {
 	resetUI();
 	stopPasting();
 	if(address.charAt(0) == "/") address = address.substr(1);
-	state.worldModel.pathname = "/" + address;
+	state.worldModel.pathname = address ? "/" + address : "";
 	ws_path = createWsPath();
 	w.changeSocket(ws_path, true);
 	getWorldProps(address, "props", function(props, error) {
