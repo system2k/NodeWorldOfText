@@ -1,6 +1,6 @@
 var utils = require("../../utils/utils.js");
 var checkURLParam = utils.checkURLParam;
-var templates = require("../../utils/templates.js");
+var templates = require("../../framework/templates.js");
 
 module.exports.GET = async function(req, write, server, ctx) {
 	var path = ctx.path;

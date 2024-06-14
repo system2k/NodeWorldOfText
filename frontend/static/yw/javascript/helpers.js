@@ -387,6 +387,7 @@ function html_tag_esc(str, non_breaking_space, newline_br) {
 	str = str.replace(/\</g, "&lt;");
 	str = str.replace(/\>/g, "&gt;");
 	str = str.replace(/\0/g, " ");
+	if(str.indexOf(">") > -1 || str.indexOf("<") > -1) return "";
 	if(newline_br) {
 		str = str.replace(/\r\n/g, "<br>");
 		str = str.replace(/\n/g, "<br>");
@@ -402,7 +403,6 @@ function html_tag_esc(str, non_breaking_space, newline_br) {
 	str = str.replace(/\\/g, "&#x5C;");
 	str = str.replace(/\=/g, "&#61;");
 	if(non_breaking_space) str = str.replace(/\u0020/g, "&nbsp;");
-	if(str.indexOf(">") > -1 || str.indexOf("<") > -1) return "";
 	return str;
 }
 

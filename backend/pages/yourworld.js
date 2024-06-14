@@ -15,18 +15,18 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var user = ctx.user;
 	var render = ctx.render;
 	var setCallback = ctx.setCallback;
+	var callPage = ctx.callPage;
 
-	var callPage = server.callPage;
 	var db = server.db;
 	var modules = server.modules;
-	var loadString = server.loadString;
 	var accountSystem = server.accountSystem;
 	var createCSRF = server.createCSRF;
+	var getServerSetting = server.getServerSetting;
 
 	var world_name = path;
 
 	var world = await getOrCreateWorld(world_name);
-	if(!world) return await callPage("404", null, req, write, server, ctx);
+	if(!world) return await callPage("404");
 	
 	setCallback(function() {
 		releaseWorld(world);
@@ -39,7 +39,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		var privNote = world.opts.privNote;
 		return await callPage("accounts/private", {
 			privateWorldMsg: privNote
-		}, req, write, server, ctx);
+		});
 	}
 
 	if(query_data.fetch == 1) { // fetch request
@@ -93,7 +93,8 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		var write_int = world.opts.writeInt;
 		if(write_int == -1) write_int = 1000;
 
-		var announcement = loadString("announcement");
+		var announcement = getServerSetting("announcement");
+		var isGlobalEnabled = getServerSetting("chatGlobalEnabled") == "1";
 
 		var state = {
 			userModel: {
@@ -123,7 +124,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 				char_rate: char_rate,
 				write_interval: write_int,
 				no_copy: world.opts.noCopy,
-				no_chat_global: world.opts.noChatGlobal
+				no_chat_global: world.opts.noChatGlobal || !isGlobalEnabled
 			}
 		};
 		if(CONST.tileRows != 8) {
@@ -214,6 +215,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 		return write(null, 403);
 	}
 
+	// TODO: relocate these declarations
 	ctx.world = world;
 	ctx.isHTTP = true;
 

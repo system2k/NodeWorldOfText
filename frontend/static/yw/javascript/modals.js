@@ -661,7 +661,6 @@ Modal.prototype.addTab = function(id, title) {
 			formTitle: this.formTitle,
 			formField: this.formField,
 			formInputs: this.formInputs,
-			hasSubmitted: this.hasSubmitted,
 			cbField: this.cbField,
 			cbList: this.cbList,
 			cbCallback: this.cbCallback
@@ -697,7 +696,6 @@ Modal.prototype.addTab = function(id, title) {
 			formTitle: null,
 			formField: null,
 			formInputs: [],
-			hasSubmitted: false,
 			cbField: null,
 			cbList: [],
 			cbCallback: null
@@ -754,7 +752,7 @@ Modal.prototype.focusTab = function(id) {
 	this.formTitle = curr.formTitle;
 	this.formField = curr.formField;
 	this.formInputs = curr.formInputs;
-	this.hasSubmitted = curr.hasSubmitted;
+	this.hasSubmitted = false;
 	this.cbField = curr.cbField;
 	this.cbList = curr.cbList;
 	this.cbCallback = curr.cbCallback;

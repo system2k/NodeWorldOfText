@@ -756,6 +756,7 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	}
 
 	var isLink = false;
+	var isTooltip = false;
 
 	// check if this char is a link
 	if(linksRendered && linkType) {
@@ -764,6 +765,9 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 			linkColor = defaultURLLinkColor;
 		} else if(linkType == "coord") {
 			linkColor = defaultCoordLinkColor;
+		} else if(linkType == "note") {
+			isLink = false;
+			isTooltip = true;
 		}
 	}
 
@@ -782,6 +786,16 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	// underline link
 	if(isLink) {
 		textRender.fillRect(fontX, Math.floor(fontY + textYOffset + zoom), cellW, lineDecoHeight);
+		hasDrawn = true;
+	} else if(isTooltip) {
+		textRender.beginPath();
+		textRender.setLineDash([zoom, zoom]);
+		textRender.lineWidth = zoom;
+		textRender.strokeStyle = textRender.fillStyle;
+		textRender.moveTo(fontX, Math.floor(fontY + textYOffset + zoom) + 0.5 * zoom);
+		textRender.lineTo(fontX + cellW, Math.floor(fontY + textYOffset + zoom) + 0.5 * zoom);
+		textRender.stroke();
+		textRender.setLineDash([]);
 		hasDrawn = true;
 	}
 
@@ -1095,6 +1109,9 @@ function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, off
 			var cellLinkType = null;
 			if(tileColProps && tileColProps.link) {
 				cellLinkType = tileColProps.link.type;
+				if(tileColProps.link.type == "url" && tileColProps.link.url.startsWith("note:")) {
+					cellLinkType = "note";
+				}
 			}
 			var protValue = writability;
 			if(tile.properties.char) {

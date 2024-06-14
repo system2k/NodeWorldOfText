@@ -1,5 +1,17 @@
 var fs = require("fs");
 
+function toHex64(n) {
+	var a = new BigUint64Array(1);
+	a[0] = BigInt(n);
+	return a[0].toString(16);
+}
+
+function toInt64(n) {
+	var a = new BigInt64Array(1);
+	a[0] = BigInt("0x" + n);
+	return a[0];
+}
+
 function trimHTML(html) {
 	// ensure all lines are \r\n instead of just \n (consistent)
 	html = html.replace(/\r\n/g, "\n");
@@ -105,75 +117,6 @@ function trimSlash(text) {
 	return text;
 }
 
-function parseCookie(input) {
-	if(!input) input = "";
-	var out = {};
-
-	var mode = 0; // 0 = key, 1 = value
-	var buffer_k = ""; // key
-	var buffer_v = ""; // value
-
-	for(var i = 0; i < input.length; i++) {
-		var chr = input.charAt(i);
-
-		var sSkip = false; // jump over char buffer
-
-		// check for value assignments
-		if(chr == "=" && mode == 0) {
-			mode = 1;
-			sSkip = true;
-		}
-
-		// char buffer
-		if(chr != ";" && !sSkip) {
-			if(mode == 0) {
-				buffer_k += chr;
-			}
-			if(mode == 1) {
-				buffer_v += chr;
-			}
-		}
-
-		// check ending of each key/value
-		if(chr == ";" || i == input.length - 1) {
-			mode = 0;
-
-			// trim whitespaces from beginning and end
-			buffer_k = buffer_k.trim();
-			buffer_v = buffer_v.trim();
-
-			var valid = true;
-
-			// ignore empty sets
-			if(buffer_k == "" && buffer_v == "") {
-				valid = false;
-			}
-
-			if(valid) {
-				// strip quotes (if any)
-				if(buffer_k.charAt(0) == "\"" && buffer_k.charAt(buffer_k.length - 1) == "\"") buffer_k = buffer_k.slice(1, -1);
-				if(buffer_v.charAt(0) == "\"" && buffer_v.charAt(buffer_v.length - 1) == "\"") buffer_v = buffer_v.slice(1, -1);
-
-				// invalid escape sequences can cause errors
-				try {
-					buffer_k = decodeURIComponent(buffer_k);
-				} catch(e){}
-				try {
-					buffer_v = decodeURIComponent(buffer_v);
-				} catch(e){}
-
-				// no overrides from sets with the same key
-				if(!(buffer_k in out)) out[buffer_k] = buffer_v;
-			}
-
-			buffer_k = "";
-			buffer_v = "";
-		}
-	}
-
-	return out;
-}
-
 // trim whitespaces in all items in array
 function ar_str_trim(ar) {
 	for(var i = 0; i < ar.length; i++) {
@@ -233,14 +176,8 @@ function tile_coord(coord) {
 	return [parseInt(coord[0]), parseInt(coord[1])];
 }
 
-// todo: move to server
-var start_time = Date.now();
-function uptime(custom_ms_ago) {
-	// (milliseconds ago)
-	var difference = custom_ms_ago || (Date.now() - start_time);
-
+function calculateTimeDiff(difference) {
 	var str = "";
-
 	var days = Math.floor(difference / 86400000);
 	difference -= days * 86400000;
 	var hours = Math.floor(difference / 3600000);
@@ -797,6 +734,7 @@ function html_tag_esc(str, non_breaking_space, newline_br) {
 	str = str.replace(/\</g, "&lt;");
 	str = str.replace(/\>/g, "&gt;");
 	str = str.replace(/\0/g, " ");
+	if(str.indexOf(">") > -1 || str.indexOf("<") > -1) return "";
 	if(newline_br) {
 		str = str.replace(/\r\n/g, "<br>");
 		str = str.replace(/\n/g, "<br>");
@@ -812,7 +750,6 @@ function html_tag_esc(str, non_breaking_space, newline_br) {
 	str = str.replace(/\\/g, "&#x5C;");
 	str = str.replace(/\=/g, "&#61;");
 	if(non_breaking_space) str = str.replace(/\u0020/g, "&nbsp;");
-	if(str.indexOf(">") > -1 || str.indexOf("<") > -1) return "";
 	return str;
 }
 
@@ -825,19 +762,6 @@ function sanitize_color(col) {
 	if(col < 0) col = 0;
 	if(col > 16777215) col = 16777215;
 	return col;
-}
-
-function parseAcceptEncoding(str) {
-	if(!str) return [];
-	var res = [];
-	str = str.split(",");
-	for(var i = 0; i < str.length; i++) {
-		var encoding = str[i];
-		encoding = encoding.split(";")[0];
-		encoding = encoding.trim();
-		res.push(encoding);
-	}
-	return res;
 }
 
 function arrayIsEntirely(arr, elm) {
@@ -902,7 +826,6 @@ module.exports = {
 	san_nbr,
 	san_dp,
 	removeLastSlash,
-	parseCookie,
 	ar_str_trim,
 	ar_str_decodeURI,
 	http_time,
@@ -910,7 +833,7 @@ module.exports = {
 	decode_base64,
 	process_error_arg,
 	tile_coord,
-	uptime,
+	calculateTimeDiff,
 	compareNoCase,
 	resembles_int_number,
 	TerminalMessage,
@@ -921,11 +844,12 @@ module.exports = {
 	change_char_in_array,
 	html_tag_esc,
 	sanitize_color,
-	parseAcceptEncoding,
 	dump_dir,
 	arrayIsEntirely,
 	normalizeCacheTile,
 	checkURLParam,
 	trimSlash,
-	checkDuplicateCookie
+	checkDuplicateCookie,
+	toHex64,
+	toInt64
 };

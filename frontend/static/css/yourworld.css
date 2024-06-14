@@ -487,6 +487,22 @@ a:visited {
 .modal-tab-btn:hover {
 	background-color: rgb(212 212 235);
 }
+.tooltip {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	background-color: #243030;
+	color: white;
+	font-family: Verdana, Arial;
+	font-size: 0.8em;
+	border: solid 1px #ff6363;
+	padding: 4px 7px 4px 7px;
+	pointer-events: none;
+	max-width: 90%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
 .chat_emote {
 	background: url(/static/emotes.png);
 	background-size: auto 100%;

@@ -32,9 +32,9 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 module.exports.POST = async function(req, write, server, ctx) {
 	var post_data = ctx.post_data;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
 	var db = server.db;
-	var callPage = server.callPage;
 	var encryptHash = server.encryptHash;
 	var accountSystem = server.accountSystem;
 	
@@ -111,7 +111,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 			 username: form_username_errors.length > 0 ? "" : username,
 			 email: form_email_errors.length > 0 ? "" : email,
 			 password: form_password1_errors.length > 0 ? "" : password1
-		 }, req, write, server, ctx);
+		 });
 	}
 
 	var date = Date.now();
@@ -127,5 +127,5 @@ module.exports.POST = async function(req, write, server, ctx) {
 		username: username,
 		password: password1,
 		registered: true
-	}, req, write, server, ctx, "POST");
+	}, "POST");
 }

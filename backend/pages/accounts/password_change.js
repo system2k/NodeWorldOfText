@@ -20,9 +20,9 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 module.exports.POST = async function(req, write, server, ctx) {
 	var post_data = ctx.post_data;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
 	var db = server.db;
-	var callPage = server.callPage;
 	var checkHash = server.checkHash;
 	var encryptHash = server.encryptHash;
 
@@ -39,19 +39,19 @@ module.exports.POST = async function(req, write, server, ctx) {
 	if(!valid) {
 		return await callPage("accounts/password_change", {
 			error: "Your old password was entered incorrectly. Please enter it again."
-		}, req, write, server, ctx);
+		});
 	}
 
 	if(confirm_pass_1 != confirm_pass_2) {
 		return await callPage("accounts/password_change", {
 			error: "The passwords do not match."
-		}, req, write, server, ctx);
+		});
 	}
 
 	if(confirm_pass_1.length < 3 || confirm_pass_1.length > 128) {
 		return await callPage("accounts/password_change", {
 			error: "The new password must be 3 - 128 characters."
-		}, req, write, server, ctx);
+		});
 	}
 
 	var new_hash = encryptHash(confirm_pass_1);

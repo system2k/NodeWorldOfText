@@ -3,7 +3,6 @@
 **  Est. May 1, 2016 as Your World of Text Node, and November 19, 2016 as Node World of Text
 **  Reprogrammed September 17, 2017
 **  Released October 8, 2017 as Our World of Text
-**  This is the main file
 */
 
 console.log("Starting up...");
@@ -12,7 +11,6 @@ const crypto      = require("crypto");
 const fs          = require("fs");
 const http        = require("http");
 const https       = require("https");
-const isIP        = require("net").isIP;
 const nodemailer  = require("nodemailer");
 const path        = require("path");
 const pg          = require("pg");
@@ -23,15 +21,16 @@ const util        = require("util");
 const WebSocket   = require("ws");
 const worker      = require("node:worker_threads");
 const zip         = require("adm-zip");
-const zlib        = require("zlib");
 
 const bin_packet   = require("./backend/utils/bin_packet.js");
 const utils        = require("./backend/utils/utils.js");
-const templates    = require("./backend/utils/templates.js");
 const rate_limiter = require("./backend/utils/rate_limiter.js");
-const ipaddress    = require("./backend/utils/ipaddress.js");
+const ipaddress    = require("./backend/framework/ipaddress.js");
 const prompt       = require("./backend/utils/prompt.js");
 const restrictions = require("./backend/utils/restrictions.js");
+const frameUtils   = require("./backend/framework/utils.js");
+const serverUtil   = require("./backend/framework/server.js");
+const templates    = require("./backend/framework/templates.js");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -39,7 +38,6 @@ var san_nbr              = utils.san_nbr;
 var san_dp               = utils.san_dp;
 var checkURLParam        = utils.checkURLParam;
 var removeLastSlash      = utils.removeLastSlash;
-var parseCookie          = utils.parseCookie;
 var ar_str_trim          = utils.ar_str_trim;
 var ar_str_decodeURI     = utils.ar_str_decodeURI;
 var http_time            = utils.http_time;
@@ -47,7 +45,7 @@ var encode_base64        = utils.encode_base64;
 var decode_base64        = utils.decode_base64;
 var process_error_arg    = utils.process_error_arg;
 var tile_coord           = utils.tile_coord;
-var uptime               = utils.uptime;
+var calculateTimeDiff    = utils.calculateTimeDiff;
 var compareNoCase        = utils.compareNoCase;
 var resembles_int_number = utils.resembles_int_number;
 var TerminalMessage      = utils.TerminalMessage;
@@ -55,13 +53,16 @@ var encodeCharProt       = utils.encodeCharProt;
 var decodeCharProt       = utils.decodeCharProt;
 var change_char_in_array = utils.change_char_in_array;
 var html_tag_esc         = utils.html_tag_esc;
-var parseAcceptEncoding  = utils.parseAcceptEncoding;
 var dump_dir             = utils.dump_dir;
 var arrayIsEntirely      = utils.arrayIsEntirely;
 var normalizeCacheTile   = utils.normalizeCacheTile;
 var checkDuplicateCookie = utils.checkDuplicateCookie;
 var advancedSplit        = utils.advancedSplit;
 var filterEdit           = utils.filterEdit;
+var toHex64              = utils.toHex64;
+var toInt64              = utils.toInt64;
+
+var parseCookie = frameUtils.parseCookie;
 
 var normalize_ipv6 = ipaddress.normalize_ipv6;
 var ipv4_to_int    = ipaddress.ipv4_to_int;
@@ -93,11 +94,11 @@ initializeDirectoryStruct();
 const settings = require(SETTINGS_PATH);
 
 var serverPort     = settings.port;
-var serverDB       = settings.paths.database;
-var editsDB        = settings.paths.edits;
-var chatDB         = settings.paths.chat_history;
-var imageDB        = settings.paths.images;
-var miscDB         = settings.paths.misc;
+var serverDBPath   = settings.paths.database;
+var editsDBPath    = settings.paths.edits;
+var chatDBPath     = settings.paths.chat_history;
+var imageDBPath    = settings.paths.images;
+var miscDBPath     = settings.paths.misc;
 var staticNumsPath = settings.paths.static_shortcuts;
 var restrPath      = settings.paths.restr;
 var restrCg1Path   = settings.paths.restr_cg1;
@@ -108,14 +109,22 @@ var logoutPath = "/accounts/logout/";
 var registerPath = "/accounts/register/";
 var profilePath = "/accounts/profile/";
 
+var sql_table_init = "./backend/default.sql";
+var sql_indexes_init = "./backend/indexes.sql";
+var sql_edits_init = "./backend/edits.sql";
+
+var serverSettings = {
+	announcement: "",
+	chatGlobalEnabled: "1"
+};
+var serverSettingsStatus = {};
+
 if(accountSystem != "uvias" && accountSystem != "local") {
 	console.log("ERROR: Invalid account system: " + accountSystem);
 	sendProcMsg("EXIT");
 	process.exit();
 }
 
-Error.stackTraceLimit = 1024;
-var gzipEnabled = false;
 var shellEnabled = true;
 
 var isTestServer = false;
@@ -124,17 +133,30 @@ var testUviasIds = false;
 var serverLoaded = false;
 var isStopping = false;
 
-var valid_subdomains = []; // e.g. ["test"]
 var closed_client_limit = 1000 * 60 * 20; // 20 min
 var ws_req_per_second = 1000;
 var pw_encryption = "sha512WithRSAEncryption";
+var connections_per_ip = 50;
+var static_path = "./frontend/static/";
+var static_path_web = "static/";
+var templates_path = "./frontend/templates/";
 
+var httpServer;
 var wss; // websocket handler
+var uvias;
 var monitorWorker;
-var clientVersion = "";
 var pgConn; // postgreSQL connection for Uvias
 var intv = {}; // intervals and timeouts
 var pluginMgr = null;
+var serverStartTime = Date.now();
+var transporter;
+var email_available = true;
+var prompt_stopped = false;
+var db,
+	db_edits,
+	db_chat,
+	db_img,
+	db_misc;
 
 // Global
 CONST = {};
@@ -146,8 +168,8 @@ CONST.tileArea = CONST.tileCols * CONST.tileRows;
 // 3 levels: world_id -> tile_y -> tile_x
 var memTileCache = {};
 
+var clientVersion = "";
 var ranks_cache = { users: {} };
-var announcement_cache = "";
 var restr_cache = "";
 var restr_cg1_cache = "";
 var restr_update = null;
@@ -157,6 +179,9 @@ var client_cursor_pos = {};
 var client_ips = {};
 var ip_address_conn_limit = {}; // {ip: count}
 var ip_address_req_limit = {}; // {ip: ws_limits} // TODO: Cleanup objects
+var staticShortcuts = {};
+var template_data = {}; // data used by the server
+var static_data = {}; // return static server files
 
 console.log("Loaded libs");
 
@@ -193,6 +218,10 @@ function loadShellFile() {
 	return file;
 }
 
+function getServerUptime() {
+	return Date.now() - serverStartTime;
+}
+
 function getClientVersion() {
 	return clientVersion;
 }
@@ -204,17 +233,6 @@ function setClientVersion(ver) {
 		clientVersion = "";
 	}
 	return true;
-}
-
-// temporary solution - TODO: make more secure
-var csrfkeys = [Math.floor(Date.now() / 86400000).toString(), crypto.randomBytes(8)];
-function createCSRF(userid, kclass) {
-	var csrftoken = crypto.createHmac("sha1", csrfkeys[kclass]).update(userid.toString()).digest("hex").toLowerCase();
-	return csrftoken;
-}
-function checkCSRF(token, userid, kclass) {
-	if(typeof token != "string" || !token) return false;
-	return token.toLowerCase() == createCSRF(userid, kclass);
 }
 
 function handle_error(e, doLog) {
@@ -246,6 +264,7 @@ process.argv.forEach(function(a) {
 	}
 });
 
+// only accessible through modifying shell.js in the data directory - no web interface ever used to enter commands
 async function runShellScript(includeColors) {
 	var shellFile = loadShellFile();
 	if(shellFile == null) {
@@ -297,86 +316,114 @@ if(accountSystem == "uvias") {
 	pg.defaults.database = settings.pg_db.database || "uvias";
 }
 
-var uvias = {
-	stats: {
+class UviasClient {
+	stats = {
 		runningAll: 0,
 		runningGet: 0,
 		runningRun: 0
 	}
-};
 
-uvias.all = async function(query, data) {
-	if(data != void 0 && !Array.isArray(data)) data = [data];
-	uvias.stats.runningAll++;
-	var result = await pgConn.query(query, data);
-	uvias.stats.runningAll--;
-	return result.rows;
+	ranksCache = {};
+
+	id = null;
+	name = null;
+	domain = null;
+	private = null;
+	only_verified = null;
+	custom_css_file_path = null;
+
+	paths = {
+		sso: null,
+		logout: null,
+		address: null,
+		loginPath: null,
+		logoutPath: null,
+		registerPath: null,
+		profilePath: null
+	};
+
+	async all(query, data) {
+		if(data != void 0 && !Array.isArray(data)) data = [data];
+		this.stats.runningAll++;
+		var result = await pgConn.query(query, data);
+		this.stats.runningAll--;
+		return result.rows;
+	}
+	
+	async get(query, data) {
+		if(data != void 0 && !Array.isArray(data)) data = [data];
+		this.stats.runningGet++;
+		var result = await pgConn.query(query, data);
+		this.stats.runningGet--;
+		return result.rows[0];
+	}
+	
+	async run(query, data) {
+		if(data != void 0 && !Array.isArray(data)) data = [data];
+		this.stats.runningRun++;
+		await pgConn.query(query, data);
+		this.stats.runningRun--;
+	}
+
+	async loadRanks() {
+		this.ranksCache = {};
+		var data = await this.all("SELECT * FROM accounts.ranks");
+		for(var i = 0; i < data.length; i++) {
+			var rank = data[i];
+			var id = rank.id;
+			var name = rank.name;
+			this.ranksCache[name] = id;
+		}
+	}
+
+	getRankIdByName(name) {
+		return this.ranksCache[name];
+	}
 }
 
-uvias.get = async function(query, data) {
-	if(data != void 0 && !Array.isArray(data)) data = [data];
-	uvias.stats.runningGet++;
-	var result = await pgConn.query(query, data);
-	uvias.stats.runningGet--;
-	return result.rows[0];
-}
+function setupUvias() {
+	uvias = new UviasClient();
 
-uvias.run = async function(query, data) {
-	if(data != void 0 && !Array.isArray(data)) data = [data];
-	uvias.stats.runningRun++;
-	await pgConn.query(query, data);
-	uvias.stats.runningRun--;
-}
+	if(testUviasIds) {
+		uvias.id = "owottest";
+		uvias.name = "Our World Of Text Test Server";
+		uvias.domain = "test.ourworldoftext.com";
+		uvias.private = true;
+		uvias.only_verified = false;
+		uvias.custom_css_file_path = settings.paths.uvias_css;
+	} else {
+		uvias.id = "owot";
+		uvias.name = "Our World Of Text";
+		uvias.domain = "ourworldoftext.com";
+		uvias.private = false;
+		uvias.only_verified = false;
+		uvias.custom_css_file_path = settings.paths.uvias_css;
+	}
 
-if(testUviasIds) {
-	uvias.id = "owottest";
-	uvias.name = "Our World Of Text Test Server";
-	uvias.domain = "test.ourworldoftext.com";
-	uvias.private = true;
-	uvias.only_verified = false;
-	uvias.custom_css_file_path = settings.paths.uvias_css;
-} else {
-	uvias.id = "owot";
-	uvias.name = "Our World Of Text";
-	uvias.domain = "ourworldoftext.com";
-	uvias.private = false;
-	uvias.only_verified = false;
-	uvias.custom_css_file_path = settings.paths.uvias_css;
-}
+	if(uvias.custom_css_file_path) {
+		uvias.custom_css_file_path = path.resolve(uvias.custom_css_file_path);
+	}
 
-if(uvias.custom_css_file_path) {
-	uvias.custom_css_file_path = path.resolve(uvias.custom_css_file_path);
-}
 
-uvias.sso = "/accounts/sso";
-// redirect to /accounts/logout/ to clear token cookie
-uvias.logout = "/accounts/logout/?return=" + "/home/";
-uvias.address = "https://uvias.com";
-uvias.loginPath = uvias.address + "/api/loginto/" + uvias.id;
-uvias.logoutPath = uvias.address + "/logoff?service=" + uvias.id;
-uvias.registerPath = uvias.address + "/api/loginto/" + uvias.id + "#create";
-uvias.profilePath = uvias.address + "/profile/@me";
-if(accountSystem == "uvias") {
-	loginPath = uvias.loginPath;
-	logoutPath = uvias.logoutPath;
-	registerPath = uvias.registerPath;
-	profilePath = uvias.profilePath;
-}
-
-function toHex64(n) {
-	var a = new BigUint64Array(1);
-	a[0] = BigInt(n);
-	return a[0].toString(16);
-}
-
-function toInt64(n) {
-	var a = new BigInt64Array(1);
-	a[0] = BigInt("0x" + n);
-	return a[0];
+	uvias.paths.sso = "/accounts/sso";
+	// redirect to /accounts/logout/ to clear token cookie
+	uvias.paths.logout = "/accounts/logout/?return=" + "/home/";
+	uvias.paths.address = "https://uvias.com";
+	uvias.paths.loginPath = uvias.paths.address + "/api/loginto/" + uvias.id;
+	uvias.paths.logoutPath = uvias.paths.address + "/logoff?service=" + uvias.id;
+	uvias.paths.registerPath = uvias.paths.address + "/api/loginto/" + uvias.id + "#create";
+	uvias.paths.profilePath = uvias.paths.address + "/profile/@me";
+	if(accountSystem == "uvias") {
+		loginPath = uvias.paths.loginPath;
+		logoutPath = uvias.paths.logoutPath;
+		registerPath = uvias.paths.registerPath;
+		profilePath = uvias.paths.profilePath;
+	}
 }
 
 if(isTestServer) {
 	serverPort = settings.test_port;
+	Error.stackTraceLimit = 128;
 }
 
 function log_error(err) {
@@ -391,20 +438,6 @@ function log_error(err) {
 	}
 }
 
-var database,
-	edits_db,
-	chat_history,
-	image_db,
-	misc_db;
-function setupDatabases() {
-	database = new sql.Database(serverDB);
-	edits_db = new sql.Database(editsDB);
-	chat_history = new sql.Database(chatDB);
-	image_db = new sql.Database(imageDB);
-	misc_db = new sql.Database(miscDB);
-}
-
-var staticShortcuts = {};
 function setupStaticShortcuts() {
 	if(!staticNumsPath) return;
 	var data;
@@ -429,14 +462,6 @@ function setupStaticShortcuts() {
 	}
 }
 
-var static_path = "./frontend/static/";
-var static_path_web = "static/";
-
-var template_data = {}; // data used by the server
-var templates_path = "./frontend/templates/";
-
-var static_data = {}; // return static server files
-
 templates.registerFilter("plural", function(count, string) {
 	if(!string) return "";
 	if(count != 1) {
@@ -451,7 +476,7 @@ templates.registerFilter("plural", function(count, string) {
 	return string;
 });
 
-function load_static() {
+function loadStatic() {
 	for(var i in template_data) {
 		delete template_data[i];
 	}
@@ -472,12 +497,8 @@ function load_static() {
 	}
 }
 
-var sql_table_init = "./backend/default.sql";
-var sql_indexes_init = "./backend/indexes.sql";
-var sql_edits_init = "./backend/edits.sql";
-
-var zip_file;
 function setupZipLog() {
+	var zip_file;
 	if(!fs.existsSync(settings.paths.zip_log)) {
 		zip_file = new zip();
 	} else {
@@ -597,28 +618,35 @@ var renameWorld = subsystems.world_mgr.renameWorld;
 var canViewWorld = subsystems.world_mgr.canViewWorld;
 var getWorldNameFromCacheById = subsystems.world_mgr.getWorldNameFromCacheById;
 
-function asyncDbSystem(database) {
-	const db = {
-		// gets data from the database (only 1 row at a time)
-		get: function(command, args) {
-			if(args == void 0 || args == null) args = [];
-			return new Promise(function(r, rej) {
-				database.get(command, args, function(err, res) {
-					if(err) {
-						return rej({
-							sqlite_error: process_error_arg(err),
-							input: { command, args }
-						});
-					}
-					r(res);
-				});
+class AsyncDBManager {
+	database = null;
+	constructor(_db) {
+		this.database = _db;
+	}
+
+	// gets data from the database (only 1 row at a time)
+	async get(command, args) {
+		var self = this;
+		if(args == void 0 || args == null) args = [];
+		return new Promise(function(r, rej) {
+			self.database.get(command, args, function(err, res) {
+				if(err) {
+					return rej({
+						sqlite_error: process_error_arg(err),
+						input: { command, args }
+					});
+				}
+				r(res);
 			});
-		},
-		// runs a command (insert, update, etc...) and might return "lastID" if needed
-		run: function(command, args) {
-			if(args == void 0 || args == null) args = [];
+		});
+	}
+
+	// runs a command (insert, update, etc...) and might return "lastID" if needed
+	async run(command, args) {
+		var self = this;
+		if(args == void 0 || args == null) args = [];
 			return new Promise(function(r, rej) {
-				database.run(command, args, function(err, res) {
+				self.database.run(command, args, function(err, res) {
 					if(err) {
 						return rej({
 							sqlite_error: process_error_arg(err),
@@ -632,12 +660,14 @@ function asyncDbSystem(database) {
 					r(info);
 				});
 			});
-		},
-		// gets multiple rows in one command
-		all: function(command, args) {
-			if(args == void 0 || args == null) args = [];
+	}
+
+	// gets multiple rows in one command
+	async all(command, args) {
+		var self = this;
+		if(args == void 0 || args == null) args = [];
 			return new Promise(function(r, rej) {
-				database.all(command, args, function(err, res) {
+				self.database.all(command, args, function(err, res) {
 					if(err) {
 						return rej({
 							sqlite_error: process_error_arg(err),
@@ -647,69 +677,69 @@ function asyncDbSystem(database) {
 					r(res);
 				});
 			});
-		},
-		// get multiple rows but execute a function for every row
-		each: function(command, args, callbacks) {
-			if(typeof args == "function") {
-				callbacks = args;
-				args = [];
-			}
-			var def = callbacks;
-			var callback_error = false;
-			var cb_err_desc = "callback_error";
-			callbacks = function(e, data) {
-				try {
-					def(data);
-				} catch(e) {
-					callback_error = true;
-					cb_err_desc = e;
-				}
-			}
-			return new Promise(function(r, rej) {
-				database.each(command, args, callbacks, function(err, res) {
-					if(err) return rej({
-						sqlite_error: process_error_arg(err),
-						input: { command, args }
-					});
-					if(callback_error) return rej(cb_err_desc);
-					r(res);
-				});
-			});
-		},
-		// like run, but executes the command as a SQL file
-		// (no comments allowed, and must be semicolon separated)
-		exec: function(command) {
-			return new Promise(function(r, rej) {
-				database.exec(command, function(err) {
-					if(err) {
-						return rej({
-							sqlite_error: process_error_arg(err),
-							input: { command }
-						});
-					}
-					r(true);
-				});
-			});
+	}
+
+	// get multiple rows but execute a function for every row
+	async each(command, args, callbacks) {
+		var self = this;
+		if(typeof args == "function") {
+			callbacks = args;
+			args = [];
 		}
-	};
-	return db;
+		var def = callbacks;
+		var callback_error = false;
+		var cb_err_desc = "callback_error";
+		callbacks = function(e, data) {
+			try {
+				def(data);
+			} catch(e) {
+				callback_error = true;
+				cb_err_desc = e;
+			}
+		}
+		return new Promise(function(r, rej) {
+			self.database.each(command, args, callbacks, function(err, res) {
+				if(err) return rej({
+					sqlite_error: process_error_arg(err),
+					input: { command, args }
+				});
+				if(callback_error) return rej(cb_err_desc);
+				r(res);
+			});
+		});
+	}
+
+	// like run, but executes the command as a SQL file
+	// (no comments allowed, and must be semicolon separated)
+	async exec(command) {
+		var self = this;
+		return new Promise(function(r, rej) {
+			self.database.exec(command, function(err) {
+				if(err) {
+					return rej({
+						sqlite_error: process_error_arg(err),
+						input: { command }
+					});
+				}
+				r(true);
+			});
+		});
+	}
 }
 
-var db,
-	db_edits,
-	db_ch,
-	db_img,
-	db_misc
 function loadDbSystems() {
-	db = asyncDbSystem(database);
-	db_edits = asyncDbSystem(edits_db);
-	db_ch = asyncDbSystem(chat_history);
-	db_img = asyncDbSystem(image_db);
-	db_misc = asyncDbSystem(misc_db);
-}
+	var database = new sql.Database(serverDBPath);
+	var edits_db = new sql.Database(editsDBPath);
+	var chat_history = new sql.Database(chatDBPath);
+	var image_db = new sql.Database(imageDBPath);
+	var misc_db = new sql.Database(miscDBPath);
 
-var transporter;
-var email_available = true;
+	db = new AsyncDBManager(database);
+	db_edits = new AsyncDBManager(edits_db);
+	db_chat = new AsyncDBManager(chat_history);
+	db_img = new AsyncDBManager(image_db);
+	db_misc = new AsyncDBManager(misc_db);
+}
 
 async function loadEmail() {
 	if(!settings.email.enabled) return;
@@ -792,20 +822,36 @@ async function fetchCloudflareIPs(ip_type) {
 	});
 }
 
-var valid_methods = ["GET", "POST", "HEAD", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"];
-function valid_method(mtd) {
-	return valid_methods.indexOf(mtd) > -1;
+function setupHTTPServer() {
+	httpServer = new serverUtil.HTTPServer(settings.port, global_data);
+
+	httpServer.setPageTree(pages);
+	httpServer.setDefaultTemplateData("loginPath", loginPath);
+	httpServer.setDefaultTemplateData("logoutPath", logoutPath);
+	httpServer.setDefaultTemplateData("registerPath", registerPath);
+	httpServer.setDefaultTemplateData("profilePath", profilePath);
+	httpServer.setDefaultTemplateData("accountSystem", accountSystem);
+	var staticVersion = getClientVersion();
+	if(staticVersion) {
+		staticVersion = "?v=" + staticVersion;
+	}
+	httpServer.setDefaultTemplateData("staticVersion", staticVersion);
 }
 
-async function initialize_server() {
+
+async function initializeServer() {
 	console.log("Starting server...");
 
-	setupDatabases();
-	setupStaticShortcuts();
-	load_static();
-	setupZipLog();
+	if(accountSystem == "uvias") {
+		setupUvias();
+		await uvias_init();
+		global_data.uvias = uvias;
+	}
+
 	loadDbSystems();
-	manage_https();
+	setupStaticShortcuts();
+	loadStatic();
+	setupZipLog();
 	setupHTTPServer();
 
 	await initialize_misc_db();
@@ -817,11 +863,10 @@ async function initialize_server() {
 	global_data.db_img = db_img;
 	global_data.db_misc = db_misc;
 	global_data.db_edits = db_edits;
-	global_data.db_ch = db_ch;
-	
-	if(accountSystem == "uvias") {
-		await uvias_init();
-	}
+	global_data.db_chat = db_chat;
+
+	global_data.checkCSRF = httpServer.checkCSRF;
+	global_data.createCSRF = httpServer.createCSRF;
 
 	if(accountSystem == "local") {
 		await loadEmail();
@@ -988,8 +1033,7 @@ async function account_prompt(isUvias) {
 	}
 }
 
-var prompt_stopped = false;
-async function command_prompt() {
+async function promptCommand() {
 	var input = await prompt.ask(">> ");
 	if(input == "stop") {
 		return stopServer();
@@ -1001,12 +1045,12 @@ async function command_prompt() {
 		return stopServer(false, true);
 	}
 	if(input == "sta") {
-		load_static();
-		return command_prompt();
+		loadStatic();
+		return promptCommand();
 	}
 	if(input == "help") {
 		console.log("stop: close server\nres: restart\nmaint: maintenance mode\nsta: reload templates and static files");
-		return command_prompt();
+		return promptCommand();
 	}
 	// REPL
 	try {
@@ -1015,7 +1059,7 @@ async function command_prompt() {
 		console.dir(e, { colors: true });
 	}
 	if(prompt_stopped) return;
-	command_prompt();
+	promptCommand();
 }
 
 //Time in milliseconds
@@ -1031,349 +1075,101 @@ var ms = {
 	decade: 315569520000
 };
 
-var http_rate_limits = [ // function ; hold limit ; [method]
-	[pages.accounts.login, 2],
-	[pages.accounts.logout, 2],
-	[pages.accounts.register, 1],
-	[pages.accounts.profile, 2, "GET"],
-	[pages.accounts.profile, 10, "POST"],
-	[pages.accounts.configure, 2],
-	[pages.accounts.member_autocomplete, 4],
-	[pages.accounts.download, 2],
-	[pages.accounts.tabular, 2],
-	[pages.accounts.sso, 3],
-	[pages.protect, 16],
-	[pages.unprotect, 16],
-	[pages.protect_char, 16],
-	[pages.unprotect_char, 16],
-	[pages.coordlink, 16],
-	[pages.urllink, 16],
-	[pages.yourworld, 16, "POST"],
-	[pages.yourworld, 6, "GET"],
-	[pages.world_style, 2],
-	[pages.world_props, 2]
-];
-
-var http_req_holds = {}; // ip/identifier -> {"<index>": {holds: <number>, resp: [<promises>,...]},...}
-
 intv.release_stuck_requests = setInterval(function() {
-	var currentTime = Date.now();
-	for(var ip in http_req_holds) {
-		for(var http_idx in http_req_holds[ip]) {
-			var rateLimData = http_req_holds[ip][http_idx];
-			var startTimes = rateLimData.startTimeById;
-			for(var id in startTimes) {
-				var start = startTimes[id];
-				if(start == -1) continue;
-				if(currentTime - start >= 1000 * 60) {
-					release_http_rate_limit(ip, parseInt(http_idx), parseInt(id));
-				}
-			}
-		}
-	}
+	httpServer.releaseStuckRequests();
 }, 1000 * 60);
 
-function check_http_rate_limit(ip, func, method) {
-	var idx = -1;
-	var max = 0;
-	for(var i = 0; i < http_rate_limits.length; i++) {
-		var line = http_rate_limits[i];
-		var lf = line[0]; // function
-		var lc = line[1]; // number of requests at a time to process
-		var lm = line[2]; // method (optional)
-		if(lf != func) continue;
-		if(lm && lm != method) continue;
-		idx = i;
-		max = lc;
-		break;
-	}
-	if(idx == -1) return -1;
-	if(!http_req_holds[ip]) {
-		http_req_holds[ip] = {};
-	}
-	var holdObj = http_req_holds[ip];
-	if(!holdObj[idx]) {
-		holdObj[idx] = {
-			holds: 1,
-			max,
-			resp: [],
-			maxId: 1,
-			startTimeById: {}
-		};
-		var id = holdObj[idx].maxId++;
-		holdObj[idx].startTimeById[id] = Date.now();
-		return [idx, id];
-	}
-	var obj = holdObj[idx];
-	if(obj.holds >= max) {
-		// there are too many requests in queue.
-		// we want this request to wait for those requests to finish first.
-		// since this request hasn't executed yet, we do not increment 'holds'
-		// until this request is ready to be executed.
-		var id = obj.maxId++;
-		obj.startTimeById[id] = -1;
-		return new Promise(function(res) {
-			obj.resp.push([res, idx, id]);
-		});
-	}
-	obj.holds++;
-	var id = obj.maxId++;
-	obj.startTimeById[id] = Date.now();
-	return [idx, id];
-}
+function createEndpoints(server) {
+	server.registerEndpoint("favicon.ico", "/static/favicon.png", { no_login: true });
+	server.registerEndpoint("robots.txt", "/static/robots.txt", { no_login: true });
+	server.registerEndpoint("home", pages.home);
+	server.registerEndpoint(".well-known/*", null);
 
-function release_http_rate_limit(ip, http_idx, id) {
-	var obj = http_req_holds[ip];
-	if(!obj) return;
-	var lim = obj[http_idx];
-	if(!lim) return;
-	if(!lim.startTimeById[id]) return; // already released
-	delete lim.startTimeById[id];
-	lim.holds--;
-	var diff = lim.max - lim.holds;
-	if(lim.holds <= 0) { // failsafe
-		diff = lim.resp.length;
-		lim.holds = 0;
-	}
-	for(var i = 0; i < diff; i++) {
-		var funcData = lim.resp[0];
-		if(!funcData) continue;
-		var func = funcData[0];
-		var funcIdx = funcData[1];
-		var funcId = funcData[2];
-		if(lim.holds < lim.max) {
-			lim.holds++;
-			lim.startTimeById[funcId] = Date.now();
-			func([funcIdx, funcId]);
-			lim.resp.splice(0, 1);
-		}
-	}
-	// no holds for this particular HTTP route
-	if(!lim.holds && !lim.resp.length) {
-		delete obj[http_idx];
-	}
-	// no holds for this IP
-	if(Object.keys(obj).length == 0) {
-		delete http_req_holds[ip];
-	}
-}
+	server.registerEndpoint("accounts/login", pages.accounts.login);
+	server.registerEndpoint("accounts/logout", pages.accounts.logout);
+	server.registerEndpoint("accounts/register", pages.accounts.register);
+	server.registerEndpoint("accounts/profile$", "/accounts/profile/"); // ensure there is always an ending slash
+	server.registerEndpoint("accounts/profile", pages.accounts.profile);
+	server.registerEndpoint("accounts/private", pages.accounts.private);
+	server.registerEndpoint("accounts/configure/*", pages.accounts.configure);
+	server.registerEndpoint("accounts/member_autocomplete", pages.accounts.member_autocomplete);
+	server.registerEndpoint("accounts/register/complete", pages.accounts.register_complete);
+	server.registerEndpoint("accounts/verify/*", pages.accounts.verify);
+	server.registerEndpoint("accounts/download/*", pages.accounts.download);
+	server.registerEndpoint("accounts/password_change", pages.accounts.password_change);
+	server.registerEndpoint("accounts/password_change/done", pages.accounts.password_change_done);
+	server.registerEndpoint("accounts/nsfw/*", pages.accounts.nsfw);
+	server.registerEndpoint("accounts/tabular", pages.accounts.tabular);
+	server.registerEndpoint("accounts/verify_email/*", pages.accounts.verify_email);
+	server.registerEndpoint("accounts/sso", pages.accounts.sso);
 
-// pathname or regexp ; function or redirect path ; [options]
-var url_patterns = [];
-var url_error_endpoints = {};
-function registerEndpoint(pattern, router, opts) {
-	// pathname or regexp ; function or redirect path ; [options]
-	if(!opts) opts = {};
+	server.registerEndpoint("ajax/protect", pages.protect);
+	server.registerEndpoint("ajax/unprotect", pages.unprotect);
+	server.registerEndpoint("ajax/protect/char", pages.protect_char);
+	server.registerEndpoint("ajax/unprotect/char", pages.unprotect_char);
+	server.registerEndpoint("ajax/coordlink", pages.coordlink);
+	server.registerEndpoint("ajax/urllink", pages.urllink);
 
-	if(typeof pattern == "string") {
-		pattern = pattern.replace(/\./g, "\\.");
-		pattern = pattern.replace(/\*/g, "(.*)");
-		if(pattern.at(-1) != "$" && pattern.at(-1) != "/") {
-			pattern += "[/]?$";
-		}
-		if(pattern.at(-1) == "/") {
-			pattern += "$";
-		}
-		pattern = new RegExp("^" + pattern, "g");
-	}
+	server.registerEndpoint("administrator/", pages.admin.administrator);
+	server.registerEndpoint("administrator/user/*", pages.admin.user);
+	server.registerEndpoint("administrator/users/by_username/*", pages.admin.users_by_username);
+	server.registerEndpoint("administrator/users/by_id/*", pages.admin.users_by_id);
+	server.registerEndpoint("administrator/backgrounds", pages.admin.backgrounds, { binary_post_data: true });
+	server.registerEndpoint("administrator/manage_ranks", pages.admin.manage_ranks);
+	server.registerEndpoint("administrator/set_custom_rank/*", pages.admin.set_custom_rank);
+	server.registerEndpoint("administrator/user_list", pages.admin.user_list);
+	server.registerEndpoint("administrator/monitor/", (settings && settings.monitor && settings.monitor.redirect) ? settings.monitor.redirect : null);
+	server.registerEndpoint("administrator/shell", pages.admin.shell);
+	server.registerEndpoint("administrator/restrictions", pages.admin.restrictions, { binary_post_data: true });
 
-	url_patterns.push([pattern, router, opts]);
-}
-function registerErrorEndpoint(code, router) {
-	url_error_endpoints[code] = router;
-}
+	server.registerEndpoint("script_manager/", pages.script_manager);
+	server.registerEndpoint("script_manager/edit/*", pages.script_edit);
+	server.registerEndpoint("script_manager/view/*", pages.script_view);
 
-function createEndpoints() {
-	registerEndpoint("favicon.ico", "/static/favicon.png", { no_login: true });
-	registerEndpoint("robots.txt", "/static/robots.txt", { no_login: true });
-	registerEndpoint("home", pages.home);
-	registerEndpoint(".well-known/*", null);
+	server.registerEndpoint("world_style", pages.world_style);
+	server.registerEndpoint("world_props", pages.world_props);
 
-	registerEndpoint("accounts/login", pages.accounts.login);
-	registerEndpoint("accounts/logout", pages.accounts.logout);
-	registerEndpoint("accounts/register", pages.accounts.register);
-	registerEndpoint("accounts/profile$", "/accounts/profile/"); // ensure there is always an ending slash
-	registerEndpoint("accounts/profile", pages.accounts.profile);
-	registerEndpoint("accounts/private", pages.accounts.private);
-	registerEndpoint("accounts/configure/*", pages.accounts.configure);
-	registerEndpoint("accounts/member_autocomplete", pages.accounts.member_autocomplete);
-	registerEndpoint("accounts/register/complete", pages.accounts.register_complete);
-	registerEndpoint("accounts/verify/*", pages.accounts.verify);
-	registerEndpoint("accounts/download/*", pages.accounts.download);
-	registerEndpoint("accounts/password_change", pages.accounts.password_change);
-	registerEndpoint("accounts/password_change/done", pages.accounts.password_change_done);
-	registerEndpoint("accounts/nsfw/*", pages.accounts.nsfw);
-	registerEndpoint("accounts/tabular", pages.accounts.tabular);
-	registerEndpoint("accounts/verify_email/*", pages.accounts.verify_email);
-	registerEndpoint("accounts/sso", pages.accounts.sso);
+	server.registerEndpoint("other/random_color", pages.other.random_color, { no_login: true });
+	server.registerEndpoint("other/backgrounds/*", pages.other.load_backgrounds, { no_login: true });
+	server.registerEndpoint("other/test/*", pages.other.test, { no_login: true });
+	server.registerEndpoint("other/ipaddress", pages.other.ipaddress);
 
-	registerEndpoint("ajax/protect", pages.protect);
-	registerEndpoint("ajax/unprotect", pages.unprotect);
-	registerEndpoint("ajax/protect/char", pages.protect_char);
-	registerEndpoint("ajax/unprotect/char", pages.unprotect_char);
-	registerEndpoint("ajax/coordlink", pages.coordlink);
-	registerEndpoint("ajax/urllink", pages.urllink);
+	server.registerEndpoint("static/*", pages.static, { no_login: true });
+	server.registerEndpoint("static", pages.static, { no_login: true });
 
-	registerEndpoint("administrator/", pages.admin.administrator);
-	registerEndpoint("administrator/user/*", pages.admin.user);
-	registerEndpoint("administrator/users/by_username/*", pages.admin.users_by_username);
-	registerEndpoint("administrator/users/by_id/*", pages.admin.users_by_id);
-	registerEndpoint("administrator/backgrounds", pages.admin.backgrounds, { binary_post_data: true });
-	registerEndpoint("administrator/manage_ranks", pages.admin.manage_ranks);
-	registerEndpoint("administrator/set_custom_rank/*", pages.admin.set_custom_rank);
-	registerEndpoint("administrator/user_list", pages.admin.user_list);
-	registerEndpoint("administrator/monitor/", (settings && settings.monitor && settings.monitor.redirect) ? settings.monitor.redirect : null);
-	registerEndpoint("administrator/shell", pages.admin.shell);
-	registerEndpoint("administrator/restrictions", pages.admin.restrictions, { binary_post_data: true });
+	// match all ASCII symbols and Unicode-defined letters
+	server.registerEndpoint(/^([\u0021-\u007E\p{L}]*)$/gu, pages.yourworld, { remove_end_slash: true });
 
-	registerEndpoint("script_manager/", pages.script_manager);
-	registerEndpoint("script_manager/edit/*", pages.script_edit);
-	registerEndpoint("script_manager/view/*", pages.script_view);
+	server.registerErrorEndpoint(404, pages["404"]);
+	server.registerErrorEndpoint(500, pages["500"]);
 
-	registerEndpoint("world_style", pages.world_style);
-	registerEndpoint("world_props", pages.world_props);
+	// set rate limits
 
-	registerEndpoint("other/random_color", pages.other.random_color, { no_login: true });
-	registerEndpoint("other/backgrounds/*", pages.other.load_backgrounds, { no_login: true });
-	registerEndpoint("other/test/*", pages.other.test, { no_login: true });
-	registerEndpoint("other/ipaddress", pages.other.ipaddress);
-
-	registerEndpoint("static/*", pages.static, { no_login: true });
-	registerEndpoint("static", pages.static, { no_login: true });
-
-	registerEndpoint(/^([\w\/\.\-\~]*)$/g, pages.yourworld, { remove_end_slash: true });
-
-	registerErrorEndpoint(404, pages["404"]);
-	registerErrorEndpoint(500, pages["500"]);
-}
-
-/*
-	redirect the page's processing to that of another page
-	EG: return callPage("404", { extra parameters for page }, req, write, server, ctx, "POST")
-	EG: return callPage("accounts/login", { extra parameters for page }, req, write, server, ctx)
-*/
-async function callPage(page, params, req, write, server, ctx, method) {
-	if(!method || !valid_method(method)) {
-		method = "GET";
-	}
-	method = method.toUpperCase();
-	if(!params) {
-		params = {};
-	}
-	if(!server) {
-		server = {};
-	}
-	var pageObj = pages;
-	page = page.split("/");
-	for(var i = 0; i < page.length; i++) {
-		pageObj = pageObj[page[i]];
-	}
-	await pageObj[method](req, write, server, ctx, params);
-}
-
-// transfer all values from one object to a main object containing all imports
-function objIncludes(defaultObj, include) {
-	var new_obj = {};
-	for(var i in defaultObj) {
-		new_obj[i] = defaultObj[i];
-	}
-	for(var i in include) {
-		new_obj[i] = include[i];
-	}
-	return new_obj;
-}
-
-// wait for the client to upload form data to the server
-function wait_response_data(req, dispatch, binary_post_data, raise_limit) {
-	var sizeLimit = 1000000;
-	if(raise_limit) sizeLimit = 100000000;
-	var queryData;
-	if(binary_post_data) {
-		queryData = Buffer.from([]);
-	} else {
-		queryData = "";
-	}
-	var error = false;
-	if(req.aborted) { // request aborted before we could insert our listeners
-		return null;
-	}
-	return new Promise(function(resolve) {
-		req.on("data", function(data) {
-			if(error) return;
-			try {
-				if(binary_post_data) {
-					queryData = Buffer.concat([queryData, data]);
-					periodHTTPInboundBytes += data.length;
-				} else {
-					queryData += data;
-					periodHTTPInboundBytes += Buffer.byteLength(data);
-				}
-				if (queryData.length > sizeLimit) { // hard limit
-					if(binary_post_data) {
-						queryData = Buffer.from([]);
-					} else {
-						queryData = "";
-					}
-					dispatch("Payload too large", 413);
-					error = true;
-					resolve(null);
-				}
-			} catch(e) {
-				handle_error(e);
-			}
-		});
-		req.on("end", function() {
-			if(error) return;
-			try {
-				if(binary_post_data) {
-					resolve(queryData);
-				} else {
-					resolve(querystring.parse(queryData, null, null, { maxKeys: 256 }));
-				}
-			} catch(e) {
-				resolve(null);
-			}
-		});
-	});
+	server.setHTTPRateLimit(pages.accounts.login, 2);
+	server.setHTTPRateLimit(pages.accounts.logout, 2);
+	server.setHTTPRateLimit(pages.accounts.register, 1);
+	server.setHTTPRateLimit(pages.accounts.profile, 2, "GET");
+	server.setHTTPRateLimit(pages.accounts.profile, 10, "POST");
+	server.setHTTPRateLimit(pages.accounts.configure, 2);
+	server.setHTTPRateLimit(pages.accounts.member_autocomplete, 4);
+	server.setHTTPRateLimit(pages.accounts.download, 2);
+	server.setHTTPRateLimit(pages.accounts.tabular, 2);
+	server.setHTTPRateLimit(pages.accounts.sso, 3);
+	server.setHTTPRateLimit(pages.protect, 16);
+	server.setHTTPRateLimit(pages.unprotect, 16);
+	server.setHTTPRateLimit(pages.protect_char, 16);
+	server.setHTTPRateLimit(pages.unprotect_char, 16);
+	server.setHTTPRateLimit(pages.coordlink, 16);
+	server.setHTTPRateLimit(pages.urllink, 16);
+	server.setHTTPRateLimit(pages.yourworld, 16, "POST");
+	server.setHTTPRateLimit(pages.yourworld, 6, "GET");
+	server.setHTTPRateLimit(pages.world_style, 2);
+	server.setHTTPRateLimit(pages.world_props, 2);
 }
 
 function new_token(len) {
 	var token = crypto.randomBytes(len).toString("hex");
 	return token;
-}
-
-var https_reference = https;
-var createHTTPServer = http.createServer;
-var https_disabled = false;
-
-var options = {};
-
-function manage_https() {
-	var private_key = settings.ssl.private_key;
-	var cert = settings.ssl.cert;
-	var chain = settings.ssl.chain;
-
-	if(settings.ssl_enabled) {
-		// check if paths exist
-		https_disabled = (!fs.existsSync(private_key) || !fs.existsSync(cert) || !fs.existsSync(chain));
-	} else {
-		https_disabled = true;
-	}
-
-	if(https_disabled) {
-		console.log("\x1b[31;1mRunning server in HTTP mode\x1b[0m");
-		http.createServer = function(opt, func) {
-			return createHTTPServer(func);
-		}
-		https_reference = http;
-	} else {
-		console.log("\x1b[31;1mDetected HTTPS keys. Running server in HTTPS mode\x1b[0m");
-		options = {
-			key:  fs.readFileSync(private_key),
-			cert: fs.readFileSync(cert),
-			ca:   fs.readFileSync(chain)
-		};
-	}
 }
 
 // parse Uvias account token
@@ -1399,7 +1195,7 @@ function parseToken(token) {
 }
 
 // TODO: cache user data (only care about uvias)
-async function get_user_info(cookies, is_websocket, dispatch) {
+async function getUserInfo(cookies, is_websocket, dispatch) {
 	/*
 		User Levels:
 		3: Superuser (Operator)
@@ -1524,92 +1320,13 @@ async function get_user_info(cookies, is_websocket, dispatch) {
 	return user;
 }
 
-function checkHTTPRestr(list, ipVal, ipFam) {
-	var resp = {
-		siteAccess: false,
-		siteAccessNote: null
-	};
-	if(!list) return resp;
-	for(var i = 0; i < list.length; i++) {
-		var item = list[i];
-
-		var ip = item.ip;
-		if(ip) {
-			var riRange = ip[0];
-			var riFam = ip[1];
-			if(riFam != ipFam) continue;
-			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
-		} else {
-			continue;
-		}
-
-		var type = item.type;
-		var mode = item.mode;
-		if(type == "daccess" && mode == "site") {
-			var note = item.note;
-			resp.siteAccessNote = note;
-			resp.siteAccess = true;
-		}
-	}
-	return resp;
-}
-
 process.on("unhandledRejection", function(reason) {
 	console.log("Unhandled promise rejection!\n" + Date.now());
 	console.log("Error:", reason);
 });
 
-var periodHTTPOutboundBytes = 0;
-var periodHTTPInboundBytes = 0;
 var periodWSOutboundBytes = 0;
 var periodWSInboundBytes = 0;
-
-var server,
-	HTTPSockets,
-	HTTPSocketID;
-function setupHTTPServer() {
-	server = https_reference.createServer(options, function(req, res) {
-		var compCallbacks = [];
-		var cbExecuted = false;
-		process_request(req, res, compCallbacks).then(function() {
-			cbExecuted = true;
-			for(var i = 0; i < compCallbacks.length; i++) {
-				var cb = compCallbacks[i];
-				cb();
-			}
-		}).catch(function(e) {
-			res.statusCode = 500;
-			var err500Temp = "";
-			try {
-				err500Temp = templates.execute(templates.getFile("500.html"));
-				if(cbExecuted) {
-					console.log("An error has occurred while executing request callbacks");
-				} else {
-					for(var i = 0; i < compCallbacks.length; i++) {
-						var cb = compCallbacks[i];
-						cb();
-					}
-				}
-				
-			} catch(e) {
-				err500Temp = "HTTP 500: An internal server error has occurred";
-				handle_error(e);
-			}
-			res.end(err500Temp);
-			handle_error(e); // writes error to error log
-		});
-	});
-	
-	HTTPSockets = {};
-	HTTPSocketID = 0;
-	server.on("connection", function(socket) {
-		var sockID = HTTPSocketID++;
-		HTTPSockets[sockID] = socket;
-		socket.on("close", function() {
-			delete HTTPSockets[sockID];
-		});
-	});
-}
 
 function setupMonitorServer() {
 	if(typeof settings.monitor.port != "number") return;
@@ -1626,338 +1343,8 @@ function setupMonitorServer() {
 	});
 }
 
-function parseHostname(hostname) {
-	if(!hostname) hostname = "ourworldoftext.com";
-	hostname = hostname.slice(0, 1000);
-	var subdomains = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
-	var sub = subdomains.slice(2);
-	for(var i = 0; i < sub.length; i++) sub[i] = sub[i].toLowerCase();
-	return sub;
-}
-
-function createDispatcher(res, opts) {
-	var encoding = opts.encoding;
-	if(!encoding) encoding = [];
-	var gzip = opts.gzip;
-	
-	var requestResolved = false;
-	var requestStreaming = false;
-	var requestEnded = false;
-	var requestPromises = [];
-	var cookiesToReturn = [];
-	function dispatch(data, status_code, params) {
-		if(requestResolved || requestEnded) return; // if request response is already sent
-		if(!requestStreaming) {
-			requestResolved = true;
-		}
-		/* params: {
-			cookie: the cookie data
-			mime: mime type (ex: text/plain)
-			redirect: url to redirect to
-			download_file: force browser to download this file as .txt. specifies its name
-			headers: header data
-		} (all optional)*/
-		var info = {};
-		if(!params) {
-			params = {};
-		}
-		if(typeof params.cookie == "string") {
-			cookiesToReturn.push(params.cookie);
-		} else if(typeof params.cookie == "object") {
-			cookiesToReturn = cookiesToReturn.concat(params.cookie);
-		}
-		if(cookiesToReturn.length == 1) {
-			cookiesToReturn = cookiesToReturn[0];
-		}
-		if(cookiesToReturn.length > 0) {
-			info["Set-Cookie"] = cookiesToReturn;
-		}
-		if(params.download_file) {
-			info["Content-disposition"] = "attachment; filename=" + params.download_file;
-		}
-		if(Math.floor(status_code / 100) * 100 == 300 || params.redirect !== void 0) { // 3xx status code
-			if(params.redirect) {
-				if(!status_code) {
-					status_code = 302;
-				}
-				info.Location = params.redirect;
-			}
-		}
-		if(params.mime) {
-			info["Content-Type"] = params.mime;
-		}
-		if(params.headers) {
-			for(var i in params.headers) {
-				info[i] = params.headers[i];
-			}
-		}
-		if(!status_code) {
-			status_code = 200;
-		}
-		if(!data) {
-			data = "";
-		}
-		if(gzip && (encoding.includes("gzip") || encoding.includes("*") && !requestStreaming)) {
-			var doNotEncode = false;
-			if(data.length < 1450) {
-				doNotEncode = true;
-			}
-			if(typeof params.mime == "string") {
-				if(params.mime.indexOf("text") == -1 && params.mime.indexOf("javascript") == -1 && params.mime.indexOf("json") == -1) {
-					doNotEncode = true;
-				}
-			} else {
-				doNotEncode = true;
-			}
-			if(!doNotEncode) {
-				info["Content-Encoding"] = "gzip";
-				data = zlib.gzipSync(data);
-			}
-		}
-		if(!requestStreaming) info["Content-Length"] = Buffer.byteLength(data);
-		res.writeHead(status_code, info);
-		if(!requestStreaming) {
-			res.write(data);
-			res.end();
-			periodHTTPOutboundBytes += data.length;
-		}
-	}
-	res.on("close", function() {
-		requestEnded = true;
-		for(var i = 0; i < requestPromises.length; i++) {
-			var prom = requestPromises[i];
-			prom();
-		}
-	});
-	dispatch.isResolved = function() {
-		return requestResolved;
-	}
-	dispatch.addCookie = function(cookie) {
-		cookiesToReturn.push(cookie);
-	}
-	dispatch.startStream = function() {
-		requestStreaming = true;
-	}
-	dispatch.endStream = function() {
-		if(requestResolved || requestEnded) return;
-		requestResolved = true;
-		res.end();
-	}
-	dispatch.writeStream = function(data) {
-		if(requestResolved || requestEnded) return true;
-		if(!requestStreaming) return false;
-		return new Promise(function(resolve) {
-			requestPromises.push(resolve);
-			res.write(data, function() {
-				var loc = requestPromises.indexOf(resolve);
-				if(loc > -1) {
-					requestPromises.splice(loc, 1);
-				} else {
-					return; // already resolved
-				}
-				resolve(requestResolved || requestEnded);
-			});
-			periodHTTPOutboundBytes += data.length;
-		});
-	}
-	return dispatch;
-}
-
-async function process_request(req, res, compCallbacks) {
-	if(!serverLoaded) return res.end("Server is not initialized");
-	if(isStopping) return;
-
-	var hostname = parseHostname(req.headers.host);
-
-	var URLparse = url.parse(req.url);
-	var URL = URLparse.pathname;
-	if(URL.charAt(0) == "/") { URL = URL.slice(1); }
-	try {
-		URL = decodeURIComponent(URL);
-	} catch (e) {};
-
-	if(hostname.length == 1 && valid_subdomains.indexOf(hostname[0]) > -1) {
-		URL = "other/" + hostname[0] + "/" + URL;
-	}
-
-	var acceptEncoding = parseAcceptEncoding(req.headers["accept-encoding"]);
-
-	var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
-	var cfIp = req.headers["CF-Connecting-IP"] || req.headers["cf-connecting-ip"];
-	var remIp = req.socket.remoteAddress;
-	var evalIp = evaluateIpAddress(remIp, realIp, cfIp);
-	var ipAddress = evalIp[0];
-	var ipAddressFam = evalIp[1];
-	var ipAddressVal = evalIp[2];
-
-	var restr = restrictions.getRestrictions();
-	var deniedPages = checkHTTPRestr(restr, ipAddressVal, ipAddressFam);
-	if(deniedPages.siteAccess) {
-		var deny_notes = "None";
-		if(deniedPages.siteAccessNote) {
-			deny_notes = deniedPages.siteAccessNote;
-		}
-		res.writeHead(403);
-		return res.end(templates.execute(templates.getFile("denied.html"), {
-			deny_notes
-		}));
-	}
-
-	var dispatch = createDispatcher(res, {
-		encoding: acceptEncoding,
-		gzip: gzipEnabled
-	});
-
-	var page_aborted = false;
-
-	async function processPage(handler, options) {
-		if(!options) options = {};
-		var no_login = options.no_login;
-		var binary_post_data = options.binary_post_data;
-		var remove_end_slash = options.remove_end_slash;
-
-		if(handler == null) {
-			dispatch("No route is available for this page", 404);
-			return true;
-		}
-		if(typeof handler == "string") { // redirection
-			dispatch(null, null, { redirect: handler });
-			return true;
-		}
-		if(typeof handler != "object") { // not a valid page type
-			return false;
-		}
-		if(req.aborted) {
-			page_aborted = true;
-			return;
-		}
-		var method = req.method.toUpperCase();
-		var rate_id = await check_http_rate_limit(ipAddress, handler, method);
-		if(rate_id !== -1) { // release handle when this request finishes
-			compCallbacks.push(function() {
-				release_http_rate_limit(ipAddress, rate_id[0], rate_id[1]);
-			});
-		}
-		var post_data = {};
-		var query_data = querystring.parse(url.parse(req.url).query);
-		var cookies = parseCookie(req.headers.cookie);
-		var user;
-		if(no_login) {
-			user = {};
-		} else {
-			user = await get_user_info(cookies, false, dispatch);
-			// check if user is logged in
-			if(!cookies.csrftoken) {
-				var token = new_token(32);
-				var date = Date.now();
-				// TODO: introduce only for forms
-				dispatch.addCookie("csrftoken=" + token + "; expires=" + http_time(date + ms.year) + "; path=/;");
-				user.csrftoken = token;
-			} else {
-				user.csrftoken = cookies.csrftoken;
-			}
-		}
-		if(method == "POST") {
-			var dat = await wait_response_data(req, dispatch, binary_post_data, user.superuser);
-			if(dat) {
-				post_data = dat;
-			}
-		}
-		var URL_mod = URL; // modified url
-		// remove end slash if enabled
-		if(remove_end_slash) {
-			URL_mod = removeLastSlash(URL_mod);
-		}
-		// return compiled HTML pages
-		function render(path, data) {
-			var template = templates.getFile(path);
-			if(!template) { // template not found
-				return "An unexpected error occurred while generating this page";
-			}
-			if(!data) {
-				data = {};
-			}
-			data.user = user;
-			data.loginPath = loginPath;
-			data.logoutPath = logoutPath;
-			data.registerPath = registerPath;
-			data.profilePath = profilePath;
-			data.accountSystem = accountSystem;
-			var staticVersion = getClientVersion();
-			if(staticVersion) {
-				staticVersion = "?v=" + staticVersion;
-			}
-			data.staticVersion = staticVersion;
-			return templates.execute(template, data);
-		}
-		var ctx = { // request-specific variables
-			cookies,
-			post_data,
-			query_data,
-			path: URL_mod,
-			user,
-			referer: req.headers.referer,
-			render,
-			ipAddress,
-			ipAddressFam,
-			ipAddressVal,
-			setCallback: function(cb) {
-				compCallbacks.push(cb);
-			}
-		};
-		var pageStat;
-		if(handler[method] && valid_method(method)) {
-			// Return the page
-			pageStat = await handler[method](req, dispatch, global_data, ctx, {});
-		} else {
-			dispatch("Method " + method + " not allowed.", 405);
-		}
-		if(!dispatch.isResolved()) return false;
-		return true;
-	}
-
-	var page_resolved = false;
-	for(var i in url_patterns) {
-		var pattern = url_patterns[i];
-		var urlReg = pattern[0];
-		var pageRes = pattern[1];
-		var options = pattern[2];
-
-		if(!URL.match(urlReg)) {
-			continue;
-		}
-
-		var status = await processPage(pageRes, options);
-		if(status) {
-			page_resolved = true;
-		}
-		break;
-	}
-
-	if(page_aborted) {
-		return;
-	}
-
-	if(!dispatch.isResolved()) {
-		var endpoint = url_error_endpoints["404"];
-		if(endpoint) {
-			var status = await processPage(endpoint, {});
-			if(status) {
-				page_resolved = true;
-			}
-		}
-	}
-
-	// the error page failed to render somehow
-	if(!page_resolved) {
-		return dispatch("HTTP 404: The resource cannot be found", 404);
-	}
-}
-
 function loadString(type) {
 	switch(type) {
-		case "announcement":
-			return announcement_cache;
 		case "restr":
 			return restr_cache;
 		case "restr_cg1":
@@ -2014,26 +1401,44 @@ async function commitRestrictionsToDisk() {
 	}
 }
 
-async function loadAnnouncement() {
-	announcement_cache = await db.get("SELECT value FROM server_info WHERE name='announcement'");
-	if(!announcement_cache) {
-		announcement_cache = "";
-	} else {
-		announcement_cache = announcement_cache.value;
+async function loadServerSettings() {
+	for(var option in serverSettings) {
+		var dbValue = await db.get("SELECT value FROM server_info WHERE name=?", option);
+		if(dbValue) {
+			serverSettings[option] = dbValue.value;
+		}
+		serverSettingsStatus[option] = {
+			updating: false
+		};
 	}
 }
 
-async function modifyAnnouncement(text) {
-	if(!text) text = "";
-	text += "";
-	announcement_cache = text;
-
-	var element = await db.get("SELECT value FROM server_info WHERE name='announcement'");
-	if(!element) {
-		await db.run("INSERT INTO server_info values('announcement', ?)", text);
-	} else {
-		await db.run("UPDATE server_info SET value=? WHERE name='announcement'", text);
+async function updateServerSetting(option, value) {
+	if(!(option in serverSettings)) {
+		return false;
 	}
+	if(serverSettingsStatus[option].updating) return false;
+	serverSettingsStatus[option].updating = true;
+	serverSettings[option] = value;
+	var element = await db.get("SELECT value FROM server_info WHERE name=?", option);
+	if(!element) {
+		await db.run("INSERT INTO server_info values(?, ?)", [option, value]);
+	} else {
+		await db.run("UPDATE server_info SET value=? WHERE name=?", [value, option]);
+	}
+	serverSettingsStatus[option].updating = false;
+}
+
+function getServerSetting(option) {
+	if(!(option in serverSettings)) {
+		return null;
+	}
+	return serverSettings[option];
+}
+
+async function modifyAnnouncement(text) {
+	if(typeof text != "string") return false;
+	updateServerSetting("announcement", text);
 	ws_broadcast({
 		kind: "announcement",
 		text: text
@@ -2171,7 +1576,10 @@ function initWebsocketPingInterval() {
 
 async function uviasSendIdentifier() {
 	await uvias.run("SELECT accounts.set_service_info($1::text, $2::text, $3::text, $4::text, $5::text, $6::integer, $7::boolean, $8::boolean, $9::text);",
-		[uvias.id, uvias.name, uvias.domain, uvias.sso, uvias.logout, process.pid, uvias.private, uvias.only_verified, uvias.custom_css_file_path]);
+		[
+			uvias.id, uvias.name, uvias.domain,
+			uvias.paths.sso, uvias.paths.logout, process.pid, uvias.private, uvias.only_verified, uvias.custom_css_file_path
+		]);
 	console.log("Sent service identifier");
 }
 
@@ -2187,6 +1595,8 @@ async function uvias_init() {
 		return;
 	}
 	await uviasSendIdentifier();
+
+	await uvias.loadRanks();
 
 	await uvias.run("LISTEN uv_kick");
 	await uvias.run("LISTEN uv_sess_renew");
@@ -2262,32 +1672,28 @@ function ws_broadcast(data, world_id, opts) {
 		if(!client.sdata) return;
 		if(!client.sdata.userClient) return;
 		if(client.readyState != WebSocket.OPEN) return;
-		try {
-			// world_id is optional - setting it to undefined will broadcast to all clients
-			if(world_id == void 0 || client.sdata.world.id == world_id) {
-				if(opts.isChat) {
-					if(client.sdata.world.opts.noChatGlobal && opts.location == "global") return;
-					var isOwner = client.sdata.world.ownerId == client.sdata.user.id;
-					var isMember = !!client.sdata.world.members.map[client.sdata.user.id];
-					var chatPerm = client.sdata.world.feature.chat;
+		// world_id is optional - setting it to undefined will broadcast to all clients
+		if(world_id == void 0 || client.sdata.world.id == world_id) {
+			if(opts.isChat) {
+				if(client.sdata.world.opts.noChatGlobal && opts.location == "global") return;
+				var isOwner = client.sdata.world.ownerId == client.sdata.user.id;
+				var isMember = !!client.sdata.world.members.map[client.sdata.user.id];
+				var chatPerm = client.sdata.world.feature.chat;
 
-					// 1: members only
-					if(chatPerm == 1) if(!(isMember || isOwner)) return;
-					// 2: owner only
-					if(chatPerm == 2) if(!isOwner) return;
-					// -1: unavailable to all
-					if(chatPerm == -1) return;
-					// check if user has blocked this client
-					if(client.sdata.chat_blocks.block_all && opts.clientId != 0) return;
-					if(client.sdata.chat_blocks.id.includes(opts.clientId)) return;
-					if(opts.username && client.sdata.chat_blocks.user.includes(opts.username)) return;
-					if(client.sdata.chat_blocks.no_anon && opts.username === null) return;
-					if(client.sdata.chat_blocks.no_reg && opts.username !== null) return;
-				}
-				wsSend(client, data);
+				// 1: members only
+				if(chatPerm == 1) if(!(isMember || isOwner)) return;
+				// 2: owner only
+				if(chatPerm == 2) if(!isOwner) return;
+				// -1: unavailable to all
+				if(chatPerm == -1) return;
+				// check if user has blocked this client
+				if(client.sdata.chat_blocks.block_all && opts.clientId != 0) return;
+				if(client.sdata.chat_blocks.id.includes(opts.clientId)) return;
+				if(opts.username && client.sdata.chat_blocks.user.includes(opts.username)) return;
+				if(client.sdata.chat_blocks.no_anon && opts.username === null) return;
+				if(client.sdata.chat_blocks.no_reg && opts.username !== null) return;
 			}
-		} catch(e) {
-			handle_error(e);
+			wsSend(client, data);
 		}
 	});
 }
@@ -2412,7 +1818,6 @@ function get_ip_kind_limits(ip) {
 	return obj;
 }
 
-var connections_per_ip = 50;
 function can_connect_ip_address(ip) {
 	if(!ip_address_conn_limit[ip] || !ip || ip == "0.0.0.0") return true;
 	if(ip_address_conn_limit[ip] >= connections_per_ip) return false;
@@ -2475,12 +1880,21 @@ async function manageWebsocketConnection(ws, req) {
 		localFilter: true
 	};
 
-	var parsedURL = url.parse(req.url);
+	var parsedURL = new URL(req.url, "ws://example.com/ws");
 	var location = parsedURL.pathname;
-	var search = querystring.parse(parsedURL.query);
+	try {
+		location = decodeURIComponent(location);
+	} catch(e) {}
+	var search = parsedURL.searchParams;
 
 	var bytesWritten = 0;
 	var bytesRead = 0;
+
+	var pre_queue = [];
+	var world = null;
+	var clientId = void 0;
+	var worldObj = null;
+	var hasClientReleasedObjects = false;
 	
 	// process ip address headers from cloudflare/nginx
 	var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
@@ -2493,7 +1907,7 @@ async function manageWebsocketConnection(ws, req) {
 	
 	var restr = restrictions.getRestrictions();
 	
-	var deniedPages = checkHTTPRestr(restr, ws.sdata.ipAddressVal, ws.sdata.ipAddressFam);
+	var deniedPages = httpServer.checkHTTPRestr(restr, ws.sdata.ipAddressVal, ws.sdata.ipAddressFam);
 	if(deniedPages.siteAccess) {
 		var deny_notes = "None";
 		if(deniedPages.siteAccessNote) {
@@ -2504,11 +1918,51 @@ async function manageWebsocketConnection(ws, req) {
 		return;
 	}
 	
-
+	function evictClient() {
+		if(hasClientReleasedObjects) return;
+		hasClientReleasedObjects = true;
+		if(world) {
+			releaseWorld(world);
+		}
+		remove_ip_address_connection(ws.sdata.ipAddress);
+		ws.sdata.terminated = true;
+		if(world && clientId != void 0) {
+			if(client_ips[world.id] && client_ips[world.id][clientId]) {
+				client_ips[world.id][clientId][2] = true;
+				client_ips[world.id][clientId][1] = Date.now();
+			}
+		}
+		if(worldObj && !ws.sdata.hide_user_count) {
+			worldObj.user_count--;
+		}
+		if(world && ws.sdata.hasBroadcastedCursorPosition && !ws.sdata.cursorPositionHidden && ws.sdata.channel) {
+			ws_broadcast({
+				kind: "cursor",
+				hidden: true,
+				channel: ws.sdata.channel
+			}, world.id);
+			var channel = ws.sdata.channel;
+			var worldId = world.id;
+			if(client_cursor_pos[worldId]) {
+				delete client_cursor_pos[worldId][channel];
+				if(Object.keys(client_cursor_pos[worldId]).length == 0) {
+					delete client_cursor_pos[worldId];
+				}
+			}
+		}
+		updateNetworkStats();
+	}
 
 	// must be at the top before any async calls (errors may otherwise occur before the event declaration)
 	ws.on("error", function(err) {
 		handle_error(JSON.stringify(process_error_arg(err)));
+		if(!ws.sdata.terminated) {
+			ws.close();
+		}
+		evictClient();
+	});
+	ws.on("close", function() {
+		evictClient();
 	});
 
 	// TODO: may not fire in all cases
@@ -2572,7 +2026,6 @@ async function manageWebsocketConnection(ws, req) {
 	// remove initial slash
 	if(location.at(0) == "/") location = location.slice(1);
 
-	var pre_queue = [];
 	// adds data to a queue. this must be before any async calls and the message event
 	function pre_message(msg) {
 		if(!can_process_req()) return;
@@ -2580,58 +2033,21 @@ async function manageWebsocketConnection(ws, req) {
 	}
 	ws.on("message", pre_message);
 
-	var world = null;
-	var clientId = void 0;
-	var worldObj = null;
-
-	ws.on("close", function() {
-		if(world) {
-			releaseWorld(world);
-		}
-		remove_ip_address_connection(ws.sdata.ipAddress);
-		ws.sdata.terminated = true;
-		if(world && clientId != void 0) {
-			if(client_ips[world.id] && client_ips[world.id][clientId]) {
-				client_ips[world.id][clientId][2] = true;
-				client_ips[world.id][clientId][1] = Date.now();
-			}
-		}
-		if(worldObj && !ws.sdata.hide_user_count) {
-			worldObj.user_count--;
-		}
-		if(world && ws.sdata.hasBroadcastedCursorPosition && !ws.sdata.cursorPositionHidden && ws.sdata.channel) {
-			ws_broadcast({
-				kind: "cursor",
-				hidden: true,
-				channel: ws.sdata.channel
-			}, world.id);
-			var channel = ws.sdata.channel;
-			var worldId = world.id;
-			if(client_cursor_pos[worldId]) {
-				delete client_cursor_pos[worldId][channel];
-				if(Object.keys(client_cursor_pos[worldId]).length == 0) {
-					delete client_cursor_pos[worldId];
-				}
-			}
-		}
-		updateNetworkStats();
-	});
 	if(ws.sdata.terminated) return; // in the event of an immediate close
 
 	var cookies = parseCookie(req.headers.cookie);
-	var user = await get_user_info(cookies, true);
+	var user = await getUserInfo(cookies, true);
 	if(ws.sdata.terminated) return;
 	var channel = new_token(7);
 	ws.sdata.channel = channel;
 
-	var server = global_data;
 	var ctx = {
 		user, channel,
-		keyQuery: search.key,
+		keyQuery: search.get("key"),
 		world: null
 	};
 
-	if(search.hide == "1") {
+	if(search.get("hide") == "1") {
 		ws.sdata.hide_user_count = true;
 	}
 
@@ -2642,7 +2058,7 @@ async function manageWebsocketConnection(ws, req) {
 	}
 
 	var permission = await canViewWorld(world, user, {
-		memKey: search.key
+		memKey: search.get("key")
 	});
 	if(ws.sdata.terminated) return;
 	if(!permission) {
@@ -2650,7 +2066,7 @@ async function manageWebsocketConnection(ws, req) {
 	}
 
 	ws.sdata.userClient = true; // client connection is now initialized
-	ws.sdata.keyQuery = search.key;
+	ws.sdata.keyQuery = search.get("key");
 	
 	ctx.world = world;
 
@@ -2724,6 +2140,7 @@ async function manageWebsocketConnection(ws, req) {
 	ws.off("message", pre_message);
 	ws.on("message", handle_message);
 	async function handle_message(msg, isBinary) {
+		if(ws.sdata.terminated) return;
 		if(!isBinary) {
 			msg = msg.toString("utf8");
 		}
@@ -2757,7 +2174,7 @@ async function manageWebsocketConnection(ws, req) {
 			var res = {
 				kind: "ping",
 				result: "pong"
-			}
+			};
 			if(msg.id != void 0) {
 				res.id = san_nbr(msg.id);
 			}
@@ -2782,7 +2199,7 @@ async function manageWebsocketConnection(ws, req) {
 		var res;
 		var resError = false;
 		try {
-			res = await websockets[kind](ws, msg, send, broadcast, server, ctx);
+			res = await websockets[kind](ws, msg, send, broadcast, global_data, ctx);
 		} catch(e) {
 			resError = true;
 			handle_error(e);
@@ -2806,7 +2223,7 @@ async function manageWebsocketConnection(ws, req) {
 }
 
 async function start_server() {
-	await loadAnnouncement();
+	await loadServerSettings();
 	loadRestrictionsList();
 	
 	if(accountSystem == "local") {
@@ -2820,10 +2237,9 @@ async function start_server() {
 	}, 2000);
 
 	intv.traff_mon_net_interval = setInterval(function() {
-		if(periodHTTPOutboundBytes || periodHTTPInboundBytes) {
-			broadcastMonitorEvent("Network", "HTTP stream: " + periodHTTPOutboundBytes + " (out); " + periodHTTPInboundBytes + " (in)");
-			periodHTTPOutboundBytes = 0;
-			periodHTTPInboundBytes = 0;
+		var httpByteStat = httpServer.consumeByteTransferStats();
+		if(httpByteStat.out || httpByteStat.in) {
+			broadcastMonitorEvent("Network", "HTTP stream: " + httpByteStat.out + " (out); " + httpByteStat.in + " (in)");
 		}
 		if(periodWSOutboundBytes || periodWSInboundBytes) {
 			broadcastMonitorEvent("Network", "WebSocket: " + periodWSOutboundBytes + " (out); " + periodWSInboundBytes + " (in)");
@@ -2843,21 +2259,25 @@ async function start_server() {
 	// ping clients at a regular interval to ensure they dont disconnect constantly
 	initWebsocketPingInterval();
 
-	createEndpoints();
+	createEndpoints(httpServer);
 
-	server.listen(serverPort, settings.ip, function() {
-		var addr = server.address();
+	if(settings.monitor && settings.monitor.enabled) {
+		setupMonitorServer();
+	}
+
+	httpServer.listen(settings.ip, function() {
+		var addr = httpServer.server.address();
 
 		console.log("\x1b[92;1mOWOT Server is running\x1b[0m");
 		console.log("Address: " + addr.address);
 		console.log("Port: " + addr.port);
 
 		// start listening for commands
-		command_prompt();
+		promptCommand();
 	});
 
 	wss = new WebSocket.Server({
-		server,
+		server: httpServer.server,
 		perMessageDeflate: true,
 		maxPayload: 128000
 	});
@@ -2873,15 +2293,10 @@ async function start_server() {
 	});
 
 	await sysLoad(); // initialize the subsystems (tile database; chat manager)
+
 	serverLoaded = true;
 
-	if(settings.monitor && settings.monitor.enabled) {
-		setupMonitorServer();
-	}
-
-	loadPlugin(true);
-	
-	var plugin = loadPlugin();
+	var plugin = loadPlugin(true);
 	if(plugin && plugin.main) {
 		plugin.main(global_data);
 	}
@@ -2894,20 +2309,21 @@ var global_data = {
 	db_img: null,
 	db_misc: null,
 	db_edits: null,
-	db_ch: null,
+	db_chat: null,
+	uvias: null,
 	wsSend,
 	ws_broadcast,
-	createCSRF,
-	checkCSRF,
+	createCSRF: null,
+	checkCSRF: null,
 	memTileCache,
 	isTestServer,
 	shellEnabled,
 	loadString,
+	updateServerSetting,
+	getServerSetting,
 	restrictions,
 	saveRestrictions,
-	uvias,
 	accountSystem,
-	callPage,
 	ms,
 	checkHash,
 	encryptHash,
@@ -2915,7 +2331,7 @@ var global_data = {
 	querystring,
 	url,
 	send_email,
-	get_user_info,
+	getUserInfo,
 	modules,
 	announce: modifyAnnouncement,
 	wss, // this is undefined by default, but will get a value once wss is initialized
@@ -2939,7 +2355,8 @@ var global_data = {
 	getClientVersion,
 	setClientVersion,
 	staticShortcuts,
-	setupStaticShortcuts
+	setupStaticShortcuts,
+	getServerUptime
 };
 
 async function sysLoad() {
@@ -2982,13 +2399,6 @@ function stopServer(restart, maintenance) {
 
 		try {
 			if(serverLoaded) {
-				for(var i in pages) {
-					var mod = pages[i];
-					if(mod.server_exit) {
-						await mod.server_exit();
-					}
-				}
-
 				for(var i in subsystems) {
 					var sys = subsystems[i];
 					if(sys.server_exit) {
@@ -2996,12 +2406,8 @@ function stopServer(restart, maintenance) {
 					}
 				}
 
-				server.close();
+				httpServer.close();
 				wss.close();
-
-				for(var id in HTTPSockets) {
-					HTTPSockets[id].destroy();
-				}
 
 				if(accountSystem == "uvias") {
 					pgConn.end();
@@ -3026,7 +2432,11 @@ function stopServer(restart, maintenance) {
 			handle_error(e);
 			if(!isTestServer) console.log(e);
 		}
-		var handles = process._getActiveHandles();
+
+		var handles = [];
+		if(process._getActiveHandles) {
+			handles = process._getActiveHandles();
+		}
 
 		for(var i = 0; i < handles.length; i++) {
 			var handle = handles[i];
@@ -3069,7 +2479,7 @@ function stopServer(restart, maintenance) {
 }
 
 // start the server
-initialize_server().catch(function(e) {
+initializeServer().catch(function(e) {
 	console.log("An error occurred during the initialization process:");
 	console.log(e);
 });

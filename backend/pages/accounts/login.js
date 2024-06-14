@@ -30,6 +30,7 @@ module.exports.POST = async function(req, write, server, ctx, params) {
 	var cookies = ctx.cookies;
 	var post_data = ctx.post_data;
 	var referer = ctx.referer;
+	var callPage = ctx.callPage;
 
 	var db = server.db;
 	var checkHash = server.checkHash;
@@ -37,7 +38,6 @@ module.exports.POST = async function(req, write, server, ctx, params) {
 	var ms = server.ms;
 	var querystring = server.querystring;
 	var url = server.url;
-	var callPage = server.callPage;
 	var accountSystem = server.accountSystem;
 	
 	if(accountSystem == "uvias") return;
@@ -51,11 +51,11 @@ module.exports.POST = async function(req, write, server, ctx, params) {
 
 	var loginuser = await db.get("SELECT * FROM auth_user WHERE username=? COLLATE NOCASE", username);
 	if(!loginuser) {
-		return await callPage("accounts/login", {errors: true, username}, req, write, server, ctx);
+		return await callPage("accounts/login", {errors: true, username});
 	}
 	var valid = checkHash(loginuser.password, password);
 	if(!valid) { // wrong password
-		return await callPage("accounts/login", {errors: true, username}, req, write, server, ctx);
+		return await callPage("accounts/login", {errors: true, username});
 	}
 
 	var date_now = Date.now();

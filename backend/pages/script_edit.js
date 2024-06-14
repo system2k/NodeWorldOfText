@@ -5,14 +5,14 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var path = ctx.path;
 	var render = ctx.render;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
-	var callPage = server.callPage;
 	var db = server.db;
 	var createCSRF = server.createCSRF;
 
 	// not staff
 	if(!user.staff) {
-		return await callPage("404", null, req, write, server, ctx);
+		return await callPage("404");
 	}
 
 	var script_name = checkURLParam("/script_manager/edit/:script", path).script;
@@ -41,9 +41,9 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var post_data = ctx.post_data;
 	var path = ctx.path;
 	var user = ctx.user;
+	var callPage = ctx.callPage;
 
 	var db = server.db;
-	var callPage = server.callPage;
 	var checkCSRF = server.checkCSRF;
 
 	if(!user.staff) {
@@ -97,5 +97,5 @@ module.exports.POST = async function(req, write, server, ctx) {
 	}
 	return await callPage("script_edit", {
 		message
-	}, req, write, server, ctx);
+	});
 }

@@ -87,6 +87,8 @@ var menuOptions            = {};
 var undoBuffer             = new CircularBuffer(2048);
 var compositionBuffer      = ""; // composition buffer for Android-based keyboards
 var compositionSuppress    = false;
+var textInputPasteMod      = false;
+var textInputPasteData     = null;
 var textDecorationOffset   = 0x20F0;
 var textDecorationModes    = { bold: false, italic: false, under: false, strike: false };
 var fontTemplate           = "$px 'Courier New', monospace";
@@ -98,6 +100,7 @@ var lastLinkHover          = null; // [tileX, tileY, charX, charY]
 var lastTileHover          = null; // [type, tileX, tileY, (charX, charY)]
 var regionSelections       = [];
 var mobileSelections       = [];
+var stampSelections        = [];
 var specialClientHooks     = {};
 var specialClientHookMap   = 0; // bitfield (starts at 0): [before char rendering, (future expansion)]
 var bgImageHasChanged      = false;
@@ -194,6 +197,7 @@ var keyConfig = {
 	cursorRight: "RIGHT+*",
 	copyRegion: ["ALT+G", "CTRL+A"],
 	centerTeleport: "HOME",
+	pastePreview: "CTRL+SHIFT+V",
 	undo: "CTRL+Z",
 	redo: ["CTRL+Y", "CTRL+SHIFT+Z"],
 	showTextDeco: ["CTRL+Q", "ALT+Q", "CTRL+SHIFT+F"],
@@ -291,7 +295,8 @@ defineElements({ // elm[<name>]
 	erase_region_once: byId("erase_region_once"),
 	erase_region_mult: byId("erase_region_mult"),
 	erase_region_ctrl: byId("erase_region_ctrl"),
-	erase_region_snap: byId("erase_region_snap")
+	erase_region_snap: byId("erase_region_snap"),
+	link_tooltip: byId("link_tooltip")
 });
 
 function setRGBColorPicker(r, g, b) {
@@ -1607,24 +1612,19 @@ function setupPoolCleanupInterval() {
 }
 
 function checkTextColorOverride() {
+	textColorOverride = 0;
 	var public = 4;
 	var member = 2;
 	var owner = 1;
 	// if custom text color is set to a zone, use that color instead of default
 	if(styles.public_text != "#000" && styles.public_text != "#000000") {
 		textColorOverride |= public;
-	} else {
-		textColorOverride &= textColorOverride ^ public;
-	}
+	} 
 	if(styles.member_text != "#000" && styles.member_text != "#000000") {
 		textColorOverride |= member;
-	} else {
-		textColorOverride &= textColorOverride ^ member;
 	}
 	if(styles.owner_text != "#000" && styles.owner_text != "#000000") {
 		textColorOverride |= owner;
-	} else {
-		textColorOverride &= textColorOverride ^ owner;
 	}
 }
 
@@ -1863,6 +1863,9 @@ function resetUI() {
 	for(var i = 0; i < regionSelections.length; i++) {
 		regionSelections[i].stopSelectionUI();
 	}
+	for(var i = 0; i < stampSelections.length; i++) {
+		stampSelections[i].deselect();
+	}
 	removeCursor();
 	tileProtectAuto.active = false;
 	tileProtectAuto.lastPos = null;
@@ -2049,6 +2052,7 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 	if(arg_pageX != void 0) pageX = arg_pageX;
 	if(arg_pageY != void 0) pageY = arg_pageY;
 	var canShowMobileKeyboard = !hasDragged;
+	var foundActiveSelection = false;
 	stopDragging();
 
 	for(var i = 0; i < draggable_element_mouseup.length; i++) {
@@ -2069,7 +2073,6 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 		return;
 	}
 
-	var foundActiveSelection = false;
 	for(var i = 0; i < regionSelections.length; i++) {
 		var reg = regionSelections[i];
 		if(reg.isSelecting) {
@@ -2083,6 +2086,13 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 		if(reg.isPreselecting) {
 			reg.setEndCoordByScreenCoord(pageX, pageY);
 			reg.stopPreselecting();
+			foundActiveSelection = true;
+		}
+	}
+	for(var i = 0; i < stampSelections.length; i++) {
+		var reg = stampSelections[i];
+		if(reg.isSelecting) {
+			reg.handleSelection();
 			foundActiveSelection = true;
 		}
 	}
@@ -2544,7 +2554,9 @@ function propagatePosition(coords, char, noEnter, noVertPos) {
 }
 
 function textcode_parser(value, coords, defaultColor, defaultBgColor) {
-	if(typeof value == "string") value = w.split(value);
+	if(typeof value == "string") {
+		value = w.split(value.replace(/\r\n/g, "\n"));
+	}
 	var hex = "ABCDEF";
 	var pasteColor = defaultColor;
 	if(!pasteColor) pasteColor = 0;
@@ -2769,6 +2781,48 @@ function textcode_parser(value, coords, defaultColor, defaultBgColor) {
 	};
 }
 
+function _timedPaste(pasteValue, tileX, tileY, charX, charY) {
+	var pastePerm = Permissions.can_paste(state.userModel, state.worldModel);
+	var parser = textcode_parser(pasteValue, {
+		tileX, tileY,
+		charX, charY
+	}, YourWorld.Color, YourWorld.BgColor);
+	renderCursor([tileX, tileY, charX, charY]);
+	verticalEnterPos[0] = tileX;
+	verticalEnterPos[1] = charX;
+
+	if(!pastePerm) {
+		cyclePaste(parser);
+		return;
+	}
+	write_busy = true;
+	var yieldItem;
+	var rate = state.worldModel.char_rate;
+	var base = rate[1];
+	if(base > 60 * 1000) base = 60 * 1000;
+	var speed = Math.floor(1000 / base * rate[0]) - 1;
+	if(speed < 1) speed = 1;
+	if(speed > 280) speed = 280;
+	if(state.userModel.is_member || state.userModel.is_owner) speed = 280;
+
+	if(pasteInterval) clearInterval(pasteInterval);
+	pasteInterval = setInterval(function() {
+		var res;
+		if(yieldItem) {
+			res = cyclePaste(null, yieldItem);
+			yieldItem = null;
+		} else {
+			res = cyclePaste(parser);
+		}
+		if(!res || cursorCoords == null) {
+			clearInterval(pasteInterval);
+			write_busy = false;
+		} else if(typeof res == "object") {
+			yieldItem = res;
+		}
+	}, Math.floor(1000 / speed));
+}
+
 function event_input(e) {
 	if(state.worldModel.char_rate[0] == 0 && !state.userModel.is_member) return;
 	var inputType = e.inputType;
@@ -2787,9 +2841,7 @@ function event_input(e) {
 	}
 	if(inputType == "insertFromPaste") {
 		var pasteValue = textareaValue;
-		var value = w.split(pasteValue.replace(/\r\n/g, "\n"));
 		elm.textInput.value = "";
-		var pastePerm = Permissions.can_paste(state.userModel, state.worldModel);
 		if(!cursorCoords) {
 			return;
 		}
@@ -2805,45 +2857,15 @@ function event_input(e) {
 		w.emit("paste", pasteEvent);
 		if(pasteEvent.cancel) return;
 
-		var parser = textcode_parser(value, {
-			tileX: cursorCoords[0],
-			tileY: cursorCoords[1],
-			charX: cursorCoords[2],
-			charY: cursorCoords[3]
-		}, YourWorld.Color, YourWorld.BgColor);
-	
-		if(!pastePerm) {
-			cyclePaste(parser);
+		// using paste previewer
+		if(textInputPasteMod) {
+			textInputPasteData = pasteValue;
+			w.pasteStamper.startSelection(currentPosition);
+			w.pasteStamper.setContentFromTextcode(pasteValue);
 			return;
 		}
-	
-		write_busy = true;
-	
-		var yieldItem;
-		var rate = state.worldModel.char_rate;
-		var base = rate[1];
-		if(base > 60 * 1000) base = 60 * 1000;
-		var speed = Math.floor(1000 / base * rate[0]) - 1;
-		if(speed < 1) speed = 1;
-		if(speed > 280) speed = 280;
-		if(state.userModel.is_member || state.userModel.is_owner) speed = 280;
-	
-		if(pasteInterval) clearInterval(pasteInterval);
-		pasteInterval = setInterval(function() {
-			var res;
-			if(yieldItem) {
-				res = cyclePaste(null, yieldItem);
-				yieldItem = null;
-			} else {
-				res = cyclePaste(parser);
-			}
-			if(!res || cursorCoords == null) {
-				clearInterval(pasteInterval);
-				write_busy = false;
-			} else if(typeof res == "object") {
-				yieldItem = res;
-			}
-		}, Math.floor(1000 / speed));
+
+		_timedPaste(pasteValue, ...cursorCoords);
 		return;
 	} else if(inputType == "deleteContentBackward") {
 		// any deletion
@@ -2878,6 +2900,14 @@ function event_input(e) {
 
 function setupInputSystem() {
 	elm.textInput.addEventListener("input", event_input);
+
+	elm.textInput.addEventListener("keydown", function(e) {
+		if(checkKeyPress(e, keyConfig.pastePreview)) {
+			textInputPasteMod = true;
+		} else {
+			textInputPasteMod = false;
+		}
+	})
 
 	elm.textInput.addEventListener("paste", function(e) {
 		// reset all the gunk added by the browser.
@@ -2919,6 +2949,10 @@ function setupInputSystem() {
 		compositionBuffer = "";
 		compositionSuppress = false;
 	});
+}
+
+function handlePasteStamp(coord, width, height) {
+	_timedPaste(textInputPasteData, ...coord);
 }
 
 function cyclePaste(parser, yieldItem) {
@@ -3121,20 +3155,28 @@ function event_keydown(e) {
 	if(actElm != elm.textInput) elm.textInput.focus();
 	stopPasting();
 	if(checkKeyPress(e, keyConfig.cursorUp)) { // arrow up
-		moveCursor("up");
-		if(!cursorCoords) autoArrowKeyMoveStart("up");
+		if(!StampSelection.adjustActiveOffset("up")) {
+			moveCursor("up");
+			if(!cursorCoords) autoArrowKeyMoveStart("up");
+		}
 	}
 	if(checkKeyPress(e, keyConfig.cursorDown)) { // arrow down
-		moveCursor("down");
-		if(!cursorCoords) autoArrowKeyMoveStart("down");
+		if(!StampSelection.adjustActiveOffset("down")) {
+			moveCursor("down");
+			if(!cursorCoords) autoArrowKeyMoveStart("down");
+		}
 	}
 	if(checkKeyPress(e, keyConfig.cursorLeft)) { // arrow left
-		moveCursor("left");
-		if(!cursorCoords) autoArrowKeyMoveStart("left");
+		if(!StampSelection.adjustActiveOffset("left")) {
+			moveCursor("left");
+			if(!cursorCoords) autoArrowKeyMoveStart("left");
+		}
 	}
 	if(checkKeyPress(e, keyConfig.cursorRight)) { // arrow right
-		moveCursor("right");
-		if(!cursorCoords) autoArrowKeyMoveStart("right");
+		if(!StampSelection.adjustActiveOffset("right")) {
+			moveCursor("right");
+			if(!cursorCoords) autoArrowKeyMoveStart("right");
+		}
 	}
 	if(checkKeyPress(e, keyConfig.reset)) { // esc
 		w.emit("esc");
@@ -3468,6 +3510,8 @@ function setupLinkElement() {
 		} else if(prot == "action") { // built-in client command
 			runClientCommand(url, currentSelectedLinkCoords);
 			return false;
+		} else if(prot == "note") {
+			return false;
 		}
 		if(secureLink && !e.ctrlKey) {
 			if((isMainPage() && charInfo.protection == 0) && !isSafeHostname(linkParams.host)) {
@@ -3526,11 +3570,35 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 		if(!closest(evt.target, elm.main_view) && evt.target != linkDiv) return;
 	}
 	var link = getLink(tileX, tileY, charX, charY);
+	if(link && linksEnabled && link.type == "url" && link.url.startsWith("note:")) {
+		var tooltip = link.url.slice("note:".length).trim();
+		elm.link_tooltip.style.display = "";
+		if(elm.link_tooltip.innerText != tooltip) {
+			// there may be performance gains, but we really don't know for sure
+			elm.link_tooltip.innerText = tooltip;
+		}
+		var posX = mouseX + 15;
+		var posY = mouseY + 25;
+		if(posX < 0) posX = 0;
+		if(posY < 0) posY = 0;
+		if(posX + elm.link_tooltip.offsetWidth >= window.innerWidth) {
+			posX = window.innerWidth - elm.link_tooltip.offsetWidth;
+		}
+		if(posY + elm.link_tooltip.offsetHeight >= window.innerHeight) {
+			posY = window.innerHeight - elm.link_tooltip.offsetHeight;
+		}
+		elm.link_tooltip.style.transform = `translate(${posX}px, ${posY}px)`;
+		elm.owot.style.cursor = "help";
+		return;
+	} else {
+		elm.link_tooltip.style.display = "none";
+		elm.owot.style.cursor = defaultCursor;
+	}
 	if(safe) {
 		if(!link) return;
 		if(link.type != "coord") return;
 	}
-	if(link && linksEnabled && !regionSelectionsActive()) {
+	if(link && linksEnabled && !regionSelectionsActive() && !stampSelectionsActive()) {
 		currentSelectedLink = link;
 		currentSelectedLinkCoords = coords;
 		var pos = tileAndCharsToWindowCoords(tileX, tileY, charX, charY);
@@ -3656,6 +3724,12 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 		var reg = mobileSelections[i];
 		if(!reg.isPreselecting) continue;
 		reg.setEndCoordByScreenCoord(pageX, pageY);
+		reg.updateSelection();
+	}
+	for(var i = 0; i < stampSelections.length; i++) {
+		var reg = stampSelections[i];
+		if(!reg.isSelecting) continue;
+		reg.setStartCoord(currentPosition);
 		reg.updateSelection();
 	}
 
@@ -4601,6 +4675,7 @@ function decodeCharProt(str) {
 	return res;
 }
 function encodeCharProt(array, encoding) {
+	const base64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	/*
 		encodings:
 			0: base64 - only 4 possible values
@@ -5014,6 +5089,7 @@ function eraseSelectionStart(start, end, width, height) {
 		}
 		var amount = Math.floor((Date.now() - prevTime) / (1000 / tileRatePerSecond));
 		amount = Math.min(tileRatePerSecond, amount);
+		if(amount <= 0) amount = 1;
 		prevTime = Date.now();
 		for(var i = 0; i < amount; i++) {
 			if(tidx >= tileList.length) break;
@@ -5184,6 +5260,13 @@ function regionSelectionsActive() {
 	}
 	return false;
 }
+function stampSelectionsActive() {
+	for(var i = 0; i < stampSelections.length; i++) {
+		if(stampSelections[i].isSelecting) return true;
+	}
+	return false;
+}
+
 function RegionSelection() {
 	this.selection = null;
 	this.regionSelected = false;
@@ -5196,7 +5279,7 @@ function RegionSelection() {
 	this.lastSelectionHover = null; // [tileX, tileY, charX, charY]
 	this.lastSelectionTiled = this.tiled;
 	this.restartSelection = false;
-	var onselectionEvents = [];
+	var onselectionEvents = []; // (coordA[tileX,tileY,charX,charY], coordB[tileX,tileY,charX,charY], regWidth, regHeight)
 	var oncancelEvents = [];
 	this.init = function() {
 		if(this.selection) return;
@@ -5359,7 +5442,7 @@ function MobileSelection() {
 	var evt_wndMouseup = [];
 	var evt_wndTouchmove = [];
 	var evt_wndTouchend = [];
-	var onselectionEvents = [];
+	var onselectionEvents = []; // (coord[tileX,tileY,charX,charY], regWidth, regHeight, actionId)
 	var oncancelEvents = [];
 	this.init = function() {
 		var cont = document.createElement("div");
@@ -5735,16 +5818,278 @@ function MobileSelection() {
 	return this;
 }
 
+function StampSelection() {
+	this.isSelecting = false;
+	this.startCoord = null;
+	this.borderSize = 1;
+	this.contentWidth = 0;
+	this.contentHeight = 0;
+	this.offsets = [-1, -1]; // left/top (-1), middle (0), right/botom (1)
+	var onselectionEvents = []; // (coords[tileX,tileY,charX,charY], width, height)
+	var oncancelEvents = [];
+	var cachedContent = null;
+	var visible = false;
+
+	this.onselection = function(func) {
+		onselectionEvents.push(func);
+	}
+	this.oncancel = function(func) {
+		oncancelEvents.push(func);
+	}
+	this.assertCanvasInitialized = function() {
+		if(!StampSelection.canvas) {
+			throw new Error("No canvas initialized");
+		}
+	}
+	this.setStartCoordByScreenCoord = function(x, y) {
+		var coords = getTileCoordsFromMouseCoords(x, y);
+		this.startCoord = coords;
+	}
+	this.setStartCoord = function(coord) {
+		this.startCoord = coord;
+	}
+	this.adjustCoord = function(coord) {
+		var offCX = 0;
+		var offCY = 0;
+		if(this.offsets[0] == 0) offCX = Math.floor(this.contentWidth / 2);
+		if(this.offsets[0] == 1) offCX = this.contentWidth - 1;
+		if(this.offsets[1] == 0) offCY = Math.floor(this.contentHeight / 2);
+		if(this.offsets[1] == 1) offCY = this.contentHeight - 1;
+		if(offCX || offCY) {
+			coord = coordinateAdd(coord[0], coord[1], coord[2], coord[3], 0, 0, -offCX, -offCY);
+		}
+		return coord;
+	}
+	this.updateSelection = function() {
+		if(this.startCoord) {
+			this.setSelection(this.startCoord);
+		}
+	}
+	this.setSelection = function(coord) {
+		this.assertCanvasInitialized();
+		coord = this.adjustCoord(coord);
+		var tileX = coord[0];
+		var tileY = coord[1];
+		var charX = coord[2];
+		var charY = coord[3];
+		var pxCoord = tileAndCharsToWindowCoords(tileX, tileY, charX, charY);
+		var canv = StampSelection.canvas;
+		canv.style.left = (pxCoord[0] - this.borderSize) + "px";
+		canv.style.top = (pxCoord[1] - this.borderSize) + "px";
+	}
+	this.deselect = function(successful) {
+		if(!this.isSelecting) return;
+		this.isSelecting = false;
+		this.startCoord = null;
+		this.hide();
+		cachedContent = null;
+		if(!successful) {
+			for(var i = 0; i < oncancelEvents.length; i++) {
+				var func = oncancelEvents[i];
+				func();
+			}
+		}
+	}
+	this.startSelection = function(initCoords) {
+		StampSelection.init();
+		if(this.isSelecting) {
+			return;
+		}
+		this.startCoord = null;
+		if(initCoords) {
+			this.startCoord = initCoords;
+		}
+		this.isSelecting = true;
+		this.updateSelection();
+		this.show();
+	}
+	this.show = function() {
+		this.assertCanvasInitialized();
+		StampSelection.canvas.style.display = "";
+	}
+	this.hide = function() {
+		this.assertCanvasInitialized();
+		StampSelection.canvas.style.display = "none";
+	}
+	this.renderPreview = function() {
+		if(!cachedContent) return;
+		this.assertCanvasInitialized();
+
+		var canv = StampSelection.canvas;
+		var ctx = StampSelection.ctx;
+		var newWidth = Math.ceil(this.contentWidth * cellW);
+		var newHeight = Math.ceil(this.contentHeight * cellH);
+		if(newWidth > 2000) newWidth = 2000;
+		if(newHeight > 2000) newHeight = 2000;
+
+		canv.width = Math.floor(newWidth);
+		canv.height = Math.floor(newHeight);
+		ctx.font = font;
+
+		// background colors
+		for(var i = 0; i < cachedContent.length; i++) {
+			var cell = cachedContent[i];
+			var posX = cell[0];
+			var posY = cell[1];
+			var bgColor = cell[4];
+			var prot = cell[5];
+
+			if(prot == null) prot = state.worldModel.writability;
+			if(bgColor > -1) {
+				ctx.fillStyle = `rgb(${bgColor >> 16 & 255},${bgColor >> 8 & 255},${bgColor & 255})`;
+			} else {
+				if (prot == 0) ctx.fillStyle = styles.public;
+				if (prot == 1) ctx.fillStyle = styles.member;
+				if (prot == 2) ctx.fillStyle = styles.owner;
+			}
+			ctx.fillRect(posX * cellW, posY * cellH, cellW, cellH);
+		}
+
+		// text data
+		for(var i = 0; i < cachedContent.length; i++) {
+			var cell = cachedContent[i];
+			var posX = cell[0];
+			var posY = cell[1];
+			var char = cell[2];
+			var color = cell[3];
+			var bgColor = cell[4];
+			var protectionValue = cell[5];
+			var linkType = cell[6];
+
+			if(protectionValue == null) protectionValue = state.worldModel.writability;
+			var offsetX = posX * cellW;
+			var offsetY = posY * cellH;
+
+			renderChar(ctx, offsetX, offsetY, char, color, cellW, cellH, protectionValue, linkType, null, null, null, null, null, false);
+		}
+	}
+	this.setContentFromTextcode = function(textcode) {
+		this.assertCanvasInitialized();
+		var canv = StampSelection.canvas;
+		var ctx = StampSelection.ctx;
+
+		canv.style.border = `${this.borderSize}px dotted`;
+
+		var parser = textcode_parser(textcode, {
+			tileX: 0, tileY: 0, charX: 0, charY: 0
+		}, YourWorld.Color, YourWorld.BgColor);
+
+		var renderChars = [];
+		var lastProt = null;
+		var lastLink = null;
+	  
+		var maxX = 0;
+		var maxY = 0;
+	  
+		while(true) {
+			var data = parser.nextItem();
+			if(data == -1) break;
+			if(data.type == "char") {
+				if(!data.writable) continue;
+				var char = data.char;
+				var color = data.color;
+				var bgColor = data.bgColor;
+
+				if(char == "\n" || char == "\r") continue;
+
+				var posX = data.tileX * 16 + data.charX;
+				var posY = data.tileY * 8 + data.charY;
+				if(posX > maxX) maxX = posX;
+				if(posY > maxY) maxY = posY;
+
+				renderChars.push([posX, posY, char, color, bgColor, lastProt, lastLink]);
+				lastProt = null;
+				lastLink = null;
+			} else if(data.type == "protect") {
+				lastProt = data.protType;
+			} else if(data.type == "link") {
+				lastLink = data.linkType;
+			}
+		}
+
+		this.contentWidth = maxX + 1;
+		this.contentHeight = maxY + 1;
+		cachedContent = renderChars;
+		this.renderPreview();
+		this.updateSelection();
+	}
+	this.handleSelection = function() {
+		var startCoord = this.adjustCoord(this.startCoord);
+		for(var i = 0; i < onselectionEvents.length; i++) {
+			var func = onselectionEvents[i];
+			func(startCoord, this.contentWidth, this.contentHeight);
+		}
+		this.deselect(true);
+	}
+	this.init = function() {}
+	this.destroy = function() {
+		cachedContent = null;
+		var idx = stampSelections.indexOf(this);
+		if(idx > -1) {
+			stampSelections.splice(idx, 1);
+		}
+	}
+	stampSelections.push(this);
+	return this;
+}
+StampSelection.init = function() {
+	if(!StampSelection.canvas) {
+		var canv = document.createElement("canvas");
+		var ctx = canv.getContext("2d");
+
+		canv.style.display = "none";
+		canv.style.position = "absolute";
+		canv.style.pointerEvents = "none";
+		canv.style.border = "1px dotted";
+
+		StampSelection.canvas = canv;
+		StampSelection.ctx = ctx;
+		document.body.appendChild(canv);
+	}
+}
+StampSelection.adjustActiveOffset = function(direction) {
+	for(var i = 0; i < stampSelections.length; i++) {
+		var sel = stampSelections[i];
+		if(sel.isSelecting) {
+			if(direction == "up") {
+				sel.offsets[1]++;
+			} else if(direction == "down") {
+				sel.offsets[1]--;
+			} else if(direction == "left") {
+				sel.offsets[0]++;
+			} else if(direction == "right") {
+				sel.offsets[0]--;
+			}
+			if(sel.offsets[0] > 1) sel.offsets[0] = 1;
+			if(sel.offsets[0] < -1) sel.offsets[0] = -1;
+			if(sel.offsets[1] > 1) sel.offsets[1] = 1;
+			if(sel.offsets[1] < -1) sel.offsets[1] = -1;
+			sel.updateSelection();
+			return true;
+		}
+	}
+	return false;
+}
 
 function setupClientEvents() {
 	w.on("tilesRendered", function() {
 		for(var i = 0; i < regionSelections.length; i++) {
 			var reg = regionSelections[i];
-			reg.updateSelection();
+			if(reg.isSelecting) {
+				reg.updateSelection();
+			}
 		}
 		for(var i = 0; i < mobileSelections.length; i++) {
 			var reg = mobileSelections[i];
-			reg.updateSelection();
+			if(reg.isSelecting) {
+				reg.updateSelection();
+			}
+		}
+		for(var i = 0; i < stampSelections.length; i++) {
+			var reg = stampSelections[i];
+			if(reg.isSelecting) {
+				reg.updateSelection();
+			}
 		}
 	});
 	
@@ -5765,6 +6110,15 @@ function setupClientEvents() {
 	
 	w.on("cursorMove", updateCoordDisplay);
 	w.on("cursorHide", updateCoordDisplay);
+
+	w.on("redraw", function() {
+		for(var i = 0; i < stampSelections.length; i++) {
+			var reg = stampSelections[i];
+			if(reg.isSelecting) {
+				reg.renderPreview();
+			}
+		}
+	});
 }
 
 function setClientGuestCursorPosition(tileX, tileY, charX, charY, hidden) {
@@ -6244,6 +6598,7 @@ Object.assign(w, {
 	protectSelect: new RegionSelection(),
 	eraseSelect: new RegionSelection(),
 	mobileCopySelect: new MobileSelection(),
+	pasteStamper: new StampSelection(),
 	color: function() {
 		w.ui.colorModal.open();
 	},
@@ -6357,7 +6712,8 @@ Object.assign(w, {
 		return [-positionY / tileH, -positionX / tileW];
 	},
 	chat: {
-		send: api_chat_send
+		send: api_chat_send,
+		registerCommand: register_chat_comamnd
 	},
 	broadcastReceive: function(force) {
 		if(w.receivingBroadcasts && !force) return;
@@ -6375,6 +6731,7 @@ Object.assign(w, {
 	redraw: function() {
 		renderSerial++;
 		w.hasUpdated = true;
+		w.emit("redraw");
 	},
 	reloadRenderer: function() {
 		reloadRenderer();
@@ -6505,6 +6862,9 @@ Object.assign(w, {
 		styles.owner = "#222";
 		styles.public = "#000";
 		styles.text = "#FFF";
+		styles.member_text = "#000";
+		styles.owner_text = "#000";
+		styles.public_text = "#000";
 		defaultURLLinkColor = "#1570F0";
 		defaultCoordLinkColor = "#409015";
 		w.nightMode = 1;
@@ -6514,6 +6874,7 @@ Object.assign(w, {
 		} else if(!elm.owot.classList.contains("nightmode")) {
 			elm.owot.classList.add("nightmode");
 		}
+		checkTextColorOverride();
 		w.redraw();
 	},
 	day: function(reloadStyle) {
@@ -6531,8 +6892,14 @@ Object.assign(w, {
 					styles.owner = style.owner;
 					styles.public = style.public;
 					styles.text = style.text;
+					styles.public_text = style.public_text;
+					styles.member_text = style.member_text;
+					styles.owner_text = style.owner_text;
+					styles.cursor = style.cursor;
+					styles.guestCursor = style.guestCursor;
 				}
 				menu_color(styles.menu);
+				checkTextColorOverride();
 				w.redraw();
 			});
 		} else {
@@ -6541,6 +6908,12 @@ Object.assign(w, {
 			styles.owner = def.owner;
 			styles.public = def.public;
 			styles.text = def.text;
+			styles.public_text = def.public_text;
+			styles.member_text = def.member_text;
+			styles.owner_text = def.owner_text;
+			styles.cursor = def.cursor;
+			styles.guestCursor = def.guestCursor;
+			checkTextColorOverride();
 			w.redraw();
 		}
 	},
@@ -6691,6 +7064,13 @@ function setupDOMEvents() {
 	document.addEventListener("mouseleave", event_mouseleave);
 	window.addEventListener("load", function() {
 		w.emit("clientLoaded");
+	});
+
+	document.addEventListener("visibilitychange", function() {
+		if(document.visibilityState == "visible") {
+			owotCtx.fillStyle = "transparent";
+			owotCtx.fillRect(0, 0, 1, 1);
+		}
 	});
 
 	elm.owot.oncontextmenu = function() {
@@ -7131,6 +7511,7 @@ function reapplyProperties(props) {
 	styles.owner_text = theme.ownerText || themeDefaults.owner_text;
 
 	menu_color(styles.menu);
+	checkTextColorOverride();
 
 	state.worldModel.writability = props.writability;
 	state.worldModel.readability = props.readability;
@@ -7691,6 +8072,8 @@ function begin() {
 
 	w.mobileCopySelect.addOption("Copy");
 	w.mobileCopySelect.onselection(handleMobileRegionSelection);
+
+	w.pasteStamper.onselection(handlePasteStamp);
 
 	w.fetchUnloadedTiles();
 	w.fixFonts("legacycomputing");

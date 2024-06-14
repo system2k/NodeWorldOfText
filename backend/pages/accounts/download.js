@@ -37,15 +37,15 @@ module.exports.GET = async function(req, write, server, ctx) {
 	var path = ctx.path;
 	var user = ctx.user;
 	var setCallback = ctx.setCallback;
+	var callPage = ctx.callPage;
 
-	var callPage = server.callPage;
 	var db = server.db;
 
 	var world_name = checkURLParam("/accounts/download/*world", path).world;
 
 	var world = await getOrCreateWorld(world_name);
 	if(!world) {
-		return await callPage("404", null, req, write, server, ctx);
+		return await callPage("404");
 	}
 
 	setCallback(function() {
@@ -55,10 +55,10 @@ module.exports.GET = async function(req, write, server, ctx) {
 	// not a superuser nor owner
 	var is_owner = world.ownerId == user.id;
 	if(!(user.superuser || is_owner)) {
-		return await callPage("404", null, req, write, server, ctx);
+		return await callPage("404");
 	}
 
-	write.startStream();
+	ctx.startStream();
 
 	// set up headers
 	write(null, null, {
@@ -78,12 +78,12 @@ module.exports.GET = async function(req, write, server, ctx) {
 		});
 		if(!firstTile) data = "," + data;
 		firstTile = false;
-		if(await write.writeStream(data)) return -1; // aborted
+		if(await ctx.writeStream(data)) return -1; // aborted
 	}
 
-	if(await write.writeStream("[")) return;
+	if(await ctx.writeStream("[")) return;
 	await iterateWorld(db, world.id, procTile);
-	if(await write.writeStream("]")) return;
+	if(await ctx.writeStream("]")) return;
 
-	write.endStream();
+	ctx.endStream();
 }

@@ -10,6 +10,7 @@ var chatRecordsPage      = [];
 var chatRecordsGlobal    = [];
 var chatAdditionsPage    = [];
 var chatAdditionsGlobal  = [];
+var chatCommandRegistry  = {};
 var chatWriteHistoryMax  = 100; // maximum size of chat write history length
 var chatHistoryLimit     = 3500;
 var chatWriteHistoryIdx  = -1; // location in chat write history
@@ -21,6 +22,7 @@ var chatGlobalUnreadBar  = null;
 var chatGreentext        = true;
 var chatEmotes           = true;
 var acceptChatDeletions  = true;
+var client_commands      = {}; // deprecated
 
 if(isNaN(defaultChatColor)) {
 	defaultChatColor = null;
@@ -122,113 +124,131 @@ function clientChatResponse(message) {
 	addChat(null, 0, "user", "[ Client ]", message, "Client", false, false, false, null, getDate());
 }
 
-var client_commands = {
-	nick: function (args) {
-		var newDisplayName = args.join(" ");
-		if(!newDisplayName) {
-			newDisplayName = "";
-		}
-		var nickLim = state.userModel.is_staff ? Infinity : 40;
-		newDisplayName = newDisplayName.slice(0, nickLim);
-		YourWorld.Nickname = newDisplayName;
-		storeNickname();
-		var nickChangeMsg;
-		if(newDisplayName) {
-			nickChangeMsg = "Set nickname to `" + newDisplayName + "`";
-		} else {
-			nickChangeMsg = "Nickname reset";
-		}
-		clientChatResponse(nickChangeMsg);
-	},
-	ping: function() {
-		var pingTime = getDate();
-		network.ping(function(resp, err) {
-			if(err) {
-				return clientChatResponse("Ping failed");
-			}
-			var pongTime = getDate();
-			var pingMs = pongTime - pingTime;
-			clientChatResponse("Ping: " + pingMs + " MS");
-		});
-	},
-	gridsize: function (args) {
-		var size = args[0];
-		if(!size) size = "10x18";
-		size = size.split("x");
-		var width = parseInt(size[0]);
-		var height = parseInt(size[1]);
-		if(!width || isNaN(width) || !isFinite(width)) width = 10;
-		if(!height || isNaN(height) || !isFinite(height)) height = 18;
-		if(width < 4) width = 4;
-		if(width > 160) width = 160;
-		if(height < 4) height = 4;
-		if(height > 144) height = 144;
-		defaultSizes.cellW = width;
-		defaultSizes.cellH = height;
-		updateScaleConsts();
-		w.reloadRenderer();
-		clientChatResponse("Changed grid size to " + width + "x" + height);
-	},
-	color: function(args) {
-		var color = args.join(" ");
-		color = resolveColorValue(color);
-		YourWorld.Color = color;
-		clientChatResponse("Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase());
-	},
-	chatcolor: function(args) {
-		var color = args.join(" ");
-		if(!color) {
-			localStorage.removeItem("chatcolor");
-			defaultChatColor = null;
-			clientChatResponse("Chat color reset");
-		} else {
-			defaultChatColor = resolveColorValue(color);
-			localStorage.setItem("chatcolor", defaultChatColor);
-			clientChatResponse("Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase());
-		}
-	},
-	warp: function(args) {
-		var address = args[0];
-		if(!address) address = "";
-		positionX = 0;
-		positionY = 0;
-		writeBuffer = [];
-		tellEdit = [];
-		resetUI();
-		stopPasting();
-		if(address.charAt(0) == "/") address = address.substr(1);
-		state.worldModel.pathname = "/" + address;
-		ws_path = createWsPath();
-		w.changeSocket(ws_path, true);
-		getWorldProps(address, "props", function(props, error) {
-			if(!error) {
-				reapplyProperties(props);
-			}
-		});
-		clientChatResponse("Switching to world: \"" + address + "\"");
-	},
-	night: function() {
-		w.night();
-	},
-	day: function() {
-		w.day(true);
-	},
-	clear: function() {
-		if(selectedChatTab == 0) {
-			for(var i = 0; i < chatRecordsPage.length; i++) {
-				var rec = chatRecordsPage[i];
-				rec.element.remove();
-			}
-			chatRecordsPage.splice(0);
-		} else if(selectedChatTab == 1) {
-			for(var i = 0; i < chatRecordsGlobal.length; i++) {
-				var rec = chatRecordsGlobal[i];
-				rec.element.remove();
-			}
-			chatRecordsGlobal.splice(0);
-		}
-	}
+// important - use the w.chat.registerCommand function
+function register_chat_comamnd(command, callback, params, desc, example) {
+	chatCommandRegistry[command.toLowerCase()] = {
+		callback,
+		params,
+		desc,
+		example
+	};
+	// client_commands may be deprecated in the future
+	client_commands[command.toLowerCase()] = callback;
 }
+
+register_chat_comamnd("nick", function (args) {
+	var newDisplayName = args.join(" ");
+	if(!newDisplayName) {
+		newDisplayName = "";
+	}
+	var nickLim = state.userModel.is_staff ? Infinity : 40;
+	newDisplayName = newDisplayName.slice(0, nickLim);
+	YourWorld.Nickname = newDisplayName;
+	storeNickname();
+	var nickChangeMsg;
+	if(newDisplayName) {
+		nickChangeMsg = "Set nickname to `" + newDisplayName + "`";
+	} else {
+		nickChangeMsg = "Nickname reset";
+	}
+	clientChatResponse(nickChangeMsg);
+}, ["nickname"], "change your nickname", "JohnDoe");
+
+register_chat_comamnd("ping", function() {
+	var pingTime = getDate();
+	network.ping(function(resp, err) {
+		if(err) {
+			return clientChatResponse("Ping failed");
+		}
+		var pongTime = getDate();
+		var pingMs = pongTime - pingTime;
+		clientChatResponse("Ping: " + pingMs + " MS");
+	});
+}, null, "check the latency", null);
+
+register_chat_comamnd("gridsize", function (args) {
+	var size = args[0];
+	if(!size) size = "10x18";
+	size = size.split("x");
+	var width = parseInt(size[0]);
+	var height = parseInt(size[1]);
+	if(!width || isNaN(width) || !isFinite(width)) width = 10;
+	if(!height || isNaN(height) || !isFinite(height)) height = 18;
+	if(width < 4) width = 4;
+	if(width > 160) width = 160;
+	if(height < 4) height = 4;
+	if(height > 144) height = 144;
+	defaultSizes.cellW = width;
+	defaultSizes.cellH = height;
+	updateScaleConsts();
+	w.reloadRenderer();
+	clientChatResponse("Changed grid size to " + width + "x" + height);
+}, ["WxH"], "change the size of cells", "10x20");
+
+register_chat_comamnd("color",  function(args) {
+	var color = args.join(" ");
+	color = resolveColorValue(color);
+	YourWorld.Color = color;
+	clientChatResponse("Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase());
+}, ["color code"], "change your text color", "#FF00FF");
+
+register_chat_comamnd("chatcolor", function(args) {
+	var color = args.join(" ");
+	if(!color) {
+		localStorage.removeItem("chatcolor");
+		defaultChatColor = null;
+		clientChatResponse("Chat color reset");
+	} else {
+		defaultChatColor = resolveColorValue(color);
+		localStorage.setItem("chatcolor", defaultChatColor);
+		clientChatResponse("Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase());
+	}
+}, ["color code"], "change your chat color", "#FF00FF");
+
+register_chat_comamnd("warp", function(args) {
+	var address = args[0];
+	if(!address) address = "";
+	positionX = 0;
+	positionY = 0;
+	writeBuffer = [];
+	tellEdit = [];
+	resetUI();
+	stopPasting();
+	if(address.charAt(0) == "/") address = address.substr(1);
+	state.worldModel.pathname = address ? "/" + address : "";
+	ws_path = createWsPath();
+	w.changeSocket(ws_path, true);
+	getWorldProps(address, "props", function(props, error) {
+		if(!error) {
+			reapplyProperties(props);
+		}
+	});
+	clientChatResponse("Switching to world: \"" + address + "\"");
+}, ["world"], "go to another world", "forexample");
+
+register_chat_comamnd("night", function() {
+	w.night();
+}, null, "enable night mode", null);
+
+register_chat_comamnd("day", function() {
+	w.day(true);
+}, null, "disable night mode", null);
+
+register_chat_comamnd("clear", function() {
+	if(selectedChatTab == 0) {
+		for(var i = 0; i < chatRecordsPage.length; i++) {
+			var rec = chatRecordsPage[i];
+			rec.element.remove();
+		}
+		chatRecordsPage.splice(0);
+	} else if(selectedChatTab == 1) {
+		for(var i = 0; i < chatRecordsGlobal.length; i++) {
+			var rec = chatRecordsGlobal[i];
+			rec.element.remove();
+		}
+		chatRecordsGlobal.splice(0);
+	}
+}, null, "clear all chat messages locally", null);
 
 function sendChat() {
 	var chatText = elm.chatbar.value;
@@ -580,6 +600,109 @@ var emoteList = {
     "zzz": [1635, 32]
 };
 
+w.on("chatMod", function(e) {
+	if(e.id !== 0) return;
+	if(e.realUsername != "[ Server ]") return;
+	if(e.message.startsWith("Command")) {
+		var cmdList = [];
+		var htmlResp = "";
+		var remoteCmdList = e.message.split("\n");
+		var head = remoteCmdList[0];
+
+		htmlResp += head + "<br>";
+		htmlResp += "<div style=\"background-color: #DADADA; font-family: monospace; font-size: 13px;\">";
+
+		var cmdIdx = 0;
+		for(var i = 1; i < remoteCmdList.length; i++) {
+			var line = remoteCmdList[i];
+			if(!line.startsWith("/")) continue;
+			line = line.split(" -> ");
+			var cmdRaw = line[0].split(" ");
+			var params = cmdRaw[1];
+			var command = cmdRaw[0].slice(1);
+			if(params) {
+				params = params.slice(1, -1).split(",");
+			}
+			var descRaw = line[1];
+			var exampleStartIdx = descRaw.indexOf("(");
+			var example = "";
+			if(exampleStartIdx > -1) {
+				example = descRaw.slice(exampleStartIdx + 1, -1); // remove parentheses
+				descRaw = descRaw.slice(0, exampleStartIdx - 1);
+				example = example.split(" ").slice(1).join(" ");
+			}
+
+			cmdList.push({
+				command: command,
+				params: params,
+				desc: descRaw,
+				example: example
+			});
+		}
+
+		for(var cmd in chatCommandRegistry) {
+			var cliCmd = chatCommandRegistry[cmd];
+			cmdList.push({
+				command: cmd,
+				params: cliCmd.params,
+				desc: cliCmd.desc,
+				example: cliCmd.example
+			});
+		}
+
+		cmdList.sort(function(a, b) {
+			return a.command.localeCompare(b.command);
+		});
+
+		for(var i = 0; i < cmdList.length; i++) {
+			var info = cmdList[i];
+			var command = info.command;
+			var params = info.params;
+			var example = info.example;
+			var desc = info.desc;
+
+			// display command parameters
+			var param_desc = "";
+			if(params) {
+				param_desc += html_tag_esc("<");
+				for(var v = 0; v < params.length; v++) {
+					var arg = params[v];
+					param_desc += "<span style=\"font-style: italic\">" + html_tag_esc(arg) + "</span>";
+					if(v != params.length - 1) {
+						param_desc += ", ";
+					}
+				}
+				param_desc += html_tag_esc(">");
+			}
+
+			var exampleElm = "";
+			if(example && params) {
+				example = "/" + command + " " + example;
+				exampleElm = "title=\"" + html_tag_esc("Example: " + example) +"\"";
+			}
+
+			command = "<span " + exampleElm + "style=\"color: #00006F\">" + html_tag_esc(command) + "</span>";
+
+			var help_row = html_tag_esc("-> /") + command + " " + param_desc + " :: " + html_tag_esc(desc);
+
+			// alternating stripes
+			if(cmdIdx % 2 == 1) {
+				help_row = "<div style=\"background-color: #C3C3C3\">" + help_row + "</div>";
+			}
+
+			htmlResp += help_row;
+			cmdIdx++;
+		}
+		htmlResp += "</div>";
+
+		e.message = htmlResp;
+		// upgrade permissions to allow display of HTML
+		e.op = true;
+		e.admin = true;
+		e.staff = true;
+	}
+});
+
 /*
 	[type]:
 	* "user"	  :: registered non-renamed nick
@@ -628,8 +751,8 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 	}
 
 	if(!op) {
-		message = html_tag_esc(message);
-		nickname = html_tag_esc(nickname);
+		message = html_tag_esc(message, false, true);
+		nickname = html_tag_esc(nickname, false, true);
 	}
 
 	// do not give the tag to [ Server ]
