@@ -498,6 +498,10 @@ a:visited {
 	border: solid 1px #ff6363;
 	padding: 4px 7px 4px 7px;
 	pointer-events: none;
+	max-width: 90%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 .chat_emote {
 	background: url(/static/emotes.png);
