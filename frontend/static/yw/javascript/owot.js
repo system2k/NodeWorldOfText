@@ -6868,7 +6868,6 @@ Object.assign(w, {
 		defaultURLLinkColor = "#1570F0";
 		defaultCoordLinkColor = "#409015";
 		w.nightMode = 1;
-		textColorOverride = 0;
 		if(ignoreUnloadedPattern) {
 			w.nightMode = 2;
 		} else if(!elm.owot.classList.contains("nightmode")) {
@@ -6879,7 +6878,6 @@ Object.assign(w, {
 	},
 	day: function(reloadStyle) {
 		w.nightMode = 0;
-		textColorOverride = 0;
 		defaultURLLinkColor = "#0000FF";
 		defaultCoordLinkColor = "#008000";
 		if(elm.owot.classList.contains("nightmode")) {
