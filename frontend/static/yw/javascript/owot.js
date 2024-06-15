@@ -3590,7 +3590,7 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 		elm.link_tooltip.style.transform = `translate(${posX}px, ${posY}px)`;
 		elm.owot.style.cursor = "help";
 		return;
-	} else {
+	} else if(elm.link_tooltip.style.display != "none") {
 		elm.link_tooltip.style.display = "none";
 		elm.owot.style.cursor = defaultCursor;
 	}
