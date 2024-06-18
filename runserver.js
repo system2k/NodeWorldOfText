@@ -72,8 +72,10 @@ var ipv6_to_range  = ipaddress.ipv6_to_range;
 var is_cf_ipv4_int = ipaddress.is_cf_ipv4_int;
 var is_cf_ipv6_int = ipaddress.is_cf_ipv6_int;
 
-var DATA_PATH = "../nwotdata/";
-var SETTINGS_PATH = DATA_PATH + "settings.json";
+const DATABASE_VERSION = 2;
+const MIGRATION_PATH = "./backend/migrations/";
+const DATA_PATH = "../nwotdata/";
+const SETTINGS_PATH = DATA_PATH + "settings.json";
 
 function initializeDirectoryStruct() {
 	// create the data folder that stores all of the server's data
@@ -114,6 +116,7 @@ var sql_indexes_init = "./backend/indexes.sql";
 var sql_edits_init = "./backend/edits.sql";
 
 var serverSettings = {
+	dbVersion: "1", // default value
 	announcement: "",
 	chatGlobalEnabled: "1"
 };
@@ -293,6 +296,47 @@ async function runShellScript(includeColors) {
 		resp += "";
 	}
 	return resp;
+}
+
+async function performDatabaseMigrations(startingVersion) {
+	if(!fs.existsSync(MIGRATION_PATH)) {
+		return;
+	}
+	var migrations = fs.readdirSync(MIGRATION_PATH);
+	var sequence = [];
+	for(var i = 0; i < migrations.length; i++) {
+		var migPath = migrations[i];
+		if(!migPath.toLowerCase().endsWith(".js")) {
+			// not a migration script
+			continue;
+		}
+		var migVersion = parseInt(migPath.toLowerCase().split("from-")[1].split(".")[0]);
+		if(migVersion < startingVersion) {
+			// version too early
+			continue;
+		}
+		sequence.push({
+			version: migVersion,
+			path: path.resolve(MIGRATION_PATH, migPath)
+		});
+	}
+	sequence.sort(function(a, b) {
+		return a[0] - b[0];
+	});
+	for(var i = 0; i < sequence.length; i++) {
+		var migration = sequence[0];
+		var migVersion = migration.version;
+		var migPath = migration.path;
+		var migModule = require(migPath);
+		if(!migModule || !migModule.migrate) {
+			console.log(`ERROR: Migration from ${startingVersion} to ${databaseVersion} halted due to invalid scripts`);
+			return;
+		}
+		var currentVersion = parseInt(getServerSetting("dbVersion"));
+		var migrationFunc = migModule.migrate;
+		console.log(`Applying DB migration from version ${currentVersion} to version ${migVersion + 1}`);
+		await migrationFunc(global_data);
+	}
 }
 
 function makePgClient() {
@@ -854,6 +898,8 @@ async function initializeServer() {
 	setupZipLog();
 	setupHTTPServer();
 
+	await loadServerSettings();
+
 	await initialize_misc_db();
 	await initialize_ranks_db();
 	await initialize_edits_db();
@@ -881,6 +927,7 @@ async function initializeServer() {
 		// server is not initialized
 		console.log("Initializing server...");
 		await db.run("INSERT INTO server_info VALUES('initialized', 'true')");
+		await db.run("INSERT INTO server_info VALUES('dbVersion', ?)", DATABASE_VERSION.toString());
 
 		var tables = fs.readFileSync(sql_table_init).toString();
 		var indexes = fs.readFileSync(sql_indexes_init).toString();
@@ -895,6 +942,12 @@ async function initializeServer() {
 			account_prompt(true);
 		}
 	}
+
+	var currentDatabaseVersion = parseInt(getServerSetting("dbVersion"));
+	if(DATABASE_VERSION > currentDatabaseVersion) {
+		await performDatabaseMigrations(currentDatabaseVersion);
+	}
+
 	if(!init) {
 		start_server();
 	}
@@ -2223,7 +2276,6 @@ async function manageWebsocketConnection(ws, req) {
 }
 
 async function start_server() {
-	await loadServerSettings();
 	loadRestrictionsList();
 	
 	if(accountSystem == "local") {
