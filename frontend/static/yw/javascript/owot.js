@@ -3577,8 +3577,8 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 			// there may be performance gains, but we really don't know for sure
 			elm.link_tooltip.innerText = tooltip;
 		}
-		var posX = mouseX + 15;
-		var posY = mouseY + 25;
+		var posX = (mouseX + 15) / zoomRatio;
+		var posY = (mouseY + 25) / zoomRatio;
 		if(posX < 0) posX = 0;
 		if(posY < 0) posY = 0;
 		if(posX + elm.link_tooltip.offsetWidth >= window.innerWidth) {
