@@ -114,6 +114,9 @@ var profilePath = "/accounts/profile/";
 var sql_table_init = "./backend/default.sql";
 var sql_indexes_init = "./backend/indexes.sql";
 var sql_edits_init = "./backend/edits.sql";
+var sql_images_init = "./backend/images.sql";
+var sql_misc_init = "./backend/misc.sql";
+var sql_chat_init = "./backend/chat.sql";
 
 var serverSettings = {
 	dbVersion: "1", // default value
@@ -893,17 +896,8 @@ async function initializeServer() {
 	}
 
 	loadDbSystems();
-	setupStaticShortcuts();
-	loadStatic();
 	setupZipLog();
 	setupHTTPServer();
-
-	await loadServerSettings();
-
-	await initialize_misc_db();
-	await initialize_ranks_db();
-	await initialize_edits_db();
-	await initialize_image_db();
 
 	global_data.db = db;
 	global_data.db_img = db_img;
@@ -931,9 +925,23 @@ async function initializeServer() {
 
 		var tables = fs.readFileSync(sql_table_init).toString();
 		var indexes = fs.readFileSync(sql_indexes_init).toString();
+		var edits_tables = fs.readFileSync(sql_edits_init).toString();
+		var images_tables = fs.readFileSync(sql_images_init).toString();
+		var misc_tables = fs.readFileSync(sql_misc_init).toString();
+		var chat_tables = fs.readFileSync(sql_chat_init).toString();
 
 		await db.exec(tables);
 		await db.exec(indexes);
+		await db_edits.exec(edits_tables);
+		await db_img.exec(images_tables);
+		await db_misc.exec(misc_tables);
+		await db_chat.exec(chat_tables);
+
+		// default preset values
+		await db_chat.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
+			["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0]);
+		await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["max_rank_id", 0]);
+		await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["rank_next_level", 4]);
 
 		init = true;
 		if(accountSystem == "local") {
@@ -943,12 +951,16 @@ async function initializeServer() {
 		}
 	}
 
-	var currentDatabaseVersion = parseInt(getServerSetting("dbVersion"));
-	if(DATABASE_VERSION > currentDatabaseVersion) {
-		await performDatabaseMigrations(currentDatabaseVersion);
-	}
+	// must be loaded after server_info exists
+	await loadServerSettings();
 
 	if(!init) {
+		// no database migration needs to be performed if the server has just initialized for the first time
+		var currentDatabaseVersion = parseInt(getServerSetting("dbVersion"));
+		if(DATABASE_VERSION > currentDatabaseVersion) {
+			await performDatabaseMigrations(currentDatabaseVersion);
+		}
+
 		start_server();
 	}
 }
@@ -959,39 +971,8 @@ function sendProcMsg(msg) {
 	}
 }
 
-async function initialize_misc_db() {
-	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='properties'")) {
-		await db_misc.run("CREATE TABLE 'properties' (key BLOB, value BLOB)");
-	}
-}
 
-async function initialize_edits_db() {
-	if(!await db_edits.get("SELECT name FROM sqlite_master WHERE type='table' AND name='edit'")) {
-		await db_edits.exec(fs.readFileSync(sql_edits_init).toString());
-	}
-}
-
-async function initialize_image_db() {
-	if(!await db_img.get("SELECT name FROM sqlite_master WHERE type='table' AND name='images'")) {
-		await db_img.run("CREATE TABLE 'images' (id INTEGER NOT NULL PRIMARY KEY, name TEXT, date_created INTEGER, mime TEXT, data BLOB)");
-	}
-}
-
-/*
-	TODO: scrap this & rename to 'chat tag'
-	proposed change:
-	- global tags; world tags
-*/
-async function initialize_ranks_db() {
-	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='ranks'")) {
-		await db_misc.run("CREATE TABLE 'ranks' (id INTEGER, level INTEGER, name TEXT, props TEXT)");
-		await db_misc.run("CREATE TABLE 'user_ranks' (userid INTEGER, rank INTEGER)");
-		await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["max_rank_id", 0]);
-		await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["rank_next_level", 4]);
-	}
-	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='admin_ranks'")) {
-		await db_misc.run("CREATE TABLE 'admin_ranks' (id INTEGER, level INTEGER)");
-	}
+async function loadCustomRanks() {
 	var ranks = await db_misc.all("SELECT * FROM ranks");
 	var user_ranks = await db_misc.all("SELECT * FROM user_ranks");
 	ranks_cache.ids = [];
@@ -2276,7 +2257,10 @@ async function manageWebsocketConnection(ws, req) {
 }
 
 async function start_server() {
+	setupStaticShortcuts();
+	loadStatic();
 	loadRestrictionsList();
+	await loadCustomRanks();
 	
 	if(accountSystem == "local") {
 		await loopClearExpiredSessions();
