@@ -1,8 +1,23 @@
-CREATE TABLE channels (id integer NOT NULL PRIMARY KEY, name integer, properties text, description text, date_created integer, world_id integer);
+CREATE TABLE channels (
+	id integer NOT NULL PRIMARY KEY,
+	name integer,
+	properties text,
+	description text,
+	date_created integer,
+	world_id integer
+);
 
-CREATE TABLE entries (id integer NOT NULL PRIMARY KEY, date integer, channel integer, data text);
+CREATE TABLE entries (
+	id integer NOT NULL PRIMARY KEY,
+	date integer,
+	channel integer,
+	data text
+);
 
-CREATE TABLE default_channels (channel_id integer, world_id integer);
+CREATE TABLE default_channels (
+	channel_id integer,
+	world_id integer
+);
 
 
 CREATE INDEX chan_default ON default_channels (world_id, channel_id);

@@ -112,7 +112,6 @@ var registerPath = "/accounts/register/";
 var profilePath = "/accounts/profile/";
 
 var sql_table_init = "./backend/default.sql";
-var sql_indexes_init = "./backend/indexes.sql";
 var sql_edits_init = "./backend/edits.sql";
 var sql_images_init = "./backend/images.sql";
 var sql_misc_init = "./backend/misc.sql";
@@ -924,14 +923,12 @@ async function initializeServer() {
 		await db.run("INSERT INTO server_info VALUES('dbVersion', ?)", DATABASE_VERSION.toString());
 
 		var tables = fs.readFileSync(sql_table_init).toString();
-		var indexes = fs.readFileSync(sql_indexes_init).toString();
 		var edits_tables = fs.readFileSync(sql_edits_init).toString();
 		var images_tables = fs.readFileSync(sql_images_init).toString();
 		var misc_tables = fs.readFileSync(sql_misc_init).toString();
 		var chat_tables = fs.readFileSync(sql_chat_init).toString();
 
 		await db.exec(tables);
-		await db.exec(indexes);
 		await db_edits.exec(edits_tables);
 		await db_img.exec(images_tables);
 		await db_misc.exec(misc_tables);
