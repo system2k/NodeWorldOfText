@@ -1,3 +1,6 @@
+var utils = require("../utils/utils.js");
+var san_nbr = utils.san_nbr;
+
 module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var user = ctx.user;
 	var channel = ctx.channel;
@@ -44,6 +47,15 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		if(accountSystem == "uvias") {
 			cdata.id = cdata.id.substr(1).toUpperCase().padStart(16, "0");
 		}
+	}
+
+	if(Array.isArray(data.coords)) {
+		cdata.coords = [
+			san_nbr(data.coords[0]),
+			san_nbr(data.coords[1]),
+			san_nbr(data.coords[2]),
+			san_nbr(data.coords[3]),
+		];
 	}
 
 	data = JSON.stringify(cdata);

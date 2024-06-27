@@ -3502,10 +3502,10 @@ function setupLinkElement() {
 			runJSLink(url, isMainPage() && charInfo.protection == 0);
 			return false;
 		} else if(prot == "com") {
-			w.broadcastCommand(url);
+			w.broadcastCommand(url, false, currentSelectedLinkCoords);
 			return false;
 		} else if(prot == "comu") {
-			w.broadcastCommand(url, true);
+			w.broadcastCommand(url, true, currentSelectedLinkCoords);
 			return false;
 		} else if(prot == "action") { // built-in client command
 			runClientCommand(url, currentSelectedLinkCoords);
@@ -6383,11 +6383,12 @@ var network = {
 			type: type
 		});
 	},
-	cmd: function(data, include_username) {
+	cmd: function(data, include_username, coords) {
 		network.transmit({
 			kind: "cmd",
 			data: data, // maximum length of 2048
-			include_username: include_username
+			include_username: include_username,
+			coords: coords
 		});
 	},
 	cmd_opt: function() {
@@ -6720,8 +6721,8 @@ Object.assign(w, {
 		w.receivingBroadcasts = true;
 		network.cmd_opt();
 	},
-	broadcastCommand: function(data, includeUsername) {
-		network.cmd(data, includeUsername);
+	broadcastCommand: function(data, includeUsername, coords) {
+		network.cmd(data, includeUsername, coords);
 	},
 	jquery: function(callback) {
 		if(window.jQuery) return;
