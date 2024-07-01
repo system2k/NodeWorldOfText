@@ -6510,7 +6510,18 @@ var network = {
 			maxX: maxX,
 			maxY: maxY
 		});
-	}	
+	},
+	stats: function(callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "stats",
+			id: cb_id // optional: number
+		});
+	}
 };
 
 Object.assign(w, {
@@ -8013,6 +8024,16 @@ var ws_functions = {
 				break;
 			case "PARAM": // invalid parameters in message
 				break;
+		}
+	},
+	stats: function(data) {
+		w.emit("stats", data);
+		if(data.id) {
+			if(network.callbacks[data.id]) {
+				var cb = network.callbacks[data.id];
+				delete network.callbacks[data.id];
+				cb(data);
+			}
 		}
 	}
 };

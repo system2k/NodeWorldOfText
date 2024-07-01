@@ -250,6 +250,15 @@ register_chat_comamnd("clear", function() {
 	}
 }, null, "clear all chat messages locally", null);
 
+register_chat_comamnd("stats", function() {
+	network.stats(function(data) {
+		var stat = "Stats for world:\n";
+		stat += "Creation date: " + convertToDate(data.creationDate) + "\n";
+		stat += "View count: " + data.views;
+		clientChatResponse(stat);
+	});
+}, null, "view stats of a world", null);
+
 function sendChat() {
 	var chatText = elm.chatbar.value;
 	elm.chatbar.value = "";
