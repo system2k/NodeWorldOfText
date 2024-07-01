@@ -51,7 +51,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 	if(Array.isArray(data.coords)) {
 		var charX = san_nbr(data.coords[2]);
-		var charY = san_nbr(data.coords[2]);
+		var charY = san_nbr(data.coords[3]);
 
 		if (charX < 0) charX = 0;
 		if (charX > 15) charX = 15;
