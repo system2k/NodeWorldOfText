@@ -50,11 +50,19 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	}
 
 	if(Array.isArray(data.coords)) {
+		var charX = san_nbr(data.coords[2]);
+		var charY = san_nbr(data.coords[2]);
+
+		if (charX < 0) charX = 0;
+		if (charX > 15) charX = 15;
+		if (charY < 0) charY = 0;
+		if (charY > 7) charY = 7;
+
 		cdata.coords = [
 			san_nbr(data.coords[0]),
 			san_nbr(data.coords[1]),
-			san_nbr(data.coords[2]),
-			san_nbr(data.coords[3]),
+			charX,
+			charY,
 		];
 	}
 
