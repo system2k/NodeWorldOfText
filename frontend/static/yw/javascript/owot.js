@@ -6438,13 +6438,14 @@ var network = {
 		}
 		network.transmit(fetchReq);
 	},
-	chat: function(message, location, nickname, color) {
+	chat: function(message, location, nickname, color, customMeta) {
 		network.transmit({
 			kind: "chat",
 			nickname: nickname,
 			message: message,
 			location: location,
-			color: color
+			color: color,
+			customMeta: customMeta
 		});
 	},
 	ping: function(callback) {

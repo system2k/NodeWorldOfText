@@ -83,6 +83,7 @@ function api_chat_send(message, opts) {
 	var exclude_commands = opts.exclude_commands;
 	var nick = opts.nick || YourWorld.Nickname || state.userModel.username;
 	var location = opts.location ? opts.location : (selectedChatTab == 0 ? "page" : "global");
+	var customMeta = opts.customMeta;
 
 	var msgLim = state.userModel.is_staff ? 3030 : 400;
 
@@ -117,7 +118,7 @@ function api_chat_send(message, opts) {
 		}
 	}
 
-	network.chat(message, location, nick, chatColor);
+	network.chat(message, location, nick, chatColor, customMeta);
 }
 
 function clientChatResponse(message) {
