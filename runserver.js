@@ -586,7 +586,8 @@ var websockets = {
 	protect: require("./backend/websockets/protect.js"),
 	write: require("./backend/websockets/write.js"),
 	config: require("./backend/websockets/config.js"),
-	boundary: require("./backend/websockets/boundary.js")
+	boundary: require("./backend/websockets/boundary.js"),
+	stats: require("./backend/websockets/stats.js")
 };
 
 var modules = {

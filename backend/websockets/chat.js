@@ -205,8 +205,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "delete", ["id", "timestamp"], "delete a chat message", "1220 1693147307895"], // check for permission
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
 		[0, "whoami", null, "display your identity"],
-		[0, "test", null, "preview your appearance"],
-		[0, "stats", null, "view stats of a world"]
+		[0, "test", null, "preview your appearance"]
 
 		// hidden by default
 		// "/search Phrase" (client) -> searches for Phrase within a 25 tile radius
@@ -648,12 +647,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			idstr += "Chat ID: " + clientId;
 			return serverChatResponse(idstr, location);
 		},
-		stats: function() {
-			var stat = "Stats for world:\n";
-			stat += "Creation date: " + create_date(world.creationDate) + "\n";
-			stat += "View count: " + world.views;
-			return serverChatResponse(stat, location);
-		},
 		delete: async function(id, timestamp) {
 			if(!is_owner && !user.staff) return;
 			id = san_nbr(id);
@@ -767,9 +760,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				return;
 			case "whoami":
 				com.whoami();
-				return;
-			case "stats":
-				com.stats();
 				return;
 			case "delete":
 				com.delete(commandArgs[1], commandArgs[2]);
