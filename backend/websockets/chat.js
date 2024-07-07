@@ -32,6 +32,24 @@ function sanitizeColor(col) {
 	return "#00FF00"; // checking did not pass
 }
 
+function sanitizeCustomMeta(meta) {
+	if(typeof(meta) != "object") return undefined;
+	if(Object.keys(meta).length > 128) return undefined;
+
+	var output = {};
+	for(var k in meta) {
+		if(k.length > 64) continue;
+
+		var v = meta[k];
+		if(typeof(k) != "string") continue;
+		if(k.length > 128) continue;
+
+		output[k] = v;
+	}
+
+	return output;
+}
+
 var chat_ip_limits = {};
 var tell_blocks = {};
 var blocked_ips_by_world_id = {}; // id 0 = global
@@ -172,6 +190,10 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		msg = msg.slice(0, 400);
 	} else {
 		msg = msg.slice(0, 3030);
+	}
+
+	if(data.hasOwnProperty("customMeta")) {
+		data.customMeta = sanitizeCustomMeta(data.customMeta);
 	}
 
 	var username_to_display = user.username;
@@ -498,7 +520,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				staff: user.staff,
 				color: data.color,
 				kind: "chat",
-				privateMessage: "to_me"
+				privateMessage: "to_me",
+				customMeta: data.customMeta
 			};
 
 			if(user.authenticated && user.id in ranks_cache.users) {
@@ -518,7 +541,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				staff: false,
 				color: "#000000",
 				kind: "chat",
-				privateMessage: "from_me"
+				privateMessage: "from_me",
+				customMeta: data.customMeta
 			});
 			// if user has blocked TELLs, don't let the /tell-er know
 			if(client.sdata.chat_blocks[id] && (client.sdata.chat_blocks.id.includes(clientId))) return; // is ID of the /tell sender? (not destination)
@@ -795,7 +819,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		op: user.operator,
 		admin: user.superuser,
 		staff: user.staff,
-		color: data.color
+		color: data.color,
+		customMeta: data.customMeta
 	};
 
 	if(user.authenticated && user.id in ranks_cache.users) {
