@@ -33,16 +33,17 @@ function sanitizeColor(col) {
 }
 
 function sanitizeCustomMeta(meta) {
-	if(typeof(meta) != "object") return undefined;
-	if(Object.keys(meta).length > 128) return undefined;
+	if(typeof meta != "object") return undefined;
+	if(meta === null || Array.isArray(meta)) return undefined;
+	if(Object.keys(meta).length > 12) return undefined;
 
 	var output = {};
 	for(var k in meta) {
-		if(k.length > 64) continue;
+		if(k.length > 36) continue;
 
 		var v = meta[k];
-		if(typeof(k) != "string") continue;
-		if(k.length > 128) continue;
+		if(typeof v != "string" && typeof v != "number") continue;
+		if(k.length > 400) continue;
 
 		output[k] = v;
 	}
