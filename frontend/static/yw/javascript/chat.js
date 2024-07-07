@@ -80,9 +80,23 @@ if(state.worldModel.no_chat_global) {
 function api_chat_send(message, opts) {
 	if(!message) return;
 	if(!opts) opts = {};
+
+	var event = {
+		message: message,
+		opts: opts,
+		cancel: false
+	};
+
+	w.emit("chatSend", event);
+	message = event.message;
+
+	if (event.cancel) return;
+	if(!message) return;
+
 	var exclude_commands = opts.exclude_commands;
 	var nick = opts.nick || YourWorld.Nickname || state.userModel.username;
 	var location = opts.location ? opts.location : (selectedChatTab == 0 ? "page" : "global");
+	var customMeta = opts.customMeta;
 
 	var msgLim = state.userModel.is_staff ? 3030 : 400;
 
@@ -117,7 +131,7 @@ function api_chat_send(message, opts) {
 		}
 	}
 
-	network.chat(message, location, nick, chatColor);
+	network.chat(message, location, nick, chatColor, customMeta);
 }
 
 function clientChatResponse(message) {
