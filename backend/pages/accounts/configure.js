@@ -234,6 +234,23 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		half_chars,
 		mixed_chars,
 
+		local_chat_mode: "principal"/*"connect"*//*null*/,
+		local_chat_principal_connects: [
+			{
+				name: "apple",
+				pending: true
+			},
+			{
+				name: "banana",
+				pending: true
+			},
+			{
+				name: "cantalope",
+				pending: true
+			}
+		],
+		local_chat_connected: null /*"fruits"*/,
+
 		ratelim_val,
 		ratelim_per,
 		is_memkey_enabled,

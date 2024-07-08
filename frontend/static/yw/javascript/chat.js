@@ -1108,5 +1108,4 @@ function chatType(registered, nickname, realUsername) {
 	if(registered && !nickMatches) return "user_nick";
 	if(!registered && !nickname) return "anon";
 	if(!registered && nickname) return "anon_nick";
-	return type;
 }

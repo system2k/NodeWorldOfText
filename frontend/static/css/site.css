@@ -105,9 +105,6 @@ table {
 	border-collapse: separate;
 	border-spacing: 0;
 }
-label {
-	font-weight: bold;
-}
 input[type=text], input[type=password], input.text, input.title, textarea, select {
 	background-color: #fff;
 	border: 1px solid #bbb;

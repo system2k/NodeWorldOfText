@@ -40,6 +40,18 @@
 		});
 		updateWriteIntBox();
 
+		document.getElementsByName("rg_lcg").forEach(function(elm) {
+			elm.onclick = updateLocalChatBox;
+			var p_lcg_connect = document.getElementById("p_lcg_connect");
+			var p_lcg_principal = document.getElementById("p_lcg_principal");
+
+			if(elm.value == "r_lcg_principal" && elm.checked) {
+				p_lcg_principal.style.display = "";
+			} else if(elm.value == "r_lcg_connect" && elm.checked) {
+				p_lcg_connect.style.display = "";
+			}
+		});
+
 		rl_0.onclick = updateRatelimBox;
 		rl_512.onclick = updateRatelimBox;
 		rl_32.onclick = updateRatelimBox;
@@ -138,6 +150,21 @@
 			var val = e.target.value;
 			if(val != "custom") {
 				custom.value = val;
+			}
+		}
+	}
+
+	function updateLocalChatBox(elm) {
+		var p_lcg_connect = document.getElementById("p_lcg_connect");
+		var p_lcg_principal = document.getElementById("p_lcg_principal");
+		p_lcg_connect.style.display = "none";
+		p_lcg_principal.style.display = "none";
+
+		if(elm) {
+			if(elm.target.value == "r_lcg_principal") {
+				p_lcg_principal.style.display = "";
+			} else if(elm.target.value == "r_lcg_connect") {
+				p_lcg_connect.style.display = "";
 			}
 		}
 	}
@@ -450,6 +477,76 @@
 		<div class="content_set_title">Download Your World</div>
 		<div class="content_set_content">
 			<span style="margin-left:1em"><a href="/accounts/download/{{ world }}/">Download</a></span>
+		</div>
+	</div>
+
+	<div class="content_set">
+		<div class="content_set_title">Local Chat Group</div>
+		<div class="content_set_content" id="local_chat_group">
+			<div>
+				<label>
+					<input type="radio" value="r_lcg_none" name="rg_lcg" {% if !local_chat_mode %}checked{% endif %}>
+					<span>None</span>
+				</label>
+			</div>
+			<div>
+				<label>
+					<input type="radio" value="r_lcg_principal" name="rg_lcg" {% if local_chat_mode == "principal" %}checked{% endif %}>
+					<span>Use this world as principal world</span>
+				</label>
+			</div>
+			<div>
+				<label>
+					<input type="radio" value="r_lcg_connect" name="rg_lcg" {% if local_chat_mode == "connect" %}checked{% endif %}>
+					<span>Use another world</span>
+				</label>
+			</div>
+
+			<form method="POST" action="" id="localchatform">
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
+				<input type="hidden" name="form" value="localchatgroup">
+				<input type="submit" value="Submit">
+			</form>
+
+			<div id="p_lcg_connect" style="display: none">
+				<hr>
+				<b>Currently connected world: </b>
+				{% if local_chat_connected %}
+					<span>/{{ local_chat_connected }}</span>
+				{% else %}
+					<i>None</i>
+				{% endif %}
+				<p>
+					World name:
+					<input name="principal_world" value="">
+					<input type="submit" name="update" value="Update">
+					<input type="submit" name="reset" value="Reset">
+				</p>
+			</div>
+			<div id="p_lcg_principal" style="display: none">
+				<hr>
+				<b>Connected worlds:</b>
+				<form method="POST" action="">
+					<div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" /></div>
+					<input type="hidden" name="form" value="lcg_remove">
+					<ul>
+					{% for world in local_chat_principal_connects %}
+						<li>
+							<span>/{{world.name}}</span>
+							{% if world.pending %}
+								<b>(Pending)</b>
+							{% endif %}
+							<input type="submit" name="remove_{{ world.name }}" value="Remove /{{ world.name }}">
+						</li>
+					{% endfor %}
+					</ul>
+					<p>
+						Invite world:
+						<input name="invited_world" value="...">
+						<input type="submit" name="invite" value="Invite">
+					</p>
+				</form>
+			</div>
 		</div>
 	</div>
 
