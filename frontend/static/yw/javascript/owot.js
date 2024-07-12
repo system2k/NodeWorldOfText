@@ -1,4 +1,4 @@
-﻿var YourWorld = {
+var YourWorld = {
 	Color: window.localStorage ? +localStorage.getItem("color") : 0,
 	BgColor: -1,
 	Nickname: state.userModel.username
@@ -114,6 +114,7 @@ var longpressPosition      = [0, 0];
 var tellEdit               = [];
 var autoTotal              = 0;
 var timesConnected         = 0;
+var landmarkList		   = JSON.parse(localStorage.getItem("landmarks")) ?? {};
 
 // intervals
 var pasteInterval          = 0;
@@ -6726,7 +6727,7 @@ Object.assign(w, {
 	},
 	chat: {
 		send: api_chat_send,
-		registerCommand: register_chat_comamnd
+		registerCommand: register_chat_command
 	},
 	broadcastReceive: function(force) {
 		if(w.receivingBroadcasts && !force) return;
