@@ -23,6 +23,7 @@ var chatGreentext        = true;
 var chatEmotes           = true;
 var acceptChatDeletions  = true;
 var client_commands      = {}; // deprecated
+var doLandmarkWipe       = false; 
 
 if(isNaN(defaultChatColor)) {
 	defaultChatColor = null;
@@ -139,7 +140,7 @@ function clientChatResponse(message) {
 }
 
 // important - use the w.chat.registerCommand function
-function register_chat_comamnd(command, callback, params, desc, example) {
+function register_chat_command(command, callback, params, desc, example) {
 	chatCommandRegistry[command.toLowerCase()] = {
 		callback,
 		params,
@@ -150,7 +151,7 @@ function register_chat_comamnd(command, callback, params, desc, example) {
 	client_commands[command.toLowerCase()] = callback;
 }
 
-register_chat_comamnd("nick", function (args) {
+register_chat_command("nick", function (args) {
 	var newDisplayName = args.join(" ");
 	if(!newDisplayName) {
 		newDisplayName = "";
@@ -168,7 +169,7 @@ register_chat_comamnd("nick", function (args) {
 	clientChatResponse(nickChangeMsg);
 }, ["nickname"], "change your nickname", "JohnDoe");
 
-register_chat_comamnd("ping", function() {
+register_chat_command("ping", function() {
 	var pingTime = getDate();
 	network.ping(function(resp, err) {
 		if(err) {
@@ -180,7 +181,7 @@ register_chat_comamnd("ping", function() {
 	});
 }, null, "check the latency", null);
 
-register_chat_comamnd("gridsize", function (args) {
+register_chat_command("gridsize", function (args) {
 	var size = args[0];
 	if(!size) size = "10x18";
 	size = size.split("x");
@@ -199,14 +200,14 @@ register_chat_comamnd("gridsize", function (args) {
 	clientChatResponse("Changed grid size to " + width + "x" + height);
 }, ["WxH"], "change the size of cells", "10x20");
 
-register_chat_comamnd("color",  function(args) {
+register_chat_command("color",  function(args) {
 	var color = args.join(" ");
 	color = resolveColorValue(color);
 	YourWorld.Color = color;
 	clientChatResponse("Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase());
 }, ["color code"], "change your text color", "#FF00FF");
 
-register_chat_comamnd("chatcolor", function(args) {
+register_chat_command("chatcolor", function(args) {
 	var color = args.join(" ");
 	if(!color) {
 		localStorage.removeItem("chatcolor");
@@ -219,7 +220,7 @@ register_chat_comamnd("chatcolor", function(args) {
 	}
 }, ["color code"], "change your chat color", "#FF00FF");
 
-register_chat_comamnd("warp", function(args) {
+register_chat_command("warp", function(args) {
 	var address = args[0];
 	if(!address) address = "";
 	positionX = 0;
@@ -240,15 +241,15 @@ register_chat_comamnd("warp", function(args) {
 	clientChatResponse("Switching to world: \"" + address + "\"");
 }, ["world"], "go to another world", "forexample");
 
-register_chat_comamnd("night", function() {
+register_chat_command("night", function() {
 	w.night();
 }, null, "enable night mode", null);
 
-register_chat_comamnd("day", function() {
+register_chat_command("day", function() {
 	w.day(true);
 }, null, "disable night mode", null);
 
-register_chat_comamnd("clear", function() {
+register_chat_command("clear", function() {
 	if(selectedChatTab == 0) {
 		for(var i = 0; i < chatRecordsPage.length; i++) {
 			var rec = chatRecordsPage[i];
@@ -264,7 +265,7 @@ register_chat_comamnd("clear", function() {
 	}
 }, null, "clear all chat messages locally", null);
 
-register_chat_comamnd("stats", function() {
+register_chat_command("stats", function() {
 	network.stats(function(data) {
 		var stat = "Stats for world:\n";
 		stat += "Creation date: " + convertToDate(data.creationDate) + "\n";
@@ -272,6 +273,73 @@ register_chat_comamnd("stats", function() {
 		clientChatResponse(stat);
 	});
 }, null, "view stats of a world", null);
+
+register_chat_command("landmark", function(args) {
+	var landmarkSubcommands = [["Save", "add a landmark to your list"], ["Visit", "teleport to a landmark"], ["List", "print a list of saved landmarks"], ["Remove", "remove a landmark from your list"], ["Wipe", "remove all landmarks from your list"], ["Subcommands", "show all subcommands"]];
+	var xCoord = Math.floor(positionX/-640);
+	var yCoord = Math.ceil(positionY/576)
+	var [subcommand, name] = args;
+	if(!name) name = xCoord+","+yCoord;
+	
+	if(subcommand === "save") {
+		if(landmarkList[name]) return clientChatResponse("This landmark is already saved");
+		landmarkList[name] = [xCoord, yCoord];
+		localStorage.setItem("landmarks", JSON.stringify(landmarkList));
+		return clientChatResponse("Saved " + name + " at " + xCoord.toString() + ", " + yCoord.toString());
+	};
+
+	if(subcommand === "visit") {
+		if(!Permissions.can_go_to_coord(state.userModel, state.worldModel)) return;
+		if(!landmarkList[name]) return clientChatResponse("No landmark " + `"${name}"` + " registered");
+		var landmarkCoords = landmarkList[name];
+		w.doGoToCoord(landmarkCoords[1], landmarkCoords[0]);
+		return clientChatResponse("Sent to landmark " + name);
+	};
+
+	if(subcommand === "list") {
+		if(JSON.stringify(landmarkList) === "{}") return clientChatResponse("No landmarks saved");
+		var out = "<br>";
+		for(var i in landmarkList) {
+			var landmarkCoords = landmarkList[i];
+			out += html_tag_esc(i) + ": " + "X - " + landmarkCoords[0] + ", Y - " + landmarkCoords[1] + "<br>";
+		};
+
+		return addChat(null, 0, "user", "[ Client ]", out, "Client", true, false, false, null, getDate());
+	};
+
+	if(subcommand === "remove") {
+		if(JSON.stringify(landmarkList) === "{}") return clientChatResponse("No landmarks saved");
+		if(!landmarkList[name]) return clientChatResponse("No landmark " + `"${name}"` + " registered");
+		delete landmarkList[name];
+		localStorage.setItem("landmarks", JSON.stringify(landmarkList));
+		return clientChatResponse("Removed landmark " + `"${name}"`);
+	};
+
+	if(subcommand === "wipe") {
+		if(JSON.stringify(landmarkList) === "{}") return clientChatResponse("No landmarks saved");
+		if(!doLandmarkWipe) {
+			clientChatResponse("Send this command again to wipe *all* landmarks");
+		} else {
+			landmarkList = {}
+			localStorage.setItem("landmarks", "{}");
+			clientChatResponse("Wiped all landmarks");
+		};
+		doLandmarkWipe = !doLandmarkWipe;
+		console.log(doLandmarkWipe);
+		return;
+	};
+
+	if(subcommand === "subcommands") {
+		var out = "<br>";
+		for(var i of landmarkSubcommands) {
+			out += i[0] + ": " + i[1] + "<br>";
+		};
+
+		return addChat(null, 0, "user", "[ Client ]", out, "Client", true, false, false, null, getDate());
+	}
+	
+	return clientChatResponse("Invalid subcommand, refer to /landmark subcommand");
+}, ["subcommand", "name"], "manage landmark locations", "visit pikacity");
 
 function sendChat() {
 	var chatText = elm.chatbar.value;
