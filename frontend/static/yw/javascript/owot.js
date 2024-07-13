@@ -5153,8 +5153,7 @@ function buildMenu() {
 	});
 	menuOptions.changeColor = menu.addOption("Change color", w.color);
 	menuOptions.goToCoords = menu.addOption("Go to coordinates", w.goToCoord);
-	menuOptions.coordLink = menu.addOption("Create link to coordinates", w.coordLink);
-	menuOptions.urlLink = menu.addOption("Create link to URL", w.urlLink);
+	menuOptions.link = menu.addOption("Create link", w.link);
 	menuOptions.ownerArea = menu.addOption("Make an area owner-only", function() {
 		return w.doProtect("owner-only");
 	});
@@ -6547,9 +6546,8 @@ Object.assign(w, {
 	menu: null,
 	ui: {
 		announcements: {},
-		coordLinkModal: null,
 		coordGotoModal: null,
-		urlModal: null,
+		linkModal: null,
 		colorModal: null,
 		selectionModal: null
 	},
@@ -6641,9 +6639,9 @@ Object.assign(w, {
 		w.isLinking = true;
 		w.link_input_type = 0;
 	},
-	urlLink: function() {
+	link: function() {
 		stopLinkUI();
-		w.ui.urlModal.open();
+		w.ui.linkModal.open();
 	},
 	doCoordLink: function(y, x) {
 		linkAuto.active = true;
@@ -6657,9 +6655,6 @@ Object.assign(w, {
 		elm.owot.style.cursor = "pointer";
 		w.isLinking = true;
 		w.link_input_type = 1;
-	},
-	coordLink: function() {
-		w.ui.coordLinkModal.open();
 	},
 	doProtect: function(protectType, unprotect) {
 		// show the protection precision menu
@@ -7139,19 +7134,6 @@ function enableBgColorPicker() {
 	colorInputBg.jscolor.fromString("#DCE943");
 }
 
-function makeCoordLinkModal() {
-	var modal = new Modal();
-	modal.createForm();
-	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a letter to create the link.\n");
-	var coordX = modal.addEntry("X", "text", "number").input;
-	var coordY = modal.addEntry("Y", "text", "number").input;
-	modal.setMaximumSize(360, 300);
-	modal.onSubmit(function() {
-		w.doCoordLink(parseFloat(coordY.value), parseFloat(coordX.value));
-	});
-	w.ui.coordLinkModal = modal;
-}
-
 function makeCoordGotoModal() {
 	var modal = new Modal();
 	modal.createForm();
@@ -7164,18 +7146,32 @@ function makeCoordGotoModal() {
 	w.ui.coordGotoModal = modal;
 }
 
-function makeURLModal() {
+function makeLinkModal() {
 	var modal = new Modal();
-	modal.setMinimumSize(250, 120);
+	modal.addTab("url", "URL");
+	modal.addTab("coord", "Coordinates");
+
+	modal.focusTab("url");
 	modal.createForm();
-	modal.setFormTitle("\n");
+	modal.setFormTitle("Enter the URL to create a link to.\n");
 	var urlInput = modal.addEntry("URL", "text").input;
 	urlInput.style.width = "175px";
+
+	modal.focusTab("coord");
+	modal.createForm();
+	modal.setFormTitle("Enter the coordinates to create a link to.\n");
+	var coordX = modal.addEntry("X", "text", "number").input;
+	var coordY = modal.addEntry("Y", "text", "number").input;
+	
 	modal.onSubmit(function() {
-		w.doUrlLink(urlInput.value);
+		if(modal.getCurrentTabId() == "url") {
+			w.doUrlLink(urlInput.value);
+		} else {
+			w.doCoordLink(parseFloat(coordY.value), parseFloat(coordX.value));
+		}
 	});
-	modal.unalignForm();
-	w.ui.urlModal = modal;
+
+	w.ui.linkModal = modal;
 }
 
 function buildBackgroundColorModal(modal) {
@@ -8054,9 +8050,8 @@ function begin() {
 	setWriteInterval();
 	setupPoolCleanupInterval();
 
-	makeCoordLinkModal();
 	makeCoordGotoModal();
-	makeURLModal();
+	makeLinkModal();
 	makeColorModal();
 	makeSelectionModal();
 	addColorShortcuts();
