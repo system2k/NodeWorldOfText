@@ -5241,8 +5241,7 @@ function updateMenuEntryVisiblity() {
 	var permEraseArea = Permissions.can_erase(state.userModel, state.worldModel);
 	w.menu.setEntryVisibility(menuOptions.changeColor, permColorText || permColorCell);
 	w.menu.setEntryVisibility(menuOptions.goToCoords, permGoToCoord);
-	w.menu.setEntryVisibility(menuOptions.coordLink, permCoordLink);
-	w.menu.setEntryVisibility(menuOptions.urlLink, permUrlLink);
+	w.menu.setEntryVisibility(menuOptions.link, permUrlLink || permCoordLink);
 	w.menu.setEntryVisibility(menuOptions.ownerArea, permOwnerArea);
 	w.menu.setEntryVisibility(menuOptions.memberArea, permMemberArea);
 	w.menu.setEntryVisibility(menuOptions.publicArea, permMemberArea);
@@ -7172,6 +7171,7 @@ function makeLinkModal() {
 	});
 
 	w.ui.linkModal = modal;
+	resetLinkModalVisibility();
 }
 
 function buildBackgroundColorModal(modal) {
@@ -7222,6 +7222,29 @@ function resetColorModalVisibility() {
 	}
 	if(!pCell && !pText) {
 		w.ui.colorModal.close();
+	}
+}
+
+function resetLinkModalVisibility() {
+	var permCoordLink = Permissions.can_coordlink(state.userModel, state.worldModel);
+	var permUrlLink = Permissions.can_urllink(state.userModel, state.worldModel);
+
+	if(permUrlLink) {
+		w.ui.linkModal.showTab("url");
+	} else {
+		w.ui.linkModal.hideTab("url");
+		w.ui.linkModal.focusTab("coord");
+	}
+
+	if(permCoordLink) {
+		w.ui.linkModal.showTab("coord");
+	} else {
+		w.ui.linkModal.hideTab("coord");
+		w.ui.linkModal.focusTab("url");
+	}
+
+	if(!permUrlLink && !permCoordLink) {
+		w.ui.linkModal.close();
 	}
 }
 
@@ -7557,6 +7580,7 @@ function reapplyProperties(props) {
 
 	updateScaleConsts();
 	resetColorModalVisibility();
+	resetLinkModalVisibility();
 	updateMenuEntryVisiblity();
 	updateWorldName();
 
@@ -7853,9 +7877,11 @@ var ws_functions = {
 					break;
 				case "coordLink":
 					state.worldModel.feature_coord_link = value;
+					resetLinkModalVisibility();
 					break;
 				case "urlLink":
 					state.worldModel.feature_url_link = value;
+					resetLinkModalVisibility();
 					break;
 				case "paste":
 					state.worldModel.feature_paste = value;
