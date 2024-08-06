@@ -820,28 +820,29 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		chatData.rankColor = rank.chat_color;
 	}
 
-	// chat interceptor (e.g. for easy filtering)
 	// the plugin interface is subject to change - use at your own risk
 	var chatPlugin = loadPlugin();
 	if(chatPlugin && chatPlugin.chat) {
 		var check = false;
 		try {
 			check = chatPlugin.chat({
-				raw: chatData,
-				isCommand,
-				ip: ipHeaderAddr,
-				isOwner: is_owner,
-				isMember: is_member,
-				isOperator: user.operator,
-				isSuperuser: user.superuser,
-				isStaff: user.staff,
-				isAuth: user.authenticated,
-				worldName: world.name,
-				worldId: world.id,
-				location: location,
-				nickname: nick,
-				message: msg,
-				id: clientId
+				client: ws.sdata,
+				user: user,
+				world: world,
+				message: {
+					isCommand,
+					isMuted,
+					isOwner: is_owner,
+					isMember: is_member,
+					rankName: chatData.rankName,
+					rankColor: chatData.rankColor,
+					location: location,
+					nickname: nick,
+					username: username_to_display,
+					message: msg,
+					color: data.color,
+					id: clientId
+				}
 			});
 		} catch(e) {
 			check = false;

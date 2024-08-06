@@ -1858,6 +1858,7 @@ async function manageWebsocketConnection(ws, req) {
 		ipAddress: null,
 		ipAddressFam: null,
 		ipAddressVal: null,
+		headers: req.headers,
 		origin: req.headers["origin"],
 		userClient: false,
 		world: null,
