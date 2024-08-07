@@ -1,5 +1,5 @@
 {
-	"version": "2.1",
+	"version": "2.2",
 
 	"website": "https://ourworldoftext.com/",
 
@@ -30,7 +30,9 @@
 	"pg_db": {
 		"user": "",
 		"host": "",
-		"database": ""
+		"database": "",
+		"password": null,
+		"port": null
 	},
 
 	"error_log": true,

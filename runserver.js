@@ -314,6 +314,8 @@ if(accountSystem == "uvias") {
 	pg.defaults.user = settings.pg_db.user || "owot";
 	pg.defaults.host = settings.pg_db.host || "/var/run/postgresql";
 	pg.defaults.database = settings.pg_db.database || "uvias";
+	pg.defaults.password = settings.pg_db.password;
+	pg.defaults.port = settings.pg_db.port || null;
 }
 
 class UviasClient {
