@@ -334,6 +334,8 @@ class UviasClient {
 	only_verified = null;
 	custom_css_file_path = null;
 
+	pid_bypass = false;
+
 	paths = {
 		sso: null,
 		logout: null,
@@ -406,6 +408,9 @@ function setupUvias() {
 		uvias.custom_css_file_path = path.resolve(uvias.custom_css_file_path);
 	}
 
+	if(settings.uvias?.pid_bypass) {
+		uvias.pid_bypass = true;
+	}
 
 	uvias.paths.sso = "/accounts/sso";
 	// redirect to /accounts/logout/ to clear token cookie
@@ -1578,10 +1583,14 @@ function initWebsocketPingInterval() {
 }
 
 async function uviasSendIdentifier() {
+	var currentPID = process.pid;
+	if(uvias.pid_bypass) {
+		currentPID = 1;
+	}
 	await uvias.run("SELECT accounts.set_service_info($1::text, $2::text, $3::text, $4::text, $5::text, $6::integer, $7::boolean, $8::boolean, $9::text);",
 		[
 			uvias.id, uvias.name, uvias.domain,
-			uvias.paths.sso, uvias.paths.logout, process.pid, uvias.private, uvias.only_verified, uvias.custom_css_file_path
+			uvias.paths.sso, uvias.paths.logout, currentPID, uvias.private, uvias.only_verified, uvias.custom_css_file_path
 		]);
 	console.log("Sent service identifier");
 }

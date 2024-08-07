@@ -1,5 +1,5 @@
 {
-	"version": "2.2",
+	"version": "2.3",
 
 	"website": "https://ourworldoftext.com/",
 
@@ -33,6 +33,10 @@
 		"database": "",
 		"password": null,
 		"port": null
+	},
+
+	"uvias": {
+		"pid_bypass": false
 	},
 
 	"error_log": true,
