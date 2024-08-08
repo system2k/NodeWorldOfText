@@ -104,6 +104,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	var stopServer = server.stopServer;
 	var checkCSRF = server.checkCSRF;
 	var setClientVersion = server.setClientVersion;
+	var deployNewClientVersion = server.deployNewClientVersion;
 	var setupStaticShortcuts = server.setupStaticShortcuts;
 	var updateServerSetting = server.updateServerSetting;
 
@@ -119,6 +120,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 		if("set_cli_version" in post_data) {
 			var new_cli_version = post_data.set_cli_version;
 			if(setClientVersion(new_cli_version)) {
+				deployNewClientVersion();
 				return await callPage("admin/administrator", {
 					cons_update_msg: "Client version updated successfully"
 				});

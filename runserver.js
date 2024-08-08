@@ -235,6 +235,14 @@ function setClientVersion(ver) {
 	return true;
 }
 
+function deployNewClientVersion() {
+	var staticVersion = getClientVersion();
+	if(staticVersion) {
+		staticVersion = "?v=" + staticVersion;
+	}
+	httpServer.setDefaultTemplateData("staticVersion", staticVersion);
+}
+
 function handle_error(e, doLog) {
 	var str = JSON.stringify(process_error_arg(e));
 	log_error(str);
@@ -315,7 +323,9 @@ if(accountSystem == "uvias") {
 	pg.defaults.host = settings.pg_db.host || "/var/run/postgresql";
 	pg.defaults.database = settings.pg_db.database || "uvias";
 	pg.defaults.password = settings.pg_db.password;
-	pg.defaults.port = settings.pg_db.port || null;
+	if(settings.pg_db.port) {
+		pg.defaults.port = settings.pg_db.port;
+	}
 }
 
 class UviasClient {
@@ -839,11 +849,6 @@ function setupHTTPServer() {
 	httpServer.setDefaultTemplateData("registerPath", registerPath);
 	httpServer.setDefaultTemplateData("profilePath", profilePath);
 	httpServer.setDefaultTemplateData("accountSystem", accountSystem);
-	var staticVersion = getClientVersion();
-	if(staticVersion) {
-		staticVersion = "?v=" + staticVersion;
-	}
-	httpServer.setDefaultTemplateData("staticVersion", staticVersion);
 }
 
 
@@ -2367,6 +2372,7 @@ var global_data = {
 	rate_limiter,
 	getClientVersion,
 	setClientVersion,
+	deployNewClientVersion,
 	staticShortcuts,
 	setupStaticShortcuts,
 	getServerUptime
