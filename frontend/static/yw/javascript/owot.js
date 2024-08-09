@@ -114,6 +114,8 @@ var longpressPosition      = [0, 0];
 var tellEdit               = [];
 var autoTotal              = 0;
 var timesConnected         = 0;
+var homeX                  = 0;
+var homeY                  = 0;
 
 // intervals
 var pasteInterval          = 0;
@@ -1306,7 +1308,7 @@ function onKeyUp(e) {
 		autoArrowKeyMoveStop("right");
 	}
 	if(checkKeyPress(e, keyConfig.centerTeleport) && e.target == elm.textInput) { // home
-		w.doGoToCoord(0, 0);
+		w.doGoToCoord(homeY, homeX);
 	}
 }
 
@@ -1703,6 +1705,8 @@ function manageCoordHash() {
 			coord = window.location.hash.split(/#x:|,y:/).slice(1).map(function(a) {
 				return parseInt(a, 10);
 			});
+			homeX = coord[0];
+			homeY = coord[1];
 			w.doGoToCoord(coord[1], coord[0]);
 		}
 	} catch(e) {
