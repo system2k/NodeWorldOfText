@@ -19,7 +19,6 @@ var chatWriteTmpBuffer   = "";
 var defaultChatColor     = window.localStorage ? parseInt(localStorage.getItem("chatcolor")) : null; // 24-bit Uint
 var chatPageUnreadBar    = null;
 var chatGlobalUnreadBar  = null;
-var chatGreentext        = true;
 var chatEmotes           = true;
 var acceptChatDeletions  = true;
 var client_commands      = {}; // deprecated
@@ -761,12 +760,6 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 	var dateStr = "";
 	if(date) dateStr = convertToDate(date);
 	var pm = dataObj.privateMessage;
-	var isGreen = false;
-
-	if(chatGreentext && message[0] == ">" && !(":;_-".includes(message[1]))) { // exception to some emoticons
-		message = message.substr(1);
-		isGreen = true;
-	}
 
 	if(chatLimitCombChars) {
 		message = filterChatMessage(message);
@@ -878,10 +871,6 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 		} else if(pm == "from_me") {
 			pmDom.innerText = "Me -> ";
 		}
-	}
-
-	if(isGreen) {
-		message = "<span style=\"color: #789922\">&gt;" + message + "</span>";
 	}
 
 	// parse emoticons
