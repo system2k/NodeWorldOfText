@@ -6726,7 +6726,7 @@ Object.assign(w, {
 	},
 	chat: {
 		send: api_chat_send,
-		registerCommand: register_chat_comamnd
+		registerCommand: register_chat_command
 	},
 	broadcastReceive: function(force) {
 		if(w.receivingBroadcasts && !force) return;
