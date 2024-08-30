@@ -5928,6 +5928,8 @@ function StampSelection() {
 
 		canv.width = Math.floor(newWidth);
 		canv.height = Math.floor(newHeight);
+		canv.style.width = Math.floor(newWidth / zoomRatio) + "px";
+		canv.style.height = Math.floor(newHeight / zoomRatio) + "px";
 		ctx.font = font;
 
 		// background colors
