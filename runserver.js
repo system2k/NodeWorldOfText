@@ -1580,9 +1580,7 @@ function initWebsocketPingInterval() {
 			if(ws.readyState != WebSocket.OPEN) return;
 			try {
 				ws.ping();
-			} catch(e) {
-				handle_error(e);
-			}
+			} catch(e) {}
 		});
 	}, 1000 * 30);
 }
@@ -1973,7 +1971,9 @@ async function manageWebsocketConnection(ws, req) {
 
 	// must be at the top before any async calls (errors may otherwise occur before the event declaration)
 	ws.on("error", function(err) {
-		handle_error(JSON.stringify(process_error_arg(err)));
+		if(err && !["WS_ERR_INVALID_OPCODE", "Z_DATA_ERROR", "WS_ERR_UNSUPPORTED_MESSAGE_LENGTH"].includes(err.code)) {
+			handle_error(JSON.stringify(process_error_arg(err)));
+		}
 		if(!ws.sdata.terminated) {
 			ws.close();
 		}
