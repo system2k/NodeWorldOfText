@@ -1,0 +1,17 @@
+{
+	"name": "nwot-ts-client",
+	"description": "NWOT Client",
+	"version": "1.0.0",
+	"private": true,
+	"devDependencies": {
+		"ts-loader": "*",
+		"typescript": "*",
+		"webpack": "^5.73.0",
+		"webpack-cli": "^4.10.0"
+	},
+	"scripts": {
+		"build": "webpack",
+		"release": "webpack --config webpack.configprod.js",
+		"watch": "webpack --watch"
+	}
+}
