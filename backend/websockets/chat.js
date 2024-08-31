@@ -546,7 +546,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			});
 			// if user has blocked TELLs, don't let the /tell-er know
 			if(client.sdata.chat_blocks[id] && (client.sdata.chat_blocks.id.includes(clientId))) return; // is ID of the /tell sender? (not destination)
-			if(client.sdata.chat_blocks.block_all && opts.clientId != 0) return;
+			if(client.sdata.chat_blocks.block_all) return;
 			if(client.sdata.chat_blocks.no_tell) return;
 			if(client.sdata.chat_blocks.no_anon && !user.authenticated) return;
 			if(client.sdata.chat_blocks.no_reg && user.authenticated) return;
