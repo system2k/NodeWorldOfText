@@ -324,8 +324,7 @@ elm.chatsend.addEventListener("click", function() {
 });
 
 elm.chatbar.addEventListener("keypress", function(e) {
-	var keyCode = e.keyCode;
-	if(keyCode == 13) { // Enter
+	if(e.key == "Enter" || e.keyCode == 13) { // Enter
 		sendChat();
 	}
 });
