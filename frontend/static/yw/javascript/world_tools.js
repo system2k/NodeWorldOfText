@@ -1,4 +1,4 @@
-client_commands.search = function(args) {
+register_chat_command("search", function(args) {
 	var phrase = args.join(" ");
 	if(!phrase) return;
 	clientChatResponse("Looking for phrase: \"" + phrase + "\"");
@@ -24,4 +24,4 @@ client_commands.search = function(args) {
 	} else {
 		doSearch();
 	}
-}
+}, ["phrase"], "search for a phrase", "Hello world");
