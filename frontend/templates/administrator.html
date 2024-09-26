@@ -150,6 +150,9 @@
 			top: -5px;
 			font-size: 1.2em;
 		}
+		.page_link_opt {
+			display: block;
+		}
 	</style>
 {% endblock %}
 
@@ -307,12 +310,11 @@
 	<div class="content_set">
 		<div class="content_set_title">Page Links</div>
 		<div class="content_set_content">
-			<a href="/administrator/backgrounds/">Upload Page Backgrounds</a>
-			<br>
-			<a href="/administrator/restrictions/">Manage restrictions</a>
-			{% if user.operator %}<br>
-			<a href="/administrator/user_list/">User list</a><br>{% endif %}
-			<a href="/administrator/shell/">Execute shell script</a>
+			<a href="/administrator/backgrounds/" class="page_link_opt">Upload Page Backgrounds</a>
+			<a href="/administrator/restrictions/" class="page_link_opt">Manage restrictions</a>
+			{% if user.operator %}
+			<a href="/administrator/user_list/" class="page_link_opt">User list</a>{% endif %}
+			<a href="/administrator/shell/" class="page_link_opt">Execute shell script</a>
 		</div>
 	</div>
 
