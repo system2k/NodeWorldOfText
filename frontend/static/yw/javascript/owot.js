@@ -8084,6 +8084,7 @@ function begin() {
 	makeCoordGotoModal();
 	makeURLModal();
 	makeColorModal();
+	makeFontChangeModal();
 	makeSelectionModal();
 	addColorShortcuts();
 	updateColorPicker();
