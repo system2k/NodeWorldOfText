@@ -1196,8 +1196,19 @@ async function iterateDatabaseChanges() {
 						continue; // do not insert empty tile
 					}
 					tile.inserting = true; // don't cache invalidate tile as it's being inserted
-					writeQueue.push(["INSERT INTO tile VALUES(null, ?, ?, ?, ?, ?, ?, ?)",
-						[worldID, tile.content.join(""), tileY, tileX, JSON.stringify(propObj), tile.writability, Date.now()], function(newTile) {
+					writeQueue.push([`
+						INSERT INTO tile (id, world_id, content, tileY, tileX, properties, writability, created_at)
+						VALUES (null, $world_id, $content, $tileY, $tileX, $properties, $writability, $created_at)
+					`,
+						{
+							$world_id: worldID,
+							$content: tile.content.join(""),
+							$tileY: tileY,
+							$tileX: tileX,
+							$properties: JSON.stringify(propObj),
+							$writability: tile.writability,
+							$created_at: Date.now()
+						}, function(newTile) {
 							tile.inserting = false;
 							tile.tile_exists = true;
 							tile.tile_id = newTile.lastID;

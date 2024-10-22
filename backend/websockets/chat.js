@@ -32,6 +32,25 @@ function sanitizeColor(col) {
 	return "#00FF00"; // checking did not pass
 }
 
+function sanitizeCustomMeta(meta) {
+	if(typeof meta != "object") return undefined;
+	if(meta === null || Array.isArray(meta)) return undefined;
+	if(Object.keys(meta).length > 12) return undefined;
+
+	var output = {};
+	for(var k in meta) {
+		if(k.length > 36) continue;
+
+		var v = meta[k];
+		if(typeof v != "string" && typeof v != "number") continue;
+		if(k.length > 400) continue;
+
+		output[k] = v;
+	}
+
+	return output;
+}
+
 var chat_ip_limits = {};
 var tell_blocks = {};
 var blocked_ips_by_world_id = {}; // id 0 = global
@@ -174,6 +193,10 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		msg = msg.slice(0, 3030);
 	}
 
+	if(data.hasOwnProperty("customMeta")) {
+		data.customMeta = sanitizeCustomMeta(data.customMeta);
+	}
+
 	var username_to_display = user.username;
 	if(accountSystem == "uvias") {
 		username_to_display = user.display_username;
@@ -205,8 +228,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "delete", ["id", "timestamp"], "delete a chat message", "1220 1693147307895"], // check for permission
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
 		[0, "whoami", null, "display your identity"],
-		[0, "test", null, "preview your appearance"],
-		[0, "stats", null, "view stats of a world"]
+		[0, "test", null, "preview your appearance"]
 
 		// hidden by default
 		// "/search Phrase" (client) -> searches for Phrase within a 25 tile radius
@@ -498,7 +520,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				staff: user.staff,
 				color: data.color,
 				kind: "chat",
-				privateMessage: "to_me"
+				privateMessage: "to_me",
+				customMeta: data.customMeta
 			};
 
 			if(user.authenticated && user.id in ranks_cache.users) {
@@ -518,11 +541,12 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				staff: false,
 				color: "#000000",
 				kind: "chat",
-				privateMessage: "from_me"
+				privateMessage: "from_me",
+				customMeta: data.customMeta
 			});
 			// if user has blocked TELLs, don't let the /tell-er know
 			if(client.sdata.chat_blocks[id] && (client.sdata.chat_blocks.id.includes(clientId))) return; // is ID of the /tell sender? (not destination)
-			if(client.sdata.chat_blocks.block_all && opts.clientId != 0) return;
+			if(client.sdata.chat_blocks.block_all) return;
 			if(client.sdata.chat_blocks.no_tell) return;
 			if(client.sdata.chat_blocks.no_anon && !user.authenticated) return;
 			if(client.sdata.chat_blocks.no_reg && user.authenticated) return;
@@ -648,12 +672,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			idstr += "Chat ID: " + clientId;
 			return serverChatResponse(idstr, location);
 		},
-		stats: function() {
-			var stat = "Stats for world:\n";
-			stat += "Creation date: " + create_date(world.creationDate) + "\n";
-			stat += "View count: " + world.views;
-			return serverChatResponse(stat, location);
-		},
 		delete: async function(id, timestamp) {
 			if(!is_owner && !user.staff) return;
 			id = san_nbr(id);
@@ -768,9 +786,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			case "whoami":
 				com.whoami();
 				return;
-			case "stats":
-				com.stats();
-				return;
 			case "delete":
 				com.delete(commandArgs[1], commandArgs[2]);
 				return;
@@ -795,7 +810,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		op: user.operator,
 		admin: user.superuser,
 		staff: user.staff,
-		color: data.color
+		color: data.color,
+		customMeta: data.customMeta
 	};
 
 	if(user.authenticated && user.id in ranks_cache.users) {
@@ -804,28 +820,29 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		chatData.rankColor = rank.chat_color;
 	}
 
-	// chat interceptor (e.g. for easy filtering)
 	// the plugin interface is subject to change - use at your own risk
 	var chatPlugin = loadPlugin();
 	if(chatPlugin && chatPlugin.chat) {
 		var check = false;
 		try {
 			check = chatPlugin.chat({
-				raw: chatData,
-				isCommand,
-				ip: ipHeaderAddr,
-				isOwner: is_owner,
-				isMember: is_member,
-				isOperator: user.operator,
-				isSuperuser: user.superuser,
-				isStaff: user.staff,
-				isAuth: user.authenticated,
-				worldName: world.name,
-				worldId: world.id,
-				location: location,
-				nickname: nick,
-				message: msg,
-				id: clientId
+				client: ws.sdata,
+				user: user,
+				world: world,
+				message: {
+					isCommand,
+					isMuted,
+					isOwner: is_owner,
+					isMember: is_member,
+					rankName: chatData.rankName,
+					rankColor: chatData.rankColor,
+					location: location,
+					nickname: nick,
+					username: username_to_display,
+					message: msg,
+					color: data.color,
+					id: clientId
+				}
 			});
 		} catch(e) {
 			check = false;

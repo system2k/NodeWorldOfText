@@ -235,6 +235,14 @@ function setClientVersion(ver) {
 	return true;
 }
 
+function deployNewClientVersion() {
+	var staticVersion = getClientVersion();
+	if(staticVersion) {
+		staticVersion = "?v=" + staticVersion;
+	}
+	httpServer.setDefaultTemplateData("staticVersion", staticVersion);
+}
+
 function handle_error(e, doLog) {
 	var str = JSON.stringify(process_error_arg(e));
 	log_error(str);
@@ -314,6 +322,10 @@ if(accountSystem == "uvias") {
 	pg.defaults.user = settings.pg_db.user || "owot";
 	pg.defaults.host = settings.pg_db.host || "/var/run/postgresql";
 	pg.defaults.database = settings.pg_db.database || "uvias";
+	pg.defaults.password = settings.pg_db.password;
+	if(settings.pg_db.port) {
+		pg.defaults.port = settings.pg_db.port;
+	}
 }
 
 class UviasClient {
@@ -331,6 +343,8 @@ class UviasClient {
 	private = null;
 	only_verified = null;
 	custom_css_file_path = null;
+
+	pid_bypass = false;
 
 	paths = {
 		sso: null,
@@ -404,6 +418,9 @@ function setupUvias() {
 		uvias.custom_css_file_path = path.resolve(uvias.custom_css_file_path);
 	}
 
+	if(settings.uvias?.pid_bypass) {
+		uvias.pid_bypass = true;
+	}
 
 	uvias.paths.sso = "/accounts/sso";
 	// redirect to /accounts/logout/ to clear token cookie
@@ -586,7 +603,8 @@ var websockets = {
 	protect: require("./backend/websockets/protect.js"),
 	write: require("./backend/websockets/write.js"),
 	config: require("./backend/websockets/config.js"),
-	boundary: require("./backend/websockets/boundary.js")
+	boundary: require("./backend/websockets/boundary.js"),
+	stats: require("./backend/websockets/stats.js")
 };
 
 var modules = {
@@ -831,11 +849,6 @@ function setupHTTPServer() {
 	httpServer.setDefaultTemplateData("registerPath", registerPath);
 	httpServer.setDefaultTemplateData("profilePath", profilePath);
 	httpServer.setDefaultTemplateData("accountSystem", accountSystem);
-	var staticVersion = getClientVersion();
-	if(staticVersion) {
-		staticVersion = "?v=" + staticVersion;
-	}
-	httpServer.setDefaultTemplateData("staticVersion", staticVersion);
 }
 
 
@@ -1567,18 +1580,20 @@ function initWebsocketPingInterval() {
 			if(ws.readyState != WebSocket.OPEN) return;
 			try {
 				ws.ping();
-			} catch(e) {
-				handle_error(e);
-			}
+			} catch(e) {}
 		});
 	}, 1000 * 30);
 }
 
 async function uviasSendIdentifier() {
+	var currentPID = process.pid;
+	if(uvias.pid_bypass) {
+		currentPID = 1;
+	}
 	await uvias.run("SELECT accounts.set_service_info($1::text, $2::text, $3::text, $4::text, $5::text, $6::integer, $7::boolean, $8::boolean, $9::text);",
 		[
 			uvias.id, uvias.name, uvias.domain,
-			uvias.paths.sso, uvias.paths.logout, process.pid, uvias.private, uvias.only_verified, uvias.custom_css_file_path
+			uvias.paths.sso, uvias.paths.logout, currentPID, uvias.private, uvias.only_verified, uvias.custom_css_file_path
 		]);
 	console.log("Sent service identifier");
 }
@@ -1857,6 +1872,7 @@ async function manageWebsocketConnection(ws, req) {
 		ipAddress: null,
 		ipAddressFam: null,
 		ipAddressVal: null,
+		headers: req.headers,
 		origin: req.headers["origin"],
 		userClient: false,
 		world: null,
@@ -1955,7 +1971,9 @@ async function manageWebsocketConnection(ws, req) {
 
 	// must be at the top before any async calls (errors may otherwise occur before the event declaration)
 	ws.on("error", function(err) {
-		handle_error(JSON.stringify(process_error_arg(err)));
+		if(err && !["WS_ERR_INVALID_OPCODE", "Z_DATA_ERROR", "WS_ERR_UNSUPPORTED_MESSAGE_LENGTH"].includes(err.code)) {
+			handle_error(JSON.stringify(process_error_arg(err)));
+		}
 		if(!ws.sdata.terminated) {
 			ws.close();
 		}
@@ -2354,6 +2372,7 @@ var global_data = {
 	rate_limiter,
 	getClientVersion,
 	setClientVersion,
+	deployNewClientVersion,
 	staticShortcuts,
 	setupStaticShortcuts,
 	getServerUptime

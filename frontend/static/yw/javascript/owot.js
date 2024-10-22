@@ -114,6 +114,8 @@ var longpressPosition      = [0, 0];
 var tellEdit               = [];
 var autoTotal              = 0;
 var timesConnected         = 0;
+var homeX                  = 0;
+var homeY                  = 0;
 
 // intervals
 var pasteInterval          = 0;
@@ -1306,7 +1308,7 @@ function onKeyUp(e) {
 		autoArrowKeyMoveStop("right");
 	}
 	if(checkKeyPress(e, keyConfig.centerTeleport) && e.target == elm.textInput) { // home
-		w.doGoToCoord(0, 0);
+		w.doGoToCoord(homeY, homeX);
 	}
 }
 
@@ -1703,6 +1705,8 @@ function manageCoordHash() {
 			coord = window.location.hash.split(/#x:|,y:/).slice(1).map(function(a) {
 				return parseInt(a, 10);
 			});
+			homeX = coord[0];
+			homeY = coord[1];
 			w.doGoToCoord(coord[1], coord[0]);
 		}
 	} catch(e) {
@@ -3502,10 +3506,10 @@ function setupLinkElement() {
 			runJSLink(url, isMainPage() && charInfo.protection == 0);
 			return false;
 		} else if(prot == "com") {
-			w.broadcastCommand(url);
+			w.broadcastCommand(url, false, currentSelectedLinkCoords);
 			return false;
 		} else if(prot == "comu") {
-			w.broadcastCommand(url, true);
+			w.broadcastCommand(url, true, currentSelectedLinkCoords);
 			return false;
 		} else if(prot == "action") { // built-in client command
 			runClientCommand(url, currentSelectedLinkCoords);
@@ -3577,8 +3581,8 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 			// there may be performance gains, but we really don't know for sure
 			elm.link_tooltip.innerText = tooltip;
 		}
-		var posX = mouseX + 15;
-		var posY = mouseY + 25;
+		var posX = (mouseX + 15) / zoomRatio;
+		var posY = (mouseY + 25) / zoomRatio;
 		if(posX < 0) posX = 0;
 		if(posY < 0) posY = 0;
 		if(posX + elm.link_tooltip.offsetWidth >= window.innerWidth) {
@@ -5924,6 +5928,8 @@ function StampSelection() {
 
 		canv.width = Math.floor(newWidth);
 		canv.height = Math.floor(newHeight);
+		canv.style.width = Math.floor(newWidth / zoomRatio) + "px";
+		canv.style.height = Math.floor(newHeight / zoomRatio) + "px";
 		ctx.font = font;
 
 		// background colors
@@ -6383,11 +6389,12 @@ var network = {
 			type: type
 		});
 	},
-	cmd: function(data, include_username) {
+	cmd: function(data, include_username, coords) {
 		network.transmit({
 			kind: "cmd",
 			data: data, // maximum length of 2048
-			include_username: include_username
+			include_username: include_username,
+			coords: coords
 		});
 	},
 	cmd_opt: function() {
@@ -6437,13 +6444,14 @@ var network = {
 		}
 		network.transmit(fetchReq);
 	},
-	chat: function(message, location, nickname, color) {
+	chat: function(message, location, nickname, color, customMeta) {
 		network.transmit({
 			kind: "chat",
 			nickname: nickname,
 			message: message,
 			location: location,
-			color: color
+			color: color,
+			customMeta: customMeta
 		});
 	},
 	ping: function(callback) {
@@ -6510,7 +6518,18 @@ var network = {
 			maxX: maxX,
 			maxY: maxY
 		});
-	}	
+	},
+	stats: function(callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "stats",
+			id: cb_id // optional: number
+		});
+	}
 };
 
 Object.assign(w, {
@@ -6713,15 +6732,15 @@ Object.assign(w, {
 	},
 	chat: {
 		send: api_chat_send,
-		registerCommand: register_chat_comamnd
+		registerCommand: register_chat_command
 	},
 	broadcastReceive: function(force) {
 		if(w.receivingBroadcasts && !force) return;
 		w.receivingBroadcasts = true;
 		network.cmd_opt();
 	},
-	broadcastCommand: function(data, includeUsername) {
-		network.cmd(data, includeUsername);
+	broadcastCommand: function(data, includeUsername, coords) {
+		network.cmd(data, includeUsername, coords);
 	},
 	jquery: function(callback) {
 		if(window.jQuery) return;
@@ -8013,6 +8032,16 @@ var ws_functions = {
 				break;
 			case "PARAM": // invalid parameters in message
 				break;
+		}
+	},
+	stats: function(data) {
+		w.emit("stats", data);
+		if(data.id) {
+			if(network.callbacks[data.id]) {
+				var cb = network.callbacks[data.id];
+				delete network.callbacks[data.id];
+				cb(data);
+			}
 		}
 	}
 };

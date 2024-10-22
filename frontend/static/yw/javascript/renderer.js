@@ -478,8 +478,20 @@ var fracBlockTransforms = [
 	[[2, 1/8],
 	[1, 1/8]],
 	
-	// relative offset: 0x1FB82 (until 0x1FB8B)
-	[[2, 2/8],
+	// relative offset: 0x1FB70 (until 0x1FB8B)
+	[[0, 1/8, 1/8],
+	[0, 1/8, 2/8],
+	[0, 1/8, 3/8],
+	[0, 1/8, 4/8],
+	[0, 1/8, 5/8],
+	[0, 1/8, 6/8],
+	[2, 1/8, 1/8],
+	[2, 1/8, 2/8],
+	[2, 1/8, 3/8],
+	[2, 1/8, 4/8],
+	[2, 1/8, 5/8],
+	[2, 1/8, 6/8],
+	,,,,,,[2, 2/8],
 	[2, 3/8],
 	[2, 5/8],
 	[2, 6/8],
@@ -499,6 +511,7 @@ function isValidSpecialSymbol(charCode) {
 	if(charCode >= 0x1CD00 && charCode <= 0x1CDE5) return true;
 	if(charCode >= 0x1FB00 && charCode <= 0x1FB3B) return true;
 	if(charCode >= 0x1FB3C && charCode <= 0x1FB6F) return true;
+	if(charCode >= 0x1FB70 && charCode <= 0x1FB7B) return true;
 	if(charCode >= 0x1FB82 && charCode <= 0x1FB8B) return true;
 
 	switch(charCode) {
@@ -634,21 +647,34 @@ function drawFractionalBlockChar(charCode, textRender, x, y, width, height) {
 		transform = fracBlockTransforms[0][charCode - 0x2580];
 	} else if(charCode >= 0x2594 && charCode <= 0x2595) {
 		transform = fracBlockTransforms[1][charCode - 0x2594];
-	} else if(charCode >= 0x1FB82 && charCode <= 0x1FB8B) {
-		transform = fracBlockTransforms[2][charCode - 0x1FB82];
+	} else if(charCode >= 0x1FB70 && charCode <= 0x1FB8B) {
+		transform = fracBlockTransforms[2][charCode - 0x1FB70];
 	}
 	if(!transform) return;
 
 	var dir = transform[0];
 	var frac = transform[1];
+	var offset = transform[2] ?? 0;
 	var x2 = x + width - 1;
 	var y2 = y + height - 1;
 
 	switch(dir) {
-		case 0: x2 -= width - (width * frac); break;
-		case 1: x += width - (width * frac); break;
-		case 2: y2 -= height - (height * frac); break;
-		case 3: y += height - (height * frac); break;
+		case 0:
+			x2 -= width - (width * (frac+offset));
+			x += width * offset;
+			break;
+		case 1:
+			x += width - (width * (frac+offset));
+			x2 -= width * offset;
+			break;
+		case 2:
+			y2 -= height - (height * (frac+offset));
+			y += height * offset;
+			break;
+		case 3:
+			y += height - (height * (frac+offset));
+			y2 -= height * offset;
+			break;
 	}
 
 	textRender.fillRect(x, y, x2 - x + 1, y2 - y + 1);
@@ -658,6 +684,7 @@ function drawBlockChar(charCode, textRender, x, y, cellW, cellH) {
 	var isShade = charCode >= 0x2591 && charCode <= 0x2593;
 	var isFractionalBlock = (charCode >= 0x2580 && charCode <= 0x2590) ||
 							(charCode >= 0x2594 && charCode <= 0x2595) ||
+							(charCode >= 0x1FB70 && charCode <= 0x1FB7B) ||
 							(charCode >= 0x1FB82 && charCode <= 0x1FB8B);
 	var is2by2 = charCode >= 0x2596 && charCode <= 0x259F;
 	var is2by3 = charCode >= 0x1FB00 && charCode <= 0x1FB3B;
