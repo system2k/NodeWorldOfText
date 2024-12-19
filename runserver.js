@@ -1470,7 +1470,9 @@ function getWorldData(worldId) {
 }
 
 function generateClientId(ip_addr) {
-	return crypto.createHash("sha256").update(ip_addr).update(settings.id_pepper).digest().readUIntBE(0, 3);
+	var id = crypto.createHash("sha256").update(ip_addr).update(settings.id_pepper).digest().readUIntBE(0, 3);
+	if (id == 0) id = 1; // better safe than sorry right
+	return id;
 }
 
 function getUserCountFromWorld(worldId) {
