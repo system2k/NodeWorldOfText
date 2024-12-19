@@ -63,5 +63,6 @@
 		"display_email": "\"Our World of Text\" <email@site.com>"
 	},
 
+	"id_pepper": "REPLACE THIS WITH A SECRET HIGH-ENTROPY VALUE",
 	"activation_key_days_expire": 3
 }

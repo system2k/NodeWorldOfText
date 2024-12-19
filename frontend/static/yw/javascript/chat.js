@@ -761,6 +761,7 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 	if(date) dateStr = convertToDate(date);
 	var pm = dataObj.privateMessage;
 	var isGreen = false;
+	var hexId = id.toString(16);
 
 	if(chatGreentext && message[0] == ">" && !(":;_-".includes(message[1]))) { // exception to some emoticons
 		message = message.substr(1);
@@ -792,7 +793,7 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 	}
 
 	if(type == "user" || type == "user_nick") {
-		nickTitle.push("ID " + id);
+		nickTitle.push("ID " + hexId);
 	}
 
 	if(hasTagDom) {
@@ -832,13 +833,13 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 			nickDom.style.fontWeight = "bold";
 		}
 		nickDom.style.pointerEvents = "default";
-		if(state.userModel.is_operator) idTag = "[" + id + "]";
+		if(state.userModel.is_operator) idTag = "[" + hexId + "]";
 	}
 	if(type == "anon_nick") {
-		idTag = "[*" + id + "]"
+		idTag = "[*" + hexId + "]"
 	}
 	if(type == "anon") {
-		idTag = "[" + id + "]"
+		idTag = "[" + hexId + "]"
 	}
 	if(type == "user_nick") {
 		nickDom.style.color = color;
@@ -847,7 +848,7 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 			impersonationWarning = " (Special chars)";
 		}
 		nickTitle.push("Username \"" + realUsername + "\"" + impersonationWarning);
-		if(state.userModel.is_operator) idTag = "[*" + id + "]";
+		if(state.userModel.is_operator) idTag = "[*" + hexId + "]";
 	}
 
 	if(state.userModel.is_operator) {

@@ -1462,33 +1462,15 @@ function getWorldData(worldId) {
 	if(worldData[worldId]) return worldData[worldId];
 
 	worldData[worldId] = {
-		id_overflow_int: 10000,
 		display_user_count: 0,
 		user_count: 0
 	};
 
 	return worldData[worldId];
 }
-function generateClientId(world_id) {
-	var worldObj = getWorldData(world_id);
 
-	var rand_ids = client_ips[world_id];
-	if(!rand_ids) rand_ids = {};
-
-	// attempt to get a random id
-	for(var i = 0; i < 64; i++) {
-		var inclusive_id = Math.floor(Math.random() * ((9999 - 1) + 1)) + 1;
-		if(!rand_ids[inclusive_id]) {
-			return inclusive_id;
-		}
-	}
-	// attempt to enumerate if it failed
-	for(var i = 1; i <= 9999; i++) {
-		if(!rand_ids[i]) {
-			return i;
-		}
-	}
-	return worldObj.id_overflow_int++;
+function generateClientId(ip_addr) {
+	return crypto.createHash("sha256").update(ip_addr).update(settings.ip_pepper).digest().readUIntBE(0, 3);
 }
 
 function getUserCountFromWorld(worldId) {
@@ -2104,7 +2086,7 @@ async function manageWebsocketConnection(ws, req) {
 		initial_user_count = worldObj.user_count;
 	}
 
-	clientId = generateClientId(world.id);
+	clientId = generateClientId(ws.sdata.ipAddress);
 
 	if(!client_ips[world.id]) {
 		client_ips[world.id] = {};
