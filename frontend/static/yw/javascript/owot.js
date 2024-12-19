@@ -35,7 +35,7 @@ function decimal(percentage) {
 	return percentage / 100;
 }
 function normFontSize(size) {
-	return Math.floor(size / 0.1) * 0.1;
+	return Math.floor(size * 10) / 10;
 }
 function deviceRatio() {
 	var ratio = window.devicePixelRatio;
@@ -95,6 +95,7 @@ var fontTemplate           = "$px 'Courier New', monospace";
 var specialFontTemplate    = "$px consolas, monospace";
 var fontOrder              = ["Courier New", "monospace"];
 var specialFontOrder       = ["consolas", "monospace"];
+var fontSize               = 16;
 var initiallyFetched       = false;
 var lastLinkHover          = null; // [tileX, tileY, charX, charY]
 var lastTileHover          = null; // [type, tileX, tileY, (charX, charY)]
@@ -743,10 +744,8 @@ function updateScaleConsts() {
 	tileWidth = Math.ceil(tileW);
 	tileHeight = Math.ceil(tileH);
 
-	var fontSize = normFontSize(16 * zoom);
-
-	font = fontTemplate.replace("$", fontSize);
-	specialCharFont = specialFontTemplate.replace("$", fontSize);
+	font = fontTemplate.replace("$", normFontSize(fontSize * zoom));
+	specialCharFont = specialFontTemplate.replace("$", normFontSize(16 * zoom));
 
 	textRenderCanvas.width = tileWidth + 5;
 	textRenderCanvas.height = tileHeight + 5;
@@ -5162,6 +5161,7 @@ function buildMenu() {
 	menuOptions.goToCoords = menu.addOption("Go to coordinates", w.goToCoord);
 	menuOptions.coordLink = menu.addOption("Create link to coordinates", w.coordLink);
 	menuOptions.urlLink = menu.addOption("Create link to URL", w.urlLink);
+	menuOptions.changeFont = menu.addOption("Change font", w.fontModal);
 	menuOptions.ownerArea = menu.addOption("Make an area owner-only", function() {
 		return w.doProtect("owner-only");
 	});
@@ -6560,7 +6560,8 @@ Object.assign(w, {
 		coordGotoModal: null,
 		urlModal: null,
 		colorModal: null,
-		selectionModal: null
+		selectionModal: null,
+		fontModal: null
 	},
 	styles: styles,
 	backgroundInfo: {
@@ -6669,6 +6670,9 @@ Object.assign(w, {
 	},
 	coordLink: function() {
 		w.ui.coordLinkModal.open();
+	},
+	fontModal: function() {
+		w.ui.fontModal.open();
 	},
 	doProtect: function(protectType, unprotect) {
 		// show the protection precision menu
@@ -7300,6 +7304,22 @@ function makeColorModal() {
 		modal.hideTab("fg");
 	}
 	w.ui.colorModal = modal;
+}
+
+function makeFontChangeModal() {
+	var modal = new Modal();
+	modal.createForm();
+	modal.setFormTitle("Set font and font size:\n");
+	var fontInput = modal.addEntry("Font", "text").input;
+	fontInput.value = fontTemplate.split(",")[0].slice(5, -1);
+	var fontSizeInput = modal.addEntry("Font size", "text", "number").input;
+	fontSizeInput.value = fontSize;
+	modal.onSubmit(function() {
+		w.changeFont(`$px '${fontInput.value}', monospace, legacycomputing`);
+		fontSize = parseFloat(fontSizeInput.value);
+		updateScaleConsts();
+	});
+	w.ui.fontModal = modal;
 }
 
 function makeSelectionModal() {
@@ -8075,6 +8095,7 @@ function begin() {
 	makeCoordGotoModal();
 	makeURLModal();
 	makeColorModal();
+	makeFontChangeModal();
 	makeSelectionModal();
 	addColorShortcuts();
 	updateColorPicker();
