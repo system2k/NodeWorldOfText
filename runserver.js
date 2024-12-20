@@ -61,6 +61,7 @@ var advancedSplit        = utils.advancedSplit;
 var filterEdit           = utils.filterEdit;
 var toHex64              = utils.toHex64;
 var toInt64              = utils.toInt64;
+var generateChatId       = utils.generateChatId;
 
 var parseCookie = frameUtils.parseCookie;
 
@@ -115,7 +116,10 @@ var sql_edits_init = "./backend/edits.sql";
 
 var serverSettings = {
 	announcement: "",
-	chatGlobalEnabled: "1"
+	chatGlobalEnabled: "1",
+	chatIdInternalSalt: "",
+	chatIdSequence: "0",
+	chatIdRandKeys: ""
 };
 var serverSettingsStatus = {};
 
@@ -170,6 +174,7 @@ var memTileCache = {};
 
 var clientVersion = "";
 var ranks_cache = { users: {} };
+var chat_id_cache = { promises: {}, entries: {} };
 var restr_cache = "";
 var restr_cg1_cache = "";
 var restr_update = null;
@@ -867,20 +872,6 @@ async function initializeServer() {
 	setupZipLog();
 	setupHTTPServer();
 
-	await initialize_misc_db();
-	await initialize_ranks_db();
-	await initialize_edits_db();
-	await initialize_image_db();
-
-	global_data.db = db;
-	global_data.db_img = db_img;
-	global_data.db_misc = db_misc;
-	global_data.db_edits = db_edits;
-	global_data.db_chat = db_chat;
-
-	global_data.checkCSRF = httpServer.checkCSRF;
-	global_data.createCSRF = httpServer.createCSRF;
-
 	if(accountSystem == "local") {
 		await loadEmail();
 	}
@@ -902,13 +893,32 @@ async function initializeServer() {
 		await db.exec(indexes);
 
 		init = true;
+	}
+
+	await loadServerSettings();
+
+	await initialize_misc_db();
+	await initialize_ranks_db();
+	await initialize_edits_db();
+	await initialize_image_db();
+	await initialize_chatid_db();
+
+	global_data.db = db;
+	global_data.db_img = db_img;
+	global_data.db_misc = db_misc;
+	global_data.db_edits = db_edits;
+	global_data.db_chat = db_chat;
+
+	global_data.checkCSRF = httpServer.checkCSRF;
+	global_data.createCSRF = httpServer.createCSRF;
+
+	if(init) {
 		if(accountSystem == "local") {
 			account_prompt();
 		} else if(accountSystem == "uvias") {
 			account_prompt(true);
 		}
-	}
-	if(!init) {
+	} else {
 		start_server();
 	}
 }
@@ -975,6 +985,18 @@ async function initialize_ranks_db() {
 	for(var i = 0; i < user_ranks.length; i++) {
 		var ur = user_ranks[i];
 		ranks_cache.users[ur.userid] = ur.rank;
+	}
+}
+
+async function initialize_chatid_db() {
+	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='chat_ids'")) {
+		await db_misc.run("CREATE TABLE 'chat_ids' (id INTEGER, ip_hash TEXT, ip_family INTEGER, date INTEGER)");
+		await db_misc.run("CREATE INDEX 'chatid_byip' ON chat_ids (ip_hash, ip_family)");
+		await updateServerSetting("chatIdInternalSalt", crypto.randomBytes(16).toString("hex"));
+		let randKeys = new Array(4).fill(0).map(() => 
+			Math.floor(Math.random() * (2**32))
+		).join(",");
+		await updateServerSetting("chatIdRandKeys", randKeys);
 	}
 }
 
@@ -1469,10 +1491,51 @@ function getWorldData(worldId) {
 	return worldData[worldId];
 }
 
-function generateClientId(ip_addr) {
-	var id = crypto.createHash("sha256").update(ip_addr).update(settings.id_pepper).digest().readUIntBE(0, 3);
-	if (id == 0) id = 1; // better safe than sorry right
-	return id;
+async function retrieveChatId(ipVal, ipFam) {
+	// this hash is used exclusively for database lookups
+	const ipHash = crypto.createHash("sha256").update(ipVal.toString()).update(
+		getServerSetting("chatIdInternalSalt")
+	).digest().subarray(0, 8).toString("hex");
+
+	const cacheKey = ipVal + "," + ipFam;
+	const cachedValue = chat_id_cache.entries[cacheKey];
+	if(cachedValue) {
+		if(cachedValue == -1) { // is pending?
+			chat_id_cache.promises[cacheKey] ??= [];
+			return new Promise(function(res) {
+				chat_id_cache.promises[cacheKey].push(res);
+			});
+		} else {
+			return cachedValue;
+		}
+	}
+
+	const dbChatId = await db_misc.get("SELECT * FROM chat_ids WHERE ip_hash=? AND ip_family=?", [ipHash, ipFam]);
+	let currentChatId;
+	if(!dbChatId) {
+		let seq = Number(getServerSetting("chatIdSequence"));
+		let keys = getServerSetting("chatIdRandKeys").split(",").map(Number);
+		let newId = generateChatId(seq++, keys);
+		if(newId == 0) {
+			// if we get 0, skip over that and try again. we should only ever hit it once.
+			newId = generateChatId(seq++, keys);
+			if(newId == 0) newId = 1; // we can't risk it in case of a defective algorithm
+		}
+		await db_misc.run("INSERT INTO chat_ids VALUES(?, ?, ?, ?)", [
+			newId, ipHash, ipFam, Date.now()
+		]);
+		updateServerSetting("chatIdSequence", seq.toString());
+		currentChatId = newId;
+	} else {
+		currentChatId = dbChatId.id;
+	}
+	// resolve all pending promises
+	if(chat_id_cache.promises[cacheKey]) {
+		chat_id_cache.promises[cacheKey].forEach((p) => p.call(currentChatId));
+		delete chat_id_cache.promises[cacheKey];
+	}
+	chat_id_cache.entries[cacheKey] = currentChatId;
+	return currentChatId;
 }
 
 function getUserCountFromWorld(worldId) {
@@ -2088,7 +2151,7 @@ async function manageWebsocketConnection(ws, req) {
 		initial_user_count = worldObj.user_count;
 	}
 
-	clientId = generateClientId(ws.sdata.ipAddress);
+	clientId = await retrieveChatId(ws.sdata.ipAddressVal, ws.sdata.ipAddressFam);
 
 	if(!client_ips[world.id]) {
 		client_ips[world.id] = {};
@@ -2225,7 +2288,6 @@ async function manageWebsocketConnection(ws, req) {
 }
 
 async function start_server() {
-	await loadServerSettings();
 	loadRestrictionsList();
 	
 	if(accountSystem == "local") {

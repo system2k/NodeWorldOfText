@@ -12,6 +12,25 @@ function toInt64(n) {
 	return a[0];
 }
 
+function generateChatId(index, keys) {
+	// index: Based on a sequential numeric sequence
+	// keys: An array of four random 24-bit prime numbers
+	// Returns a 24-bit randomized ID
+	// Based on a modified XTEA algorithm
+	var numRounds = 12;
+	var v0 = (index >> 12) & 0xFFF;
+	var v1 = index & 0xFFF;
+	var sum = 0;
+	var delta = 0xFE1273CD;
+	for(var i = 0; i < numRounds; i++) {
+		v0 = (v0 + ((((v1 << 4) >>> 0) ^ (v1 >>> 5)) + v1) ^ (sum + keys[sum & 3])) & 0xFFF;
+		sum = (sum + delta) >>> 0;
+		v1 = (v1 + ((((v0 << 4) >>> 0) ^ (v0 >>> 5)) + v0) ^ (sum + keys[(sum >>> 11) & 3])) & 0xFFF;
+	}
+	var res = v1 << 12 | v0;
+	return res;
+}
+
 function trimHTML(html) {
 	// ensure all lines are \r\n instead of just \n (consistent)
 	html = html.replace(/\r\n/g, "\n");
@@ -851,5 +870,6 @@ module.exports = {
 	trimSlash,
 	checkDuplicateCookie,
 	toHex64,
-	toInt64
+	toInt64,
+	generateChatId
 };
