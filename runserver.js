@@ -1538,6 +1538,29 @@ async function retrieveChatId(ipVal, ipFam) {
 	return currentChatId;
 }
 
+function canChooseChatId(chatId, worldId) {
+	let clientObj = client_ips[worldId] && client_ips[worldId][chatId];
+	return !clientObj || (clientObj && clientObj[2]);
+}
+
+function chooseChatId(chatId, worldId) {
+	for(let i = 0; i < 20; i++) {
+		let rand = Math.floor(Math.random() * 100);
+		let candidateId = chatId * 256 + rand;
+		if(canChooseChatId(candidateId, worldId)) {
+			return candidateId;
+		}
+	}
+	// we couldn't find an open ID, so try them all
+	for(let i = 0; i < 256; i++) {
+		let candidateId = clientId * 256 + i;
+		if(canChooseChatId(candidateId, worldId)) {
+			return candidateId;
+		}
+	}
+	return candidateId * 256 + 0; // failsafe
+}
+
 function getUserCountFromWorld(worldId) {
 	var counter = 0;
 	wss.clients.forEach(function(ws) {
@@ -2152,6 +2175,8 @@ async function manageWebsocketConnection(ws, req) {
 	}
 
 	clientId = await retrieveChatId(ws.sdata.ipAddressVal, ws.sdata.ipAddressFam);
+	// perform adjustment to make ID unique to client
+	clientId = chooseChatId(clientId, world.id);
 
 	if(!client_ips[world.id]) {
 		client_ips[world.id] = {};

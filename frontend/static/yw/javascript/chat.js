@@ -761,7 +761,10 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 	if(date) dateStr = convertToDate(date);
 	var pm = dataObj.privateMessage;
 	var isGreen = false;
-	var hexId = id.toString(16);
+
+	var baseId = id >> 8;
+	var connectionId = id & 0xFF;
+	var hexId = baseId.toString(16) + ":" + connectionId;
 
 	if(chatGreentext && message[0] == ">" && !(":;_-".includes(message[1]))) { // exception to some emoticons
 		message = message.substr(1);
