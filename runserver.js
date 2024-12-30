@@ -1670,6 +1670,9 @@ function wsSend(socket, data) {
 				socket.sdata.messageBackpressure--;
 			}
 			error = true;
+			if(socket.sdata.methods.updateNetworkStats) {
+				socket.sdata.methods.updateNetworkStats();
+			}
 		});
 	} catch(e) {
 		if(!error && socket.sdata) {
@@ -1868,6 +1871,9 @@ function invalidateWebsocketSession(session_token) {
 async function manageWebsocketConnection(ws, req) {
 	if(isStopping || !serverLoaded) return ws.close();
 	ws.sdata = {
+		methods: {
+			updateNetworkStats: null
+		},
 		terminated: false,
 		ipAddress: null,
 		ipAddressFam: null,
@@ -1992,6 +1998,8 @@ async function manageWebsocketConnection(ws, req) {
 		bytesWritten = b_out;
 		bytesRead = b_in;
 	}
+	ws.sdata.methods.updateNetworkStats = updateNetworkStats;
+
 	function send_ws(data) {
 		wsSend(ws, data);
 		updateNetworkStats();
