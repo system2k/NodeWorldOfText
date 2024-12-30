@@ -8,6 +8,7 @@ var owot, owotCtx, textInput;
 var linkElm, linkDiv;
 var colorInput, colorInputBg;
 var colorShortcuts, colorShortcutsBg;
+var urlInput;
 function init_dom() {
 	owot = document.getElementById("owot");
 	owot.style.display = "block";
@@ -5160,8 +5161,7 @@ function buildMenu() {
 	});
 	menuOptions.changeColor = menu.addOption("Change color", w.color);
 	menuOptions.goToCoords = menu.addOption("Go to coordinates", w.goToCoord);
-	menuOptions.coordLink = menu.addOption("Create link to coordinates", w.coordLink);
-	menuOptions.urlLink = menu.addOption("Create link to URL", w.urlLink);
+	menuOptions.canvasLink = menu.addOption("Create link", w.canvasLink);
 	menuOptions.ownerArea = menu.addOption("Make an area owner-only", function() {
 		return w.doProtect("owner-only");
 	});
@@ -5249,8 +5249,7 @@ function updateMenuEntryVisiblity() {
 	var permEraseArea = Permissions.can_erase(state.userModel, state.worldModel);
 	w.menu.setEntryVisibility(menuOptions.changeColor, permColorText || permColorCell);
 	w.menu.setEntryVisibility(menuOptions.goToCoords, permGoToCoord);
-	w.menu.setEntryVisibility(menuOptions.coordLink, permCoordLink);
-	w.menu.setEntryVisibility(menuOptions.urlLink, permUrlLink);
+	w.menu.setEntryVisibility(menuOptions.canvasLink, permCoordLink || permUrlLink);
 	w.menu.setEntryVisibility(menuOptions.ownerArea, permOwnerArea);
 	w.menu.setEntryVisibility(menuOptions.memberArea, permMemberArea);
 	w.menu.setEntryVisibility(menuOptions.publicArea, permMemberArea);
@@ -6556,9 +6555,8 @@ Object.assign(w, {
 	menu: null,
 	ui: {
 		announcements: {},
-		coordLinkModal: null,
 		coordGotoModal: null,
-		urlModal: null,
+		canvasLinkModal: null,
 		colorModal: null,
 		selectionModal: null
 	},
@@ -6650,10 +6648,6 @@ Object.assign(w, {
 		w.isLinking = true;
 		w.link_input_type = 0;
 	},
-	urlLink: function() {
-		stopLinkUI();
-		w.ui.urlModal.open();
-	},
 	doCoordLink: function(y, x) {
 		linkAuto.active = true;
 		linkAuto.mode = 1;
@@ -6667,8 +6661,8 @@ Object.assign(w, {
 		w.isLinking = true;
 		w.link_input_type = 1;
 	},
-	coordLink: function() {
-		w.ui.coordLinkModal.open();
+	canvasLink: function() {
+		w.ui.canvasLinkModal.open();
 	},
 	doProtect: function(protectType, unprotect) {
 		// show the protection precision menu
@@ -7148,19 +7142,6 @@ function enableBgColorPicker() {
 	colorInputBg.jscolor.fromString("#DCE943");
 }
 
-function makeCoordLinkModal() {
-	var modal = new Modal();
-	modal.createForm();
-	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a letter to create the link.\n");
-	var coordX = modal.addEntry("X", "text", "number").input;
-	var coordY = modal.addEntry("Y", "text", "number").input;
-	modal.setMaximumSize(360, 300);
-	modal.onSubmit(function() {
-		w.doCoordLink(parseFloat(coordY.value), parseFloat(coordX.value));
-	});
-	w.ui.coordLinkModal = modal;
-}
-
 function makeCoordGotoModal() {
 	var modal = new Modal();
 	modal.createForm();
@@ -7178,7 +7159,7 @@ function makeURLModal() {
 	modal.setMinimumSize(250, 120);
 	modal.createForm();
 	modal.setFormTitle("\n");
-	var urlInput = modal.addEntry("URL", "text").input;
+	urlInput = modal.addEntry("URL", "text").input;
 	urlInput.style.width = "175px";
 	modal.onSubmit(function() {
 		w.doUrlLink(urlInput.value);
@@ -7215,6 +7196,22 @@ function buildBackgroundColorModal(modal) {
 	});
 }
 
+function buildURLModal(modal) {
+	modal.addTab("coords", "Coordinates");
+	modal.addTab("url", "URL");
+
+	modal.focusTab("url");
+
+	modal.setMinimumSize(250, 120);
+	modal.createForm();
+	modal.setFormTitle("\n");
+	urlInput = modal.addEntry("URL", "text").input;
+	urlInput.style.width = "175px";
+	modal.unalignForm();
+
+	modal.focusTab("coords");
+}
+
 function resetColorModalVisibility() {
 	var pText = Permissions.can_color_text(state.userModel, state.worldModel);
 	var pCell = Permissions.can_color_cell(state.userModel, state.worldModel);
@@ -7235,6 +7232,29 @@ function resetColorModalVisibility() {
 	}
 	if(!pCell && !pText) {
 		w.ui.colorModal.close();
+	}
+}
+
+function resetCanvasLinkModalVisibility() {
+	var pCoords = Permissions.can_coordlink(state.userModel, state.worldModel);
+	var pURL = Permissions.can_urllink(state.userModel, state.worldModel);
+	if(pURL) {
+		if(!w.ui.canvasLinkModal.getTabData("url")) {
+			buildURLModal(w.ui.canvasLinkModal);
+		}
+		w.ui.canvasLinkModal.showTab("url");
+	} else {
+		w.ui.canvasLinkModal.hideTab("url");
+		w.ui.canvasLinkModal.focusTab("coords");
+	}
+	if(pCoords) {
+		w.ui.canvasLinkModal.showTab("coords");
+	} else {
+		w.ui.canvasLinkModal.hideTab("coords");
+		w.ui.canvasLinkModal.focusTab("url");
+	}
+	if(!pURL && !pCoords) {
+		w.ui.canvasLinkModal.close();
 	}
 }
 
@@ -7300,6 +7320,32 @@ function makeColorModal() {
 		modal.hideTab("fg");
 	}
 	w.ui.colorModal = modal;
+}
+
+function makeCanvasLinkModal() {
+	var modal = new Modal();
+	modal.createForm();
+	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a letter to create the link.\n");
+	var coordX = modal.addEntry("X", "text", "number").input;
+	var coordY = modal.addEntry("Y", "text", "number").input;
+	modal.setMaximumSize(360, 300);
+	modal.onSubmit(function() {
+		var isUrl = modal.getCurrentTabId() == "url";
+		if(!isUrl) { // coords link
+			w.doCoordLink(parseFloat(coordY.value), parseFloat(coordX.value));
+		} else { // url link
+			w.doUrlLink(urlInput.value);
+		}
+	});
+	if(Permissions.can_urllink(state.userModel, state.worldModel)) {
+		buildURLModal(modal);
+	}
+
+	if(!Permissions.can_coordlink(state.userModel, state.worldModel)) {
+		modal.focusTab("url");
+		modal.hideTab("coords");
+	}
+	w.ui.canvasLinkModal = modal;
 }
 
 function makeSelectionModal() {
@@ -7571,6 +7617,7 @@ function reapplyProperties(props) {
 
 	updateScaleConsts();
 	resetColorModalVisibility();
+	resetCanvasLinkModalVisibility();
 	updateMenuEntryVisiblity();
 	updateWorldName();
 
@@ -7874,9 +7921,11 @@ var ws_functions = {
 					break;
 				case "coordLink":
 					state.worldModel.feature_coord_link = value;
+					resetCanvasLinkModalVisibility();
 					break;
 				case "urlLink":
 					state.worldModel.feature_url_link = value;
+					resetCanvasLinkModalVisibility();
 					break;
 				case "paste":
 					state.worldModel.feature_paste = value;
@@ -8071,9 +8120,8 @@ function begin() {
 	setWriteInterval();
 	setupPoolCleanupInterval();
 
-	makeCoordLinkModal();
 	makeCoordGotoModal();
-	makeURLModal();
+	makeCanvasLinkModal();
 	makeColorModal();
 	makeSelectionModal();
 	addColorShortcuts();
