@@ -7311,8 +7311,20 @@ function makeFontChangeModal() {
 	modal.createForm();
 	modal.setFormTitle("Set font and font size:\n");
 	var fontInput = modal.addEntry("Font", "text").input;
+	fontInput.id = "font_input";
+	fontInput.list = "font_list";
 	fontInput.value = fontTemplate.split(",")[0].slice(5, -1);
+	var fontDatalist = document.createElement('datalist');
+	fontDatalist.id = "font_list";
+	var fontPresets = ["Courier New", "monospace", "Oxygen Mono", "Roboto Mono", "Cousine", "Noto Sans Mono", "IBM Plex Mono", "Kode Mono", "Inconsolata"];
+	for (let font of fontPresets) {
+		const fontOption = document.createElement('option');
+		fontOption.innerText = font;
+		fontDatalist.append(fontOption);
+	}
+	modal.inputField.append(fontDatalist);
 	var fontSizeInput = modal.addEntry("Font size", "text", "number").input;
+	fontSizeInput.id = "fontsize_input"
 	fontSizeInput.value = fontSize;
 	modal.onSubmit(function() {
 		w.changeFont(`$px '${fontInput.value}', monospace, legacycomputing`);
