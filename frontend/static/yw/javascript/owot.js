@@ -2226,7 +2226,7 @@ function doBackspace() {
 
 // place a character
 // TODO: after refactoring this function, we will keep this header for legacy purposes
-function writeCharTo(char, charColor, tileX, tileY, charX, charY, undoFlags, undoOffset, charBgColor, dB, dI, dU, dS) {
+function writeCharTo(char, charColor, tileX, tileY, charX, charY, undoFlags, undoOffset, charBgColor, dB, dI, dU, dS, visualOnly) {
 	if(!Tile.get(tileX, tileY)) {
 		Tile.set(tileX, tileY, blankTile());
 	}
@@ -2327,40 +2327,43 @@ function writeCharTo(char, charColor, tileX, tileY, charX, charY, undoFlags, und
 		if(charX == tileC - 1) w.setTileRedraw(tileX + 1, tileY, true);
 		if(charY == 0 && charX == tileC - 1) w.setTileRedraw(tileX + 1, tileY - 1, true);
 	}
-	var undoFlag_dontMarkUndo = undoFlags ? undoFlags & 1 : 0;
-	var undoFlag_dontStepBack = undoFlags ? (undoFlags >> 1) & 1 : 0;
-	var undoFlag_forceMarkUndo = undoFlags ? (undoFlags >> 2) & 1 : 0;
-	if(hasChanged && (!undoFlag_dontMarkUndo || undoFlag_dontStepBack) || undoFlag_forceMarkUndo) {
-		if(!undoFlag_dontStepBack) {
-			undoBuffer.trim();
-		}
-		if(!isCharLatestInUndoBuffer(tileX, tileY, charX, charY)) {
-			// while the prevChar already stores deco info in the form of combining chars, it's stripped away once undo/redo is done
-			undoBuffer.push([tileX, tileY, charX, charY, prevChar, prevColor, prevLink, prevBgColor, getCharTextDecorations(prevChar), undoOffset]);
-		}
-	}
 
-	var editArray = [tileY, tileX, charY, charX, getDate(), char, nextObjId];
-	if(tileFetchOffsetX || tileFetchOffsetY) {
-		editArray[0] += tileFetchOffsetY;
-		editArray[1] += tileFetchOffsetX;
-	}
-
-	var charColorAdded = false;
-	if(charColor && Permissions.can_color_text(state.userModel, state.worldModel)) {
-		editArray.push(charColor);
-		charColorAdded = true;
-	}
-	if(charBgColor != null && charBgColor != -1 && Permissions.can_color_cell(state.userModel, state.worldModel)) {
-		if(!charColorAdded) {
-			editArray.push(0);
+	if(!visualOnly) {
+		var undoFlag_dontMarkUndo = undoFlags ? undoFlags & 1 : 0;
+		var undoFlag_dontStepBack = undoFlags ? (undoFlags >> 1) & 1 : 0;
+		var undoFlag_forceMarkUndo = undoFlags ? (undoFlags >> 2) & 1 : 0;
+		if(hasChanged && (!undoFlag_dontMarkUndo || undoFlag_dontStepBack) || undoFlag_forceMarkUndo) {
+			if(!undoFlag_dontStepBack) {
+				undoBuffer.trim();
+			}
+			if(!isCharLatestInUndoBuffer(tileX, tileY, charX, charY)) {
+				// while the prevChar already stores deco info in the form of combining chars, it's stripped away once undo/redo is done
+				undoBuffer.push([tileX, tileY, charX, charY, prevChar, prevColor, prevLink, prevBgColor, getCharTextDecorations(prevChar), undoOffset]);
+			}
 		}
-		editArray.push(charBgColor);
-	}
 
-	tellEdit.push(editArray); // track local changes
-	writeBuffer.push(editArray); // send edits to server
-	nextObjId++;
+		var editArray = [tileY, tileX, charY, charX, getDate(), char, nextObjId];
+		if(tileFetchOffsetX || tileFetchOffsetY) {
+			editArray[0] += tileFetchOffsetY;
+			editArray[1] += tileFetchOffsetX;
+		}
+
+		var charColorAdded = false;
+		if(charColor && Permissions.can_color_text(state.userModel, state.worldModel)) {
+			editArray.push(charColor);
+			charColorAdded = true;
+		}
+		if(charBgColor != null && charBgColor != -1 && Permissions.can_color_cell(state.userModel, state.worldModel)) {
+			if(!charColorAdded) {
+				editArray.push(0);
+			}
+			editArray.push(charBgColor);
+		}
+
+		tellEdit.push([editArray, prevChar, prevColor, prevBgColor]); // track local changes
+		writeBuffer.push(editArray); // send edits to server
+		nextObjId++;
+	}
 
 	return hasChanged;
 }
@@ -7509,10 +7512,11 @@ function makeSelectionModal() {
 // tileY, tileX, charY, charX, X, X, editID
 function searchTellEdit(tileX, tileY, charX, charY) {
 	for(var i = 0; i < tellEdit.length; i++) {
-		if(tellEdit[i][1] == tileX &&
-			tellEdit[i][0] == tileY &&
-			tellEdit[i][3] == charX &&
-			tellEdit[i][2] == charY) {
+		var pendingEdit = tellEdit[i][0];
+		if(pendingEdit[1] == tileX &&
+			pendingEdit[0] == tileY &&
+			pendingEdit[3] == charX &&
+			pendingEdit[2] == charY) {
 			return true;
 		}
 	}
@@ -7784,11 +7788,12 @@ var ws_functions = {
 		w.emit("writeResponse", data);
 		for(var i = 0; i < data.accepted.length; i++) {
 			for(var x = 0; x < tellEdit.length; x++) {
-				if(tellEdit[x][6] == data.accepted[i]) {
-					var tileX = tellEdit[x][1];
-					var tileY = tellEdit[x][0];
-					var charX = tellEdit[x][3];
-					var charY = tellEdit[x][2];
+				var pendingEdit = tellEdit[x][0];
+				if(pendingEdit[6] == data.accepted[i]) {
+					var tileX = pendingEdit[1];
+					var tileY = pendingEdit[0];
+					var charX = pendingEdit[3];
+					var charY = pendingEdit[2];
 					// check if there are links in queue
 					for(var r = 0; r < linkQueue.length; r++) {
 						var queueItem = linkQueue[r];
@@ -7825,21 +7830,27 @@ var ws_functions = {
 		for(var i in data.rejected) {
 			var rej = data.rejected[i];
 			for(var x = 0; x < tellEdit.length; x++) {
-				if(tellEdit[x][6] != i) continue;
-				var tileX = tellEdit[x][1];
-				var tileY = tellEdit[x][0];
-				var charX = tellEdit[x][3];
-				var charY = tellEdit[x][2];
+				var pendingEdit = tellEdit[x][0];
+				if(pendingEdit[6] != i) continue;
+				var tileX = pendingEdit[1];
+				var tileY = pendingEdit[0];
+				var charX = pendingEdit[3];
+				var charY = pendingEdit[2];
+				var prevChar = tellEdit[x][1];
+				var prevColor = tellEdit[x][2];
+				var prevBgColor = tellEdit[x][3];
 				if(rej == 1 || rej == 4) { // denied because zero rate limit
 					highlight([[tileX, tileY, charX, charY]], true, [255, 0, 0]);
+					writeCharTo(prevChar, prevColor, tileX, tileY, charX, charY, null, null, prevBgColor, false, false, false, false, true);
 					tellEdit.splice(x, 1);
 					x--;
 					continue;
 				}
 				colorChar(tileX, tileY, charX, charY, "err");
 				w.setTileRedraw(tileX, tileY, true);
-				tellEdit[x][4] = getDate();
-				writeBuffer.push(tellEdit[x]);
+				pendingEdit[4] = getDate();
+				// push back into write buffer for a retry
+				writeBuffer.push(pendingEdit);
 			}
 		}
 	},
