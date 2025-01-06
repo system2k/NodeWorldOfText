@@ -7312,7 +7312,7 @@ function makeFontChangeModal() {
 	modal.setFormTitle("Set font and font size:\n");
 	var fontInput = modal.addEntry("Font", "text").input;
 	fontInput.id = "font_input";
-	fontInput.list = "font_list";
+	fontInput.setAttribute("list", "font_list");
 	fontInput.value = fontTemplate.split(",")[0].slice(5, -1);
 	var fontDatalist = document.createElement('datalist');
 	fontDatalist.id = "font_list";
