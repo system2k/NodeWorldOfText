@@ -341,12 +341,12 @@ function procRest(list) {
 			} else {
 				world = null;
 			}
-			if(world == ".") continue;
 			region = procRegionString(region);
 			rate = parseInt(rate);
 			if(isNaN(rate)) continue;
 			if(rate < 0) rate = 0;
 			if(rate > 1000000) rate = 1000000;
+			if(region && itemgroup) continue;
 			obj = {
 				type: "charrate",
 				rate, world, region
@@ -359,7 +359,6 @@ function procRest(list) {
 			} else {
 				world = null;
 			}
-			if(world == ".") continue;
 			rate = parseInt(rate);
 			if(isNaN(rate)) continue;
 			if(rate < 0) rate = 0;
@@ -376,8 +375,8 @@ function procRest(list) {
 			} else {
 				world = null;
 			}
-			if(world == ".") continue;
 			region = procRegionString(region);
+			if(region && itemgroup) continue;
 			obj = {
 				type: "color",
 				region, world
@@ -393,7 +392,6 @@ function procRest(list) {
 			} else {
 				world = null;
 			}
-			if(world == ".") continue;
 			obj = {
 				type: "daccess",
 				mode,
@@ -410,6 +408,9 @@ function procRest(list) {
 				obj.group = itemgroup;
 			}
 			obj.index = i;
+			restrictionsList.push(obj);
+		}
+		if(obj && obj.world != ".") {
 			switch(obj.type) {
 				case "charrate":
 					if(itemip) {
@@ -465,7 +466,6 @@ function procRest(list) {
 						}
 					}
 			}
-			restrictionsList.push(obj);
 		}
 	}
 	
@@ -730,6 +730,7 @@ function retrieveRestrictionRule(restGroup, ipVal, ipFam, isGrouped, world, tile
 	let regionRule;
 	if(tileX != null && tileY != null) {
 		let reg = lookupRule(restGroup[ipMode]?.[world]?.regions, ipVal);
+		// currently, there's no support for cg1 region restrictions
 		if(reg) {
 			let unwrap = unwrapRuleRegion(reg);
 			for(let r = 0; r < unwrap.length; r++) {
