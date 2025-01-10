@@ -716,6 +716,7 @@ function getMinRule(a, b) {
 }
 
 function retrieveRestrictionRule(restGroup, ipVal, ipFam, isGrouped, world, tileX, tileY) {
+	if(!restGroup) return null;
 	world = world.toLowerCase();
 	let ipMode = ipFam == 4 ? "ipv4" : "ipv6";
 	let globalLookup = lookupRule(restGroup[ipMode]?.["."]?.list, ipVal);
@@ -757,7 +758,9 @@ function retrieveRestrictionRule(restGroup, ipVal, ipFam, isGrouped, world, tile
 
 function retrieveSiteRestrictionRule(restGroups, ipVal, ipFam) {
 	let ipMode = ipFam == 4 ? "ipv4" : "ipv6";
-	let lookup = lookupRule(restGroups.daccess.site[ipMode], ipVal, ipFam);
+	let ipList = restGroups?.daccess?.site?.[ipMode];
+	if(!ipList) return null;
+	let lookup = lookupRule(ipList, ipVal, ipFam);
 	if(lookup) {
 		return lookup.rule;
 	}
