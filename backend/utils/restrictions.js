@@ -149,39 +149,6 @@ function reconIPv6(start, end) {
 	return ip;
 }
 
-function constructIPTree(list) {
-	var res = {
-		ip: null,
-		list: [],
-		index: Infinity
-	};
-	var path = [res];
-	for(var i = 0; i < list.length; i++) {
-		let ip = list[i];
-		while(true) {
-			let container = path.at(-1);
-			let princip = container.ip;
-			if(princip == null || ip[0] >= princip[0] && ip[0] <= princip[1]) {
-				if(ip[2] > container.index) {
-					// disqualified
-					break;
-				}
-				let obj = {
-					ip: ip,
-					list: [],
-					index: ip[2]
-				};
-				container.list.push(obj);
-				path.push(obj);
-				break;
-			} else {
-				path.pop();
-			}
-		}
-	}
-	return res;
-}
-
 function sortRestrictionListIPv4(list) {
 	list.sort(function(a, b) {
 		let dir = a.ip[0][0] - b.ip[0][0];
