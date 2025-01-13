@@ -40,6 +40,7 @@ function sanitizeCustomMeta(meta) {
 	var output = {};
 	for(var k in meta) {
 		if(k.length > 36) continue;
+		if(Object.prototype.hasOwnProperty(k)) continue;
 
 		var v = meta[k];
 		if(typeof v != "string" && typeof v != "number") continue;
