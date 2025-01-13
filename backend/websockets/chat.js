@@ -43,7 +43,7 @@ function sanitizeCustomMeta(meta) {
 
 		var v = meta[k];
 		if(typeof v != "string" && typeof v != "number") continue;
-		if(k.length > 400) continue;
+		if(v.length > 400) continue;
 
 		output[k] = v;
 	}
