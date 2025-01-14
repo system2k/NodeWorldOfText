@@ -546,21 +546,18 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				customMeta: data.customMeta
 			});
 			// if user has blocked TELLs, don't let the /tell-er know
-			if(client.sdata.chat_blocks[id] && (client.sdata.chat_blocks.id.includes(clientId))) return; // is ID of the /tell sender? (not destination)
 			if(client.sdata.chat_blocks.block_all) return;
 			if(client.sdata.chat_blocks.no_tell) return;
 			if(client.sdata.chat_blocks.no_anon && !user.authenticated) return;
 			if(client.sdata.chat_blocks.no_reg && user.authenticated) return;
+			if(user.authenticated && client.sdata.chat_blocks.user.includes(username_to_display.toUpperCase())) {
+				return; // sender username is blocked by destination user
+			}
 				
 			// user has blocked the TELLer by IP
 			var tellblock = tell_blocks[client.sdata.ipAddress];
 			if(tellblock && tellblock[ipHeaderAddr]) {
-				var blk = tellblock[ipHeaderAddr];
-				if(Date.now() - blk > 1000 * 60 * 60) { // delete after 1 hour
-					delete tellblock[ipHeaderAddr];
-				} else {
-					return;
-				}
+				return;
 			}
 
 			wsSend(client, JSON.stringify(privateMessage));
