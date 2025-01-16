@@ -78,6 +78,13 @@ function procRegionString(region) {
 	return [x1, y1, x2, y2];
 }
 
+function normalizeWorldName(worldName) {
+	worldName = worldName.trim().toLowerCase();
+	if(worldName.startsWith("/")) worldName = worldName.slice(1);
+	if(worldName.endsWith("/")) worldName = worldName.slice(0, -1);
+	return worldName;
+}
+
 function removeOverlaps(list) {
     var res = [];
     for(var i = 0; i < list.length; i++) {
@@ -142,18 +149,142 @@ function reconIPv6(start, end) {
 	return ip;
 }
 
+function sortRestrictionListIPv4(list) {
+	list.sort(function(a, b) {
+		let dir = a.ip[0][0] - b.ip[0][0];
+		if(dir == 0) {
+			return a.index - b.index;
+		} else {
+			return dir;
+		}
+	});
+}
+
+function sortRestrictionListIPv6(list) {
+	list.sort(function(a, b) {
+		let dir = a.ip[0][0] - b.ip[0][0];
+		if(dir == 0) {
+			return a.index - b.index;
+		} else {
+			return Number(dir);
+		}
+	});
+}
+
+function divideRestrictionsIntoWorlds(list, classObj) {
+	for(let i = 0; i < list.length; i++) {
+		let obj = list[i];
+		let worldName = obj.world ?? ".";
+		classObj[worldName] ??= {regions: [], list: []};
+		if(obj.region) {
+			classObj[worldName].regions.push(obj);
+		} else {
+			classObj[worldName].list.push(obj);
+		}
+	}
+}
+
+function buildRestrictionsTree(currentList) {
+	let result = {
+		ip: null,
+		list: [],
+		index: Infinity
+	};
+	let path = [result];
+	let prevRegionObj = null;
+	for(let i = 0; i < currentList.length; i++) {
+		let rule = currentList[i];
+		let isRegionRule = (rule.region != null);
+		while(true) {
+			let container = path.at(-1);
+			let princip = container.ip;
+			let isIpSameAsPrevReg = prevRegionObj && (prevRegionObj.ip[0] == rule.ip[0][0] && prevRegionObj.ip[1] == rule.ip[0][1]);
+			let doesIpFitInsideRange = princip && (rule.ip[0][0] >= princip[0] && rule.ip[0][0] <= princip[1]);
+			if(princip == null || doesIpFitInsideRange) {
+				if(!isRegionRule && rule.index > container.index) {
+					// rules with an IP address inside a range declared previously are trimmed.
+					// the 'regions' type has an exception because region restrictions are difficult to trim.
+					break;
+				}
+				let obj = {
+					ip: rule.ip[0],
+					list: [],
+					index: rule.index
+				};
+				if(isRegionRule) {
+					if(isIpSameAsPrevReg) {
+						prevRegionObj.rules.push(rule);
+					} else {
+						obj.rules = [rule];
+						obj.container = container;
+						prevRegionObj = obj;
+						container.list.push(obj);
+						path.push(obj);
+					}
+				} else {
+					obj.rule = rule;
+					container.list.push(obj);
+					path.push(obj);
+				}
+				break;
+			} else {
+				path.pop();
+			}
+		}
+	}
+	
+	return result.list;
+}
+
+function divideGroupIntoRestrictionsTree(group) {
+	for(let ipMode in group) {
+		if(ipMode == "cg1") continue;
+		for(let world in group[ipMode]) {
+			let worldObj = group[ipMode][world];
+			worldObj.list = buildRestrictionsTree(worldObj.list);
+			worldObj.regions = buildRestrictionsTree(worldObj.regions);
+		}
+	}
+}
+
 function procRest(list) {
-	var restrictions = [];
-	for(var i = 0; i < list.length; i++) {
-		var item = list[i].split(";");
-		var itemtype = "";
-		var itemip = "";
-		var itemgroup = "";
-		var props = {};
-		for(var x = 0; x < item.length; x++) {
-			var subitem = item[x].split("=");
-			var key = subitem[0].trim().toLowerCase();
-			var val = subitem.slice(1).join("=").trim();
+	let restrictionsList = [];
+	let groups = {
+		charrate: { ipv4: {}, ipv6: {}, cg1: {} },
+		linkrate: { ipv4: {}, ipv6: {}, cg1: {} },
+		color: { ipv4: {}, ipv6: {}, cg1: {} },
+		daccess: {
+			site: { ipv4: [], ipv6: [] },
+			httpwrite: { ipv4: {}, ipv6: {}, cg1: {} }
+		}
+	};
+	
+	let charrate_list_ipv4 = [];
+	let charrate_list_ipv6 = [];
+	let charrate_list_cg1 = [];
+	
+	let linkrate_list_ipv4 = [];
+	let linkrate_list_ipv6 = [];
+	let linkrate_list_cg1 = [];
+	
+	let color_list_ipv4 = [];
+	let color_list_ipv6 = [];
+	let color_list_cg1 = [];
+	
+	let httpwrite_list_ipv4 = [];
+	let httpwrite_list_ipv6 = [];
+	let httpwrite_list_cg1 = [];
+
+	for(let i = 0; i < list.length; i++) {
+		let item = list[i].split(";");
+		let itemtype = "";
+		let itemip = "";
+		let itemgroup = "";
+		let props = {};
+		for(let x = 0; x < item.length; x++) {
+			let subitem = item[x].split("=");
+			let key = subitem[0].trim().toLowerCase();
+			let val = subitem.slice(1).join("=").trim();
 			if(key == "ip") {
 				itemip = val;
 			} else if(key == "type") {
@@ -164,15 +295,17 @@ function procRest(list) {
 				props[key] = val;
 			}
 		}
-		if((!itemip && !itemgroup) || (itemtype != "charrate" && itemtype != "color" && itemtype != "linkrate" && itemtype != "daccess")) continue;
+		if((!itemip && !itemgroup) || !["charrate", "color", "linkrate", "daccess"].includes(itemtype)) continue;
 		if(itemgroup && itemip) continue; // can't have both
 		
-		var obj = null;
+		let obj = null;
 		if(itemtype == "charrate") {
-			var rate = props.rate;
-			var world = props.world;
-			var region = props.region;
-			if(!("world" in props)) {
+			let rate = props.rate;
+			let world = props.world;
+			let region = props.region;
+			if("world" in props) {
+				world = normalizeWorldName(world);
+			} else {
 				world = null;
 			}
 			region = procRegionString(region);
@@ -180,14 +313,17 @@ function procRest(list) {
 			if(isNaN(rate)) continue;
 			if(rate < 0) rate = 0;
 			if(rate > 1000000) rate = 1000000;
+			if(region && itemgroup) continue;
 			obj = {
 				type: "charrate",
 				rate, world, region
 			};
 		} else if(itemtype == "linkrate") {
-			var rate = props.rate;
-			var world = props.world;
-			if(!("world" in props)) {
+			let rate = props.rate;
+			let world = props.world;
+			if("world" in props) {
+				world = normalizeWorldName(world);
+			} else {
 				world = null;
 			}
 			rate = parseInt(rate);
@@ -199,23 +335,28 @@ function procRest(list) {
 				rate, world
 			};
 		} else if(itemtype == "color") {
-			var region = props.region;
-			var world = props.world;
-			if(!("world" in props)) {
+			let region = props.region;
+			let world = props.world;
+			if("world" in props) {
+				world = normalizeWorldName(world);
+			} else {
 				world = null;
 			}
 			region = procRegionString(region);
+			if(region && itemgroup) continue;
 			obj = {
 				type: "color",
 				region, world
 			};
 		} else if(itemtype == "daccess") {
-			var mode = props.mode;
-			var note = props.note;
-			var world = props.world;
+			let mode = props.mode;
+			let note = props.note;
+			let world = props.world;
 			if(mode != "httpwrite" && mode != "site") continue;
 			if(typeof note != "string" || !note) note = null;
-			if(!("world" in props)) {
+			if("world" in props) {
+				world = normalizeWorldName(world);
+			} else {
 				world = null;
 			}
 			obj = {
@@ -227,19 +368,119 @@ function procRest(list) {
 		}
 		if(obj) {
 			if(itemip) {
-				var ipInfo = procIP(itemip);
+				let ipInfo = procIP(itemip);
 				if(!ipInfo) continue;
 				obj.ip = ipInfo;
 			} else if(itemgroup) {
 				obj.group = itemgroup;
 			}
-			restrictions.push(obj);
+			obj.index = i;
+			restrictionsList.push(obj);
+		}
+		if(obj && obj.world != ".") {
+			switch(obj.type) {
+				case "charrate":
+					if(itemip) {
+						if(obj.ip[1] == 4) {
+							charrate_list_ipv4.push(obj);
+						} else if(obj.ip[1] == 6) {
+							charrate_list_ipv6.push(obj);
+						}
+					} else if(itemgroup) {
+						charrate_list_cg1.push(obj);
+					}
+					break;
+				case "linkrate":
+					if(itemip) {
+						if(obj.ip[1] == 4) {
+							linkrate_list_ipv4.push(obj);
+						} else if(obj.ip[1] == 6) {
+							linkrate_list_ipv6.push(obj);
+						}
+					} else if(itemgroup) {
+						linkrate_list_cg1.push(obj);
+					}
+					break;
+				case "color":
+					if(itemip) {
+						if(obj.ip[1] == 4) {
+							color_list_ipv4.push(obj);
+						} else if(obj.ip[1] == 6) {
+							color_list_ipv6.push(obj);
+						}
+					} else if(itemgroup) {
+						color_list_cg1.push(obj);
+					}
+					break;
+				case "daccess":
+					if(obj.mode == "site") {
+						if(itemip) {
+							if(obj.ip[1] == 4) {
+								groups.daccess.site.ipv4.push(obj);
+							} else if(obj.ip[1] == 6) {
+								groups.daccess.site.ipv6.push(obj);
+							}
+						}
+					} else if(obj.mode == "httpwrite") {
+						if(itemip) {
+							if(obj.ip[1] == 4) {
+								httpwrite_list_ipv4.push(obj);
+							} else if(obj.ip[1] == 6) {
+								httpwrite_list_ipv6.push(obj);
+							}
+						} else if(itemgroup) {
+							httpwrite_list_cg1.push(obj);
+						}
+					}
+			}
 		}
 	}
 	
+	sortRestrictionListIPv4(charrate_list_ipv4);
+	sortRestrictionListIPv6(charrate_list_ipv6);
+
+	sortRestrictionListIPv4(linkrate_list_ipv4);
+	sortRestrictionListIPv6(linkrate_list_ipv6);
+
+	sortRestrictionListIPv4(color_list_ipv4);
+	sortRestrictionListIPv6(color_list_ipv6);
+
+	sortRestrictionListIPv4(groups.daccess.site.ipv4);
+	sortRestrictionListIPv4(groups.daccess.site.ipv6);
+
+	sortRestrictionListIPv4(httpwrite_list_ipv4);
+	sortRestrictionListIPv4(httpwrite_list_ipv6);
+	
+	// we don't need to sort the cg1 lists nor build a restrictions tree for them
+	
+	// look through each list and split by worldname. the "." worldname represents all worlds.
+	divideRestrictionsIntoWorlds(charrate_list_ipv4, groups.charrate.ipv4);
+	divideRestrictionsIntoWorlds(charrate_list_ipv6, groups.charrate.ipv6);
+	divideRestrictionsIntoWorlds(charrate_list_cg1, groups.charrate.cg1);
+	
+	divideRestrictionsIntoWorlds(linkrate_list_ipv4, groups.linkrate.ipv4);
+	divideRestrictionsIntoWorlds(linkrate_list_ipv6, groups.linkrate.ipv6);
+	divideRestrictionsIntoWorlds(linkrate_list_cg1, groups.linkrate.cg1);
+	
+	divideRestrictionsIntoWorlds(color_list_ipv4, groups.color.ipv4);
+	divideRestrictionsIntoWorlds(color_list_ipv6, groups.color.ipv6);
+	divideRestrictionsIntoWorlds(color_list_cg1, groups.color.cg1);
+	
+	divideRestrictionsIntoWorlds(httpwrite_list_ipv4, groups.daccess.httpwrite.ipv4);
+	divideRestrictionsIntoWorlds(httpwrite_list_ipv6, groups.daccess.httpwrite.ipv6);
+	divideRestrictionsIntoWorlds(httpwrite_list_cg1, groups.daccess.httpwrite.cg1);
+	
+	divideGroupIntoRestrictionsTree(groups.charrate);
+	divideGroupIntoRestrictionsTree(groups.linkrate);
+	divideGroupIntoRestrictionsTree(groups.color);
+	divideGroupIntoRestrictionsTree(groups.daccess.httpwrite);
+	
+	groups.daccess.site.ipv4 = buildRestrictionsTree(groups.daccess.site.ipv4);
+	groups.daccess.site.ipv6 = buildRestrictionsTree(groups.daccess.site.ipv6);
+	
 	return {
-		data: restrictions,
-		raw: rebuildRestrictionsList(restrictions)
+		groups: groups,
+		raw: rebuildRestrictionsList(restrictionsList)
 	};
 }
 
@@ -360,29 +601,138 @@ function rebuildCoalitionList(ranges4, ranges6) {
 	return cstr;
 }
 
-function appendRestriction(restrictions, newRestr) {
-	if(Array.isArray(newRestr)) {
-		restrictions.push(...newRestr);
+function scanRuleList(list, val) {
+	if(!list.length) {
+		return null;
+	}
+	let posa = 0;
+	let posb = list.length - 1;
+	// binary search through the list
+	for(let i = 0; i < list.length; i++) {
+		let pos = Math.floor((posa + posb) / 2);
+		let item = list[pos];
+		let a = item.ip[0];
+		let b = item.ip[1];
+		if(a <= val && b >= val) return item;
+		if(posb - posa == 1) {
+			let ra = list[posa].ip;
+			let rb = list[posb].ip;
+			if(ra[0] <= val && ra[1] >= val) return list[posa];
+			if(rb[0] <= val && rb[1] >= val) return list[posb];
+			return null;
+		}
+		if(a > val) {
+			if(posb - posa == 0) return null;
+			posb = pos - 1;
+			continue;
+		}
+		if(b < val) {
+			if(posb - posa == 0) return null;
+			posa = pos + 1;
+			continue;
+		}
+	}
+	return null;
+}
+
+function unwrapRuleRegion(input) {
+	let res = [];
+	let cont = input;
+	while(true) {
+		if(cont.index == Infinity) break;
+		let rules = cont.rules;
+		for(let i = 0; i < rules.length; i++) {
+			res.push(rules[i]);
+		}
+		cont = cont.container;
+	}
+	res.sort(function(a, b) {
+		return a.index - b.index;
+	});
+	return res;
+}
+
+function lookupRule(currentList, ipVal) {
+	if(!currentList) return null;
+	let scanResult;
+	while(true) {
+		let currentScan = scanRuleList(currentList, ipVal);
+		if(!currentScan) {
+			break;
+		}
+		scanResult = currentScan;
+		if(currentScan.list.length) {
+			currentList = currentScan.list;
+		} else {
+			break;
+		}
+	}
+	return scanResult;
+}
+
+function getMinRule(a, b) {
+	let aIndex = Infinity;
+	let bIndex = Infinity;
+	if(a) aIndex = a.index;
+	if(b) bIndex = b.index;
+	if(aIndex > bIndex) {
+		return b;
 	} else {
-		restrictions.push(newRestr);
+		return a;
 	}
 }
 
-function prependRestriction(restrictions, newRestr) {
-	if(Array.isArray(newRestr)) {
-		restrictions.unshift(...newRestr);
-	} else {
-		restrictions.unshift(newRestr);
+function retrieveRestrictionRule(restGroup, ipVal, ipFam, isGrouped, world, tileX, tileY) {
+	if(!restGroup) return null;
+	world = world.toLowerCase();
+	let ipMode = ipFam == 4 ? "ipv4" : "ipv6";
+	let globalLookup = lookupRule(restGroup[ipMode]?.["."]?.list, ipVal);
+	let worldLookup = lookupRule(restGroup[ipMode]?.[world]?.list, ipVal);
+	let currentRule = getMinRule(globalLookup, worldLookup);
+	if(isGrouped) {
+		let globalGroup = restGroup["cg1"]?.["."]?.list?.[0];
+		let worldGroup = restGroup["cg1"]?.[world]?.list?.[0];
+		let groupRule = getMinRule(globalGroup, worldGroup);
+		currentRule = getMinRule(currentRule, groupRule);
 	}
+	let regionRule;
+	if(tileX != null && tileY != null) {
+		let reg = lookupRule(restGroup[ipMode]?.[world]?.regions, ipVal);
+		// currently, there's no support for cg1 region restrictions
+		if(reg) {
+			let unwrap = unwrapRuleRegion(reg);
+			for(let r = 0; r < unwrap.length; r++) {
+				let rule = unwrap[r];
+				let region = rule.region;
+				if(region[0] <= tileX && tileX <= region[2] && region[1] <= tileY && tileY <= region[3]) {
+					regionRule = rule;
+					break;
+				}
+			}
+		}
+	}
+	let minRule = getMinRule(currentRule, regionRule);
+	if(minRule) {
+		if(minRule.rule) {
+			return minRule.rule;
+		} else {
+			// region restriction rule
+			return minRule;
+		}
+	}
+	return null;
 }
 
-/*
-	Inserting programmatically:
-	restr = restrictions.procRest(["ip=1.1.1.1;type=charrate;rate=15;world="]).data
-	restrictions.prependRestriction(restrictions.getRestrictions(), restr)
-	rawList = restrictions.rebuildRestrictionsList(restrictions.getRestrictions())
-	saveRestrictions("main", rawList)
-*/
+function retrieveSiteRestrictionRule(restGroups, ipVal, ipFam) {
+	let ipMode = ipFam == 4 ? "ipv4" : "ipv6";
+	let ipList = restGroups?.daccess?.site?.[ipMode];
+	if(!ipList) return null;
+	let lookup = lookupRule(ipList, ipVal, ipFam);
+	if(lookup) {
+		return lookup.rule;
+	}
+	return null;
+}
 
 module.exports = {
 	procRest,
@@ -391,8 +741,8 @@ module.exports = {
 	getRestrictions,
 	setCoalition,
 	checkCoalition,
-	appendRestriction,
-	prependRestriction,
 	rebuildRestrictionsList,
-	rebuildCoalitionList
+	rebuildCoalitionList,
+	retrieveRestrictionRule,
+	retrieveSiteRestrictionRule
 };

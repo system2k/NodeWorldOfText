@@ -684,32 +684,17 @@ class HTTPServer {
 		return token.toLowerCase() == this.createCSRF(userid, kclass);
 	}
 
-	checkHTTPRestr(list, ipVal, ipFam) {
+	checkHTTPRestr(restGroups, ipVal, ipFam) {
 		var resp = {
 			siteAccess: false,
 			siteAccessNote: null
 		};
-		if(!list) return resp;
-		for(var i = 0; i < list.length; i++) {
-			var item = list[i];
-	
-			var ip = item.ip;
-			if(ip) {
-				var riRange = ip[0];
-				var riFam = ip[1];
-				if(riFam != ipFam) continue;
-				if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
-			} else {
-				continue;
-			}
-	
-			var type = item.type;
-			var mode = item.mode;
-			if(type == "daccess" && mode == "site") {
-				var note = item.note;
-				resp.siteAccessNote = note;
-				resp.siteAccess = true;
-			}
+		if(!restGroups) return resp;
+
+		var r = restrictions.retrieveSiteRestrictionRule(restGroups, ipVal, ipFam);
+		if(r) {
+			resp.siteAccessNote = r.note;
+			resp.siteAccess = true;
 		}
 		return resp;
 	}

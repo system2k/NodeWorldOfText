@@ -1377,7 +1377,7 @@ function loadRestrictionsList() {
 		if(restr_cache) {
 			var list = restr_cache.toString("utf8").replace(/\r\n/g, "\n").split("\n");
 			var result = restrictions.procRest(list);
-			restrictions.setRestrictions(result.data);
+			restrictions.setRestrictions(result.groups);
 		}
 		if(restr_cg1_cache) {
 			var list = restr_cg1_cache.toString("utf8").replace(/\r\n/g, "\n").split("\n");
@@ -1935,7 +1935,7 @@ async function manageWebsocketConnection(ws, req) {
 		if(deniedPages.siteAccessNote) {
 			deny_notes = deniedPages.siteAccessNote;
 		}
-		ws.send("Site access denied, note: "+deny_notes);
+		ws.send("Site access denied, note: " + deny_notes);
 		ws.close();
 		return;
 	}
