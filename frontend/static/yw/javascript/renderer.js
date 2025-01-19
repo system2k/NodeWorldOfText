@@ -871,7 +871,7 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	var checkIdx = 1;
 	if(char.codePointAt(0) > 65535) checkIdx = 2;
 	var isSpecial = char.codePointAt(checkIdx) != void 0;
-	isSpecial = isSpecial || (cCode >= 0x2500 && cCode <= 0x257F);
+	isSpecial = isSpecial || cCode >= 0x2500 && cCode <= 0x257F || cCode >= 0x1CC00 && cCode <= 0x1CCF9 || cCode >= 0x1CDE6 && cCode <= 0x1CEB3 || cCode >= 0x1F8B3 && cCode <= 0x1F8BB || cCode >= 0x1FB7C && cCode <= 0x1FBF9;
 
 	if(ansiBlockFill && isValidSpecialSymbol(cCode) && !(isHalfShard && !isBold) && !isShadeSkipped) {
 		if(!isOverflow) {
