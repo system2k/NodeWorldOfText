@@ -654,7 +654,7 @@ function drawFractionalBlockChar(charCode, textRender, x, y, width, height) {
 
 	var dir = transform[0];
 	var frac = transform[1];
-	var offset = transform[2] ?? 0;
+	var offset = transform[2] || 0;
 	var x2 = x + width - 1;
 	var y2 = y + height - 1;
 

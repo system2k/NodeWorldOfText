@@ -86,6 +86,8 @@ var disconnectTimeout      = null;
 var menuOptions            = {};
 var undoBuffer             = new CircularBuffer(2048);
 var compositionBuffer      = ""; // composition buffer for Android-based keyboards
+var pasteEventPending      = false;
+var compositionDotFix      = false;
 var compositionSuppress    = false;
 var textInputPasteMod      = false;
 var textInputPasteData     = null;
@@ -2834,16 +2836,20 @@ function event_input(e) {
 	if(state.worldModel.char_rate[0] == 0 && !state.userModel.is_member) return;
 	var inputType = e.inputType;
 	var inputData = e.data;
-	var textareaValue = elm.textInput.value;
+	var textareaValue = elm.textInput.value.replace(/\x7F/g, "");
+	if(!pasteEventPending && compositionDotFix && textareaValue.charAt(0) == ".") {
+		textareaValue = textareaValue.slice(1);
+	}
+	pasteEventPending = false;
+	compositionDotFix = false;
 	if(!inputType && !inputData) { // backwards compatability: use the textInput data instead
-		var data = elm.textInput.value.replace(/\x7F/g, "");
 		elm.textInput.value = "";
-		if(!data || data == "\n" || data == "\r") return;
-		textareaValue = data;
-		if(w.split(data).length > 1) {
+		if(!textareaValue || textareaValue == "\n" || textareaValue == "\r") return;
+		textareaValue = textareaValue;
+		if(w.split(textareaValue).length > 1) {
 			inputType = "insertFromPaste";
 		} else {
-			inputData = data;
+			inputData = textareaValue;
 		}
 	}
 	if(inputType == "insertFromPaste") {
@@ -2898,6 +2904,7 @@ function event_input(e) {
 		// workaround: disable dot after double-typing spaces on Android
 		// don't use this workaround if using textInput value fallback
 		if(inputData == " " && inputType) {
+			compositionDotFix = true;
 			elm.textInput.value = ".";
 			return;
 		}
@@ -2918,6 +2925,7 @@ function setupInputSystem() {
 
 	elm.textInput.addEventListener("paste", function(e) {
 		// reset all the gunk added by the browser.
+		pasteEventPending = true;
 		elm.textInput.value = "";
 	});
 
@@ -3192,6 +3200,10 @@ function event_keydown(e) {
 	if(checkKeyPress(e, "CTRL+ENTER")) {
 		elm.textInput.value = "";
 		writeChar("\n");
+	}
+	if(checkKeyPress(e, "CTRL+SPACE")) {
+		elm.textInput.value = "";
+		writeChar(" ");
 	}
 	if(checkKeyPress(e, "SHIFT+ENTER")) {
 		elm.textInput.value = "";
