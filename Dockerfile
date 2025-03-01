@@ -1,5 +1,6 @@
 FROM node:18
 WORKDIR /app/src
+VOLUME /app/nwotdata
 
 COPY package.json ./
 RUN npm i
