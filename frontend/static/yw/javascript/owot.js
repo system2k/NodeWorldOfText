@@ -3450,16 +3450,10 @@ function parseClientCommandArgs(string) {
 	return result;
 }
 
-function runClientCommand(string, coords) {
-	if(typeof string != "string") return;
-	var query = string.split(/\s(.+)$/g, 2);
-	var command = query[0].toLowerCase();
-	var args = parseClientCommandArgs(query[1]);
-	if(command == "night") {
-		w.night();
-	} else if(command == "day") {
-		w.day();
-	} else if(command == "theme") {
+var actions = {
+	night: (args, coords) => w.night(),
+	day: (args, coords) => w.day(),
+	theme: (args, coords) => {
 		var charInfo = getCharInfo(coords[0], coords[1], coords[2], coords[3]);
 		var restrict = state.worldModel.name == "" && charInfo.protection == 0;
 		if(restrict) {
@@ -3481,7 +3475,8 @@ function runClientCommand(string, coords) {
 		checkTextColorOverride();
 		w.redraw();
 		menu_color(styles.menu);
-	} else if(command == "copy") {
+	},
+	copy: (args, coords) => {
 		if(args.char) {
 			w.clipboard.copy(w.split(args.char)[0]);
 		} else {
@@ -3489,8 +3484,17 @@ function runClientCommand(string, coords) {
 			w.clipboard.copy(char);
 			highlight([coords], true, [0, 255, 0]);
 		}
-	} else if(command == "deco") {
-		toggleTextDecoBar();
+	},
+	deco: (args, coords) => toggleTextDecoBar()
+};
+
+function runClientCommand(string, coords) {
+	if(typeof string != "string") return;
+	var query = string.split(/\s(.+)$/g, 2);
+	var command = query[0].toLowerCase();
+	var args = parseClientCommandArgs(query[1]);
+	if(actions.hasOwnProperty(command)) {
+		actions[command](args, coords);
 	}
 }
 
