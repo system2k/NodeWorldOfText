@@ -345,7 +345,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				blocks.no_reg = true;
 				break;
 			default:
-				id = san_nbr(id);
+				id = san_nbr(parseInt(id, 16));
 				if (id < 0) return;
 
 				if ((blocks.id.length + blocks.user.length) >= chatBlockLimit)
@@ -366,7 +366,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				}
 			}
 
-			serverChatResponse("Blocked chats from ID: " + id, location);
+			serverChatResponse("Blocked chats from ID: " + id.toString(16), location);
 		},
 		blockuser: function(username) {
 			var blocks = ws.sdata.chat_blocks;
@@ -404,7 +404,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			case "reg":
 				blocks.no_reg = false;
 			default:
-				id = san_nbr(id);
+				id = san_nbr(parseInt(id, 16));
 				if(id < 0) return;
 
 				var idx = blocks.id.indexOf(id);
@@ -420,7 +420,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				}
 			}
 
-			serverChatResponse("Unblocked chats from ID: " + id, location);
+			serverChatResponse("Unblocked chats from ID: " + id.toString(16), location);
 		},
 		unblockuser: function(username) {
 			var blocks = ws.sdata.chat_blocks;
@@ -468,7 +468,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			if(!message) {
 				return serverChatResponse("No message given", location);
 			}
-			id = parseInt(id, 10);
+			id = parseInt(id, 16);
 			if(isNaN(id)) {
 				return serverChatResponse("Invalid ID format", location);
 			}
@@ -594,7 +594,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		},
 		mute: function(id, time, flag) {
 			if(!is_owner && !user.staff) return;
-			id = san_nbr(id);
+			id = san_nbr(parseInt(id, 16));
 			time = san_nbr(time); // in seconds
 
 			var timeSuffixMap = {
@@ -672,7 +672,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		},
 		delete: async function(id, timestamp) {
 			if(!is_owner && !user.staff) return;
-			id = san_nbr(id);
+			id = san_nbr(parseInt(id, 16));
 			timestamp = san_nbr(timestamp);
 			var wid = world.id;
 			if(location == "global") {
