@@ -933,7 +933,6 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	var isItalic = deco && deco.italic;
 	var isHalfShard = ((cCode >= 0x25E2 && cCode <= 0x25E5) ||
 						cCode == 0x25B2 || cCode == 0x25C4 || cCode == 0x25BA || cCode == 0x25BC);
-	var isHalfShard2 = (cCode == 0x25B2 || cCode == 0x25C4 || cCode == 0x25BA || cCode == 0x25BC);
 	var isShadeSkipped = (cCode >= 0x2591 && cCode <= 0x2593) && (defaultSizes.cellW == 10 && defaultSizes.cellH == 18);
 
 	var checkIdx = 1;
@@ -941,7 +940,7 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	var isSpecial = char.codePointAt(checkIdx) != void 0;
 	isSpecial = isSpecial || (cCode >= 0x2500 && cCode <= 0x257F);
 
-	if(ansiBlockFill && isValidSpecialSymbol(cCode) && (!(isHalfShard && !isBold) || !(isHalfShard2 && !isItalic)) && !isShadeSkipped) {
+	if(ansiBlockFill && isValidSpecialSymbol(cCode) && !(isHalfShard && !isBold) && !isShadeSkipped) {
 		if(!isOverflow) {
 			drawBlockChar(cCode, textRender, fontX, fontY, cellW, cellH, !!isBold, !!isItalic);
 			hasDrawn = true;
