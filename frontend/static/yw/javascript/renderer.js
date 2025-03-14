@@ -370,9 +370,28 @@ function testCanvasForCrossOriginError() {
 	}
 }
 
-var lcsShardCharVectors = [];
+function convertToNewFormat(vectorArray) {
+	var newVectorArray = [];
+	for(var i in vectorArray) {
+		if(vectorArray[i] === null) {
+			newVectorArray.push(null);
+			continue;
+		}
+		var newVectorPointArray = [];
+		for(var j in vectorArray[i]) {
+			var gpX = [0, 1, 2];
+			var gpY = [0, 4/3, 2, (4/3)*2, 4];
+			newVectorPointArray.push([gpX[vectorArray[i][j][0]], gpY[vectorArray[i][j][1]]]);
+		}
+		newVectorArray.push(newVectorPointArray);
+	}
+	return newVectorArray;
+}
 
-var slcCharVectors = [
+// these vectors are EXTREMELY messy and I deeply apologize for this eyesore of code
+var lcsShardCharVectors = []; // keeping just in case
+
+var slcCharVectors = convertToNewFormat([
 	[[0,3],[1,4],[0,4],[0,3]],             
 	[[0,3],[2,4],[0,4],[0,3]],
 	[[0,1],[1,4],[0,4],[0,1]],
@@ -425,9 +444,9 @@ var slcCharVectors = [
 	[[0,0],[2,0],[1,2],[0,0]],             
 	[[2,0],[2,4],[1,2],[2,0]],
 	[[1,2],[2,4],[0,4],[1,2]],             
-];
+]);
 
-var slcCharVectorsHalved = [
+var slcCharVectorsHalved = convertToNewFormat([
 	[[0,2],[2,4],[0,4]],                   
 	null,                              
 	[[0,2],[1,4],[0,4]],                   
@@ -472,34 +491,63 @@ var slcCharVectorsHalved = [
 	[[0,0],[2,0],[2,2]],                   
 	null,
 	null,
-	[[0,0],[2,0],[2,4],[0,4],[2,2],[0,0]], 
+	[[0,0],[2,0],[2,4],[0,4],[2,2]], 
 	null, 
-	[[0,0],[2,0],[0,2],[2,4],[0,4],[0,0]], 
+	[[0,0],[2,0],[0,2],[2,4],[0,4]], 
 	null, 
 	null,
+	[[0,0],[2,0],[1,1]],             
 	null,
-	null,
-	null
+	[[1,3],[2,4],[0,4]],
+]);
+var slcCharVectorsHalved2 = [
+	[[0,0],[2,0],[1,1]],
+	[[1,3],[2,4],[0,4]],
 ];
 
-var upperLowerVectors = [
+var upperLowerVectors = convertToNewFormat([
 	[[0,0],[2,4],[0,4],[2,0],[0,0]], 
 	[[2,0],[2,4],[0,0],[0,4],[2,0]],
-]
+]);
 
-var _90degVectors = [
+var _90degVectors = convertToNewFormat([
 	[[2,0],[2,4],[0,4],[2,0]],
 	[[0,0],[2,4],[0,4],[0,0]],
 	[[0,0],[2,0],[0,4],[0,0]],
 	[[0,0],[2,0],[2,4],[0,0]],
-];
+]);
 
-var isoTriVectors = [
+var isoTriVectors = convertToNewFormat([
 	[[1,0],[2,4],[0,4],[1,0]],
 	[[0,0],[2,2],[0,4],[0,0]],
 	[[0,0],[2,0],[1,4],[0,0]],
 	[[2,0],[2,4],[0,2],[2,0]] 
+]);
+
+var tinyTriVectors = [
+	[[1,0],[1,4],[0,2]],
+	[[0,1],[1,0],[2,1],[2,4],[0,4]],
+	[[1,0],[1,4],[2,2]],
+	[[0,3],[1,4],[2,3],[2,0],[0,0]]
 ];
+
+var tinyTriVectors2 = [
+	[[1,0],[2,0],[2,4],[1,4],[0,2]],
+	[[0,2],[1,1],[2,2],[2,4],[0,4]],
+	[[1,0],[0,0],[0,4],[1,4],[2,2]],
+	[[0,2],[1,3],[2,2],[2,0],[0,0]]
+];
+
+var tinyTriVectors3 = [
+	[[1,0],[2,0],[2,4],[1,4],[0,2]],
+	[[0,3],[1,2],[2,3],[2,4],[0,4]],
+	[[1,0],[0,0],[0,4],[1,4],[2,2]],
+	[[0,1],[1,2],[2,1],[2,0],[0,0]]
+];
+
+var tinyTriVectors_ = convertToNewFormat([tinyTriVectors[1],tinyTriVectors[3]]);
+var tinyTriVectors2_ = convertToNewFormat([tinyTriVectors2[1],tinyTriVectors2[3]]);
+var tinyTriVectors3_ = convertToNewFormat([tinyTriVectors3[1],tinyTriVectors3[3]]);
 
 // 2x4 octant character lookup (relative char code -> bit pattern)
 // range: 0x1CD00 - 0x1CDE5
@@ -573,10 +621,12 @@ function isValidSpecialSymbol(charCode) {
 	if(charCode >= 0x2594 && charCode <= 0x259F) return true;
 	if(charCode >= 0x25E2 && charCode <= 0x25E5) return true;
 	if(charCode >= 0x1CD00 && charCode <= 0x1CDE5) return true;
+	if(charCode >= 0x1F780 && charCode <= 0x1F783 ) return true;
 	if(charCode >= 0x1FB00 && charCode <= 0x1FB3B) return true;
 	if(charCode >= 0x1FB3C && charCode <= 0x1FB6F) return true;
 	if(charCode >= 0x1FB70 && charCode <= 0x1FB7B) return true;
 	if(charCode >= 0x1FB82 && charCode <= 0x1FB8B) return true;
+	if(charCode >= 0x23F6 && charCode <= 0x23F7) return true;
 
 	switch(charCode) {
 		case 0x25B2: return true;
@@ -645,31 +695,33 @@ function draw2by3Char(charCode, textRender, x, y, width, height) {
 function drawTriangleShardChar(charCode, textRender, x, y, width, height, isBold, isItalic) {
 	var is90degTri = charCode >= 0x25E2 && charCode <= 0x25E5;
 	var isIsoTri = charCode == 0x25B2 || charCode == 0x25BA || charCode == 0x25BC || charCode == 0x25C4;
+	var isTinyTri = charCode >= 0x1F780 && charCode <= 0x1F783;
+	var isAltArrow = charCode == 0x1FB6D || charCode == 0x1FB6F;
+	var isNewShard = charCode == 0x23F6 || charCode == 0x23F7;
 
 	var vecs = [];
-	if(charCode >= 0x1FB9A && charCode <= 0x1FB9B) {
-		vecs = upperLowerVectors[charCode - 0x1FB9A];
-	} else if(is90degTri) {
-		vecs = _90degVectors[charCode - 0x25E2];
-	} else if(isIsoTri) {
-		switch(charCode) {
-			case 0x25B2: vecs = isoTriVectors[0]; break;
-			case 0x25BA: vecs = isoTriVectors[1]; break;
-			case 0x25BC: vecs = isoTriVectors[2]; break;
-			case 0x25C4: vecs = isoTriVectors[3]; break;
-		}
-	} else  {
-        if(isItalic) vecs = slcCharVectorsHalved[charCode - 0x1FB3C];
-        else vecs = slcCharVectors[charCode - 0x1FB3C];
-        if(isItalic && vecs == null) vecs = slcCharVectors[charCode - 0x1FB3C];
-    }
-	var gpX = [0, width / 2, width];
-	var gpY = [0, height / 3, height / 2, (height / 3) * 2, height];
+	if(charCode >= 0x1FB9A && charCode <= 0x1FB9B) vecs = upperLowerVectors[charCode - 0x1FB9A];
+	else if(is90degTri) vecs = _90degVectors[charCode - 0x25E2];
+	else if(isIsoTri) vecs = isoTriVectors[[0x25B2,0x25BA,0x25BC,0x25C4].indexOf(charCode)];
+	else if(isTinyTri) {
+		if(isItalic && !isBold) vecs = tinyTriVectors[charCode - 0x1F780];
+		if(isBold && !isItalic) vecs = tinyTriVectors2[charCode - 0x1F780];
+		if(isBold && isItalic) vecs = tinyTriVectors3[charCode - 0x1F780];
+	} else if(isNewShard) {
+		if(!isBold && isItalic) vecs = tinyTriVectors_[[0x23F6,0x23F7].indexOf(charCode)];
+		else if(isBold && !isItalic) vecs = tinyTriVectors2_[[0x23F6,0x23F7].indexOf(charCode)];
+		else if(isBold && isItalic) vecs = tinyTriVectors3_[[0x23F6,0x23F7].indexOf(charCode)];
+	} else {
+		if(isBold && isAltArrow && !isItalic) vecs = slcCharVectorsHalved2[[0x1FB6D,0x1FB6F].indexOf(charCode)];
+		else if(isItalic) vecs = slcCharVectorsHalved[charCode - 0x1FB3C];
+		else vecs = slcCharVectors[charCode - 0x1FB3C];
+		if(isItalic && vecs == null) vecs = slcCharVectors[charCode - 0x1FB3C];
+	}
 	textRender.beginPath();
 	for(var i = 0; i < vecs.length; i++) {
 		var vec = vecs[i];
-		var gx = gpX[vec[0]];
-		var gy = gpY[vec[1]];
+		var gx = vec[0]/2 * width
+		var gy = vec[1]/4 * height
 		if(i == 0) {
 			textRender.moveTo(x + gx, y + gy);
 		} else {
@@ -760,9 +812,11 @@ function drawBlockChar(charCode, textRender, x, y, cellW, cellH, isBold, isItali
 					charCode == 0x1CEA0 || charCode == 0x1FBE6 || charCode == 0x1FBE7;
 	var is90degTri = charCode >= 0x25E2 && charCode <= 0x25E5;
 	var isIsoTri = charCode == 0x25B2 || charCode == 0x25BA || charCode == 0x25BC || charCode == 0x25C4;
+	var isTinyTri = charCode >= 0x1F780 && charCode <= 0x1F783;
+	var isNewShard = charCode == 0x23F6 || charCode == 0x23F7 || charCode == 0x2BC5 || charCode == 0x2BC6;
 	var isTriangleShard = (charCode >= 0x1FB3C && charCode <= 0x1FB6F) ||
 							(charCode >= 0x1FB9A && charCode <= 0x1FB9B) ||
-							(is90degTri || isIsoTri);
+							(is90degTri || isIsoTri || isTinyTri || isNewShard);
 
 	if(isFractionalBlock) { // basic fractional blocks (full, half, n/8)
 		drawFractionalBlockChar(charCode, textRender, x, y, cellW, cellH);
@@ -801,6 +855,17 @@ function dispatchCharClientHook(cCode, textRender, tileX, tileY, x, y, clampW, c
 	return false;
 }
 
+function isSurrogate(char) {
+	var char_code = char.codePointAt(0);
+	var char_code_2 = char.codePointAt(1);
+	return(char_code && (char_code >= 0xD800 && char_code <= 0xDBFF) && char_code_2 && (char_code_2 >= 0xDC00 && char_code_2 <= 0xDFFF));
+}
+
+function fromSurrogatePair(high_surrog, low_surrog) {
+	if(high_surrog < 0xD800 || high_surrog > 0xDBFF || low_surrog < 0xDC00 || low_surrog > 0xDFFF) return null;
+	return ((high_surrog - 0xD800) << 10) + (low_surrog - 0xDC00) + 0x10000;
+}
+
 function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, protectionValue, linkType, highlight, charX, charY, tileX, tileY, isOverflow) {
 	var hasDrawn = false;
 
@@ -822,7 +887,7 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 		overbarCount = overbarCount[1];
 	}
 
-	var cCode = char.codePointAt(0);
+	var cCode = isSurrogate(char) ? fromSurrogatePair(char) : char.codePointAt(0);
 	if(isOverflow) {
 		if(cCode < 1024 && !deco) return;
 		if(cCode == 0xFDFD) return;
@@ -917,8 +982,8 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 		}
 	}
 
-	// don't render whitespaces
-	if(char == "\u0020" || char == "\u00A0") return hasDrawn;
+	// don't render whitespaces (some commmented out; not sure if I should skip them or render them despite that I believe all of them should always be blank)
+	if(cCode == 0x20 || cCode == 0xA0 || (cCode >= 0x2000 && cCode <= 0x200F) || /*(cCode >= 0x202B && cCode <= 0x202F) || (cCode >= 0x205F && cCode <= 0x206F) ||*/ cCode == 0x3000 || cCode == 0xFEFF || cCode == 0x2800 /*|| (cCode >= 0xE0000 && cCode <= 0xE007F) || (cCode >= 0xFE00 && cCode <= 0xFE0F) */) return hasDrawn;
 
 	if(!surrogateCharsEnabled || !combiningCharsEnabled) {
 		char = w.split(char, !surrogateCharsEnabled, !combiningCharsEnabled);
@@ -933,6 +998,7 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	var isItalic = deco && deco.italic;
 	var isHalfShard = ((cCode >= 0x25E2 && cCode <= 0x25E5) ||
 						cCode == 0x25B2 || cCode == 0x25C4 || cCode == 0x25BA || cCode == 0x25BC);
+	var isNewShard = (cCode >= 0x1F780 && cCode <= 0x1F783) || cCode == 0x23F6 || cCode == 0x23F7;
 	var isShadeSkipped = (cCode >= 0x2591 && cCode <= 0x2593) && (defaultSizes.cellW == 10 && defaultSizes.cellH == 18);
 
 	var checkIdx = 1;
@@ -940,7 +1006,9 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	var isSpecial = char.codePointAt(checkIdx) != void 0;
 	isSpecial = isSpecial || (cCode >= 0x2500 && cCode <= 0x257F);
 
-	if(ansiBlockFill && isValidSpecialSymbol(cCode) && !(isHalfShard && !isBold) && !isShadeSkipped) {
+	var isValidHalfShard = !(isHalfShard && !isBold);
+	var isValidNewShard = !(isNewShard && (!isBold && !isItalic));
+	if(ansiBlockFill && isValidSpecialSymbol(cCode) && isValidHalfShard && isValidNewShard && !isShadeSkipped) {
 		if(!isOverflow) {
 			drawBlockChar(cCode, textRender, fontX, fontY, cellW, cellH, !!isBold, !!isItalic);
 			hasDrawn = true;
