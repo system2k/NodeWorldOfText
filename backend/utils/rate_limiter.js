@@ -1,3 +1,5 @@
+var { retrieveRestrictionRule } = require("./restrictions.js");
+
 var editRateLimits = {}; // TODO: garbage collection
 var linkRateLimits = {};
 var tileRateLimits = {};
@@ -59,121 +61,30 @@ function prepareRateLimiter(limObj, periodLength, ipAddress) {
 	return obj;
 }
 
-function checkCharrateRestr(list, ipVal, ipFam, isGrouped, world, tileX, tileY) {
-	if(!list) return null;
-	for(var i = 0; i < list.length; i++) {
-		var item = list[i];
-
-		var ip = item.ip;
-		var group = item.group;
-		if(ip) {
-			var riRange = ip[0];
-			var riFam = ip[1];
-			if(riFam != ipFam) continue;
-			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
-		} else if(group) {
-			if(!(group == "cg1" && isGrouped)) continue;
-		}
-
-		var type = item.type;
-		if(type == "charrate") {
-			var rRate = item.rate;
-			var rRorld = item.world;
-			var rRegion = item.region;
-			if(rRorld == null || rRorld.toUpperCase() == world.toUpperCase()) {
-				if(rRegion == null || rRegion[0] <= tileX && tileX <= rRegion[2] && rRegion[1] <= tileY && tileY <= rRegion[3]) {
-					return rRate;
-				}
-			}
-		}
+function checkCharrateRestr(restGroups, ipVal, ipFam, isGrouped, world, tileX, tileY) {
+	let r = retrieveRestrictionRule(restGroups.charrate, ipVal, ipFam, isGrouped, world, tileX, tileY);
+	if(r) {
+		return r.rate;
 	}
 	return null;
 }
 
-function checkLinkrateRestr(list, ipVal, ipFam, isGrouped, world) {
-	if(!list) return null;
-	for(var i = 0; i < list.length; i++) {
-		var item = list[i];
-
-		var ip = item.ip;
-		var group = item.group;
-		if(ip) {
-			var riRange = ip[0];
-			var riFam = ip[1];
-			if(riFam != ipFam) continue;
-			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
-		} else if(group) {
-			if(!(group == "cg1" && isGrouped)) continue;
-		}
-
-		var type = item.type;
-		if(type == "linkrate") {
-			var rRate = item.rate;
-			var rRorld = item.world;
-			if(rRorld == null || rRorld.toUpperCase() == world.toUpperCase()) {
-				return rRate;
-			}
-		}
+function checkLinkrateRestr(restGroups, ipVal, ipFam, isGrouped, world) {
+	let r = retrieveRestrictionRule(restGroups.linkrate, ipVal, ipFam, isGrouped, world, null, null);
+	if(r) {
+		return r.rate;
 	}
 	return null;
 }
 
-function checkColorRestr(list, ipVal, ipFam, isGrouped, world, tileX, tileY) {
-	if(!list) return false;
-	for(var i = 0; i < list.length; i++) {
-		var item = list[i];
-
-		var ip = item.ip;
-		var group = item.group;
-		if(ip) {
-			var riRange = ip[0];
-			var riFam = ip[1];
-			if(riFam != ipFam) continue;
-			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
-		} else if(group) {
-			if(!(group == "cg1" && isGrouped)) continue;
-		}
-
-		var type = item.type;
-		if(type == "color") {
-			var rRegion = item.region;
-			var rWorld = item.world;
-			if(rWorld == null || rWorld.toUpperCase() == world.toUpperCase()) {
-				if(rRegion == null || rRegion[0] <= tileX && tileX <= rRegion[2] && rRegion[1] <= tileY && tileY <= rRegion[3]) {
-					return true;
-				}
-			}
-		}
-	}
-	return false;
+function checkColorRestr(restGroups, ipVal, ipFam, isGrouped, world, tileX, tileY) {
+	let r = retrieveRestrictionRule(restGroups.color, ipVal, ipFam, isGrouped, world, tileX, tileY);
+	return r != null;
 }
 
-function checkHTTPWriteRestr(list, ipVal, ipFam, isGrouped, world) {
-	if(!list) return false;
-	for(var i = 0; i < list.length; i++) {
-		var item = list[i];
-
-		var ip = item.ip;
-		var group = item.group;
-		if(ip) {
-			var riRange = ip[0];
-			var riFam = ip[1];
-			if(riFam != ipFam) continue;
-			if(!(ipVal >= riRange[0] && ipVal <= riRange[1])) continue;
-		} else if(group) {
-			if(!(group == "cg1" && isGrouped)) continue;
-		}
-
-		var type = item.type;
-		var mode = item.mode;
-		if(type == "daccess" && mode == "httpwrite") {
-			var rWorld = item.world;
-			if(rWorld == null || rWorld.toUpperCase() == world.toUpperCase()) {
-				return true;
-			}
-		}
-	}
-	return false;
+function checkHTTPWriteRestr(restGroups, ipVal, ipFam, isGrouped, world) {
+	let r = retrieveRestrictionRule(restGroups.daccess.httpwrite, ipVal, ipFam, isGrouped, world, null, null);
+	return r != null;
 }
 
 function setHold(id, worldId, tileX, tileY) {

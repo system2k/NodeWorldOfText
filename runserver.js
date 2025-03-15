@@ -1377,7 +1377,7 @@ function loadRestrictionsList() {
 		if(restr_cache) {
 			var list = restr_cache.toString("utf8").replace(/\r\n/g, "\n").split("\n");
 			var result = restrictions.procRest(list);
-			restrictions.setRestrictions(result.data);
+			restrictions.setRestrictions(result.groups);
 		}
 		if(restr_cg1_cache) {
 			var list = restr_cg1_cache.toString("utf8").replace(/\r\n/g, "\n").split("\n");
@@ -1670,6 +1670,9 @@ function wsSend(socket, data) {
 				socket.sdata.messageBackpressure--;
 			}
 			error = true;
+			if(socket.sdata.methods.updateNetworkStats) {
+				socket.sdata.methods.updateNetworkStats();
+			}
 		});
 	} catch(e) {
 		if(!error && socket.sdata) {
@@ -1868,6 +1871,9 @@ function invalidateWebsocketSession(session_token) {
 async function manageWebsocketConnection(ws, req) {
 	if(isStopping || !serverLoaded) return ws.close();
 	ws.sdata = {
+		methods: {
+			updateNetworkStats: null
+		},
 		terminated: false,
 		ipAddress: null,
 		ipAddressFam: null,
@@ -1929,7 +1935,7 @@ async function manageWebsocketConnection(ws, req) {
 		if(deniedPages.siteAccessNote) {
 			deny_notes = deniedPages.siteAccessNote;
 		}
-		ws.send("Site access denied, note: "+deny_notes);
+		ws.send("Site access denied, note: " + deny_notes);
 		ws.close();
 		return;
 	}
@@ -1992,6 +1998,8 @@ async function manageWebsocketConnection(ws, req) {
 		bytesWritten = b_out;
 		bytesRead = b_in;
 	}
+	ws.sdata.methods.updateNetworkStats = updateNetworkStats;
+
 	function send_ws(data) {
 		wsSend(ws, data);
 		updateNetworkStats();

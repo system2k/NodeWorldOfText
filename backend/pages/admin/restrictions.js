@@ -43,7 +43,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 
 	if(type == "1") { // restrictions
 		var result = procRest(list);
-		setRestrictions(result.data);
+		setRestrictions(result.groups);
 		saveRestrictions("main", result.raw);
 	} else if(type == "2") { // coalesce
 		var result = procCoal(list);
