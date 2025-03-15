@@ -1,6 +1,6 @@
-﻿var YourWorld = {
+var YourWorld = {
 	Color: window.localStorage ? +localStorage.getItem("color") : 0,
-	BgColor: window.localStorage ? +localStorage.getItem("bgColor") : 0,
+	BgColor: -1,
 	Nickname: state.userModel.username
 };
 
@@ -7266,7 +7266,7 @@ function makeColorModal() {
 		if(!isBg) { // text color
 			color = colorInput.value;
 		} else { // cell color
-			colorInputBg.jscolor.importColor();
+			if(!colorInputBg.jscolor.refine) return;
 			color = colorInputBg.value;
 		}
 		var this_color = 0;
@@ -7281,7 +7281,7 @@ function makeColorModal() {
 			localStorage.setItem("color", this_color);
 		} else {
 			w.changeBgColor(this_color);
-			localStorage.setItem("bgColor", this_color);
+			// we don't need to save the bg color to localStorage (if enabled for this world)
 		}
 	});
 	modal.onClose(function(canceled) {
