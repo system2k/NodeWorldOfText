@@ -909,7 +909,7 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 		var emoteMessage = "";
 		var emoteBuffer = "";
 		var emoteMode = false;
-		var emoteCharset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+		var emoteCharset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_";
 		// emotes are case sensitive
 		for(var i = 0; i < message.length; i++) {
 			var chr = message[i];
