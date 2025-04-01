@@ -1089,7 +1089,13 @@ var ms = {
 };
 
 intv.release_stuck_requests = setInterval(function() {
-	httpServer.releaseStuckRequests();
+	try {
+		if(httpServer) {
+			httpServer.releaseStuckRequests();
+		}
+	} catch(e) {
+		handle_error(e, true);
+	}
 }, 1000 * 60);
 
 function createEndpoints(server) {
