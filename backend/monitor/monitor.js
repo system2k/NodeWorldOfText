@@ -80,10 +80,10 @@ var server = http.createServer(async function(req, res) {
 				});
 				res.end(pageTemplate);
 			} else {
-				res.end(loginTemplate);
 				res.writeHead(200, {
 					"Content-Type": "text/html"
 				});
+				res.end(loginTemplate);
 			}
 			return;
 		} else if(method == "POST") {
@@ -114,9 +114,10 @@ var server = http.createServer(async function(req, res) {
 			}
 			return;
 		}
+	} else {
+		res.writeHead(404);
+		res.end("404: Not found");
 	}
-	res.writeHead(404);
-	res.end("404: Not found");
 });
 
 parentPort.on("message", function(data) {
