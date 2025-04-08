@@ -207,22 +207,22 @@ function filterUpdatePacketDistance(client, packet) {
 	var isFiltered = false;
 	var center = client.sdata.center;
 	var boundary = client.sdata.boundary;
-	var x1 = boundary[0];
-	var y1 = boundary[1];
-	var x2 = boundary[2];
-	var y2 = boundary[3];
-	for(var idx in tiles) {
-		var pos = idx.split(",");
-		var tileX = san_nbr(pos[1]);
-		var tileY = san_nbr(pos[0]);
-		var dist = (center[0] - tileX) ** 2 + (center[1] - tileY) ** 2;
+	for(let idx in tiles) {
+		let pos = idx.split(",");
+		let tileX = san_nbr(pos[1]);
+		let tileY = san_nbr(pos[0]);
+		let dist = (center[0] - tileX) ** 2 + (center[1] - tileY) ** 2;
 		if(dist > 128 * 128) {
 			// not in range from center point
 			isFiltered = true;
 			continue;
 		}
-		if(x1 && y1 && x2 && y2) {
-			// not in range of boundary
+		// not in range of boundary
+		if(boundary) {
+			let x1 = boundary[0];
+			let y1 = boundary[1];
+			let x2 = boundary[2];
+			let y2 = boundary[3];
 			if(!(tileX >= x1 && tileX <= x2 && tileY >= y1 && tileY <= y2)) {
 				isFiltered = true;
 				continue;
