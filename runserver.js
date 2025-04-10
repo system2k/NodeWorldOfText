@@ -15,7 +15,6 @@ const nodemailer  = require("nodemailer");
 const path        = require("path");
 const pg          = require("pg");
 const querystring = require("querystring");
-const sql         = require("sqlite3");
 const url         = require("url");
 const util        = require("util");
 const WebSocket   = require("ws");
@@ -74,6 +73,10 @@ var is_cf_ipv6_int = ipaddress.is_cf_ipv6_int;
 
 var DATA_PATH = "../nwotdata/";
 var SETTINGS_PATH = DATA_PATH + "settings.json";
+
+function getPath(filePath) {
+	return path.resolve(module.path, filePath);
+}
 
 function initializeDirectoryStruct() {
 	// create the data folder that stores all of the server's data
@@ -637,126 +640,208 @@ var canViewWorld = subsystems.world_mgr.canViewWorld;
 var getWorldNameFromCacheById = subsystems.world_mgr.getWorldNameFromCacheById;
 
 class AsyncDBManager {
-	database = null;
-	constructor(_db) {
-		this.database = _db;
+	databasePath = null;
+	databaseInitted = false;
+	databaseTerminated = false;
+
+	bsqlThread = null;
+	bsqlReqId = 0;
+	bsqlRequests = {};
+	bsqlPreQueue = [];
+	bsqlIterCallbacks = {};
+
+	constructor(_path) {
+		this.databasePath = _path;
+
+		let self = this;
+
+		this.bsqlThread = new worker.Worker(getPath("./database_thread.js"));
+
+		this.bsqlThread.on("online", async function() {
+			await self._run("*INIT*", getPath(self.databasePath), null, null, true);
+			self.databaseInitted = true;
+			self._flushPreQueue();
+		});
+
+		this.bsqlThread.on("message", function(data) {
+			var id = data.id;
+			var res = data.data;
+			var error = data.error;
+			var isIteratorItem = data.isIteratorItem;
+			var cb = self.bsqlRequests[id];
+			if(isIteratorItem) {
+				self.bsqlIterCallbacks[id](res);
+			} else if(cb) {
+				delete self.bsqlRequests[id];
+				delete self.bsqlIterCallbacks[id];
+				if(error) {
+					cb[1](error);
+				} else {
+					cb[0](res);
+				}
+			}
+		});
+
+		this.bsqlThread.on("error", function(err) {
+			console.log("Error", err, self.databasePath);
+		});
+	}
+
+	_terminate() {
+		if(this.bsqlThread) {
+			this.bsqlThread.terminate();
+			this.databaseTerminated = true;
+		}
+	}
+
+	_run(query, param, method, id, bypassQueue, iterCallback) {
+		if(this.databaseTerminated) {
+			throw new Error("Can't execute query - database is already terminated: " + this.databasePath);
+		}
+		let self = this;
+		if(id == void 0) {
+			id = this.bsqlReqId++;
+		}
+		if(iterCallback) {
+			this.bsqlIterCallbacks[id] = iterCallback;
+		}
+		if(!this.databaseInitted && !bypassQueue) {
+			this.bsqlPreQueue.push({ query, param, method, id });
+		} else {
+			this.bsqlThread.postMessage({
+				sql: query,
+				param: param,
+				method: method,
+				id: id
+			});
+		}
+		if(!this.bsqlRequests[id]) {
+			return new Promise(function(res, rej) {
+				self.bsqlRequests[id] = [res, rej];
+			});
+		}
+	}
+
+	_flushPreQueue() {
+		let list = this.bsqlPreQueue;
+		for(let i = 0; i < list.length; i++) {
+			let call = list[i];
+			this._run(call.query, call.param, call.method, call.id);
+		}
+		this.bsqlPreQueue = [];
+	}
+
+	_normalizeArgs(buffer) {
+		if(!Array.isArray(buffer)) return buffer;
+		for(var i = 0; i < buffer.length; i++) {
+			if(typeof buffer[i] == "boolean") {
+				buffer[i] = Number(buffer[i]);
+			}
+		}
+		return buffer;
 	}
 
 	// gets data from the database (only 1 row at a time)
 	async get(command, args) {
-		var self = this;
-		if(args == void 0 || args == null) args = [];
-		return new Promise(function(r, rej) {
-			self.database.get(command, args, function(err, res) {
-				if(err) {
-					return rej({
-						sqlite_error: process_error_arg(err),
-						input: { command, args }
-					});
-				}
-				r(res);
-			});
-		});
+		args = this._normalizeArgs(args);
+		let res;
+		try {
+			res = await this._run(command, args, "get");
+		} catch(err) {
+			throw {
+				sqlite_error: err,
+				input: { command, args }
+			};
+		}
+		return res;
 	}
 
 	// runs a command (insert, update, etc...) and might return "lastID" if needed
 	async run(command, args) {
-		var self = this;
-		if(args == void 0 || args == null) args = [];
-			return new Promise(function(r, rej) {
-				self.database.run(command, args, function(err, res) {
-					if(err) {
-						return rej({
-							sqlite_error: process_error_arg(err),
-							input: { command, args }
-						});
-					}
-					var info = {
-						lastID: this.lastID,
-						changes: this.changes
-					}
-					r(info);
-				});
-			});
+		args = this._normalizeArgs(args);
+		let res;
+		try {
+			res = this._run(command, args, "run");
+		} catch(err) {
+			throw {
+				sqlite_error: err,
+				input: { command, args }
+			};
+		}
+		if(res) {
+			return {
+				lastID: res.lastInsertRowid,
+				changes: res.changes
+			};
+		}
 	}
 
 	// gets multiple rows in one command
 	async all(command, args) {
-		var self = this;
-		if(args == void 0 || args == null) args = [];
-			return new Promise(function(r, rej) {
-				self.database.all(command, args, function(err, res) {
-					if(err) {
-						return rej({
-							sqlite_error: process_error_arg(err),
-							input: { command, args }
-						});
-					}
-					r(res);
-				});
-			});
+		args = this._normalizeArgs(args);
+		let res;
+		try {
+			res = await this._run(command, args, "all");
+		} catch(err) {
+			throw {
+				sqlite_error: err,
+				input: { command, args }
+			};
+		}
+		return res;
 	}
 
 	// get multiple rows but execute a function for every row
-	async each(command, args, callbacks) {
-		var self = this;
+	async each(command, args, callback) {
+		args = this._normalizeArgs(args);
 		if(typeof args == "function") {
-			callbacks = args;
+			callback = args;
 			args = [];
 		}
-		var def = callbacks;
-		var callback_error = false;
-		var cb_err_desc = "callback_error";
-		callbacks = function(e, data) {
-			try {
-				def(data);
-			} catch(e) {
-				callback_error = true;
-				cb_err_desc = e;
-			}
-		}
-		return new Promise(function(r, rej) {
-			self.database.each(command, args, callbacks, function(err, res) {
-				if(err) return rej({
-					sqlite_error: process_error_arg(err),
-					input: { command, args }
-				});
-				if(callback_error) return rej(cb_err_desc);
-				r(res);
+		try {
+			await this._run(command, args, "each", null, false, function(data) {
+				try {
+					callback(data);
+				} catch(e) {
+					handle_error(e);
+				}
 			});
-		});
+		} catch(err) {
+			throw {
+				sqlite_error: err,
+				input: { command, args }
+			};
+		}
 	}
 
 	// like run, but executes the command as a SQL file
 	// (no comments allowed, and must be semicolon separated)
 	async exec(command) {
-		var self = this;
-		return new Promise(function(r, rej) {
-			self.database.exec(command, function(err) {
-				if(err) {
-					return rej({
-						sqlite_error: process_error_arg(err),
-						input: { command }
-					});
-				}
-				r(true);
-			});
-		});
+		try {
+			this._run(command, null, "exec");
+		} catch(err) {
+			throw {
+				sqlite_error: err,
+				input: { command, args }
+			};
+		}
 	}
 }
 
 function loadDbSystems() {
-	var database = new sql.Database(serverDBPath);
-	var edits_db = new sql.Database(editsDBPath);
-	var chat_history = new sql.Database(chatDBPath);
-	var image_db = new sql.Database(imageDBPath);
-	var misc_db = new sql.Database(miscDBPath);
+	db = new AsyncDBManager(serverDBPath);
+	db_edits = new AsyncDBManager(editsDBPath);
+	db_chat = new AsyncDBManager(chatDBPath);
+	db_img = new AsyncDBManager(imageDBPath);
+	db_misc = new AsyncDBManager(miscDBPath);
+}
 
-	db = new AsyncDBManager(database);
-	db_edits = new AsyncDBManager(edits_db);
-	db_chat = new AsyncDBManager(chat_history);
-	db_img = new AsyncDBManager(image_db);
-	db_misc = new AsyncDBManager(misc_db);
+function terminateDbSystems() {
+	db._terminate();
+	db_edits._terminate();
+	db_chat._terminate();
+	db_img._terminate();
+	db_misc._terminate();
 }
 
 async function loadEmail() {
@@ -2461,9 +2546,11 @@ function stopServer(restart, maintenance) {
 			}
 
 			await loopCommitRestrictions(true);
+
+			terminateDbSystems();
 		} catch(e) {
 			handle_error(e);
-			if(!isTestServer) console.log(e);
+			console.log(e);
 		}
 
 		var handles = [];

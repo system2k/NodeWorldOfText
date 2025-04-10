@@ -1201,13 +1201,13 @@ async function iterateDatabaseChanges() {
 						VALUES (null, $world_id, $content, $tileY, $tileX, $properties, $writability, $created_at)
 					`,
 						{
-							$world_id: worldID,
-							$content: tile.content.join(""),
-							$tileY: tileY,
-							$tileX: tileX,
-							$properties: JSON.stringify(propObj),
-							$writability: tile.writability,
-							$created_at: Date.now()
+							world_id: worldID,
+							content: tile.content.join(""),
+							tileY: tileY,
+							tileX: tileX,
+							properties: JSON.stringify(propObj),
+							writability: tile.writability,
+							created_at: Date.now()
 						}, function(newTile) {
 							tile.inserting = false;
 							tile.tile_exists = true;

@@ -133,23 +133,23 @@ async function insertWorld(name) {
 			$feature_coord_link, $feature_url_link, $custom_bg, $custom_cursor, $custom_guest_cursor, $custom_color, $custom_tile_owner,
 			$custom_tile_member, $writability, $readability, $properties)
 	`, {
-		$name: name,
-		$owner_id: null,
-		$created_at: date,
-		$feature_go_to_coord: feature_go_to_coord,
-		$feature_membertiles_addremove: feature_membertiles_addremove,
-		$feature_paste: feature_paste,
-		$feature_coord_link: feature_coord_link,
-		$feature_url_link: feature_url_link,
-		$custom_bg: custom_bg,
-		$custom_cursor: custom_cursor,
-		$custom_guest_cursor: custom_guest_cursor,
-		$custom_color: custom_color,
-		$custom_tile_owner: custom_tile_owner,
-		$custom_tile_member: custom_tile_member,
-		$writability: writability,
-		$readability: readability,
-		$properties: properties
+		name: name,
+		owner_id: null,
+		created_at: date,
+		feature_go_to_coord: feature_go_to_coord,
+		feature_membertiles_addremove: feature_membertiles_addremove,
+		feature_paste: feature_paste,
+		feature_coord_link: feature_coord_link,
+		feature_url_link: feature_url_link,
+		custom_bg: custom_bg,
+		custom_cursor: custom_cursor,
+		custom_guest_cursor: custom_guest_cursor,
+		custom_color: custom_color,
+		custom_tile_owner: custom_tile_owner,
+		custom_tile_member: custom_tile_member,
+		writability: writability,
+		readability: readability,
+		properties: properties
 	});
 	var worldId = await db.get("SELECT * FROM world WHERE id=?", rw.lastID);
 	return worldId;
