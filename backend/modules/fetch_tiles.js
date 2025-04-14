@@ -4,52 +4,13 @@ var normalizeCacheTile = utils.normalizeCacheTile;
 var advancedSplit = utils.advancedSplit;
 var san_nbr = utils.san_nbr;
 
-function partitionRectangle(rect) {
-	var minY = rect.minY;
-	var minX = rect.minX;
-	var maxY = rect.maxY;
-	var maxX = rect.maxX;
-
-	var regWidth = maxX - minX + 1;
-	var regHeight = maxY - minY + 1;
-
-	if(!regWidth || !regHeight) {
-		return [];
-	}
-
-	var res = [];
-
-	var sectorWidth, sectorHeight;
-	if(regWidth > 100) {
-		sectorWidth = 100;
-		sectorHeight = 1;
-	} else {
-		sectorWidth = regWidth;
-		sectorHeight = Math.floor(100 / regWidth);
-	}
-
-	var divW = Math.ceil(regWidth / sectorWidth);
-	var divH = Math.ceil(regHeight / sectorHeight);
-
-	for(var y = 0; y < divH; y++) {
-		for(var x = 0; x < divW; x++) {
-			var x1 = minX + sectorWidth * x;
-			var y1 = minY + sectorHeight * y;
-			var x2 = Math.min(x1 + sectorWidth - 1, maxX);
-			var y2 = Math.min(y1 + sectorHeight - 1, maxY);
-			res.push([x1, y1, x2, y2]);
-		}
-	}
-
-	return res;
-}
-
 module.exports = async function(data, server, params) {
 	var world = params.world;
 
 	var memTileCache = server.memTileCache;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
-	var tile_fetcher = server.tile_fetcher;
+	//var tile_fetcher = server.tile_fetcher;
+	var db_tileReadPool = server.db_tileReadPool;
 
 	var tiles = {};
 	var fetchRectLimit = 50;
@@ -116,8 +77,27 @@ module.exports = async function(data, server, params) {
 
 	var fetchedTiles = {};
 	for(var i = 0; i < len; i++) {
-		var rect = partitionRectangle(data.fetchRectangles[i]);
-		for(var x = 0; x < rect.length; x++) {
+		var rect = data.fetchRectangles[i];
+
+		var x1 = rect.minX;
+		var y1 = rect.minY;
+		var x2 = rect.maxX;
+		var y2 = rect.maxY;
+		for(var ty = y1; ty <= y2; ty++) {
+			for(var tx = x1; tx <= x2; tx++) {
+				tiles[ty + "," + tx] = null;
+			}
+		}
+		var fetched = await db_tileReadPool.fetchRegion(world.id, x1, y1, x2, y2);
+		for(var t = 0; t < fetched.length; t++) {
+			var tileX = fetched[t].tileX;
+			var tileY = fetched[t].tileY;
+			fetchedTiles[tileY + "," + tileX] = fetched[t];
+		}
+
+		//console.log("frect", rect);
+
+		/*for(var x = 0; x < rect.length; x++) {
 			var subRect = rect[x];
 
 			// set all tiles to null first
@@ -142,7 +122,8 @@ module.exports = async function(data, server, params) {
 				var tileY = tileData[t].tileY;
 				fetchedTiles[tileY + "," + tileX] = tileData[t];
 			}
-		}
+		}*/
+
 	}
 
 	// normalize the retrieved tiles

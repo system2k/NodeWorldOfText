@@ -21,6 +21,10 @@ const WebSocket   = require("ws");
 const worker      = require("node:worker_threads");
 const zip         = require("adm-zip");
 
+const DATA_PATH = "../nwotdata/";
+const SETTINGS_PATH = DATA_PATH + "settings.json";
+const DATABASE_THREAD_PATH = "./backend/database_thread.js";
+
 const bin_packet   = require("./backend/utils/bin_packet.js");
 const utils        = require("./backend/utils/utils.js");
 const rate_limiter = require("./backend/utils/rate_limiter.js");
@@ -70,13 +74,6 @@ var ipv4_to_range  = ipaddress.ipv4_to_range;
 var ipv6_to_range  = ipaddress.ipv6_to_range;
 var is_cf_ipv4_int = ipaddress.is_cf_ipv4_int;
 var is_cf_ipv6_int = ipaddress.is_cf_ipv6_int;
-
-var DATA_PATH = "../nwotdata/";
-var SETTINGS_PATH = DATA_PATH + "settings.json";
-
-function getPath(filePath) {
-	return path.resolve(module.path, filePath);
-}
 
 function initializeDirectoryStruct() {
 	// create the data folder that stores all of the server's data
@@ -160,6 +157,7 @@ var db,
 	db_chat,
 	db_img,
 	db_misc;
+var db_tileReadPool;
 
 // Global
 CONST = {};
@@ -639,28 +637,36 @@ var renameWorld = subsystems.world_mgr.renameWorld;
 var canViewWorld = subsystems.world_mgr.canViewWorld;
 var getWorldNameFromCacheById = subsystems.world_mgr.getWorldNameFromCacheById;
 
-class AsyncDBManager {
+class AsyncDBConnection {
 	databasePath = null;
+	databaseWALEnabled = false;
+	databaseReadonly = false;
 	databaseInitted = false;
 	databaseTerminated = false;
 
 	bsqlThread = null;
 	bsqlReqId = 0;
 	bsqlRequests = {};
-	bsqlPreQueue = [];
 	bsqlIterCallbacks = {};
 
-	constructor(_path) {
-		this.databasePath = _path;
+	constructor(path, WALEnabled, readonly) {
+		this.databasePath = path;
+		this.databaseWALEnabled = WALEnabled;
+		this.databaseReadonly = readonly;
+	}
 
+	load() {
 		let self = this;
-
-		this.bsqlThread = new worker.Worker(getPath("./database_thread.js"));
-
+		let loadRes = null;
+		this.bsqlThread = new worker.Worker(path.resolve(module.path, DATABASE_THREAD_PATH));
 		this.bsqlThread.on("online", async function() {
-			await self._run("*INIT*", getPath(self.databasePath), null, null, true);
+			await self._run("*INIT*", {
+				path: path.resolve(module.path, self.databasePath),
+				WALEnabled: self.databaseWALEnabled,
+				readonly: self.databaseReadonly
+			});
 			self.databaseInitted = true;
-			self._flushPreQueue();
+			loadRes();
 		});
 
 		this.bsqlThread.on("message", function(data) {
@@ -685,16 +691,20 @@ class AsyncDBManager {
 		this.bsqlThread.on("error", function(err) {
 			console.log("Error", err, self.databasePath);
 		});
+
+		return new Promise(function(res, rej) {
+			loadRes = res;
+		});
 	}
 
-	_terminate() {
+	terminate() {
 		if(this.bsqlThread) {
 			this.bsqlThread.terminate();
 			this.databaseTerminated = true;
 		}
 	}
 
-	_run(query, param, method, id, bypassQueue, iterCallback) {
+	_run(query, param, method, id, iterCallback) {
 		if(this.databaseTerminated) {
 			throw new Error("Can't execute query - database is already terminated: " + this.databasePath);
 		}
@@ -705,30 +715,17 @@ class AsyncDBManager {
 		if(iterCallback) {
 			this.bsqlIterCallbacks[id] = iterCallback;
 		}
-		if(!this.databaseInitted && !bypassQueue) {
-			this.bsqlPreQueue.push({ query, param, method, id });
-		} else {
-			this.bsqlThread.postMessage({
-				sql: query,
-				param: param,
-				method: method,
-				id: id
-			});
-		}
+		this.bsqlThread.postMessage({
+			sql: query,
+			param: param,
+			method: method,
+			id: id
+		});
 		if(!this.bsqlRequests[id]) {
 			return new Promise(function(res, rej) {
 				self.bsqlRequests[id] = [res, rej];
 			});
 		}
-	}
-
-	_flushPreQueue() {
-		let list = this.bsqlPreQueue;
-		for(let i = 0; i < list.length; i++) {
-			let call = list[i];
-			this._run(call.query, call.param, call.method, call.id);
-		}
-		this.bsqlPreQueue = [];
 	}
 
 	_normalizeArgs(buffer) {
@@ -792,14 +789,14 @@ class AsyncDBManager {
 	}
 
 	// get multiple rows but execute a function for every row
-	async each(command, args, callback) {
+	async each(command, args, callback, isCooperative) {
 		args = this._normalizeArgs(args);
 		if(typeof args == "function") {
 			callback = args;
 			args = [];
 		}
 		try {
-			await this._run(command, args, "each", null, false, function(data) {
+			await this._run(command, args, isCooperative ? "each_coop" : "each", null, function(data) {
 				try {
 					callback(data);
 				} catch(e) {
@@ -828,20 +825,182 @@ class AsyncDBManager {
 	}
 }
 
-function loadDbSystems() {
-	db = new AsyncDBManager(serverDBPath);
-	db_edits = new AsyncDBManager(editsDBPath);
-	db_chat = new AsyncDBManager(chatDBPath);
-	db_img = new AsyncDBManager(imageDBPath);
-	db_misc = new AsyncDBManager(miscDBPath);
+class TileReaderPool {
+	databasePath = null;
+	databaseWALEnabled = false;
+	databaseThreadCount = 0;
+	databaseInstances = [];
+
+	constructor(path, WALEnabled, poolSize) {
+		this.databasePath = path;
+		this.databaseWALEnabled = WALEnabled;
+		this.databaseThreadCount = poolSize;
+	}
+
+	static *PartStepper(x1, y1, x2, y2) {
+		const widthLim = 10;
+		const heightLim = 5;
+		if(x1 > x2) throw "Invalid range";
+		if(y1 > y2) throw "Invalid range";
+		let height = y2 - y1 + 1;
+		let width = x2 - x1 + 1;
+		let rowSegments = Math.ceil(height / heightLim);
+		let colSegments = Math.ceil(width / widthLim);
+		for(let y = 0; y < rowSegments; y++) {
+			for(let x = 0; x < colSegments; x++) {
+				let startX = x1 + x * widthLim;
+				let endX = startX + widthLim - 1;
+				let startY = y1 + y * heightLim;
+				let endY = startY + heightLim - 1;
+				if(endX > x2) endX = x2;
+				if(endY > y2) endY = y2;
+				yield {
+					x1: startX,
+					x2: endX,
+					y1: startY,
+					y2: endY
+				};
+			}
+		}
+	}
+
+	async load() {
+		//console.log()
+		for(let i = 0; i < this.databaseThreadCount; i++) {
+			let db = new AsyncDBConnection(this.databasePath, this.databaseWALEnabled, true);
+			this.databaseInstances.push({
+				db: db,
+				activeTiles: 0,
+				sequence: i
+			});
+		}
+		let loadList = this.databaseInstances.map((inst) => {
+			return inst.db.load();
+		});
+		return Promise.all(loadList);
+	}
+
+	async _loadNext(worldId, x1, y1, x2, y2) {
+		//let db = databaseInstances[0].db;
+
+		let dbMin = null;
+		let dbMinVal = Infinity;
+		for(let i = 0; i < this.databaseInstances.length; i++) {
+			let inst = this.databaseInstances[i];
+			if(inst.activeTiles < dbMinVal) {
+				dbMin = inst;
+				dbMinVal = inst.activeTiles;
+			}
+		}
+		console.log(worldId, x1, y1, x2, y2, [dbMin.sequence])
+
+		let area = (y2 - y1 + 1) * (x2 - x1 + 1);
+		let yCount = y2 - y1 + 1;
+		let qParam = [worldId, x1, x2];
+		for(let y = y1; y <= y2; y++) {
+			qParam.push(y);
+		}
+		let tiles = [];
+		dbMin.activeTiles += area;
+		let totalRecv = 0;
+		await db.each(
+			"SELECT * FROM tile WHERE world_id=? AND tileX >= ? AND tileX <= ? AND tileY IN" + " (" + new Array(yCount).fill("?").join(",") + ")",
+			qParam, function(newData) {
+				tiles.push(...newData);
+				console.log("AT", dbMin.activeTiles, newData.length)
+				// we want to shrink the number of active tiles as the tiles are being received.
+				// towards the end, we will then remove the remaining area.
+				dbMin.activeTiles -= newData.length;
+				totalRecv += newData.length;
+			}, true
+		);
+		console.log("totalrecv", area, totalRecv)
+		dbMin.activeTiles -= (area - totalRecv);
+		return tiles;
+	}
+
+	async fetchRegion(worldId, x1, y1, x2, y2) {
+		let stepper = TileReaderPool.PartStepper(x1, y1, x2, y2);
+		// we want 8 simultaneous fetches
+		let fetchers = new Array(this.databaseThreadCount).fill(null);
+		let tileList = [];
+		let stepperDone = false;
+		let finalize = null;
+		let resolved = false;
+		let totalWaiting = 0;
+		let checkResolve = () => {
+			if(resolved) return;
+			if(totalWaiting == 0) {
+				resolved = true;
+				finalize(tileList);
+			}
+		}
+		let loadCallback = (data, index) => {
+			//console.log("RECV", data)
+			tileList.push(...data);
+			if(!stepperDone) {
+				let stepNext = stepper.next();
+				if(stepNext.done) {
+					stepperDone = true;
+				} else {
+					let pos = stepNext.value;
+					fetchers[index] = this._loadNext(worldId, pos.x1, pos.y1, pos.x2, pos.y2).then((data, index) => {
+						totalWaiting--;
+						loadCallback(data, index);
+					});
+					totalWaiting++;
+				}
+			}
+			checkResolve();
+		}
+		for(let i = 0; i < fetchers.length; i++) {
+			let stepNext = stepper.next();
+			if(stepNext.done) {
+				stepperDone = true;
+				checkResolve();
+				break;
+			}
+			let pos = stepNext.value;
+			//console.log("FETCH", pos)
+			fetchers[i] = this._loadNext(worldId, pos.x1, pos.y1, pos.x2, pos.y2).then((data) => {
+				totalWaiting--;
+				loadCallback(data, i);
+			});
+			totalWaiting++;
+		}
+		return new Promise(function(res, rej) {
+			finalize = res;
+		});
+	}
+}
+
+async function loadDbSystems() {
+	let WALEnabled = true;
+
+	db = new AsyncDBConnection(serverDBPath, WALEnabled, false);
+	db_edits = new AsyncDBConnection(editsDBPath, WALEnabled, false);
+	db_chat = new AsyncDBConnection(chatDBPath, WALEnabled, false);
+	db_img = new AsyncDBConnection(imageDBPath, WALEnabled, false);
+	db_misc = new AsyncDBConnection(miscDBPath, WALEnabled, false);
+
+	db_tileReadPool = new TileReaderPool(serverDBPath, WALEnabled, 8);
+
+	await Promise.all([
+		db.load(),
+		db_edits.load(),
+		db_chat.load(),
+		db_img.load(),
+		db_misc.load(),
+		db_tileReadPool.load()
+	]);
 }
 
 function terminateDbSystems() {
-	db._terminate();
-	db_edits._terminate();
-	db_chat._terminate();
-	db_img._terminate();
-	db_misc._terminate();
+	db.terminate();
+	db_edits.terminate();
+	db_chat.terminate();
+	db_img.terminate();
+	db_misc.terminate();
 }
 
 async function loadEmail() {
@@ -946,7 +1105,7 @@ async function initializeServer() {
 		global_data.uvias = uvias;
 	}
 
-	loadDbSystems();
+	await loadDbSystems();
 	setupStaticShortcuts();
 	loadStatic();
 	setupZipLog();
@@ -962,6 +1121,7 @@ async function initializeServer() {
 	global_data.db_misc = db_misc;
 	global_data.db_edits = db_edits;
 	global_data.db_chat = db_chat;
+	global_data.db_tileReadPool = db_tileReadPool;
 
 	global_data.checkCSRF = httpServer.checkCSRF;
 	global_data.createCSRF = httpServer.createCSRF;
@@ -2427,6 +2587,7 @@ var global_data = {
 	db_misc: null,
 	db_edits: null,
 	db_chat: null,
+	db_tileReadPool: null,
 	uvias: null,
 	wsSend,
 	ws_broadcast,
