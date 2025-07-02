@@ -305,7 +305,8 @@ async function runShellScript(includeColors) {
 
 function makePgClient() {
 	pgConn = new pg.Client({
-		connectionString: "pg://"
+		connectionString: "pg://",
+		application_name: "nodeworldoftext"
 	});
 	console.log("Postgres client connected");
 	pgConn.on("end", function() {
@@ -1265,7 +1266,12 @@ async function getUserInfo(cookies, is_websocket, dispatch) {
 	}
 
 	if(accountSystem == "uvias" && cookies.token) {
-		var parsed = await uvias.get("SELECT * FROM accounts.parse_token($1::text)", [cookies.token]);
+		var parsed;
+		try {
+			parsed = await uvias.get("SELECT * FROM accounts.parse_token($1::text)", [cookies.token]);
+		} catch(e) {
+			return user;
+		}
 		var success = false;
 		var has_refreshed = false;
 		if(parsed) {
