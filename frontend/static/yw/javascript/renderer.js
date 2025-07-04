@@ -532,6 +532,29 @@ function isValidSpecialSymbol(charCode) {
 	return false;
 }
 
+function isShardGridManipulable(charCode) {
+	switch(charCode) {
+		case 0x1FB3E:
+		case 0x1FB3F:
+		case 0x1FB43:
+		case 0x1FB44:
+		case 0x1FB49:
+		case 0x1FB4A:
+		case 0x1FB4E:
+		case 0x1FB4F:
+		case 0x1FB54:
+		case 0x1FB55:
+		case 0x1FB59:
+		case 0x1FB5A:
+		case 0x1FB5F:
+		case 0x1FB60:
+		case 0x1FB64:
+		case 0x1FB65:
+			return true;
+	}
+	return false;
+}
+
 function drawShadeChar(charCode, textRender, x, y, clampW, clampH, flags) {
 	let isLight = charCode == 0x2591;
 	let factor = isLight ? 3 : 5;
@@ -578,7 +601,7 @@ function draw2by3Char(charCode, textRender, x, y, width, height) {
 	textRender.fill();
 }
 
-function drawTriangleShardChar(charCode, textRender, x, y, width, height) {
+function drawTriangleShardChar(charCode, textRender, x, y, width, height, altGrid) {
 	var is90degTri = charCode >= 0x25E2 && charCode <= 0x25E5;
 	var isIsoTri = charCode == 0x25B2 || charCode == 0x25BA || charCode == 0x25BC || charCode == 0x25C4;
 
@@ -598,6 +621,25 @@ function drawTriangleShardChar(charCode, textRender, x, y, width, height) {
 	var vecs = lcsShardCharVectors[vecIndex];
 	var gpX = [0, width / 2, width];
 	var gpY = [0, height / 3, height / 2, (height / 3) * 2, height];
+	if(altGrid) {
+		if(isShardGridManipulable(charCode)) {
+			gpY = [0, height / 2, height / 2, height / 2, height];
+		}
+		switch(charCode) {
+			case 0x1FB68: // inverted right-pointing half-width triangle
+				gpX[1] = width;
+				break;
+			case 0x1FB69: // inverted bottom-pointing half-width triangle
+				gpY[1] = gpY[2] = height;
+				break;
+			case 0x1FB6A: // inverted left-pointing half-width triangle
+				gpX[1] = 0;
+				break;
+			case 0x1FB6B: // inverted top-pointing half-width triangle
+				gpY[1] = gpY[2] = 0;
+				break;
+		}
+	}
 	textRender.beginPath();
 	for(var i = 0; i < vecs.length; i++) {
 		var vec = vecs[i];
@@ -680,7 +722,7 @@ function drawFractionalBlockChar(charCode, textRender, x, y, width, height) {
 	textRender.fillRect(x, y, x2 - x + 1, y2 - y + 1);
 }
 
-function drawBlockChar(charCode, textRender, x, y, cellW, cellH) {
+function drawBlockChar(charCode, textRender, x, y, cellW, cellH, altGrid) {
 	var isShade = charCode >= 0x2591 && charCode <= 0x2593;
 	var isFractionalBlock = (charCode >= 0x2580 && charCode <= 0x2590) ||
 							(charCode >= 0x2594 && charCode <= 0x2595) ||
@@ -704,7 +746,7 @@ function drawBlockChar(charCode, textRender, x, y, cellW, cellH) {
 	} else if(is2by3) { // 2x3 blocks
 		draw2by3Char(charCode, textRender, x, y, cellW, cellH);
 	} else if(isTriangleShard) { // LCS shard characters
-		drawTriangleShardChar(charCode, textRender, x, y, cellW, cellH);
+		drawTriangleShardChar(charCode, textRender, x, y, cellW, cellH, altGrid);
 	} else if(is2by4) { // 2x4 LCS octant characters
 		draw2by4Char(charCode, textRender, x, y, cellW, cellH);
 	} else if(isShade) { // shades (light, medium, dark)
@@ -875,7 +917,7 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 
 	if(ansiBlockFill && isValidSpecialSymbol(cCode) && !(isHalfShard && !isBold) && !isShadeSkipped) {
 		if(!isOverflow) {
-			drawBlockChar(cCode, textRender, fontX, fontY, cellW, cellH);
+			drawBlockChar(cCode, textRender, fontX, fontY, cellW, cellH, isBold);
 			hasDrawn = true;
 		}
 	} else { // character rendering
