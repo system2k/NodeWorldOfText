@@ -387,6 +387,13 @@ a:visited {
 	top: 220px;
 	left: 20px;
 }
+#confirm_js_copy {
+	position: absolute;
+	color: blue;
+	text-decoration: underline;
+	top: 220px;
+	left: 280px;
+}
 .region_selection {
 	position: absolute;
 	border: 1px solid black;
