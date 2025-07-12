@@ -3265,7 +3265,7 @@ function alertJS(data, restrict) {
 			closeJSAlert();
 			return false;
 		}
-		elm.confirm_js_copy.display = "none";
+		elm.confirm_js_copy.style.display = "none";
 	} else {
 		elm.confirm_js_msg.innerHTML = "Are you sure you want to run this javascript link?<br>Press Close to <i>not</i> run it.";
 		run_js_confirm.innerText = "run";
@@ -3273,7 +3273,7 @@ function alertJS(data, restrict) {
 			confirmRunJSLink(data);
 			return false;
 		}
-		elm.confirm_js_copy.display = "";
+		elm.confirm_js_copy.style.display = "";
 		elm.confirm_js_copy.onclick = function() {
 			w.clipboard.copy(data);
 			closeJSAlert();
