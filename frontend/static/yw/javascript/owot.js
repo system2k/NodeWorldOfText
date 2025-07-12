@@ -286,6 +286,7 @@ defineElements({ // elm[<name>]
 	confirm_js: byId("confirm_js"),
 	confirm_js_msg: byId("confirm_js_msg"),
 	confirm_js_code: byId("confirm_js_code"),
+	confirm_js_copy: byId("confirm_js_copy"),
 	main_view: byId("main_view"),
 	usr_online: byId("usr_online"),
 	link_element: byId("link_element"),
@@ -3264,11 +3265,18 @@ function alertJS(data, restrict) {
 			closeJSAlert();
 			return false;
 		}
+		elm.confirm_js_copy.style.display = "none";
 	} else {
 		elm.confirm_js_msg.innerHTML = "Are you sure you want to run this javascript link?<br>Press Close to <i>not</i> run it.";
 		run_js_confirm.innerText = "run";
 		run_js_confirm.onclick = function() {
 			confirmRunJSLink(data);
+			return false;
+		}
+		elm.confirm_js_copy.style.display = "";
+		elm.confirm_js_copy.onclick = function() {
+			w.clipboard.copy(data);
+			closeJSAlert();
 			return false;
 		}
 	}
