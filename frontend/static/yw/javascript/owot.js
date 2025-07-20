@@ -1,4 +1,4 @@
-var YourWorld = {
+﻿var YourWorld = {
 	Color: window.localStorage ? +localStorage.getItem("color") : 0,
 	BgColor: -1,
 	Nickname: state.userModel.username
@@ -2495,10 +2495,10 @@ function writeChar(char, doNotMoveCursor, color, noNewline, undoCursorOffset, bg
 		}
 	}
 	if(!newLine && !skipChar) {
-		var data = {char, charColor, bgColor: charBgColor, tileX, tileY, charX, charY, dB, dI, dU, dS};
+		var data = {char, color: charColor, bgColor: charBgColor, tileX, tileY, charX, charY, bold: dB, italic: dI, underline: dU, strikethrough: dS};
 
 		w.emit("writeBefore", data);
-		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, 0, undoCursorOffset, data.bgColor, data.dB, data.dI, data.dU, data.dS);
+		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, 0, undoCursorOffset, data.bgColor, data.bold, data.italic, data.underline, data.strikethrough);
 		w.emit("write", data);
 	}
 }
