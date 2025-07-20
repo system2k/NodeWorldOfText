@@ -2495,18 +2495,10 @@ function writeChar(char, doNotMoveCursor, color, noNewline, undoCursorOffset, bg
 		}
 	}
 	if(!newLine && !skipChar) {
-		var data = {
-			char: char,
-			color: charColor,
-			bgColor: charBgColor,
-			tileX: tileX,
-			tileY: tileY,
-			charX: charX,
-			charY: charY
-		};
+		var data = {char, charColor, bgColor: charBgColor, tileX, tileY, charX, charY, dB, dI, dU, dS};
 
 		w.emit("writeBefore", data);
-		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, 0, undoCursorOffset, data.bgColor, dB, dI, dU, dS);
+		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, 0, undoCursorOffset, data.bgColor, data.dB, data.dI, data.dU, data.dS);
 		w.emit("write", data);
 	}
 }
