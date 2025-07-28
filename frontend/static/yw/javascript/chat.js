@@ -578,7 +578,7 @@ var emoteList = {
 	"bruh": [128, 0],
 	"huh": [160, 0],
 	"derp": [192, 0],
-	"heh": [224, 0],
+	"aha": [224, 0],
 	"lol": [256, 0],
 	"neat": [288, 0],
 	"awesome2": [320, 0],
@@ -592,6 +592,7 @@ var emoteList = {
 	"blob_pride": [576, 0],
 	"blob_ally": [608, 0],
 	"blob_trans": [640, 0],
+	"1010", [672, 0], // not a blob, but uses the same color palette
 	// 16px faces
 	"ded": [0, 32],
 	"mad": [32, 32],
@@ -615,6 +616,8 @@ var emoteList = {
 	"thinq": [608, 32],
 	"thunk": [640, 32],
 	"cringe": [672, 32],
+	"mortimer": [704, 32],
+	"morty": [736, 32],
 	// miscellaneous
 	"yeesh": [0, 64],
 	"aaaHD": [32, 64],
@@ -635,6 +638,13 @@ var emoteList = {
 	"catspeak": [584, 64],
 	"horsespeak": [616, 64, 30],
 	"fireboard": [646, 64],
+	"skull_dark": [678, 64, 26],
+	"fop": [704, 64, 29],
+	"owot": [733, 64, 31],
+	"px_sparkles": [764, 64],
+	"uni": [796, 64],
+	"silly": [828, 64],
+	"oneko": [860, 64, 27],
 	// fp
 	"fp": [0, 96],
 	"fpthinkaaa": [32, 96],
