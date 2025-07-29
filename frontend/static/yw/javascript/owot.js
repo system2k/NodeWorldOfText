@@ -3550,8 +3550,9 @@ function setupLinkElement() {
 	}
 	linkElm.onauxclick = function(e) {
 		if(e.which == 2) {
+			var noMiddleClick = ["javascript", "com", "comu", "action"];
 			var prot = linkParams.protocol;
-			if(prot == "javascript") {
+			if(noMiddleClick.includes(prot)) {
 				e.preventDefault();
 				return false;
 			}
