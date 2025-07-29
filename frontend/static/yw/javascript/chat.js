@@ -592,7 +592,8 @@ var emoteList = {
 	"blob_pride": [576, 0],
 	"blob_ally": [608, 0],
 	"blob_trans": [640, 0],
-	"1010", [672, 0], // not a blob, but uses the same color palette
+	"blob_intersex": [672, 0],
+	"1010", [704, 0], // not a blob, but uses the same color palette
 	// 16px faces
 	"ded": [0, 32],
 	"mad": [32, 32],
@@ -647,6 +648,7 @@ var emoteList = {
 	"oneko": [860, 64, 27],
 	"iunno": [887, 64, 48],
 	"sunglas": [935, 64],
+	"infra": [967, 64, 28],
 	// fp
 	"fp": [0, 96],
 	"fpthinkaaa": [32, 96],
