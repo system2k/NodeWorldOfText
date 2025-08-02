@@ -593,7 +593,7 @@ var emoteList = {
 	"blob_ally": [608, 0],
 	"blob_trans": [640, 0],
 	"blob_intersex": [672, 0],
-	"1010", [704, 0], // not a blob, but uses the same color palette
+	"1010": [704, 0], // not a blob, but uses the same color palette
 	// 16px faces
 	"ded": [0, 32],
 	"mad": [32, 32],
