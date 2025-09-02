@@ -1,4 +1,4 @@
-var YourWorld = {
+﻿var YourWorld = {
 	Color: window.localStorage ? +localStorage.getItem("color") : 0,
 	BgColor: -1,
 	Nickname: state.userModel.username
@@ -286,6 +286,7 @@ defineElements({ // elm[<name>]
 	confirm_js: byId("confirm_js"),
 	confirm_js_msg: byId("confirm_js_msg"),
 	confirm_js_code: byId("confirm_js_code"),
+	confirm_js_copy: byId("confirm_js_copy"),
 	main_view: byId("main_view"),
 	usr_online: byId("usr_online"),
 	link_element: byId("link_element"),
@@ -2494,18 +2495,10 @@ function writeChar(char, doNotMoveCursor, color, noNewline, undoCursorOffset, bg
 		}
 	}
 	if(!newLine && !skipChar) {
-		var data = {
-			char: char,
-			color: charColor,
-			bgColor: charBgColor,
-			tileX: tileX,
-			tileY: tileY,
-			charX: charX,
-			charY: charY
-		};
+		var data = {char, color: charColor, bgColor: charBgColor, tileX, tileY, charX, charY, bold: dB, italic: dI, underline: dU, strikethrough: dS};
 
 		w.emit("writeBefore", data);
-		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, 0, undoCursorOffset, data.bgColor, dB, dI, dU, dS);
+		writeCharTo(data.char, data.color, data.tileX, data.tileY, data.charX, data.charY, 0, undoCursorOffset, data.bgColor, data.bold, data.italic, data.underline, data.strikethrough);
 		w.emit("write", data);
 	}
 }
@@ -3264,11 +3257,18 @@ function alertJS(data, restrict) {
 			closeJSAlert();
 			return false;
 		}
+		elm.confirm_js_copy.style.display = "none";
 	} else {
 		elm.confirm_js_msg.innerHTML = "Are you sure you want to run this javascript link?<br>Press Close to <i>not</i> run it.";
 		run_js_confirm.innerText = "run";
 		run_js_confirm.onclick = function() {
 			confirmRunJSLink(data);
+			return false;
+		}
+		elm.confirm_js_copy.style.display = "";
+		elm.confirm_js_copy.onclick = function() {
+			w.clipboard.copy(data);
+			closeJSAlert();
 			return false;
 		}
 	}
@@ -3550,8 +3550,9 @@ function setupLinkElement() {
 	}
 	linkElm.onauxclick = function(e) {
 		if(e.which == 2) {
+			var noMiddleClick = ["javascript", "com", "comu", "action"];
 			var prot = linkParams.protocol;
-			if(prot == "javascript") {
+			if(noMiddleClick.includes(prot)) {
 				e.preventDefault();
 				return false;
 			}
