@@ -19,6 +19,7 @@ var memTileCache;
 var broadcastMonitorEvent;
 var wsSend;
 var loadPlugin;
+var db_tileReadPool;
 
 var server_exiting = false;
 var editlog_cell_props = false;
@@ -52,6 +53,7 @@ module.exports.main = function(server) {
 	broadcastMonitorEvent = server.broadcastMonitorEvent;
 	wsSend = server.wsSend;
 	loadPlugin = server.loadPlugin;
+	db_tileReadPool = server.db_tileReadPool;
 
 	databaseClock();
 	editLogClock();
@@ -304,9 +306,9 @@ function is_consistent(array) {
 }
 
 function normalizeTile(tile_db_data) {
-	// tile_db_data must contain: (rowid, content, writability, properties)
+	// tile_db_data must contain: (id, content, writability, properties)
 	var data = {
-		tile_id: null, // rowid; id must be set once inserted to database. null if does not exist yet.
+		tile_id: null, // id; id must be set once inserted to database. null if does not exist yet.
 		tile_exists: false, // is set to true once the tile is added to database
 		content: null,
 		writability: null,
@@ -359,7 +361,7 @@ function normalizeTile(tile_db_data) {
 		data.tile_exists = true;
 		data.content = advancedSplit(tile_db_data.content);
 		data.writability = tile_db_data.writability;
-		data.tile_id = tile_db_data.rowid;
+		data.tile_id = tile_db_data.id;
 	} else {
 		data.prop_color = new Array(CONST.tileArea).fill(0);
 		data.prop_bgcolor = null; // not going to be used often, so we will skimp on memory
@@ -374,8 +376,9 @@ function normalizeTile(tile_db_data) {
 }
 
 async function loadTileCacheData(world_id, tileX, tileY) {
-	var tile = await db.get("SELECT rowid as rowid, content, properties, writability FROM tile WHERE tileX=? AND tileY=? AND world_id=?", [tileX, tileY, world_id]);
-	return normalizeTile(tile);
+	// attributes needed: id, content, properties, writability
+	let region = await db_tileReadPool.fetchRegion(world_id, tileX, tileY, tileX, tileY);
+	return normalizeTile(region[0]);
 }
 
 // free all in-memory tiles if they haven't been written to in a while
@@ -1145,20 +1148,20 @@ async function iterateDatabaseChanges() {
 						if(!empty_props) {
 							propObj.cell_props = tile.prop_cell_props;
 						}
-						writeQueuePending.push(["UPDATE tile SET properties=? WHERE rowid=?", [JSON.stringify(propObj), tile.tile_id]]);
+						writeQueuePending.push(["UPDATE tile SET properties=? WHERE id=?", [JSON.stringify(propObj), tile.tile_id]]);
 					}
 					if(tile.content_updated) {
 						tile.content_updated = false;
-						writeQueuePending.push(["UPDATE tile SET content=? WHERE rowid=?", [tile.content.join(""), tile.tile_id]]);
+						writeQueuePending.push(["UPDATE tile SET content=? WHERE id=?", [tile.content.join(""), tile.tile_id]]);
 					}
 					if(tile.writability_updated) {
 						tile.writability_updated = false;
-						writeQueuePending.push(["UPDATE tile SET writability=? WHERE rowid=?", [tile.writability, tile.tile_id]]);
+						writeQueuePending.push(["UPDATE tile SET writability=? WHERE id=?", [tile.writability, tile.tile_id]]);
 					}
 					// this is an empty tile - we can just remove it from the database
 					if(empty_content && empty_color && empty_bgcolor && empty_char && empty_props && tile.writability === null) {
 						writeQueuePending.splice(0);
-						writeQueuePending.push(["DELETE FROM tile WHERE rowid=?", tile.tile_id, function() {
+						writeQueuePending.push(["DELETE FROM tile WHERE id=?", tile.tile_id, function() {
 							tile.tile_exists = false;
 							tile.tile_id = null;
 						}]);
@@ -1518,7 +1521,7 @@ function asyncWait(ms) {
 async function processNextPublicClearBatch(context) {
 	var writeQueue = [];
 	var chunkSize = 16;
-	var data = await db.all("SELECT rowid AS rowid, content, tileX, tileY, properties, writability FROM tile WHERE world_id=? AND (tileY, tileX) > (?, ?) LIMIT ?",
+	var data = await db.all("SELECT id, content, tileX, tileY, properties, writability FROM tile WHERE world_id=? AND (tileY, tileX) > (?, ?) LIMIT ?",
 		[context.world.id, context.posY, context.posX, chunkSize]);
 	for(var d = 0; d < data.length; d++) {
 		var tile = data[d];
@@ -1550,15 +1553,15 @@ async function processNextPublicClearBatch(context) {
 				if(Object.keys(tileObj.prop_cell_props).length > 0) {
 					propObj.cell_props = tileObj.prop_cell_props;
 				}
-				writeQueue.push(["UPDATE tile SET properties=? WHERE rowid=?", [JSON.stringify(propObj), tileObj.tile_id]]);
+				writeQueue.push(["UPDATE tile SET properties=? WHERE id=?", [JSON.stringify(propObj), tileObj.tile_id]]);
 			}
 			if(tileObj.content_updated) {
 				tileObj.content_updated = false;
-				writeQueue.push(["UPDATE tile SET content=? WHERE rowid=?", [tileObj.content.join(""), tileObj.tile_id]]);
+				writeQueue.push(["UPDATE tile SET content=? WHERE id=?", [tileObj.content.join(""), tileObj.tile_id]]);
 			}
 			if(tileObj.writability_updated) {
 				tileObj.writability_updated = false;
-				writeQueue.push(["UPDATE tile SET writability=? WHERE rowid=?", [tileObj.writability, tileObj.tile_id]]);
+				writeQueue.push(["UPDATE tile SET writability=? WHERE id=?", [tileObj.writability, tileObj.tile_id]]);
 			}
 		}
 	}

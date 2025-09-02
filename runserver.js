@@ -24,6 +24,7 @@ const zip         = require("adm-zip");
 const DATA_PATH = "../nwotdata/";
 const SETTINGS_PATH = DATA_PATH + "settings.json";
 const DATABASE_THREAD_PATH = "./backend/database_thread.js";
+const DATABASE_THREAD_COUNT = 8;
 
 const bin_packet   = require("./backend/utils/bin_packet.js");
 const utils        = require("./backend/utils/utils.js");
@@ -619,7 +620,6 @@ var modules = {
 var subsystems = {
 	chat_mgr: require("./backend/subsystems/chat_mgr.js"),
 	tile_database: require("./backend/subsystems/tile_database.js"),
-	tile_fetcher: require("./backend/subsystems/tile_fetcher.js"),
 	world_mgr: require("./backend/subsystems/world_mgr.js")
 };
 
@@ -825,11 +825,75 @@ class AsyncDBConnection {
 	}
 }
 
+/**
+ * Processes items from an iterator in parallel using an asynchronous processor.
+ *
+ * @param {Iterator} iterator - The iterator instance to consume items from.
+ * @param {number} parallelCount - The number of simultaneous executions allowed.
+ * @param {(item: any) => Promise<boolean>} processor - An asynchronous function to call for each iterated item.
+ * 	If true is returned, then the iteration is terminated early.
+ */
+function executeAsyncParallelIterator(iterator, parallelCount, processor) {
+	let finalize = null;
+	let isStopped = false;
+	let maxJobCount = 0;
+	let totalJobCount = 0;
+
+	let finalCheck = () => {
+		totalJobCount++;
+		if(totalJobCount >= maxJobCount) {
+			finalize();
+		}
+	}
+
+	let consumer = (retVal) => {
+		if(retVal === true) isStopped = true;
+		if(isStopped) return;
+		let nextValue = iterator.next();
+		if(nextValue.done) {
+			isStopped = true;
+			return;
+		}
+		maxJobCount++;
+		processor(nextValue.value).then(consumer).then(finalCheck);
+	}
+
+	for(let i = 0; i < parallelCount; i++) {
+		consumer();
+		if(isStopped) {
+			if(maxJobCount == 0) {
+				return Promise.resolve();
+			}
+			break;
+		}
+	}
+
+	return new Promise(function(res, rej) {
+		finalize = res;
+	});
+}
+
 class TileReaderPool {
 	databasePath = null;
 	databaseWALEnabled = false;
 	databaseThreadCount = 0;
 	databaseInstances = [];
+	rateLimSeq = 1;
+
+	ipRateLimits = {
+		indiv: {
+			busy: {},
+			queue: []
+		}, // individual IP addresses
+		v4Sub16: {
+			busy: {},
+			queue: []
+		}, // ipv4 /16 subnet
+		v6Sub56: {
+			busy: {},
+			queue: []
+		} // ipv6 /56 subnet
+	};
 
 	constructor(path, WALEnabled, poolSize) {
 		this.databasePath = path;
@@ -865,7 +929,6 @@ class TileReaderPool {
 	}
 
 	async load() {
-		//console.log()
 		for(let i = 0; i < this.databaseThreadCount; i++) {
 			let db = new AsyncDBConnection(this.databasePath, this.databaseWALEnabled, true);
 			this.databaseInstances.push({
@@ -880,9 +943,7 @@ class TileReaderPool {
 		return Promise.all(loadList);
 	}
 
-	async _loadNext(worldId, x1, y1, x2, y2) {
-		//let db = databaseInstances[0].db;
-
+	async _loadRegionFromDb(worldId, x1, y1, x2, y2) {
 		let dbMin = null;
 		let dbMinVal = Infinity;
 		for(let i = 0; i < this.databaseInstances.length; i++) {
@@ -892,7 +953,6 @@ class TileReaderPool {
 				dbMinVal = inst.activeTiles;
 			}
 		}
-		console.log(worldId, x1, y1, x2, y2, [dbMin.sequence])
 
 		let area = (y2 - y1 + 1) * (x2 - x1 + 1);
 		let yCount = y2 - y1 + 1;
@@ -903,74 +963,159 @@ class TileReaderPool {
 		let tiles = [];
 		dbMin.activeTiles += area;
 		let totalRecv = 0;
-		await db.each(
-			"SELECT * FROM tile WHERE world_id=? AND tileX >= ? AND tileX <= ? AND tileY IN" + " (" + new Array(yCount).fill("?").join(",") + ")",
-			qParam, function(newData) {
+		await dbMin.db.each(
+			"SELECT * FROM tile WHERE world_id=? AND tileX >= ? AND tileX <= ? AND tileY IN (" + new Array(yCount).fill("?").join(",") + ")",
+			qParam, (newData) => {
 				tiles.push(...newData);
-				console.log("AT", dbMin.activeTiles, newData.length)
 				// we want to shrink the number of active tiles as the tiles are being received.
 				// towards the end, we will then remove the remaining area.
 				dbMin.activeTiles -= newData.length;
 				totalRecv += newData.length;
 			}, true
 		);
-		console.log("totalrecv", area, totalRecv)
 		dbMin.activeTiles -= (area - totalRecv);
 		return tiles;
 	}
 
-	async fetchRegion(worldId, x1, y1, x2, y2) {
-		let stepper = TileReaderPool.PartStepper(x1, y1, x2, y2);
-		// we want 8 simultaneous fetches
-		let fetchers = new Array(this.databaseThreadCount).fill(null);
-		let tileList = [];
-		let stepperDone = false;
-		let finalize = null;
-		let resolved = false;
-		let totalWaiting = 0;
-		let checkResolve = () => {
-			if(resolved) return;
-			if(totalWaiting == 0) {
-				resolved = true;
-				finalize(tileList);
-			}
+	_checkRateLimit(ipAddress) {
+		let ipAddressVal = ipAddress[0];
+		let ipAddressFam = ipAddress[1];
+
+		let exceededIndiv = false;
+		let exceededSub = false;
+
+		let iRate = this.ipRateLimits.indiv.busy[ipAddressVal];
+		let sRate, sKey, sObj;
+		if(ipAddressFam == 4) {
+			sObj = this.ipRateLimits.v4Sub16.busy;
+			sKey = Math.floor(ipAddressVal / 0xFFFF);
+			sRate = sObj[sKey];
+		} else if(ipAddressFam == 6) {
+			sObj = this.ipRateLimits.v6Sub56.busy;
+			sKey = BigInt(ipAddressVal) / (256n ** (16n - 7n));
+			sRate = sObj[sKey];
 		}
-		let loadCallback = (data, index) => {
-			//console.log("RECV", data)
-			tileList.push(...data);
-			if(!stepperDone) {
-				let stepNext = stepper.next();
-				if(stepNext.done) {
-					stepperDone = true;
+
+		if(iRate != null) {
+			if(iRate >= 8) {
+				exceededIndiv = true;
+			}
+		} else {
+			this.ipRateLimits.indiv.busy[ipAddressVal] = 0;
+		}
+
+		if(sRate != null) {
+			if((ipAddressFam == 4 && sRate >= 40) || (ipAddressFam == 6 && sRate >= 90)) {
+				exceededSub = true;
+			}
+		} else {
+			sObj[sKey] = 0;
+		}
+
+		if(exceededIndiv || exceededSub) {
+			return new Promise((res) => {
+				if(exceededIndiv) {
+					this.ipRateLimits.indiv.queue.push([res, this.rateLimSeq++]);
 				} else {
-					let pos = stepNext.value;
-					fetchers[index] = this._loadNext(worldId, pos.x1, pos.y1, pos.x2, pos.y2).then((data, index) => {
-						totalWaiting--;
-						loadCallback(data, index);
-					});
-					totalWaiting++;
+					if(ipAddressFam == 4) {
+						this.ipRateLimits.v4Sub16.queue.push([res, this.rateLimSeq++]);
+					} else if(ipAddressFam == 6) {
+						this.ipRateLimits.v6Sub56.queue.push([res, this.rateLimSeq++]);
+					}
 				}
-			}
-			checkResolve();
-		}
-		for(let i = 0; i < fetchers.length; i++) {
-			let stepNext = stepper.next();
-			if(stepNext.done) {
-				stepperDone = true;
-				checkResolve();
-				break;
-			}
-			let pos = stepNext.value;
-			//console.log("FETCH", pos)
-			fetchers[i] = this._loadNext(worldId, pos.x1, pos.y1, pos.x2, pos.y2).then((data) => {
-				totalWaiting--;
-				loadCallback(data, i);
 			});
-			totalWaiting++;
+		} else {
+			this.ipRateLimits.indiv.busy[ipAddressVal]++;
+			sObj[sKey]++;
 		}
-		return new Promise(function(res, rej) {
-			finalize = res;
+	}
+
+	_releaseRateLimit(ipAddress) {
+		let ipAddressVal = ipAddress[0];
+		let ipAddressFam = ipAddress[1];
+
+		let indivQueue = this.ipRateLimits.indiv.queue;
+		let subQueue;
+		if(ipAddressFam == 4) {
+			subQueue = this.ipRateLimits.v4Sub16.queue;
+		} else if(ipAddressFam == 6) {
+			subQueue = this.ipRateLimits.v6Sub56.queue;
+		}
+
+		let indivPeek = indivQueue[0];
+		let subPeek = subQueue[0];
+
+		let minQueue;
+		if(indivPeek && subPeek) {
+			if(indivPeek[1] > subPeek[1]) {
+				minQueue = subPeek[0];
+				subQueue.shift();
+			} else {
+				minQueue = indivPeek[0];
+				indivQueue.shift();
+			}
+		} else if(indivPeek) {
+			minQueue = indivPeek[0];
+			indivQueue.shift();
+		} else if(subPeek) {
+			minQueue = subPeek[0];
+			subQueue.shift();
+		}
+
+		if(minQueue) {
+			minQueue();
+		} else {
+			let sKey, sObj;
+			if(ipAddressFam == 4) {
+				sObj = this.ipRateLimits.v4Sub16.busy;
+				sKey = Math.floor(ipAddressVal / (0xFFFF));
+			} else if(ipAddressFam == 6) {
+				sObj = this.ipRateLimits.v6Sub56.busy;
+				sKey = BigInt(ipAddressVal) / (256n ** (16n - 7n));
+			}
+
+			this.ipRateLimits.indiv.busy[ipAddressVal]--;
+			sObj[sKey]--;
+		}
+	}
+
+	async fetchRegion(worldId, x1, y1, x2, y2, ipAddress, statusCallback) {
+		let stepper = TileReaderPool.PartStepper(x1, y1, x2, y2);
+
+		let tiles = [];
+		// we want N simultaneous fetches, where N = number of database connections
+		await executeAsyncParallelIterator(stepper, this.databaseThreadCount, async (pos) => {
+			let data = null;
+			let isCanceled = false;
+			if(ipAddress) {
+				await this._checkRateLimit(ipAddress);
+			}
+			try {
+				data = await this._loadRegionFromDb(worldId, pos.x1, pos.y1, pos.x2, pos.y2);
+			} catch(e) {
+				handle_error(e);
+			}
+			if(ipAddress) {
+				this._releaseRateLimit(ipAddress);
+			}
+			if(data) {
+				tiles.push(...data);
+			}
+			statusCallback(null, () => {
+				isCanceled = true;
+			});
+			if(isCanceled) {
+				return true;
+			}
 		});
+
+		return tiles;
+	}
+
+	terminate() {
+		for(let inst of this.databaseInstances) {
+			inst.db.terminate();
+		}
 	}
 }
 
@@ -983,16 +1128,18 @@ async function loadDbSystems() {
 	db_img = new AsyncDBConnection(imageDBPath, WALEnabled, false);
 	db_misc = new AsyncDBConnection(miscDBPath, WALEnabled, false);
 
-	db_tileReadPool = new TileReaderPool(serverDBPath, WALEnabled, 8);
+	db_tileReadPool = new TileReaderPool(serverDBPath, WALEnabled, DATABASE_THREAD_COUNT);
 
 	await Promise.all([
 		db.load(),
 		db_edits.load(),
 		db_chat.load(),
 		db_img.load(),
-		db_misc.load(),
-		db_tileReadPool.load()
+		db_misc.load()
 	]);
+
+	// when switching to WAL for the first time, this must run after the main DB loads
+	await db_tileReadPool.load();
 }
 
 function terminateDbSystems() {
@@ -1001,6 +1148,7 @@ function terminateDbSystems() {
 	db_chat.terminate();
 	db_img.terminate();
 	db_misc.terminate();
+	db_tileReadPool.terminate();
 }
 
 async function loadEmail() {
@@ -2617,7 +2765,6 @@ var global_data = {
 	handle_error,
 	client_ips,
 	tile_database: subsystems.tile_database,
-	tile_fetcher: subsystems.tile_fetcher,
 	chat_mgr: subsystems.chat_mgr,
 	intv,
 	ranks_cache,

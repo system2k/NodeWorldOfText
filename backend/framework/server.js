@@ -1,3 +1,4 @@
+const fs = require("fs");
 const http = require("http");
 const https = require("https");
 const url = require("url");
@@ -662,7 +663,7 @@ class HTTPServer {
 	setSSLConfig(isEnabled, privkeyPath, certPath, chainPath) {
 		this.sslEnabled = !!isEnabled;
 		if(!isEnabled) return;
-		if(!fs.existsSync(private_key) || !fs.existsSync(cert) || !fs.existsSync(chain)) {
+		if(!fs.existsSync(privkeyPath) || !fs.existsSync(certPath) || !fs.existsSync(chainPath)) {
 			this.sslEnabled = false;
 			return;
 		}

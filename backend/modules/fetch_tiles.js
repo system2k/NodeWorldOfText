@@ -9,7 +9,6 @@ module.exports = async function(data, server, params) {
 
 	var memTileCache = server.memTileCache;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
-	//var tile_fetcher = server.tile_fetcher;
 	var db_tileReadPool = server.db_tileReadPool;
 
 	var tiles = {};
@@ -17,10 +16,16 @@ module.exports = async function(data, server, params) {
 	var totalAreaLimit = 5000;
 
 	var ipAddress;
+	var ipAddressVal;
+	var ipAddressFam;
 	if(params.ws && params.ws.sdata) {
 		ipAddress = params.ws.sdata.ipAddress;
+		ipAddressVal = params.ws.sdata.ipAddressVal;
+		ipAddressFam = params.ws.sdata.ipAddressFam;
 	} else {
 		ipAddress = params.ipAddress;
+		ipAddressVal = params.ipAddressVal;
+		ipAddressFam = params.ipAddressFam;
 	}
 
 	if(!Array.isArray(data.fetchRectangles)) return "Invalid parameters";
@@ -77,6 +82,9 @@ module.exports = async function(data, server, params) {
 
 	var fetchedTiles = {};
 	for(var i = 0; i < len; i++) {
+		if(params.ws && params.ws.readyState !== WebSocket.OPEN) {
+			break;
+		}
 		var rect = data.fetchRectangles[i];
 
 		var x1 = rect.minX;
@@ -88,42 +96,16 @@ module.exports = async function(data, server, params) {
 				tiles[ty + "," + tx] = null;
 			}
 		}
-		var fetched = await db_tileReadPool.fetchRegion(world.id, x1, y1, x2, y2);
+		var fetched = await db_tileReadPool.fetchRegion(world.id, x1, y1, x2, y2, [ipAddressVal, ipAddressFam], (status, cancel) => {
+			if(params.ws && params.ws.readyState !== WebSocket.OPEN) {
+				cancel();
+			}
+		});
 		for(var t = 0; t < fetched.length; t++) {
 			var tileX = fetched[t].tileX;
 			var tileY = fetched[t].tileY;
 			fetchedTiles[tileY + "," + tileX] = fetched[t];
 		}
-
-		//console.log("frect", rect);
-
-		/*for(var x = 0; x < rect.length; x++) {
-			var subRect = rect[x];
-
-			// set all tiles to null first
-			var x1 = subRect[0];
-			var y1 = subRect[1];
-			var x2 = subRect[2];
-			var y2 = subRect[3];
-			for(var ty = y1; ty <= y2; ty++) {
-				for(var tx = x1; tx <= x2; tx++) {
-					tiles[ty + "," + tx] = null;
-				}
-			}
-
-			var tileData = await tile_fetcher.fetch(ipAddress, world.id, subRect, params.channel);
-			if(params.ws && params.ws.readyState !== WebSocket.OPEN) {
-				tile_fetcher.cancel(params.channel);
-				return null;
-			}
-			// merge our fetched tiles together
-			for(var t = 0; t < tileData.length; t++) {
-				var tileX = tileData[t].tileX;
-				var tileY = tileData[t].tileY;
-				fetchedTiles[tileY + "," + tileX] = tileData[t];
-			}
-		}*/
-
 	}
 
 	// normalize the retrieved tiles
