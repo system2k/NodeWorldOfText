@@ -1102,9 +1102,11 @@ class TileReaderPool {
 			if(data) {
 				tiles.push(...data);
 			}
-			statusCallback(null, () => {
-				isCanceled = true;
-			});
+			if(statusCallback) {
+				statusCallback(null, () => {
+					isCanceled = true;
+				});
+			}
 			if(isCanceled) {
 				return true;
 			}
