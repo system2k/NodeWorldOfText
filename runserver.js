@@ -759,7 +759,14 @@ class AsyncDBConnection {
 		args = this._normalizeArgs(args);
 		let res;
 		try {
-			res = this._run(command, args, "run");
+			if (args instanceof Object) {
+				for (let a in args) {
+					if (typeof args[a] == "boolean") {
+						args[a] = Number(args[a]);
+					}
+				}
+			}
+			res = await this._run(command, args, "run");
 		} catch(err) {
 			throw {
 				sqlite_error: err,
@@ -816,7 +823,7 @@ class AsyncDBConnection {
 	// (no comments allowed, and must be semicolon separated)
 	async exec(command) {
 		try {
-			this._run(command, null, "exec");
+			await this._run(command, null, "exec");
 		} catch(err) {
 			throw {
 				sqlite_error: err,
