@@ -1950,6 +1950,7 @@ function renderCursor(coords) {
 	var newTileY = coords[1];
 	var tile = Tile.get(newTileX, newTileY);
 	if(!tile) return false;
+	if(window.dcm) return false; // TEMP
 	var writability = tile.properties.writability;
 	var thisTile = {
 		writability: writability,
@@ -3975,9 +3976,8 @@ function touch_pagePos(e) {
 function event_wheel(e) {
 	if(Modal.isOpen) return;
 	if(!scrollingEnabled) return; // return if disabled
-	// if focused on chat, don't scroll world
-	if(closest(e.target, getChatfield())) return;
-	if(closest(e.target, elm.confirm_js)) return;
+	// if not focused on canvas, don't scroll world
+	if(!closest(e.target, elm.main_view)) return;
 	if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
 	var deltaX = Math.trunc(e.deltaX);
 	var deltaY = Math.trunc(e.deltaY);

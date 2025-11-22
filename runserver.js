@@ -2324,6 +2324,7 @@ async function manageWebsocketConnection(ws, req) {
 	var clientId = void 0;
 	var worldObj = null;
 	var hasClientReleasedObjects = false;
+	var hasTrackedClient = false;
 	
 	// process ip address headers from cloudflare/nginx
 	var realIp = req.headers["X-Real-IP"] || req.headers["x-real-ip"];
@@ -2353,7 +2354,9 @@ async function manageWebsocketConnection(ws, req) {
 		if(world) {
 			releaseWorld(world);
 		}
-		remove_ip_address_connection(ws.sdata.ipAddress);
+		if(hasTrackedClient) {
+			remove_ip_address_connection(ws.sdata.ipAddress);
+		}
 		ws.sdata.terminated = true;
 		if(world && clientId != void 0) {
 			if(client_ips[world.id] && client_ips[world.id][clientId]) {
@@ -2420,10 +2423,13 @@ async function manageWebsocketConnection(ws, req) {
 		ws.close();
 	}
 
-	if(!can_connect_ip_address(ws.sdata.ipAddress)) {
+	if(can_connect_ip_address(ws.sdata.ipAddress)) {
+		add_ip_address_connection(ws.sdata.ipAddress);
+		hasTrackedClient = true;
+	} else {
 		return error_ws("CONN_LIMIT", "Too many connections");
 	}
-	add_ip_address_connection(ws.sdata.ipAddress);
+
 	var reqs_second = 0; // requests received at current second
 	var current_second = Math.floor(Date.now() / 1000);
 	function can_process_req() { // limit requests per second
