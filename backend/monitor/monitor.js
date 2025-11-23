@@ -6,6 +6,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const http = require("http");
+const https = require("https");
 const querystring = require("querystring");
 const WebSocket = require("ws");
 const worker = require("node:worker_threads");
@@ -17,6 +18,8 @@ var workerData = worker.workerData;
 
 const auth_user = workerData.user;
 const auth_pass = workerData.pass;
+const ssl_enabled = workerData.ssl_enabled;
+const ssl_config = workerData.ssl_config;
 
 var pageTemplate = fs.readFileSync("./backend/monitor/monitor.html");
 var loginTemplate = fs.readFileSync("./backend/monitor/login.html");
@@ -48,7 +51,43 @@ function isAuthenticated(key) {
 	}
 }
 
-var server = http.createServer(async function(req, res) {
+var server;
+if(ssl_enabled && ssl_config) {
+	try {
+		var sslOptions = {};
+		if(ssl_config.private_key && fs.existsSync(ssl_config.private_key)) {
+			sslOptions.key = fs.readFileSync(ssl_config.private_key);
+		}
+		if(ssl_config.cert && fs.existsSync(ssl_config.cert)) {
+			sslOptions.cert = fs.readFileSync(ssl_config.cert);
+		}
+		if(ssl_config.chain && fs.existsSync(ssl_config.chain)) {
+			sslOptions.ca = fs.readFileSync(ssl_config.chain);
+		}
+		if(sslOptions.key && sslOptions.cert && sslOptions.ca) {
+			server = https.createServer(sslOptions, async function(req, res) {
+				await handleRequest(req, res);
+			});
+			console.log("Monitor: HTTPS server enabled");
+		} else {
+			server = http.createServer(async function(req, res) {
+				await handleRequest(req, res);
+			});
+			console.log("Monitor: SSL config incomplete, falling back to HTTP");
+		}
+	} catch(e) {
+		server = http.createServer(async function(req, res) {
+			await handleRequest(req, res);
+		});
+		console.log("Monitor: SSL error, falling back to HTTP -", e.message);
+	}
+} else {
+	server = http.createServer(async function(req, res) {
+		await handleRequest(req, res);
+	});
+}
+
+async function handleRequest(req, res) {
 	let path = req.url;
 	let method = req.method;
 	let cookies = util.parseCookie(req.headers.cookie);
@@ -118,7 +157,7 @@ var server = http.createServer(async function(req, res) {
 		res.writeHead(404);
 		res.end("404: Not found");
 	}
-});
+}
 
 parentPort.on("message", function(data) {
 	if(typeof data == "object") {

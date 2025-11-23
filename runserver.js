@@ -844,7 +844,6 @@ async function fetchCloudflareIPs(ip_type) {
 function setupHTTPServer() {
 	httpServer = new serverUtil.HTTPServer(settings.port, global_data);
 
-	// Configure HTTPS if enabled in settings
 	if(settings.ssl_enabled) {
 		var sslConf = settings.ssl || {};
 		var priv = sslConf.private_key;
@@ -1374,7 +1373,9 @@ function setupMonitorServer() {
 			port: settings.monitor.port,
 			ip: settings.monitor.ip,
 			user: settings.monitor.credentials.user,
-			pass: settings.monitor.credentials.pass
+			pass: settings.monitor.credentials.pass,
+			ssl_enabled: settings.ssl_enabled || false,
+			ssl_config: settings.ssl || null
 		}
 	});
 	monitorWorker.on("error", function(e) {
