@@ -844,6 +844,20 @@ async function fetchCloudflareIPs(ip_type) {
 function setupHTTPServer() {
 	httpServer = new serverUtil.HTTPServer(settings.port, global_data);
 
+	// Configure HTTPS if enabled in settings
+	if(settings.ssl_enabled) {
+		var sslConf = settings.ssl || {};
+		var priv = sslConf.private_key;
+		var cert = sslConf.cert;
+		var chain = sslConf.chain;
+		var ok = httpServer.setSSLConfig(true, priv, cert, chain);
+		if(!ok) {
+			console.log("SSL configuration failed or files missing. Falling back to HTTP.");
+		} else {
+			console.log("SSL enabled. HTTPS server will be used.");
+		}
+	}
+
 	httpServer.setPageTree(pages);
 	httpServer.setDefaultTemplateData("loginPath", loginPath);
 	httpServer.setDefaultTemplateData("logoutPath", logoutPath);
