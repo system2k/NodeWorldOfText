@@ -615,6 +615,8 @@ var emoteList = {
 	"thinq": [608, 32],
 	"thunk": [640, 32],
 	"cringe": [672, 32],
+	"mortimer": [704, 32],
+	"sunglas": [736, 32],
 	// miscellaneous
 	"yeesh": [0, 64],
 	"aaaHD": [32, 64],
