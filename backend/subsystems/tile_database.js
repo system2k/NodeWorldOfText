@@ -1059,6 +1059,7 @@ function appendToEditLogQueue(tileX, tileY, userID, data, worldID, date) {
 }
 
 async function flushBulkWriteQueue() {
+	let bulkCallbackResponses = [];
 	await db.run("BEGIN");
 	try {
 		var elm = bulkWriteQueue[0];
@@ -1072,7 +1073,9 @@ async function flushBulkWriteQueue() {
 			var callback = command[2];
 			try {
 				var resp = await db.run(sql, params);
-				if(callback) callback(resp);
+				if(callback) {
+					bulkCallbackResponses.push({ callback, data: resp });
+				}
 			} catch(e) {
 				handle_error(e, true);
 			}
@@ -1081,6 +1084,15 @@ async function flushBulkWriteQueue() {
 		handle_error(e, true);
 	}
 	await db.run("COMMIT");
+	// only execute callbacks after commit
+	for (let i = 0; i < bulkCallbackResponses.length; i++) {
+		let ret = bulkCallbackResponses[i];
+		try {
+			ret.callback(ret.data);
+		} catch (e) {
+			handle_error(e, true);
+		}
+	}
 	bulkWriteBusy = false;
 	if(bulkWriteQueue.length) {
 		stimulateBulkWriteQueue();
