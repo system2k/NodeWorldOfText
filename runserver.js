@@ -1022,13 +1022,18 @@ class TileReaderPool {
 
 		if(exceededIndiv || exceededSub) {
 			return new Promise((res) => {
+				let callback = () => {
+					this.ipRateLimits.indiv.busy[ipAddressVal]++;
+					sObj[sKey]++;
+					res();
+				}
 				if(exceededIndiv) {
-					this.ipRateLimits.indiv.queue.push([res, this.rateLimSeq++]);
+					this.ipRateLimits.indiv.queue.push([callback, this.rateLimSeq++]);
 				} else {
 					if(ipAddressFam == 4) {
-						this.ipRateLimits.v4Sub16.queue.push([res, this.rateLimSeq++]);
+						this.ipRateLimits.v4Sub16.queue.push([callback, this.rateLimSeq++]);
 					} else if(ipAddressFam == 6) {
-						this.ipRateLimits.v6Sub56.queue.push([res, this.rateLimSeq++]);
+						this.ipRateLimits.v6Sub56.queue.push([callback, this.rateLimSeq++]);
 					}
 				}
 			});
@@ -1070,20 +1075,20 @@ class TileReaderPool {
 			subQueue.shift();
 		}
 
+		let sKey, sObj;
+		if(ipAddressFam == 4) {
+			sObj = this.ipRateLimits.v4Sub16.busy;
+			sKey = Math.floor(ipAddressVal / (0xFFFF));
+		} else if(ipAddressFam == 6) {
+			sObj = this.ipRateLimits.v6Sub56.busy;
+			sKey = BigInt(ipAddressVal) / (256n ** (16n - 7n));
+		}
+
+		this.ipRateLimits.indiv.busy[ipAddressVal]--;
+		sObj[sKey]--;
+
 		if(minQueue) {
 			minQueue();
-		} else {
-			let sKey, sObj;
-			if(ipAddressFam == 4) {
-				sObj = this.ipRateLimits.v4Sub16.busy;
-				sKey = Math.floor(ipAddressVal / (0xFFFF));
-			} else if(ipAddressFam == 6) {
-				sObj = this.ipRateLimits.v6Sub56.busy;
-				sKey = BigInt(ipAddressVal) / (256n ** (16n - 7n));
-			}
-
-			this.ipRateLimits.indiv.busy[ipAddressVal]--;
-			sObj[sKey]--;
 		}
 	}
 
