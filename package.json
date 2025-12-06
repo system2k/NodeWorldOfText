@@ -4,10 +4,10 @@
 	"description": "OurWorldOfText server",
 	"dependencies": {
 		"adm-zip": "^0.5.16",
-		"nodemailer": "^6.9.16",
+		"nodemailer": "^7.0.10",
 		"pg": "^8.13.1",
 		"sqlite3": "^5.1.7",
-		"ws": "^8.18.0"
+		"ws": "^8.18.3"
 	},
 	"scripts": {
 		"start": "node main.js",
