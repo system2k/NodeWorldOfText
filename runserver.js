@@ -613,7 +613,11 @@ var websockets = {
 	worlds: require("./backend/websockets/worlds.js"),
 	chat_channel: require("./backend/websockets/chat_channel.js"),
 	mute: require("./backend/websockets/mute.js"),
-	clear_mutes: require("./backend/websockets/clear_mutes.js")
+	clear_mutes: require("./backend/websockets/clear_mutes.js"),
+	block_special: require("./backend/websockets/block_special.js"),
+	block_id: require("./backend/websockets/block_id.js"),
+	block_user: require("./backend/websockets/block_user.js"),
+	unblock_all: require("./backend/websockets/unblock_all.js")
 };
 
 var modules = {

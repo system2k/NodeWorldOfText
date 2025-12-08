@@ -6643,6 +6643,47 @@ var network = {
 			location,
 			request: cb_id
 		});
+	},
+	block_id: function(id, location, block, callback) {
+		var cb_id = void 0;
+		if(block && callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "block_id",
+			id,
+			location,
+			block,
+			request: cb_id
+		});
+	},
+	block_user: function(username, block, callback) {
+		var cb_id = void 0;
+		if(block && callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "block_user",
+			username,
+			block,
+			request: cb_id
+		});
+	},
+	block_special: function(all, tell, anon, reg) {
+		network.transmit({
+			kind: "block_special",
+			all,
+			tell,
+			anon,
+			reg
+		});
+	},
+	unblock_all: function() {
+		network.transmit({
+			kind: "unblock_all"
+		});
 	}
 };
 
@@ -8221,6 +8262,24 @@ var ws_functions = {
 		}
 	},
 	clear_mutes: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	block_id: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	block_user: function(data) {
 		if(data.request) {
 			if(network.callbacks[data.request]) {
 				var cb = network.callbacks[data.request];

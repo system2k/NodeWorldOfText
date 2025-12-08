@@ -423,6 +423,100 @@ register_chat_command("tell", function(args) {
 	api_chat_send(msg, opts);
 }, ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)");
 
+register_chat_command("block", function(args) {
+	var id = args[0];
+	var location = selectedChatTab == 0 ? "page" : "global";
+
+	switch (id) {
+	case "*":
+		network.block_special(true, null, null, null);
+		clientChatResponse("Blocked all messages");
+		break;
+	case "tell":
+		network.block_special(null, true, null, null);
+		clientChatResponse("Blocked private messages");
+		break;
+	case "anon":
+		network.block_special(null, null, true, null);
+		clientChatResponse("Blocked messages from anonymous users");
+		break;
+	case "reg":
+		network.block_special(null, null, null, true);
+		clientChatResponse("Blocked messages from registered users");
+		break;
+	default:
+		id = Number(id);
+		network.block_id(id, location, true, function(data) {
+			if(data.success) {
+				clientChatResponse("Blocked chats from ID: " + id);
+			} else {
+				if(data.error == "too_many") {
+					clientChatResponse("Too many blocked IDs/users");
+				} else if(data.error == "bad_id") {
+					clientChatResponse("Invalid ID");
+				}
+			}
+		});
+	}
+}, ["id"], "block someone by id", "1220");
+
+register_chat_command("unblock", function(args) {
+	var id = args[0];
+	var location = selectedChatTab == 0 ? "page" : "global";
+
+	switch (id) {
+	case "*":
+		network.block_special(false, null, null, null);
+		clientChatResponse("Unblocked all messages");
+		break;
+	case "tell":
+		network.block_special(null, false, null, null);
+		clientChatResponse("Unblocked private messages");
+		break;
+	case "anon":
+		network.block_special(null, null, false, null);
+		clientChatResponse("Unblocked messages from anonymous users");
+		break;
+	case "reg":
+		network.block_special(null, null, null, false);
+		clientChatResponse("Unblocked messages from registered users");
+		break;
+	default:
+		id = Number(id);
+		network.block_id(id, location, false);
+		clientChatResponse("Unblocked chats from ID: " + id);
+	}
+
+}, ["id"], "unblock someone by id", "1220");
+
+register_chat_command("blockuser", function(args) {
+	var username = args[0];
+
+	network.block_user(username, true, function(data) {
+		if(data.success) {
+			clientChatResponse("Blocked chats from user: " + username);
+		} else {
+			if(data.error == "too_many") {
+				clientChatResponse("Too many blocked IDs/users");
+			} else if(data.error == "bad_username") {
+				clientChatResponse("Invalid username");
+			}
+		}
+	});
+}, ["username"], "block someone by username", "JohnDoe");
+
+register_chat_command("unblockuser", function(args) {
+	var username = args[0];
+
+	network.block_user(username, false);
+	clientChatResponse("Unblocked chats from user: " + username);
+}, ["username"], "unblock someone by username", "JohnDoe");
+
+register_chat_command("unblockall", function(args) {
+	network.unblock_all();
+	clientChatResponse("Cleared all blocks");
+}, null, "unblock all users", null);
+
 function sendChat() {
 	var chatText = elm.chatbar.value;
 	elm.chatbar.value = "";

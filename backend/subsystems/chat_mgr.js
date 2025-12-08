@@ -349,6 +349,8 @@ function unmute(world_id, ip) {
 	}
 }
 
+var tell_blocks = {};
+
 module.exports.retrieveChatHistory = retrieveChatHistory;
 module.exports.add_to_chatlog = add_to_chatlog;
 module.exports.remove_from_chatlog = remove_from_chatlog;
@@ -357,3 +359,4 @@ module.exports.getMuteInfo = getMuteInfo;
 module.exports.mute = mute;
 module.exports.clearMutes = clearMutes;
 module.exports.unmute = unmute;
+module.exports.tell_blocks = tell_blocks;

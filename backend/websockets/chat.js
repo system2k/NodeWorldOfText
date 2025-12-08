@@ -54,7 +54,6 @@ function sanitizeCustomMeta(meta) {
 }
 
 var chat_ip_limits = {};
-var tell_blocks = {};
 
 module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var channel = ctx.channel;
@@ -64,6 +63,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var db = server.db;
 	var ws_broadcast = server.ws_broadcast; // site-wide broadcast
 	var chat_mgr = server.chat_mgr;
+	var tell_blocks = chat_mgr.tell_blocks;
 	var wss = server.wss;
 	var ranks_cache = server.ranks_cache;
 	var accountSystem = server.accountSystem;
@@ -189,18 +189,10 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		username_to_display = user.display_username;
 	}
 
-	var chatBlockLimit = 1280;
-
 	// [rank, name, args, description, example]
 	var command_list = [
 		// general
-		[0, "help", null, "list all commands", null],
-		
-		[0, "block", ["id"], "block someone by id", "1220"],
-		[0, "blockuser", ["username"], "block someone by username", "JohnDoe"],
-		[0, "unblock", ["id"], "unblock someone by id", "1220"],
-		[0, "unblockuser", ["username"], "unblock someone by username", "JohnDoe"],
-		[0, "unblockall", null, "unblock all users", null]
+		[0, "help", null, "list all commands", null]
 
 		// hidden by default
 		// "/search Phrase" (client) -> searches for Phrase within a 25 tile radius
@@ -246,132 +238,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var com = {
 		help: function(modifier) {
 			return serverChatResponse(generate_command_list(), location);
-		},
-		block: function(id) {
-			var blocks = ws.sdata.chat_blocks;
-
-			switch (id) {
-			case "*":
-				blocks.block_all = true;
-				break;
-			case "tell":
-				blocks.no_tell = true;
-				break;
-			case "anon":
-				blocks.no_anon = true;
-				break;
-			case "reg":
-				blocks.no_reg = true;
-				break;
-			default:
-				id = san_nbr(id);
-				if (id < 0) return;
-
-				if ((blocks.id.length + blocks.user.length) >= chatBlockLimit)
-					return serverChatResponse("Too many blocked IDs/users", location);
-				if (blocks.id.indexOf(id) > -1) return;
-				blocks.id.push(id);
-			}
-			
-			var blocked_ip = getClientIPByChatID(server, world.id, id, location == "global");
-			if(blocked_ip) {
-				var blist = tell_blocks[ipHeaderAddr];
-				if(!blist) {
-					blist = {};
-					tell_blocks[ipHeaderAddr] = blist;
-				}
-				if(!blist[blocked_ip]) {
-					blist[blocked_ip] = Date.now();
-				}
-			}
-
-			serverChatResponse("Blocked chats from ID: " + id, location);
-		},
-		blockuser: function(username) {
-			var blocks = ws.sdata.chat_blocks;
-			if(typeof username != "string" || !username) {
-				serverChatResponse("Invalid username", location);
-				return;
-			}
-
-			if (!/^[^\s\x00-\x20]+$/.test(username)) return;
-
-			// The case-insensitive value to be stored in chat_blocks.
-			var username_value = username.toUpperCase();
-
-			// Ensure maximum block count not exceeded, and check if it already exists.
-			if ((blocks.id.length + blocks.user.length) >= chatBlockLimit)
-					return serverChatResponse("Too many blocked IDs/users", location);
-			if (blocks.user.indexOf(username_value) > -1) return;
-			blocks.user.push(username_value);
-
-			serverChatResponse("Blocked chats from user: " + username, location);
-		},
-		unblock: function(id) {
-			var blocks = ws.sdata.chat_blocks;
-
-			switch (id) {
-			case "*":
-				blocks.block_all = false;
-				break;
-			case "tell":
-				blocks.no_tell = false;
-				break;
-			case "anon":
-				blocks.no_anon = false;
-				break;
-			case "reg":
-				blocks.no_reg = false;
-			default:
-				id = san_nbr(id);
-				if(id < 0) return;
-
-				var idx = blocks.id.indexOf(id);
-				if(idx == -1) return;
-				blocks.id.splice(idx, 1);
-			}
-			
-			var unblocked_ip = getClientIPByChatID(server, world.id, id, location == "global");
-			if(unblocked_ip) {
-				var blist = tell_blocks[ipHeaderAddr];
-				if(blist) {
-					delete blist[unblocked_ip];
-				}
-			}
-
-			serverChatResponse("Unblocked chats from ID: " + id, location);
-		},
-		unblockuser: function(username) {
-			var blocks = ws.sdata.chat_blocks;
-			if(typeof username != "string" || !username) {
-				serverChatResponse("Invalid username", location);
-				return;
-			}
-
-			// The case-insensitive value to be stored in chat_blocks.
-			var username_value = username.toUpperCase();
-
-			var idx = blocks.user.indexOf(username_value);
-			if(idx == -1) return;
-			blocks.user.splice(idx, 1);
-
-			serverChatResponse("Unblocked chats from user: " + username, location);
-		},
-		unblockall: function() {
-			ws.sdata.chat_blocks.id.splice(0);
-			ws.sdata.chat_blocks.user.splice(0);
-			ws.sdata.chat_blocks.block_all = false;
-			ws.sdata.chat_blocks.no_tell = false;
-			ws.sdata.chat_blocks.no_anon = false;
-			ws.sdata.chat_blocks.no_reg = false;
-			
-			var tblocks = tell_blocks[ipHeaderAddr];
-			if(tblocks) {
-				for(var b in tblocks) {
-					delete tblocks[b];
-				}
-			}
-			serverChatResponse("Cleared all blocks", location);
 		},
 		passive: function(mode) {
 			if(mode == "on") {
@@ -425,21 +291,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		switch(commandType) {
 			case "help":
 				com.help();
-				return;
-			case "block":
-				com.block(commandArgs[1]);
-				return;
-			case "blockuser":
-				com.blockuser(commandArgs[1]);
-				return;
-			case "unblock":
-				com.unblock(commandArgs[1]);
-				return;
-			case "unblockuser":
-				com.unblockuser(commandArgs[1]);
-				return;
-			case "unblockall":
-				com.unblockall();
 				return;
 			case "passive":
 				com.passive(commandArgs[1]);
