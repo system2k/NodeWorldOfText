@@ -340,6 +340,24 @@ register_chat_command("worlds", function() {
 	});
 }, null, "list all worlds", null);
 
+register_chat_command("channel", function() {
+	var location = selectedChatTab == 0 ? "page" : "global";
+
+	network.chat_channel(location, function(data) {
+		var infoLog = "Found " + data.channels.length + " channel(s) for this world:\n";
+		for(var i = 0; i < data.channels.length; i++) {
+			var ch = data.channels[i];
+			infoLog += "Name: " + ch.name + "\n";
+			infoLog += "Desc: " + ch.description + "\n";
+			infoLog += "Created: " + convertToDate(ch.date_created) + "\n";
+			infoLog += "----------------\n";
+		}
+
+		infoLog += "Default channel id: " + (data.default_channel ?? "<none>");
+		clientChatResponse(infoLog);
+	});
+}, null, "get info about a chat channel", null);
+
 function sendChat() {
 	var chatText = elm.chatbar.value;
 	elm.chatbar.value = "";

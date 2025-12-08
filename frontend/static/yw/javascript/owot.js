@@ -6604,6 +6604,18 @@ var network = {
 			kind: "worlds",
 			request: cb_id
 		});
+	},
+	chat_channel: function(location, callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "chat_channel",
+			location,
+			request: cb_id
+		});
 	}
 };
 
@@ -8155,6 +8167,15 @@ var ws_functions = {
 		}
 	},
 	worlds: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	chat_channel: function(data) {
 		if(data.request) {
 			if(network.callbacks[data.request]) {
 				var cb = network.callbacks[data.request];

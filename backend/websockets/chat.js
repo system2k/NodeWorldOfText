@@ -62,7 +62,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var world = ctx.world;
 
 	var db = server.db;
-	var db_chat = server.db_chat;
 	var ws_broadcast = server.ws_broadcast; // site-wide broadcast
 	var chat_mgr = server.chat_mgr;
 	var wss = server.wss;
@@ -203,9 +202,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 	// [rank, name, args, description, example]
 	var command_list = [
-		// staff
-		[1, "channel", null, "get info about a chat channel"],
-
 		// general
 		[0, "help", null, "list all commands", null],
 		
@@ -533,32 +529,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			}
 			broadcastMonitorEvent("TellSpam", "Tell from " + clientId + " (" + ipHeaderAddr + ") to " + id + ", first 4 chars: [" + message.slice(0, 4) + "]");
 		},
-		channel: async function() {
-			if(!user.staff) return;
-			var worldId = world.id;
-			if(location == "global") worldId = 0;
-			var channels = await db_chat.all("SELECT * FROM channels WHERE world_id=?", worldId);
-			var count = channels.length;
-			var infoLog = "Found " + count + " channel(s) for this world:\n";
-			for(var i = 0; i < count; i++) {
-				var ch = channels[i];
-				var name = ch.name;
-				var desc = ch.description;
-				var date = ch.date_created;
-				infoLog += "Name: " + name + "\n";
-				infoLog += "Desc: " + desc + "\n";
-				infoLog += "Created: " + create_date(date) + "\n";
-				infoLog += "----------------\n";
-			}
-			var def = await db_chat.get("SELECT * FROM default_channels WHERE world_id=?", worldId);
-			if(def && def.channel_id) {
-				def = def.channel_id;
-			} else {
-				def = "<none>";
-			}
-			infoLog += "Default channel id: " + def;
-			return serverChatResponse(infoLog, location);
-		},
 		mute: function(id, time, flag) {
 			if(!is_owner && !user.staff) return;
 			id = san_nbr(id);
@@ -690,9 +660,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				return;
 			case "tell":
 				com.tell(commandArgs[1], commandArgs.slice(2).join(" "));
-				return;
-			case "channel":
-				com.channel();
 				return;
 			case "mute":
 				com.mute(commandArgs[1], commandArgs[2], commandArgs[3]);
