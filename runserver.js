@@ -1915,7 +1915,6 @@ async function manageWebsocketConnection(ws, req) {
 		messageBackpressure: 0,
 		receiveContentUpdates: true,
 		descriptiveCmd: false,
-		passiveCmd: false,
 		handleCmdSockets: false,
 		cmdsSentInSecond: 0,
 		lastCmdSecond: 0,

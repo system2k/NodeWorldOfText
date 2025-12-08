@@ -2,8 +2,6 @@ var utils = require("../utils/utils.js");
 var html_tag_esc = utils.html_tag_esc;
 var san_nbr = utils.san_nbr;
 var calculateTimeDiff = utils.calculateTimeDiff;
-var create_date = utils.create_date;
-var getClientIPByChatID = utils.getClientIPByChatID;
 
 function sanitizeColor(col) {
 	var masks = ["#XXXXXX", "#XXX"];
@@ -98,7 +96,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 	// sends `[ Server ]: <message>` in chat.
 	function serverChatResponse(message, location) {
-		if(ws.sdata.passiveCmd) return;
 		send({
 			nickname: "[ Server ]",
 			realUsername: "[ Server ]",
@@ -189,23 +186,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		username_to_display = user.display_username;
 	}
 
-	var com = {
-		passive: function(mode) {
-			if(mode == "on") {
-				ws.sdata.passiveCmd = true;
-			} else if(mode == "off") {
-				ws.sdata.passiveCmd = false;
-			}
-		}
-	}
-
-	var isCommand = (msg[0] == "/");
-	var commandArgs, commandType;
-	if(isCommand) {
-		commandArgs = msg.slice(1).split(" ");
-		commandType = commandArgs[0].toLowerCase();
-	}
-
 	// chat limiter
 	var msNow = Date.now();
 	var second = Math.floor(msNow / 1000);
@@ -214,7 +194,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		if(is_member) chatsEverySecond = 8;
 		if(is_owner) chatsEverySecond = 512;
 	}
-	if(isCommand) chatsEverySecond = 512;
 
 	if(!chat_ip_limits[ipHeaderAddr]) {
 		chat_ip_limits[ipHeaderAddr] = {};
@@ -231,20 +210,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			}
 		} else {
 			cil.chatsSentInSecond++;
-		}
-	}
-
-	if(isCommand) {
-		var operator = user.operator;
-		var superuser = user.superuser;
-		var staff = user.staff;
-
-		switch(commandType) {
-			case "passive":
-				com.passive(commandArgs[1]);
-				return;
-			default:
-				serverChatResponse("Invalid command: " + msg);
 		}
 	}
 
@@ -374,7 +339,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				user: user,
 				world: world,
 				message: {
-					isCommand,
+					isCommand: false,
 					isMuted,
 					isOwner: is_owner,
 					isMember: is_member,
@@ -397,7 +362,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		}
 	}
 
-	if(!isCommand && !isMuted) {
+	if(!isMuted) {
 		if(location == "page") {
 			await add_to_chatlog(chatData, world.id);
 		} else if(location == "global") {
@@ -405,7 +370,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		}
 	}
 
-	if(!isCommand && user.operator && !safeOrigin) {
+	if(user.operator && !safeOrigin) {
 		msg = html_tag_esc(msg);
 		chatData.message = msg;
 	}
@@ -427,14 +392,12 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		username: user.authenticated ? username_to_display.toUpperCase() : null
 	};
 
-	if(!isCommand) {
-		if(clientIpObj && location == "global") {
-			clientIpObj[3] = Date.now();
-		}
-		if(location == "page") {
-			broadcast(websocketChatData, chatOpts);
-		} else if(location == "global") {
-			ws_broadcast(websocketChatData, void 0, chatOpts);
-		}
+	if(clientIpObj && location == "global") {
+		clientIpObj[3] = Date.now();
+	}
+	if(location == "page") {
+		broadcast(websocketChatData, chatOpts);
+	} else if(location == "global") {
+		ws_broadcast(websocketChatData, void 0, chatOpts);
 	}
 }

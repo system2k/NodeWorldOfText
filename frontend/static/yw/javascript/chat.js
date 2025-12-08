@@ -127,8 +127,10 @@ function api_chat_send(message, opts) {
 		args.shift();
 		if(client_commands.hasOwnProperty(command)) {
 			client_commands[command](args);
-			return;
+		} else {
+			clientChatResponse("Invalid command: " + message);
 		}
+		return;
 	}
 
 	network.chat(message, location, nick, chatColor, customMeta, opts.privateMessageTo);
