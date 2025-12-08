@@ -6579,6 +6579,20 @@ var network = {
 			nickname,
 			color
 		});
+	},
+	chat_delete_req: function(id, timestamp, location, callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "chat_delete_req",
+			id,
+			timestamp,
+			location,
+			request: cb_id
+		});
 	}
 };
 
@@ -8120,6 +8134,15 @@ var ws_functions = {
 			}
 		}
 	},
+	chat_delete_req: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	}
 };
 
 function begin() {

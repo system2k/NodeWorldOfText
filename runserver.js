@@ -608,7 +608,8 @@ var websockets = {
 	stats: require("./backend/websockets/stats.js"),
 	uptime: require("./backend/websockets/uptime.js"),
 	whoami: require("./backend/websockets/whoami.js"),
-	chat_test: require("./backend/websockets/chat_test.js")
+	chat_test: require("./backend/websockets/chat_test.js"),
+	chat_delete_req: require("./backend/websockets/chat_delete_req.js")
 };
 
 var modules = {

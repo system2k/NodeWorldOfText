@@ -303,6 +303,26 @@ register_chat_command("test", function() {
 	network.chat_test(location, nickname, color);
 }, null, "preview your appearance", null);
 
+register_chat_command("delete", function(args) {
+	var id = Number(args[0]);
+	var timestamp = Number(args[1]);
+	var location = selectedChatTab == 0 ? "page" : "global";
+
+	network.chat_delete_req(id, timestamp, location, function(data) {
+		if(data.success) {
+			if(data.count == 0) {
+				clientChatResponse("No messages deleted");
+			} else {
+				clientChatResponse("Deleted " + data.count + " message(s)");
+			}
+		} else {
+			if(data.error == "no_perm") {
+				clientChatResponse("You do not have permission to delete messages here");
+			}
+		}
+	});
+}, ["id", "timestamp"], "delete a chat message", "1220 1693147307895");
+
 function sendChat() {
 	var chatText = elm.chatbar.value;
 	elm.chatbar.value = "";

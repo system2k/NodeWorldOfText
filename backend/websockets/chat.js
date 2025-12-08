@@ -76,7 +76,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var getServerSetting = server.getServerSetting;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
-	var remove_from_chatlog = chat_mgr.remove_from_chatlog;
 
 	var ipHeaderAddr = ws.sdata.ipAddress;
 	var clientId = ws.sdata.clientId;
@@ -221,7 +220,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "unblockall", null, "unblock all users", null],
 		[0, "mute", ["id", "seconds", "[h/d/w/m/y]"], "mute a user completely", "1220 9999"], // check for permission
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
-		[0, "delete", ["id", "timestamp"], "delete a chat message", "1220 1693147307895"], // check for permission
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"]
 
 		// hidden by default
@@ -254,7 +252,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			var desc = row[3];
 			var example = row[4];
 
-			if(command == "mute" || command == "clearmutes" || command == "delete") {
+			if(command == "mute" || command == "clearmutes") {
 				if(!user.staff && !is_owner) {
 					continue;
 				}
@@ -643,28 +641,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			}
 			return serverChatResponse("Unmuted " + cnt + " user(s)", location);
 		},
-		delete: async function(id, timestamp) {
-			if(!is_owner && !user.staff) return;
-			id = san_nbr(id);
-			timestamp = san_nbr(timestamp);
-			var wid = world.id;
-			if(location == "global") {
-				if(!user.staff) {
-					return serverChatResponse("You do not have permission to delete messages on global", location);
-				}
-				wid = 0;
-			}
-			var res = await remove_from_chatlog(wid, id, timestamp);
-			if(res == 0) {
-				return serverChatResponse("No messages deleted", location);
-			}
-			broadcast({
-				kind: "chatdelete",
-				id: id,
-				time: timestamp
-			});
-			return serverChatResponse("Deleted " + res + " message(s)", location);
-		},
 		passive: function(mode) {
 			if(mode == "on") {
 				ws.sdata.passiveCmd = true;
@@ -747,9 +723,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				return;
 			case "clearmutes":
 				com.clearmutes();
-				return;
-			case "delete":
-				com.delete(commandArgs[1], commandArgs[2]);
 				return;
 			case "passive":
 				com.passive(commandArgs[1]);
