@@ -323,6 +323,23 @@ register_chat_command("delete", function(args) {
 	});
 }, ["id", "timestamp"], "delete a chat message", "1220 1693147307895");
 
+register_chat_command("worlds", function() {
+	network.worlds(function(data) {
+		var worldList = "";
+		for(var i = 0; i < data.list.length; i++) {
+			var row = data.list[i];
+			if(row[1] == "") {
+				row[1] = "(main)"
+			} else {
+				row[1] = "/" + row[1];
+			}
+			worldList += "-> " + row[1] + " [" + row[0] + "]";
+			if(i != data.list.length - 1) worldList += "\n";
+		}
+		clientChatResponse("Currently loaded worlds (top " + data.topCount + "):\n" + worldList);
+	});
+}, null, "list all worlds", null);
+
 function sendChat() {
 	var chatText = elm.chatbar.value;
 	elm.chatbar.value = "";

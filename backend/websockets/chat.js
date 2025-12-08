@@ -65,7 +65,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var db_chat = server.db_chat;
 	var ws_broadcast = server.ws_broadcast; // site-wide broadcast
 	var chat_mgr = server.chat_mgr;
-	var topActiveWorlds = server.topActiveWorlds;
 	var wss = server.wss;
 	var ranks_cache = server.ranks_cache;
 	var accountSystem = server.accountSystem;
@@ -204,9 +203,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 	// [rank, name, args, description, example]
 	var command_list = [
-		// superuser
-		[2, "worlds", null, "list all worlds", null],
-
 		// staff
 		[1, "channel", null, "get info about a chat channel"],
 
@@ -299,23 +295,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	}
 
 	var com = {
-		worlds: function() {
-			var topCount = 1000;
-			var lst = topActiveWorlds(topCount);
-			var worldList = "";
-			for(var i = 0; i < lst.length; i++) {
-				var row = lst[i];
-				if(row[1] == "") {
-					row[1] = "(main)"
-				} else {
-					row[1] = "/" + row[1];
-				}
-				worldList += "-> " + row[1] + " [" + row[0] + "]";
-				if(i != lst.length - 1) worldList += "\n";
-			}
-			serverChatResponse("Currently loaded worlds (top " + topCount + "):\n" + worldList, location);
-			return;
-		},
 		help: function(modifier) {
 			return serverChatResponse(generate_command_list(), location);
 		},
@@ -691,9 +670,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		var staff = user.staff;
 
 		switch(commandType) {
-			case "worlds":
-				if(superuser) com.worlds();
-				return;
 			case "help":
 				com.help();
 				return;
