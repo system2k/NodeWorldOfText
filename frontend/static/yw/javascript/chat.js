@@ -358,6 +358,56 @@ register_chat_command("channel", function() {
 	});
 }, null, "get info about a chat channel", null);
 
+register_chat_command("mute", function(args) {
+	var id = Number(args[0]);
+	var seconds = Number(args[1]);
+	var flag = args[2];
+	var location = selectedChatTab == 0 ? "page" : "global";
+
+	var timeSuffixMap = {
+		"h": 3600,
+		"d": 86400,
+		"w": 86400*7,
+		"m": 86400*30,
+		"y": 31556925.216 //average year length
+	};
+
+	if(flag in timeSuffixMap) {
+		seconds *= timeSuffixMap[flag];
+	} else {
+		if(flag) { //invalid flag
+			clientChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.");
+			return;
+		}
+	}
+
+	network.mute(id, seconds, location, function(data) {
+		if(data.success) {
+			clientChatResponse("Muted client until " + convertToDate(data.until));
+		} else {
+			if(data.error == "no_perm") {
+				clientChatResponse("You do not have permission to mute here");
+			} else if(data.error == "not_found") {
+				clientChatResponse("Client not found");
+			}
+		}
+	});
+}, ["id", "seconds", "[h/d/w/m/y]"], "mute a user completely", "1220 9999");
+
+register_chat_command("clearmutes", function() {
+	var location = selectedChatTab == 0 ? "page" : "global";
+
+	network.clear_mutes(location, function(data) {
+		if(data.success) {
+			clientChatResponse("Unmuted " + data.count + " user(s)");
+		} else {
+			if(data.error == "no_perm") {
+				clientChatResponse("You do not have permission to unmute here");
+			}
+		}
+	});
+}, null, "unmute all clients", null);
+
 function sendChat() {
 	var chatText = elm.chatbar.value;
 	elm.chatbar.value = "";

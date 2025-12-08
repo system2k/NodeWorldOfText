@@ -6616,6 +6616,32 @@ var network = {
 			location,
 			request: cb_id
 		});
+	},
+	mute: function(id, time, location, callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "mute",
+			id,
+			time,
+			location,
+			request: cb_id
+		});
+	},
+	clear_mutes: function(location, callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "clear_mutes",
+			location,
+			request: cb_id
+		});
 	}
 };
 
@@ -8176,6 +8202,24 @@ var ws_functions = {
 		}
 	},
 	chat_channel: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	mute: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	clear_mutes: function(data) {
 		if(data.request) {
 			if(network.callbacks[data.request]) {
 				var cb = network.callbacks[data.request];

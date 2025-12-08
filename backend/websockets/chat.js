@@ -3,6 +3,7 @@ var html_tag_esc = utils.html_tag_esc;
 var san_nbr = utils.san_nbr;
 var calculateTimeDiff = utils.calculateTimeDiff;
 var create_date = utils.create_date;
+var getClientIPByChatID = utils.getClientIPByChatID;
 
 function sanitizeColor(col) {
 	var masks = ["#XXXXXX", "#XXX"];
@@ -54,7 +55,6 @@ function sanitizeCustomMeta(meta) {
 
 var chat_ip_limits = {};
 var tell_blocks = {};
-var blocked_ips_by_world_id = {}; // id 0 = global
 
 module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var channel = ctx.channel;
@@ -135,24 +135,15 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		return;
 	}
 
+	var muteInfo = chat_mgr.getMuteInfo(location == "global" ? 0 : world.id, ipHeaderAddr);
 	var isMuted = false;
-	var muteInfo = null;
-	var worldChatMutes = blocked_ips_by_world_id[world.id];
-	if(location == "global") {
-		worldChatMutes = blocked_ips_by_world_id[0];
-	}
-	if(worldChatMutes) {
-		muteInfo = worldChatMutes[ipHeaderAddr];
-		if(muteInfo) {
-			isMuted = true;
-		}
-	}
+	if (muteInfo) isMuted = true;
 
 	if(isMuted) {
 		var expTime = muteInfo[0];
 		if(!expTime || typeof expTime != "number" || Date.now() >= expTime) {
 			isMuted = false;
-			delete worldChatMutes[ipHeaderAddr];
+			chat_mgr.unmute(location == "global" ? 0 : world.id, ipHeaderAddr);
 		}
 	}
 
@@ -210,8 +201,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "unblock", ["id"], "unblock someone by id", "1220"],
 		[0, "unblockuser", ["username"], "unblock someone by username", "JohnDoe"],
 		[0, "unblockall", null, "unblock all users", null],
-		[0, "mute", ["id", "seconds", "[h/d/w/m/y]"], "mute a user completely", "1220 9999"], // check for permission
-		[0, "clearmutes", null, "unmute all clients"], // check for permission
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"]
 
 		// hidden by default
@@ -244,12 +233,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			var desc = row[3];
 			var example = row[4];
 
-			if(command == "mute" || command == "clearmutes") {
-				if(!user.staff && !is_owner) {
-					continue;
-				}
-			}
-
 			var rawArgs = "";
 			var rawExample = "";
 			if(example) rawExample = " (/" + command + " " + example + ")";
@@ -259,35 +242,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 		}
 		return html;
-	}
-
-	function getClientIPByChatID(id, isGlobal) {
-		if(isGlobal) {
-			// since this is global, there is the potential for duplicate IDs.
-			// pick the one that has chatted the most recently.
-			var latestGCli = null;
-			var latestGCliTime = -1;
-			for(var cw in client_ips) {
-				var worldClients = client_ips[cw];
-				if(worldClients[id]) {
-					var gCli = worldClients[id];
-					if(gCli[3] != -1 && gCli[3] >= latestGCliTime) {
-						latestGCliTime = gCli[3];
-						latestGCli = gCli;
-					}
-				}
-			}
-			if(latestGCli) {
-				return latestGCli[0];
-			}
-		} else {
-			if(client_ips[world.id]) {
-				if(client_ips[world.id][id]) {
-					return client_ips[world.id][id][0];
-				}
-			}
-		}
-		return null;
 	}
 
 	var com = {
@@ -320,7 +274,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				blocks.id.push(id);
 			}
 			
-			var blocked_ip = getClientIPByChatID(id, location == "global");
+			var blocked_ip = getClientIPByChatID(server, world.id, id, location == "global");
 			if(blocked_ip) {
 				var blist = tell_blocks[ipHeaderAddr];
 				if(!blist) {
@@ -378,7 +332,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				blocks.id.splice(idx, 1);
 			}
 			
-			var unblocked_ip = getClientIPByChatID(id, location == "global");
+			var unblocked_ip = getClientIPByChatID(server, world.id, id, location == "global");
 			if(unblocked_ip) {
 				var blist = tell_blocks[ipHeaderAddr];
 				if(blist) {
@@ -529,67 +483,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			}
 			broadcastMonitorEvent("TellSpam", "Tell from " + clientId + " (" + ipHeaderAddr + ") to " + id + ", first 4 chars: [" + message.slice(0, 4) + "]");
 		},
-		mute: function(id, time, flag) {
-			if(!is_owner && !user.staff) return;
-			id = san_nbr(id);
-			time = san_nbr(time); // in seconds
-
-			var timeSuffixMap = {
-				"h": 3600,
-				"d": 86400,
-				"w": 86400*7,
-				"m": 86400*30,
-				"y": 31556925.216 //average year length
-			};
-
-			if(flag in timeSuffixMap) {
-				time *= timeSuffixMap[flag];
-			} else { 
-				if(flag) { //invalid flag
-					return serverChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.")
-				}
-			}
-
-			if(location == "global" && !user.staff) {
-				return serverChatResponse("You do not have permission to mute on global", location);
-			}
-
-			var muted_ip = getClientIPByChatID(id, location == "global");
-
-			if(muted_ip) {
-				var muteDate = Date.now() + (time * 1000);
-				var mute_wid = null;
-				if(location == "global") {
-					mute_wid = 0;
-				} else if(location == "page") {
-					mute_wid = world.id;
-				}
-				if(mute_wid == null) {
-					return serverChatResponse("Invalid location", location);
-				}
-				if(!blocked_ips_by_world_id[mute_wid]) blocked_ips_by_world_id[mute_wid] = {};
-				blocked_ips_by_world_id[mute_wid][muted_ip] = [muteDate];
-				return serverChatResponse("Muted client until " + create_date(muteDate), location);
-			} else {
-				return serverChatResponse("Client not found", location);
-			}
-		},
-		clearmutes: function() {
-			if(!is_owner && !user.staff) return;
-			var cnt = 0;
-			if(location == "global" && user.staff) {
-				if(blocked_ips_by_world_id["0"]) {
-					cnt = Object.keys(blocked_ips_by_world_id["0"]).length;
-					delete blocked_ips_by_world_id["0"];
-				}
-			} else {
-				if(blocked_ips_by_world_id[world.id]) {
-					cnt = Object.keys(blocked_ips_by_world_id[world.id]).length;
-					delete blocked_ips_by_world_id[world.id];
-				}
-			}
-			return serverChatResponse("Unmuted " + cnt + " user(s)", location);
-		},
 		passive: function(mode) {
 			if(mode == "on") {
 				ws.sdata.passiveCmd = true;
@@ -660,12 +553,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				return;
 			case "tell":
 				com.tell(commandArgs[1], commandArgs.slice(2).join(" "));
-				return;
-			case "mute":
-				com.mute(commandArgs[1], commandArgs[2], commandArgs[3]);
-				return;
-			case "clearmutes":
-				com.clearmutes();
 				return;
 			case "passive":
 				com.passive(commandArgs[1]);

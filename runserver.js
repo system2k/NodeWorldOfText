@@ -611,7 +611,9 @@ var websockets = {
 	chat_test: require("./backend/websockets/chat_test.js"),
 	chat_delete_req: require("./backend/websockets/chat_delete_req.js"),
 	worlds: require("./backend/websockets/worlds.js"),
-	chat_channel: require("./backend/websockets/chat_channel.js")
+	chat_channel: require("./backend/websockets/chat_channel.js"),
+	mute: require("./backend/websockets/mute.js"),
+	clear_mutes: require("./backend/websockets/clear_mutes.js")
 };
 
 var modules = {

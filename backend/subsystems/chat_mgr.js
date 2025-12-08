@@ -314,7 +314,46 @@ async function chatDatabaseClock(serverExit) {
 	}
 }
 
+var muted_ips_by_world_id = {}; // id 0 = global
+function getMuteInfo(world_id, ip) {
+	var worldChatMutes = muted_ips_by_world_id[world_id];
+
+	if(worldChatMutes) {
+		return worldChatMutes[ip];
+	}
+
+	return null;
+}
+
+function mute(world_id, ip, date) {
+	if(!muted_ips_by_world_id[world_id]) muted_ips_by_world_id[world_id] = {};
+	muted_ips_by_world_id[world_id][ip] = [date];
+}
+
+function clearMutes(world_id) {
+	var cnt = 0;
+
+	if(muted_ips_by_world_id[world_id]) {
+		cnt = Object.keys(muted_ips_by_world_id[world_id]).length;
+		delete muted_ips_by_world_id[world_id];
+	}
+
+	return cnt;
+}
+
+function unmute(world_id, ip) {
+	var worldChatMutes = muted_ips_by_world_id[world_id];
+
+	if(worldChatMutes) {
+		delete worldChatMutes[ip];
+	}
+}
+
 module.exports.retrieveChatHistory = retrieveChatHistory;
 module.exports.add_to_chatlog = add_to_chatlog;
 module.exports.remove_from_chatlog = remove_from_chatlog;
 module.exports.clearChatlog = clearChatlog;
+module.exports.getMuteInfo = getMuteInfo;
+module.exports.mute = mute;
+module.exports.clearMutes = clearMutes;
+module.exports.unmute = unmute;
