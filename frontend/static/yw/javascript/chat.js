@@ -150,6 +150,69 @@ function register_chat_command(command, callback, params, desc, example) {
 	client_commands[command.toLowerCase()] = callback;
 }
 
+register_chat_command("help", function() {
+	var cmdList = [];
+	var htmlResp = "<div style=\"background-color: #DADADA; font-family: monospace; font-size: 13px;\">";
+	var cmdIdx = 0;
+
+	for(var cmd in chatCommandRegistry) {
+		var cliCmd = chatCommandRegistry[cmd];
+		cmdList.push({
+			command: cmd,
+			params: cliCmd.params,
+			desc: cliCmd.desc,
+			example: cliCmd.example
+		});
+	}
+
+	cmdList.sort(function(a, b) {
+		return a.command.localeCompare(b.command);
+	});
+
+	for(var i = 0; i < cmdList.length; i++) {
+		var info = cmdList[i];
+		var command = info.command;
+		var params = info.params;
+		var example = info.example;
+		var desc = info.desc;
+
+		// display command parameters
+		var param_desc = "";
+		if(params) {
+			param_desc += html_tag_esc("<");
+			for(var v = 0; v < params.length; v++) {
+				var arg = params[v];
+				param_desc += "<span style=\"font-style: italic\">" + html_tag_esc(arg) + "</span>";
+				if(v != params.length - 1) {
+					param_desc += ", ";
+				}
+			}
+			param_desc += html_tag_esc(">");
+		}
+
+		var exampleElm = "";
+		if(example && params) {
+			example = "/" + command + " " + example;
+			exampleElm = "title=\"" + html_tag_esc("Example: " + example) +"\"";
+		}
+
+		command = "<span " + exampleElm + "style=\"color: #00006F\">" + html_tag_esc(command) + "</span>";
+
+		var help_row = html_tag_esc("-> /") + command + " " + param_desc + " :: " + html_tag_esc(desc);
+
+		// alternating stripes
+		if(cmdIdx % 2 == 1) {
+			help_row = "<div style=\"background-color: #C3C3C3\">" + help_row + "</div>";
+		}
+
+		htmlResp += help_row;
+		cmdIdx++;
+	}
+	htmlResp += "</div>";
+
+	addChat(null, 0, "user", "[ Client ]", htmlResp, "Client", true, true, true, null, getDate());
+}, null, "list all commands", null);
+
 register_chat_command("nick", function (args) {
 	var newDisplayName = args.join(" ");
 	if(!newDisplayName) {
@@ -886,109 +949,6 @@ var emoteList = {
 	"fpdislikeaaa": [96, 96],
 	"fppinchaaa": [128, 96]
 };
-
-w.on("chatMod", function(e) {
-	if(e.id !== 0) return;
-	if(e.realUsername != "[ Server ]") return;
-	if(e.message.startsWith("Command")) {
-		var cmdList = [];
-		var htmlResp = "";
-		var remoteCmdList = e.message.split("\n");
-		var head = remoteCmdList[0];
-
-		htmlResp += head + "<br>";
-		htmlResp += "<div style=\"background-color: #DADADA; font-family: monospace; font-size: 13px;\">";
-
-		var cmdIdx = 0;
-		for(var i = 1; i < remoteCmdList.length; i++) {
-			var line = remoteCmdList[i];
-			if(!line.startsWith("/")) continue;
-			line = line.split(" -> ");
-			var cmdRaw = line[0].split(" ");
-			var params = cmdRaw[1];
-			var command = cmdRaw[0].slice(1);
-			if(params) {
-				params = params.slice(1, -1).split(",");
-			}
-			var descRaw = line[1];
-			var exampleStartIdx = descRaw.indexOf("(");
-			var example = "";
-			if(exampleStartIdx > -1) {
-				example = descRaw.slice(exampleStartIdx + 1, -1); // remove parentheses
-				descRaw = descRaw.slice(0, exampleStartIdx - 1);
-				example = example.split(" ").slice(1).join(" ");
-			}
-
-			cmdList.push({
-				command: command,
-				params: params,
-				desc: descRaw,
-				example: example
-			});
-		}
-
-		for(var cmd in chatCommandRegistry) {
-			var cliCmd = chatCommandRegistry[cmd];
-			cmdList.push({
-				command: cmd,
-				params: cliCmd.params,
-				desc: cliCmd.desc,
-				example: cliCmd.example
-			});
-		}
-
-		cmdList.sort(function(a, b) {
-			return a.command.localeCompare(b.command);
-		});
-
-		for(var i = 0; i < cmdList.length; i++) {
-			var info = cmdList[i];
-			var command = info.command;
-			var params = info.params;
-			var example = info.example;
-			var desc = info.desc;
-
-			// display command parameters
-			var param_desc = "";
-			if(params) {
-				param_desc += html_tag_esc("<");
-				for(var v = 0; v < params.length; v++) {
-					var arg = params[v];
-					param_desc += "<span style=\"font-style: italic\">" + html_tag_esc(arg) + "</span>";
-					if(v != params.length - 1) {
-						param_desc += ", ";
-					}
-				}
-				param_desc += html_tag_esc(">");
-			}
-
-			var exampleElm = "";
-			if(example && params) {
-				example = "/" + command + " " + example;
-				exampleElm = "title=\"" + html_tag_esc("Example: " + example) +"\"";
-			}
-
-			command = "<span " + exampleElm + "style=\"color: #00006F\">" + html_tag_esc(command) + "</span>";
-
-			var help_row = html_tag_esc("-> /") + command + " " + param_desc + " :: " + html_tag_esc(desc);
-
-			// alternating stripes
-			if(cmdIdx % 2 == 1) {
-				help_row = "<div style=\"background-color: #C3C3C3\">" + help_row + "</div>";
-			}
-
-			htmlResp += help_row;
-			cmdIdx++;
-		}
-		htmlResp += "</div>";
-
-		e.message = htmlResp;
-		// upgrade permissions to allow display of HTML
-		e.op = true;
-		e.admin = true;
-		e.staff = true;
-	}
-});
 
 /*
 	[type]:

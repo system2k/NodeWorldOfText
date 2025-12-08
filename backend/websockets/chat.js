@@ -189,56 +189,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		username_to_display = user.display_username;
 	}
 
-	// [rank, name, args, description, example]
-	var command_list = [
-		// general
-		[0, "help", null, "list all commands", null]
-
-		// hidden by default
-		// "/search Phrase" (client) -> searches for Phrase within a 25 tile radius
-		// "/passive on/off" -> disable or enable server responses to commands (e.g. /block)
-	];
-
-	function generate_command_list() {
-		var list = [];
-		for(var i = 0; i < command_list.length; i++) {
-			var command = command_list[i];
-			var rank = command[0];
-			if(rank == 3 && user.operator) list.push(command);
-			if(rank == 2 && user.superuser) list.push(command);
-			if(rank == 1 && user.staff) list.push(command);
-			if(rank == 0) list.push(command);
-		}
-
-		// sort the command list
-		list.sort(function(v1, v2) {
-			return v1[1].localeCompare(v2[1], "en", { sensitivity: "base" });
-		});
-
-		var html = "";
-		html += "Command list:\n";
-		for(var i = 0; i < list.length; i++) {
-			var row = list[i];
-			var command = row[1];
-			var args = row[2];
-			var desc = row[3];
-			var example = row[4];
-
-			var rawArgs = "";
-			var rawExample = "";
-			if(example) rawExample = " (/" + command + " " + example + ")";
-			if(args) rawArgs = " <" + args.join(",") + ">";
-
-			html += `/${command}${rawArgs} -> ${desc}${rawExample}\n`;
-
-		}
-		return html;
-	}
-
 	var com = {
-		help: function(modifier) {
-			return serverChatResponse(generate_command_list(), location);
-		},
 		passive: function(mode) {
 			if(mode == "on") {
 				ws.sdata.passiveCmd = true;
@@ -289,9 +240,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		var staff = user.staff;
 
 		switch(commandType) {
-			case "help":
-				com.help();
-				return;
 			case "passive":
 				com.passive(commandArgs[1]);
 				return;
