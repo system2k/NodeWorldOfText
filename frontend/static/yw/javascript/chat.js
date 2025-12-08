@@ -131,7 +131,7 @@ function api_chat_send(message, opts) {
 		}
 	}
 
-	network.chat(message, location, nick, chatColor, customMeta);
+	network.chat(message, location, nick, chatColor, customMeta, opts.privateMessageTo);
 }
 
 function clientChatResponse(message) {
@@ -407,6 +407,21 @@ register_chat_command("clearmutes", function() {
 		}
 	});
 }, null, "unmute all clients", null);
+
+register_chat_command("tell", function(args) {
+	var id = args[0];
+	var msg = args.slice(1).join(" ");
+
+	var opts = {
+		privateMessageTo: id
+	};
+
+	if(defaultChatColor != null) {
+		opts.color = "#" + ("00000" + defaultChatColor.toString(16)).slice(-6);
+	}
+
+	api_chat_send(msg, opts);
+}, ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)");
 
 function sendChat() {
 	var chatText = elm.chatbar.value;

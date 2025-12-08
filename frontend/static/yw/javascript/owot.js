@@ -6464,14 +6464,15 @@ var network = {
 		}
 		network.transmit(fetchReq);
 	},
-	chat: function(message, location, nickname, color, customMeta) {
+	chat: function(message, location, nickname, color, customMeta, pmTo) {
 		network.transmit({
 			kind: "chat",
 			nickname: nickname,
 			message: message,
 			location: location,
 			color: color,
-			customMeta: customMeta
+			customMeta: customMeta,
+			privateMessageTo: pmTo
 		});
 	},
 	ping: function(callback) {

@@ -200,8 +200,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "blockuser", ["username"], "block someone by username", "JohnDoe"],
 		[0, "unblock", ["id"], "unblock someone by id", "1220"],
 		[0, "unblockuser", ["username"], "unblock someone by username", "JohnDoe"],
-		[0, "unblockall", null, "unblock all users", null],
-		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"]
+		[0, "unblockall", null, "unblock all users", null]
 
 		// hidden by default
 		// "/search Phrase" (client) -> searches for Phrase within a 25 tile radius
@@ -374,115 +373,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			}
 			serverChatResponse("Cleared all blocks", location);
 		},
-		tell: function(id, message) {
-			id += "";
-			message += "";
-			message = message.trim();
-			var noClient = false;
-			if(!id) {
-				return serverChatResponse("No id given", location);
-			}
-			if(!message) {
-				return serverChatResponse("No message given", location);
-			}
-			id = parseInt(id, 10);
-			if(isNaN(id)) {
-				return serverChatResponse("Invalid ID format", location);
-			}
-			id = san_nbr(id);
-
-			var client = null;
-			var latestGlobalClientTime = -1;
-			wss.clients.forEach(function(ws) {
-				if(!ws.sdata) return;
-				if(!ws.sdata.userClient) return;
-				var dstClientId = ws.sdata.clientId;
-				var clientWorld = ws.sdata.world;
-				if(dstClientId != id) return;
-				if(location == "page") {
-					if(clientWorld.id == world.id) {
-						client = ws;
-					}
-				} else if(location == "global") {
-					var cliObj = client_ips[clientWorld.id][dstClientId];
-					var cliTime = cliObj[3];
-					var disconnected = cliObj[2];
-					if((!disconnected && cliTime != -1 && cliTime >= latestGlobalClientTime) || (dstClientId == clientId)) { // allow self-dm
-						latestGlobalClientTime = cliTime;
-						client = ws;
-					}
-				}
-			});
-
-			if(!client) {
-				noClient = true;
-			}
-
-			hasPrivateMsged = true;
-
-			if(isMuted) return;
-
-			if(noClient) {
-				return serverChatResponse("User not found", location);
-			}
-
-			var privateMessage = {
-				nickname: nick,
-				realUsername: username_to_display,
-				id: clientId, // client id of sender
-				message: message,
-				registered: user.authenticated,
-				location: location,
-				op: user.operator,
-				admin: user.superuser,
-				staff: user.staff,
-				color: data.color,
-				kind: "chat",
-				privateMessage: "to_me",
-				customMeta: data.customMeta
-			};
-
-			if(user.authenticated && user.id in ranks_cache.users) {
-				var rank = ranks_cache[ranks_cache.users[user.id]];
-				privateMessage.rankName = rank.name;
-				privateMessage.rankColor = rank.chat_color;
-			}
-			send({
-				nickname: "",
-				realUsername: "",
-				id: id, // client id of receiver
-				message: message,
-				registered: false,
-				location: location,
-				op: false,
-				admin: false,
-				staff: false,
-				color: "#000000",
-				kind: "chat",
-				privateMessage: "from_me",
-				customMeta: data.customMeta
-			});
-			// if user has blocked TELLs, don't let the /tell-er know
-			if(client.sdata.chat_blocks.block_all) return;
-			if(client.sdata.chat_blocks.no_tell) return;
-			if(client.sdata.chat_blocks.no_anon && !user.authenticated) return;
-			if(client.sdata.chat_blocks.no_reg && user.authenticated) return;
-			if(user.authenticated && client.sdata.chat_blocks.user.includes(username_to_display.toUpperCase())) {
-				return; // sender username is blocked by destination user
-			}
-				
-			// user has blocked the TELLer by IP
-			var tellblock = tell_blocks[client.sdata.ipAddress];
-			if(tellblock && tellblock[ipHeaderAddr]) {
-				return;
-			}
-
-			wsSend(client, JSON.stringify(privateMessage));
-			if(clientIpObj && location == "global") {
-				clientIpObj[3] = Date.now();
-			}
-			broadcastMonitorEvent("TellSpam", "Tell from " + clientId + " (" + ipHeaderAddr + ") to " + id + ", first 4 chars: [" + message.slice(0, 4) + "]");
-		},
 		passive: function(mode) {
 			if(mode == "on") {
 				ws.sdata.passiveCmd = true;
@@ -507,7 +397,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		if(is_member) chatsEverySecond = 8;
 		if(is_owner) chatsEverySecond = 512;
 	}
-	if(isCommand && commandType != "tell") chatsEverySecond = 512;
+	if(isCommand) chatsEverySecond = 512;
 
 	if(!chat_ip_limits[ipHeaderAddr]) {
 		chat_ip_limits[ipHeaderAddr] = {};
@@ -551,15 +441,108 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			case "unblockall":
 				com.unblockall();
 				return;
-			case "tell":
-				com.tell(commandArgs[1], commandArgs.slice(2).join(" "));
-				return;
 			case "passive":
 				com.passive(commandArgs[1]);
 				return;
 			default:
 				serverChatResponse("Invalid command: " + msg);
 		}
+	}
+
+	if(data.privateMessageTo) {
+		var noClient = false;
+		var id = san_nbr(data.privateMessageTo);
+
+		var client = null;
+		var latestGlobalClientTime = -1;
+		wss.clients.forEach(function(ws) {
+			if(!ws.sdata) return;
+			if(!ws.sdata.userClient) return;
+			var dstClientId = ws.sdata.clientId;
+			var clientWorld = ws.sdata.world;
+			if(dstClientId != id) return;
+			if(location == "page") {
+				if(clientWorld.id == world.id) {
+					client = ws;
+				}
+			} else if(location == "global") {
+				var cliObj = client_ips[clientWorld.id][dstClientId];
+				var cliTime = cliObj[3];
+				var disconnected = cliObj[2];
+				if((!disconnected && cliTime != -1 && cliTime >= latestGlobalClientTime) || (dstClientId == clientId)) { // allow self-dm
+					latestGlobalClientTime = cliTime;
+					client = ws;
+				}
+			}
+		});
+
+		if(!client) {
+			noClient = true;
+		}
+
+		if(isMuted) return;
+
+		if(noClient) {
+			return serverChatResponse("User not found", location);
+		}
+
+		var privateMessage = {
+			nickname: nick,
+			realUsername: username_to_display,
+			id: clientId, // client id of sender
+			message: msg,
+			registered: user.authenticated,
+			location: location,
+			op: user.operator,
+			admin: user.superuser,
+			staff: user.staff,
+			color: data.color,
+			kind: "chat",
+			privateMessage: "to_me",
+			customMeta: data.customMeta
+		};
+
+		if(user.authenticated && user.id in ranks_cache.users) {
+			var rank = ranks_cache[ranks_cache.users[user.id]];
+			privateMessage.rankName = rank.name;
+			privateMessage.rankColor = rank.chat_color;
+		}
+		send({
+			nickname: "",
+			realUsername: "",
+			id: id, // client id of receiver
+			message: msg,
+			registered: false,
+			location: location,
+			op: false,
+			admin: false,
+			staff: false,
+			color: "#000000",
+			kind: "chat",
+			privateMessage: "from_me",
+			customMeta: data.customMeta
+		});
+		// if user has blocked TELLs, don't let the /tell-er know
+		if(client.sdata.chat_blocks.block_all) return;
+		if(client.sdata.chat_blocks.no_tell) return;
+		if(client.sdata.chat_blocks.no_anon && !user.authenticated) return;
+		if(client.sdata.chat_blocks.no_reg && user.authenticated) return;
+		if(user.authenticated && client.sdata.chat_blocks.user.includes(username_to_display.toUpperCase())) {
+			return; // sender username is blocked by destination user
+		}
+
+		// user has blocked the TELLer by IP
+		var tellblock = tell_blocks[client.sdata.ipAddress];
+		if(tellblock && tellblock[ipHeaderAddr]) {
+			return;
+		}
+
+		wsSend(client, JSON.stringify(privateMessage));
+		if(clientIpObj && location == "global") {
+			clientIpObj[3] = Date.now();
+		}
+		broadcastMonitorEvent("TellSpam", "Tell from " + clientId + " (" + ipHeaderAddr + ") to " + id + ", first 4 chars: [" + msg.slice(0, 4) + "]");
+		return;
 	}
 
 	var chatData = {
