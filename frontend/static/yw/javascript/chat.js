@@ -103,12 +103,15 @@ function api_chat_send(message, opts) {
 	message = message.trim();
 	if(!message.length) return;
 	message = message.slice(0, msgLim);
-	chatWriteHistory.push(message);
-	if(chatWriteHistory.length > chatWriteHistoryMax) {
-		chatWriteHistory.shift();
+
+	if (!opts.privateMessageTo) {
+		chatWriteHistory.push(message);
+		if(chatWriteHistory.length > chatWriteHistoryMax) {
+			chatWriteHistory.shift();
+		}
+		chatWriteHistoryIdx = -1;
+		chatWriteTmpBuffer = "";
 	}
-	chatWriteHistoryIdx = -1;
-	chatWriteTmpBuffer = "";
 
 	var chatColor;
 	if(!opts.color) {
