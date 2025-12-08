@@ -289,6 +289,20 @@ register_chat_command("whoami", function() {
 	});
 }, null, "display your identity", null);
 
+register_chat_command("test", function() {
+	var location = selectedChatTab == 0 ? "page" : "global";
+	var nickname = YourWorld.Nickname || state.userModel.username;
+
+	var color;
+	if(!YourWorld.Color) {
+		color = assignColor(nickname);
+	} else {
+		color = "#" + ("00000" + YourWorld.Color.toString(16)).slice(-6);
+	}
+
+	network.chat_test(location, nickname, color);
+}, null, "preview your appearance", null);
+
 function sendChat() {
 	var chatText = elm.chatbar.value;
 	elm.chatbar.value = "";

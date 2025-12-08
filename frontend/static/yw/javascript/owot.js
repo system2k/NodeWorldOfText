@@ -6571,6 +6571,14 @@ var network = {
 			kind: "whoami",
 			request: cb_id
 		});
+	},
+	chat_test: function(location, nickname, color) {
+		network.transmit({
+			kind: "chat_test",
+			location,
+			nickname,
+			color
+		});
 	}
 };
 

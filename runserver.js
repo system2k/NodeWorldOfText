@@ -607,7 +607,8 @@ var websockets = {
 	boundary: require("./backend/websockets/boundary.js"),
 	stats: require("./backend/websockets/stats.js"),
 	uptime: require("./backend/websockets/uptime.js"),
-	whoami: require("./backend/websockets/whoami.js")
+	whoami: require("./backend/websockets/whoami.js"),
+	chat_test: require("./backend/websockets/chat_test.js")
 };
 
 var modules = {
@@ -2232,7 +2233,7 @@ async function manageWebsocketConnection(ws, req) {
 		}
 		if(!can_process_req_kind(kindLimits, kind)) return;
 		function send(msg) {
-			msg.kind = kind;
+			if(!msg.kind) msg.kind = kind;
 			if(requestID !== null) msg.request = requestID;
 			send_ws(JSON.stringify(msg));
 		}

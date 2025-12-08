@@ -139,7 +139,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	}
 
 	var isMuted = false;
-	var isTestMessage = false;
 	var muteInfo = null;
 	var worldChatMutes = blocked_ips_by_world_id[world.id];
 	if(location == "global") {
@@ -223,8 +222,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "mute", ["id", "seconds", "[h/d/w/m/y]"], "mute a user completely", "1220 9999"], // check for permission
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
 		[0, "delete", ["id", "timestamp"], "delete a chat message", "1220 1693147307895"], // check for permission
-		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
-		[0, "test", null, "preview your appearance"]
+		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"]
 
 		// hidden by default
 		// "/search Phrase" (client) -> searches for Phrase within a 25 tile radius
@@ -673,9 +671,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			} else if(mode == "off") {
 				ws.sdata.passiveCmd = false;
 			}
-		},
-		test: function() {
-			isTestMessage = true;
 		}
 	}
 
@@ -759,9 +754,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			case "passive":
 				com.passive(commandArgs[1]);
 				return;
-			case "test":
-				com.test();
-				break;
 			default:
 				serverChatResponse("Invalid command: " + msg);
 		}
@@ -849,11 +841,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		clientId,
 		username: user.authenticated ? username_to_display.toUpperCase() : null
 	};
-
-	if(isTestMessage) {
-		websocketChatData.message = "This message is visible to only you.";
-		send(websocketChatData);
-	}
 
 	if(!isCommand) {
 		if(clientIpObj && location == "global") {
