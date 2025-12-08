@@ -6549,6 +6549,28 @@ var network = {
 			kind: "stats",
 			id: cb_id // optional: number
 		});
+	},
+	uptime: function(callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "uptime",
+			request: cb_id
+		});
+	},
+	whoami: function(callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "whoami",
+			request: cb_id
+		});
 	}
 };
 
@@ -8071,7 +8093,25 @@ var ws_functions = {
 				cb(data);
 			}
 		}
-	}
+	},
+	uptime: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	whoami: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
 };
 
 function begin() {

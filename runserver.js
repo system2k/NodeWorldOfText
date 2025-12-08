@@ -605,7 +605,9 @@ var websockets = {
 	write: require("./backend/websockets/write.js"),
 	config: require("./backend/websockets/config.js"),
 	boundary: require("./backend/websockets/boundary.js"),
-	stats: require("./backend/websockets/stats.js")
+	stats: require("./backend/websockets/stats.js"),
+	uptime: require("./backend/websockets/uptime.js"),
+	whoami: require("./backend/websockets/whoami.js")
 };
 
 var modules = {

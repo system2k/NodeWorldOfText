@@ -74,7 +74,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
 	var loadPlugin = server.loadPlugin;
 	var getServerSetting = server.getServerSetting;
-	var getServerUptime = server.getServerUptime;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
 	var remove_from_chatlog = chat_mgr.remove_from_chatlog;
@@ -207,9 +206,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 	// [rank, name, args, description, example]
 	var command_list = [
-		// operator
-		[3, "uptime", null, "get uptime of server", null],
-
 		// superuser
 		[2, "worlds", null, "list all worlds", null],
 
@@ -228,7 +224,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
 		[0, "delete", ["id", "timestamp"], "delete a chat message", "1220 1693147307895"], // check for permission
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
-		[0, "whoami", null, "display your identity"],
 		[0, "test", null, "preview your appearance"]
 
 		// hidden by default
@@ -454,9 +449,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			}
 			serverChatResponse("Cleared all blocks", location);
 		},
-		uptime: function() {
-			serverChatResponse("Server uptime: " + calculateTimeDiff(getServerUptime()), location);
-		},
 		tell: function(id, message) {
 			id += "";
 			message += "";
@@ -653,23 +645,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			}
 			return serverChatResponse("Unmuted " + cnt + " user(s)", location);
 		},
-		whoami: function() {
-			var idstr = "Who Am I:\n";
-			var user_login = "(anonymous)";
-			var user_disp = "(anonymous)";
-			if(user.authenticated) {
-				user_disp = username_to_display;
-				if(accountSystem == "uvias") {
-					user_login = user.username;
-				} else {
-					user_login = user_disp;
-				}
-			}
-			idstr += "Login username: " + user_login + "\n";
-			idstr += "Display username: " + user_disp + "\n";
-			idstr += "Chat ID: " + clientId;
-			return serverChatResponse(idstr, location);
-		},
 		delete: async function(id, timestamp) {
 			if(!is_owner && !user.staff) return;
 			id = san_nbr(id);
@@ -751,9 +726,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			case "help":
 				com.help();
 				return;
-			case "uptime":
-				com.uptime();
-				return;
 			case "block":
 				com.block(commandArgs[1]);
 				return;
@@ -780,9 +752,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				return;
 			case "clearmutes":
 				com.clearmutes();
-				return;
-			case "whoami":
-				com.whoami();
 				return;
 			case "delete":
 				com.delete(commandArgs[1], commandArgs[2]);

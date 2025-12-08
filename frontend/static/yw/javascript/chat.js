@@ -273,6 +273,22 @@ register_chat_command("stats", function() {
 	});
 }, null, "view stats of a world", null);
 
+register_chat_command("uptime", function() {
+	network.uptime(function(data) {
+		clientChatResponse("Server uptime: " + calculateTimeDiff(data.uptime));
+	});
+}, null, "get uptime of server", null);
+
+register_chat_command("whoami", function() {
+	network.whoami(function(data) {
+		var idstr = "Who Am I:\n";
+		idstr += "Login username: " + (data.user_login ?? "(anonymous)") + "\n";
+		idstr += "Display username: " + (data.user_disp ?? "(anonymous)") + "\n";
+		idstr += "Chat ID: " + w.clientId;
+		clientChatResponse(idstr);
+	});
+}, null, "display your identity", null);
+
 function sendChat() {
 	var chatText = elm.chatbar.value;
 	elm.chatbar.value = "";
