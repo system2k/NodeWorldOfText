@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const querystring = require("querystring");
 const isIP = require("net").isIP;
 const zlib = require("zlib");
+const fs = require("fs");
 
 const templates = require("./templates.js");
 const utils = require("../utils/utils.js");
@@ -661,14 +662,24 @@ class HTTPServer {
 
 	setSSLConfig(isEnabled, privkeyPath, certPath, chainPath) {
 		this.sslEnabled = !!isEnabled;
-		if(!isEnabled) return;
-		if(!fs.existsSync(private_key) || !fs.existsSync(cert) || !fs.existsSync(chain)) {
+		if(!this.sslEnabled) return false;
+		try {
+			if(!privkeyPath || !certPath || !chainPath) {
+				this.sslEnabled = false;
+				return false;
+			}
+			if(!fs.existsSync(privkeyPath) || !fs.existsSync(certPath) || !fs.existsSync(chainPath)) {
+				this.sslEnabled = false;
+				return false;
+			}
+			this.sslOptions.key = fs.readFileSync(privkeyPath);
+			this.sslOptions.cert = fs.readFileSync(certPath);
+			this.sslOptions.ca = fs.readFileSync(chainPath);
+			return true;
+		} catch(e) {
 			this.sslEnabled = false;
-			return;
+			return false;
 		}
-		this.sslOptions.key = fs.readFileSync(privkeyPath);
-		this.sslOptions.cert = fs.readFileSync(certPath);
-		this.sslOptions.ca = fs.readFileSync(chainPath);
 	}
 	isSSLEnabled() {
 		return this.sslEnabled;

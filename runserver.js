@@ -844,6 +844,19 @@ async function fetchCloudflareIPs(ip_type) {
 function setupHTTPServer() {
 	httpServer = new serverUtil.HTTPServer(settings.port, global_data);
 
+	if(settings.ssl_enabled) {
+		var sslConf = settings.ssl || {};
+		var priv = sslConf.private_key;
+		var cert = sslConf.cert;
+		var chain = sslConf.chain;
+		var ok = httpServer.setSSLConfig(true, priv, cert, chain);
+		if(!ok) {
+			console.log("SSL configuration failed or files missing. Falling back to HTTP.");
+		} else {
+			console.log("SSL enabled. HTTPS server will be used.");
+		}
+	}
+
 	httpServer.setPageTree(pages);
 	httpServer.setDefaultTemplateData("loginPath", loginPath);
 	httpServer.setDefaultTemplateData("logoutPath", logoutPath);
@@ -1360,7 +1373,9 @@ function setupMonitorServer() {
 			port: settings.monitor.port,
 			ip: settings.monitor.ip,
 			user: settings.monitor.credentials.user,
-			pass: settings.monitor.credentials.pass
+			pass: settings.monitor.credentials.pass,
+			ssl_enabled: settings.ssl_enabled || false,
+			ssl_config: settings.ssl || null
 		}
 	});
 	monitorWorker.on("error", function(e) {
