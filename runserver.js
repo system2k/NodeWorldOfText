@@ -22,6 +22,34 @@ const WebSocket   = require("ws");
 const worker      = require("node:worker_threads");
 const zip         = require("adm-zip");
 
+const {
+	parseArgs
+} = require("node:util");
+
+let args = parseArgs({
+	options: {
+		"lt": {
+			type: "boolean"
+		},
+		"test-server": {
+			type: "boolean"
+		},
+		"log": {
+			type: "boolean"
+		},
+		"uvias-test-info": {
+			type: "boolean"
+		},
+		"no": {
+			type: "boolean",
+			short: "n"
+		},
+		"data-path": {
+			type: "string"
+		}
+	}
+});
+
 const bin_packet   = require("./backend/utils/bin_packet.js");
 const utils        = require("./backend/utils/utils.js");
 const rate_limiter = require("./backend/utils/rate_limiter.js");
@@ -72,9 +100,47 @@ var ipv6_to_range  = ipaddress.ipv6_to_range;
 var is_cf_ipv4_int = ipaddress.is_cf_ipv4_int;
 var is_cf_ipv6_int = ipaddress.is_cf_ipv6_int;
 
+var shellEnabled = true;
+
+var isTestServer = false;
+var debugLogging = false;
+var testUviasIds = false;
+var serverLoaded = false;
+var isStopping = false;
+var implyNo = false; // ignore all prompts that may block the server from starting
+var overriddenDataPath = null;
+
+function handleArgs() {
+	if(args.values["test-server"]) {
+		if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
+		isTestServer = true;
+	}
+	if(args.values["log"]) {
+		if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
+		debugLogging = true;
+	}
+	if(args.values["uvias-test-info"]) {
+		testUviasIds = true;
+	}
+	if(args.values["lt"]) {
+		if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
+		isTestServer = true;
+		if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
+		debugLogging = true;
+		testUviasIds = true;
+	}
+	if(args.values["no"]) {
+		implyNo = true;
+	}
+	if(args.values["data-path"]) {
+		overriddenDataPath = args.values["data-path"];
+	}
+}
+handleArgs();
+
 const DATABASE_VERSION = 2;
 const MIGRATION_PATH = "./backend/migrations/";
-const DATA_PATH = "../nwotdata/";
+const DATA_PATH = overriddenDataPath || "../nwotdata/";
 const SETTINGS_PATH = DATA_PATH + "settings.json";
 
 function initializeDirectoryStruct() {
@@ -129,14 +195,6 @@ if(accountSystem != "uvias" && accountSystem != "local") {
 	sendProcMsg("EXIT");
 	process.exit();
 }
-
-var shellEnabled = true;
-
-var isTestServer = false;
-var debugLogging = false;
-var testUviasIds = false;
-var serverLoaded = false;
-var isStopping = false;
 
 var closed_client_limit = 1000 * 60 * 20; // 20 min
 var ws_req_per_second = 1000;
@@ -255,27 +313,6 @@ function handle_error(e, doLog) {
 		console.log("Error:", str);
 	}
 }
-
-process.argv.forEach(function(a) {
-	if(a == "--test-server") {
-		if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
-		isTestServer = true;
-	}
-	if(a == "--log") {
-		if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
-		debugLogging = true;
-	}
-	if(a == "--uvias-test-info") {
-		testUviasIds = true;
-	}
-	if(a == "--lt") {
-		if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
-		isTestServer = true;
-		if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
-		debugLogging = true;
-		testUviasIds = true;
-	}
-});
 
 // only accessible through modifying shell.js in the data directory - no web interface ever used to enter commands
 async function runShellScript(includeColors) {
@@ -949,16 +986,30 @@ async function initializeServer() {
 		await db_chat.exec(chat_tables);
 
 		// default preset values
-		await db_chat.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
-			["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0]);
+		await db_chat.run(`
+			INSERT INTO channels
+				(id, name, properties, description, date_created, world_id, is_global)
+			VALUES
+				(null, $name, $properties, $description, $date_created, $world_id, $is_global)`, {
+			$name: "global",
+			$properties: JSON.stringify({}),
+			$description: "The global channel - Users can access this channel from any page on OWOT",
+			$date_created: Date.now(),
+			$world_id: 0,
+			$is_global: true
+		});
 		await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["max_rank_id", 0]);
 		await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["rank_next_level", 4]);
 
 		init = true;
-		if(accountSystem == "local") {
-			account_prompt();
-		} else if(accountSystem == "uvias") {
-			account_prompt(true);
+		if(!implyNo) {
+			if(accountSystem == "local") {
+				account_prompt();
+			} else if(accountSystem == "uvias") {
+				account_prompt(true);
+			}
+		} else {
+			start_server();
 		}
 	}
 

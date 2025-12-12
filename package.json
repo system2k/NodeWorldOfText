@@ -11,8 +11,8 @@
 	},
 	"scripts": {
 		"start": "node main.js",
-		"tst": "node --expose-gc main.js --test-server",
-		"dbg": "node --trace-warnings --stack-trace-limit=1024 --expose-gc main.js --test-server"
+		"test": "node --expose-gc main.js --lt",
+		"debug": "node --trace-warnings --stack-trace-limit=1024 --expose-gc main.js --lt"
 	},
 	"private": true
 }

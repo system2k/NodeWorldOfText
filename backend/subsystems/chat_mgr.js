@@ -245,8 +245,20 @@ async function doUpdateChatLogData() {
 		var def_channel = await db_chat.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId);
 		if(!def_channel) {
 			var channelDesc = "Channel - \"" + channelName + "\"";
-			var world_channel = await db_chat.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
-				["_" + channelName, "{}", channelDesc, Date.now(), worldId]);
+
+			var world_channel = await db_chat.run(`
+				INSERT INTO channels
+					(id, name, properties, description, date_created, world_id, is_global)
+				VALUES
+					(null, $name, $properties, $description, $date_created, $world_id, $is_global)`, {
+				$name: "_" + channelName,
+				$properties: JSON.stringify({}),
+				$description: channelDesc,
+				$date_created: Date.now(),
+				$world_id: worldId,
+				$is_global: false
+			})
+
 			var new_def_channel = await db_chat.run("INSERT INTO default_channels VALUES(?, ?)",
 				[world_channel.lastID, worldId]);
 			def_channel = world_channel.lastID;
