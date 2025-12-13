@@ -21,8 +21,34 @@ const WebSocket   = require("ws");
 const worker      = require("node:worker_threads");
 const zip         = require("adm-zip");
 
-const DATA_PATH = "../nwotdata/";
-const SETTINGS_PATH = DATA_PATH + "settings.json";
+const {
+	parseArgs
+} = require("node:util");
+
+let args = parseArgs({
+	options: {
+		"lt": {
+			type: "boolean"
+		},
+		"test-server": {
+			type: "boolean"
+		},
+		"log": {
+			type: "boolean"
+		},
+		"uvias-test-info": {
+			type: "boolean"
+		},
+		"no": {
+			type: "boolean",
+			short: "n"
+		},
+		"data-path": {
+			type: "string"
+		}
+	}
+});
+
 const DATABASE_THREAD_PATH = "./backend/database_thread.js";
 const DATABASE_THREAD_COUNT = 8;
 
@@ -76,6 +102,49 @@ var ipv6_to_range  = ipaddress.ipv6_to_range;
 var is_cf_ipv4_int = ipaddress.is_cf_ipv4_int;
 var is_cf_ipv6_int = ipaddress.is_cf_ipv6_int;
 
+var shellEnabled = true;
+
+var isTestServer = false;
+var debugLogging = false;
+var testUviasIds = false;
+var serverLoaded = false;
+var isStopping = false;
+var implyNo = false; // ignore all prompts that may block the server from starting
+var overriddenDataPath = null;
+
+function handleArgs() {
+	if(args.values["test-server"]) {
+		if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
+		isTestServer = true;
+	}
+	if(args.values["log"]) {
+		if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
+		debugLogging = true;
+	}
+	if(args.values["uvias-test-info"]) {
+		testUviasIds = true;
+	}
+	if(args.values["lt"]) {
+		if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
+		isTestServer = true;
+		if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
+		debugLogging = true;
+		testUviasIds = true;
+	}
+	if(args.values["no"]) {
+		implyNo = true;
+	}
+	if(args.values["data-path"]) {
+		overriddenDataPath = args.values["data-path"];
+	}
+}
+handleArgs();
+
+const DATABASE_VERSION = 2;
+const MIGRATION_PATH = "./backend/migrations/";
+const DATA_PATH = overriddenDataPath || "../nwotdata/";
+const SETTINGS_PATH = DATA_PATH + "settings.json";
+
 function initializeDirectoryStruct() {
 	// create the data folder that stores all of the server's data
 	if(!fs.existsSync(DATA_PATH)) {
@@ -111,10 +180,13 @@ var registerPath = "/accounts/register/";
 var profilePath = "/accounts/profile/";
 
 var sql_table_init = "./backend/default.sql";
-var sql_indexes_init = "./backend/indexes.sql";
 var sql_edits_init = "./backend/edits.sql";
+var sql_images_init = "./backend/images.sql";
+var sql_misc_init = "./backend/misc.sql";
+var sql_chat_init = "./backend/chat.sql";
 
 var serverSettings = {
+	dbVersion: "1", // default value
 	announcement: "",
 	chatGlobalEnabled: "1"
 };
@@ -125,14 +197,6 @@ if(accountSystem != "uvias" && accountSystem != "local") {
 	sendProcMsg("EXIT");
 	process.exit();
 }
-
-var shellEnabled = true;
-
-var isTestServer = false;
-var debugLogging = false;
-var testUviasIds = false;
-var serverLoaded = false;
-var isStopping = false;
 
 var closed_client_limit = 1000 * 60 * 20; // 20 min
 var ws_req_per_second = 1000;
@@ -253,27 +317,6 @@ function handle_error(e, doLog) {
 	}
 }
 
-process.argv.forEach(function(a) {
-	if(a == "--test-server") {
-		if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
-		isTestServer = true;
-	}
-	if(a == "--log") {
-		if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
-		debugLogging = true;
-	}
-	if(a == "--uvias-test-info") {
-		testUviasIds = true;
-	}
-	if(a == "--lt") {
-		if(!isTestServer) console.log("\x1b[31;1mThis is a test server\x1b[0m");
-		isTestServer = true;
-		if(!debugLogging) console.log("\x1b[31;1mDebug logging enabled\x1b[0m");
-		debugLogging = true;
-		testUviasIds = true;
-	}
-});
-
 // only accessible through modifying shell.js in the data directory - no web interface ever used to enter commands
 async function runShellScript(includeColors) {
 	var shellFile = loadShellFile();
@@ -303,6 +346,47 @@ async function runShellScript(includeColors) {
 		resp += "";
 	}
 	return resp;
+}
+
+async function performDatabaseMigrations(startingVersion) {
+	if(!fs.existsSync(MIGRATION_PATH)) {
+		return;
+	}
+	var migrations = fs.readdirSync(MIGRATION_PATH);
+	var sequence = [];
+	for(var i = 0; i < migrations.length; i++) {
+		var migPath = migrations[i];
+		if(!migPath.toLowerCase().endsWith(".js")) {
+			// not a migration script
+			continue;
+		}
+		var migVersion = parseInt(migPath.toLowerCase().split("up-")[1].split(".")[0]);
+		if(migVersion < startingVersion) {
+			// version too early
+			continue;
+		}
+		sequence.push({
+			version: migVersion,
+			path: path.resolve(MIGRATION_PATH, migPath)
+		});
+	}
+	sequence.sort(function(a, b) {
+		return a[0] - b[0];
+	});
+	for(var i = 0; i < sequence.length; i++) {
+		var migration = sequence[0];
+		var migVersion = migration.version;
+		var migPath = migration.path;
+		var migModule = require(migPath);
+		if(!migModule || !migModule.migrate) {
+			console.log(`ERROR: Migration from ${startingVersion} to ${DATABASE_VERSION} halted due to invalid scripts`);
+			return;
+		}
+		var currentVersion = parseInt(getServerSetting("dbVersion"));
+		var migrationFunc = migModule.migrate;
+		console.log(`Applying DB migration from version ${currentVersion} to version ${migVersion + 1}`);
+		await migrationFunc(global_data);
+	}
 }
 
 function makePgClient() {
@@ -1269,15 +1353,8 @@ async function initializeServer() {
 	}
 
 	await loadDbSystems();
-	setupStaticShortcuts();
-	loadStatic();
 	setupZipLog();
 	setupHTTPServer();
-
-	await initialize_misc_db();
-	await initialize_ranks_db();
-	await initialize_edits_db();
-	await initialize_image_db();
 
 	global_data.db = db;
 	global_data.db_img = db_img;
@@ -1302,21 +1379,58 @@ async function initializeServer() {
 		// server is not initialized
 		console.log("Initializing server...");
 		await db.run("INSERT INTO server_info VALUES('initialized', 'true')");
+		await db.run("INSERT INTO server_info VALUES('dbVersion', ?)", DATABASE_VERSION.toString());
 
 		var tables = fs.readFileSync(sql_table_init).toString();
-		var indexes = fs.readFileSync(sql_indexes_init).toString();
+		var edits_tables = fs.readFileSync(sql_edits_init).toString();
+		var images_tables = fs.readFileSync(sql_images_init).toString();
+		var misc_tables = fs.readFileSync(sql_misc_init).toString();
+		var chat_tables = fs.readFileSync(sql_chat_init).toString();
 
 		await db.exec(tables);
-		await db.exec(indexes);
+		await db_edits.exec(edits_tables);
+		await db_img.exec(images_tables);
+		await db_misc.exec(misc_tables);
+		await db_chat.exec(chat_tables);
+
+		// default preset values
+		await db_chat.run(`
+			INSERT INTO channels
+				(id, name, properties, description, date_created, world_id, is_global)
+			VALUES
+				(null, $name, $properties, $description, $date_created, $world_id, $is_global)`, {
+			$name: "global",
+			$properties: JSON.stringify({}),
+			$description: "The global channel - Users can access this channel from any page on OWOT",
+			$date_created: Date.now(),
+			$world_id: 0,
+			$is_global: true
+		});
+		await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["max_rank_id", 0]);
+		await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["rank_next_level", 4]);
 
 		init = true;
-		if(accountSystem == "local") {
-			account_prompt();
-		} else if(accountSystem == "uvias") {
-			account_prompt(true);
+		if(!implyNo) {
+			if(accountSystem == "local") {
+				account_prompt();
+			} else if(accountSystem == "uvias") {
+				account_prompt(true);
+			}
+		} else {
+			start_server();
 		}
 	}
+
+	// must be loaded after server_info exists
+	await loadServerSettings();
+
 	if(!init) {
+		// no database migration needs to be performed if the server has just initialized for the first time
+		var currentDatabaseVersion = parseInt(getServerSetting("dbVersion"));
+		if(DATABASE_VERSION > currentDatabaseVersion) {
+			await performDatabaseMigrations(currentDatabaseVersion);
+		}
+
 		start_server();
 	}
 }
@@ -1327,39 +1441,7 @@ function sendProcMsg(msg) {
 	}
 }
 
-async function initialize_misc_db() {
-	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='properties'")) {
-		await db_misc.run("CREATE TABLE 'properties' (key BLOB, value BLOB)");
-	}
-}
-
-async function initialize_edits_db() {
-	if(!await db_edits.get("SELECT name FROM sqlite_master WHERE type='table' AND name='edit'")) {
-		await db_edits.exec(fs.readFileSync(sql_edits_init).toString());
-	}
-}
-
-async function initialize_image_db() {
-	if(!await db_img.get("SELECT name FROM sqlite_master WHERE type='table' AND name='images'")) {
-		await db_img.run("CREATE TABLE 'images' (id INTEGER NOT NULL PRIMARY KEY, name TEXT, date_created INTEGER, mime TEXT, data BLOB)");
-	}
-}
-
-/*
-	TODO: scrap this & rename to 'chat tag'
-	proposed change:
-	- global tags; world tags
-*/
-async function initialize_ranks_db() {
-	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='ranks'")) {
-		await db_misc.run("CREATE TABLE 'ranks' (id INTEGER, level INTEGER, name TEXT, props TEXT)");
-		await db_misc.run("CREATE TABLE 'user_ranks' (userid INTEGER, rank INTEGER)");
-		await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["max_rank_id", 0]);
-		await db_misc.run("INSERT INTO properties VALUES(?, ?)", ["rank_next_level", 4]);
-	}
-	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='admin_ranks'")) {
-		await db_misc.run("CREATE TABLE 'admin_ranks' (id INTEGER, level INTEGER)");
-	}
+async function loadCustomRanks() {
 	var ranks = await db_misc.all("SELECT * FROM ranks");
 	var user_ranks = await db_misc.all("SELECT * FROM user_ranks");
 	ranks_cache.ids = [];
@@ -2674,8 +2756,10 @@ async function manageWebsocketConnection(ws, req) {
 }
 
 async function start_server() {
-	await loadServerSettings();
+	setupStaticShortcuts();
+	loadStatic();
 	loadRestrictionsList();
+	await loadCustomRanks();
 	
 	if(accountSystem == "local") {
 		await loopClearExpiredSessions();

@@ -10,14 +10,14 @@ module.exports.main = async function(server) {
 	db = server.db;
 	broadcastMonitorEvent = server.broadcastMonitorEvent;
 
-	await init_chat_history();
-
 	// every 5 minutes, clear the chat cache
 	intv.invalidate_chat_cache = setInterval(function() {
 		for(var i in chat_cache) {
 			invalidate_chat_cache(i);
 		}
 	}, 60000 * 5);
+
+	chatDatabaseClock();
 }
 
 var server_exiting = false;
@@ -25,27 +25,6 @@ var server_exiting = false;
 module.exports.server_exit = async function() {
 	server_exiting = true;
 	await chatDatabaseClock(true);
-}
-
-async function init_chat_history() {
-	if(!await db_chat.get("SELECT name FROM sqlite_master WHERE type='table' AND name='ch_info'")) {
-		await db_chat.run("CREATE TABLE 'ch_info' (name TEXT, value TEXT)");
-	}
-	if(!await db_chat.get("SELECT value FROM ch_info WHERE name='initialized'")) {
-		await db_chat.run("INSERT INTO ch_info VALUES('initialized', 'true')");
-		await db_chat.run("CREATE TABLE channels (id integer NOT NULL PRIMARY KEY, name integer, properties text, description text, date_created integer, world_id integer)");
-		await db_chat.run("CREATE TABLE entries (id integer NOT NULL PRIMARY KEY, date integer, channel integer, data text)");
-		await db_chat.run("CREATE TABLE default_channels (channel_id integer, world_id integer)");
-		await db_chat.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
-			["global", "{}", "The global channel - Users can access this channel from any page on OWOT", Date.now(), 0]);
-		// add important indices
-		await db_chat.run("CREATE INDEX chan_default ON default_channels (world_id, channel_id)");
-		await db_chat.run("CREATE INDEX chan_id ON channels (world_id, id)");
-		await db_chat.run("CREATE INDEX ent_id ON entries (channel, id DESC)");
-		await db_chat.run("CREATE INDEX ent_date ON entries (channel, date)");
-		await db_chat.run("CREATE INDEX ent_channel ON entries (channel)");
-	}
-	chatDatabaseClock();
 }
 
 var chat_cache = {};
@@ -266,8 +245,20 @@ async function doUpdateChatLogData() {
 		var def_channel = await db_chat.get("SELECT channel_id FROM default_channels WHERE world_id=?", worldId);
 		if(!def_channel) {
 			var channelDesc = "Channel - \"" + channelName + "\"";
-			var world_channel = await db_chat.run("INSERT INTO channels VALUES(null, ?, ?, ?, ?, ?)",
-				["_" + channelName, "{}", channelDesc, Date.now(), worldId]);
+
+			var world_channel = await db_chat.run(`
+				INSERT INTO channels
+					(id, name, properties, description, date_created, world_id, is_global)
+				VALUES
+					(null, $name, $properties, $description, $date_created, $world_id, $is_global)`, {
+				$name: "_" + channelName,
+				$properties: JSON.stringify({}),
+				$description: channelDesc,
+				$date_created: Date.now(),
+				$world_id: worldId,
+				$is_global: false
+			})
+
 			var new_def_channel = await db_chat.run("INSERT INTO default_channels VALUES(?, ?)",
 				[world_channel.lastID, worldId]);
 			def_channel = world_channel.lastID;
