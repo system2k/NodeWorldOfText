@@ -594,9 +594,17 @@ function draw2by3Char(charCode, textRender, x, y, width, height) {
 	if(charCode >= 0x1FB14 && charCode <= 0x1FB27) code = charCode - 0x1FB00 + 2;
 	if(charCode >= 0x1FB28 && charCode <= 0x1FB3B) code = charCode - 0x1FB00 + 3;
 	textRender.beginPath();
-	for(var i = 0; i < 6; i++) {
-		if(!(code >> i & 1)) continue;
-		textRender.rect(x + (width / 2) * (i & 1), y + (height / 3) * (i >> 1), width / 2, height / 3);
+	for(var py = 0; py < 3; py++) {
+		var idx = py * 2;
+		if(code >> idx & 1) {
+			if (code >> idx & 2) {
+				textRender.rect(x, y + py * (height / 3), width, height / 3);
+			} else {
+				textRender.rect(x, y + py * (height / 3), width / 2, height / 3);
+			}
+		} else if (code >> idx & 2) {
+			textRender.rect(x + (width / 2), y + py * (height / 3), width / 2, height / 3);
+		}
 	}
 	textRender.fill();
 }
@@ -672,11 +680,15 @@ function draw2by4Char(charCode, textRender, x, y, width, height) {
 	if(!code) return false;
 	textRender.beginPath();
 	for(var py = 0; py < 4; py++) {
-		for(var px = 0; px < 2; px++) {
-			var idx = py * 2 + px;
-			if(code >> idx & 1) {
-				textRender.rect(x + px * (width / 2), y + py * (height / 4), width / 2, height / 4);
+		var idx = py * 2;
+		if(code >> idx & 1) {
+			if (code >> idx & 2) {
+				textRender.rect(x, y + py * (height / 4), width, height / 4);
+			} else {
+				textRender.rect(x, y + py * (height / 4), width / 2, height / 4);
 			}
+		} else if (code >> idx & 2) {
+			textRender.rect(x + (width / 2), y + py * (height / 4), width / 2, height / 4);
 		}
 	}
 	textRender.fill();
