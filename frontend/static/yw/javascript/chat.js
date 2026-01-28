@@ -192,8 +192,12 @@ register_chat_command("gridsize", function (args) {
 	if(width > 160) width = 160;
 	if(height < 4) height = 4;
 	if(height > 144) height = 144;
+	var originalW = defaultSizes.cellW;
+	var originalH = defaultSizes.cellH;
 	defaultSizes.cellW = width;
 	defaultSizes.cellH = height;
+	positionX *= width / originalW;
+	positionY *= height / originalH;
 	updateScaleConsts();
 	w.reloadRenderer();
 	clientChatResponse("Changed grid size to " + width + "x" + height);
