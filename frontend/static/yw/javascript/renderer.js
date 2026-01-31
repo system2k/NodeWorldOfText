@@ -849,6 +849,8 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 		} else if(linkType == "note") {
 			isLink = false;
 			isTooltip = true;
+		} else if(linkType == "js") {
+			linkColor = defaultJSLinkColor;
 		}
 	}
 
@@ -1190,8 +1192,12 @@ function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, off
 			var cellLinkType = null;
 			if(tileColProps && tileColProps.link) {
 				cellLinkType = tileColProps.link.type;
-				if(tileColProps.link.type == "url" && tileColProps.link.url.startsWith("note:")) {
-					cellLinkType = "note";
+				if(tileColProps.link.type == "url") {
+    				if(tileColProps.link.url.startsWith("note:")) {
+    				    cellLinkType = "note";
+    				} else if(tileColProps.link.url.startsWith("javascript:")) {
+    				    cellLinkType = "js";
+    				}
 				}
 			}
 			var protValue = writability;
