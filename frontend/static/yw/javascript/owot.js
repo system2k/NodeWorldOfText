@@ -159,6 +159,7 @@ var combiningCharsEnabled  = true;
 var surrogateCharsEnabled  = true;
 var defaultCoordLinkColor  = "#008000";
 var defaultURLLinkColor    = "#0000FF";
+var defaultJSLinkColor     = "#AA0000"; // compliant with most accessibility standards
 var defaultHighlightColor  = [0xFF, 0xFF, 0x99];
 var secureJSLink           = true; // display warning prompt when clicking on javascript links
 var secureLink             = true; // display confirmation when clicking on links in a suspicious setting
