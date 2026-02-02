@@ -15,6 +15,8 @@ function validateCSS(c) {
 	if(c == "default") return "";
 	if(typeof c !== "string") return "";
 	if(c.length > 100) c = c.slice(0, 100);
+	c = c.toWellFormed();
+	c = c.replace(/\0/g, "");
 	c = c.replace(/{/g, "");
 	c = c.replace(/}/g, "");
 	c = c.replace(/;/g, "");
@@ -36,6 +38,48 @@ function validateCSS(c) {
 		}
 	}
 	return c.slice(0, 20);
+}
+
+// TODO: Move to utils
+function isHexString(str) {
+	if(!str.length) return false;
+	for(var i = 0; i < str.length; i++) {
+		var chr = str[i];
+		var isHex = ("a" <= chr && chr <= "f") || ("A" <= chr && chr <= "F") || ("0" <= chr && chr <= "9");
+		if(!isHex) return false;
+	}
+	return true;
+}
+
+function resolveColorValue(val) {
+	if(typeof val != "string" || !val) return null;
+	if(val.length > 50 || !val.isWellFormed()) return null;
+	val = val.trim();
+	if(val[0] == "#") {
+		val = val.slice(1);
+		if(isHexString(val)) {
+			if(val.length == 3) {
+				return parseInt(val[0] + val[0] + val[1] + val[1] + val[2] + val[2], 16);
+			} else if(val.length == 6) {
+				return parseInt(val, 16);
+			}
+		}
+		return null;
+	}
+	var rgbTest = val.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+	if(rgbTest) {
+		let r = parseInt(rgbTest[1]);
+		let g = parseInt(rgbTest[2]);
+		let b = parseInt(rgbTest[3]);
+		if(!isInteger(r) || !isInteger(g) || !isInteger(b)) {
+			return null;
+		}
+		if(r < 0 || g < 0 || b < 0 || r > 255 || g > 255 || b > 255) {
+			return null;
+		}
+		return b + g * 256 + r * 65536;
+	}
+	return null;
 }
 
 function validatePerms(p, max, allowNeg) {
@@ -132,7 +176,6 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 
 	// owner info for superusers
 	var owner_name = "";
-
 	if(world.ownerId && user.superuser) {
 		if(accountSystem == "uvias") {
 			var debug1 = world.ownerId;
@@ -147,6 +190,9 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 			owner_name = (await db.get("SELECT username FROM auth_user WHERE id=?", [world.ownerId])).username;
 		}
 	}
+
+	var color_palette_conv = world.opts.colorPalette?.map(v => `#${v.toString(16).padStart(6, 0).toUpperCase()}`) || ["#000000"];
+	var bg_color_palette_conv = world.opts.bgColorPalette?.map(v => `#${v.toString(16).padStart(6, 0).toUpperCase()}`) || ["#DCE943"];
 
 	var color = world.theme.color || "default";
 	var cursor_color = world.theme.cursor || "default";
@@ -251,7 +297,11 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		default_script_path: world.opts.defaultScriptPath,
 
 		priv_note: world.opts.privNote,
-		meta_desc: world.opts.desc
+		meta_desc: world.opts.desc,
+		color_palette: color_palette_conv,
+		color_palette_enabled: world.opts.colorPaletteEnabled,
+		bg_color_palette: bg_color_palette_conv,
+		bg_color_palette_enabled: world.opts.bgColorPaletteEnabled
 	};
 
 	write(render("configure.html", data));
@@ -849,6 +899,68 @@ module.exports.POST = async function(req, write, server, ctx) {
 		} else if("clear_chat_hist" in post_data) {
 			clearChatlog(world.id);
 		}
+	} else if(post_data.form == "color_palette") {
+		let isFgEnabled = post_data.color_palette_enabled == "on";
+		let isBgEnabled = post_data.bg_color_palette_enabled == "on";
+		let fgColors = post_data.color_palette_value;
+		let bgColors = post_data.bg_color_palette_value;
+
+		if(isFgEnabled) {
+			if(!Array.isArray(fgColors) && typeof fgColors != "string") {
+				return write(null, 400);
+			}
+			if(typeof fgColors == "string") fgColors = [fgColors];
+			if(fgColors.length > 300) {
+				return await callPage("accounts/configure", {
+					color_palette_message: "Only a maximum of 300 colors are allowed"
+				});
+			}
+			let colorListNorm = fgColors.map(resolveColorValue).filter(v => v != null).sort((a, b) => a - b);
+			if(colorListNorm.length) {
+				modifyWorldProp(world, "opts/colorPaletteEnabled", true);
+				modifyWorldProp(world, "opts/colorPalette", colorListNorm);
+			} else {
+				modifyWorldProp(world, "opts/colorPaletteEnabled", false);
+				modifyWorldProp(world, "opts/colorPalette", null);
+			}
+		} else {
+			modifyWorldProp(world, "opts/colorPaletteEnabled", false);
+		}
+		if(isBgEnabled) {
+			if(!Array.isArray(bgColors) && typeof bgColors != "string") {
+				return write(null, 400);
+			}
+			if(typeof bgColors == "string") bgColors = [bgColors];
+			if(bgColors.length > 300) {
+				return await callPage("accounts/configure", {
+					color_palette_message: "Only a maximum of 300 colors are allowed"
+				});
+			}
+			let colorListNorm = bgColors.map(resolveColorValue).filter(v => v != null).sort((a, b) => a - b);
+			if(colorListNorm.length) {
+				modifyWorldProp(world, "opts/bgColorPaletteEnabled", true);
+				modifyWorldProp(world, "opts/bgColorPalette", colorListNorm);
+			} else {
+				modifyWorldProp(world, "opts/bgColorPaletteEnabled", false);
+				modifyWorldProp(world, "opts/bgColorPalette", null);
+			}
+		} else {
+			modifyWorldProp(world, "opts/bgColorPaletteEnabled", false);
+		}
+
+		ws_broadcast({
+			kind: "propUpdate",
+			props: [
+				{
+					type: "colorPalette",
+					value: world.opts.colorPaletteEnabled ? world.opts.colorPalette : null
+				},
+				{
+					type: "bgColorPalette",
+					value: world.opts.bgColorPaletteEnabled ? world.opts.bgColorPalette : null
+				}
+			]
+		}, world.id);
 	}
 
 	if(new_world_name == null) {

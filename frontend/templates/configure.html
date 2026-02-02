@@ -7,6 +7,15 @@
 {% block endhead %}
 <link rel="stylesheet" type="text/css" href="/static/css/autocomplete.css">
 <script>
+	function closestClassName(element, className) {
+		var currentElm = element;
+		while(currentElm) {
+			if(currentElm?.className == className) return currentElm;
+			currentElm = currentElm.parentNode;
+		}
+		return null;
+	}
+
 	var actionMethod = "";
 	var writeintCustom;
 	// rate limit toggles
@@ -54,6 +63,13 @@
 			ratelimVal.disabled = false;
 			ratelimPer.disabled = false;
 		}
+		
+		var color_palette_enabled = document.getElementById("color_palette_enabled");
+		color_palette_enabled.onclick = updateColorPaletteTableInputsEnabled;
+		var bg_color_palette_enabled = document.getElementById("bg_color_palette_enabled");
+		bg_color_palette_enabled.onclick = updateBgColorPaletteTableInputsEnabled;
+		updateColorPaletteTableInputsEnabled();
+		updateBgColorPaletteTableInputsEnabled();
 	}
 	function action_confirm() {
 		var msg = "";
@@ -140,6 +156,111 @@
 				custom.value = val;
 			}
 		}
+	}
+
+	function updateColorPaletteTableInputsEnabled() {
+		var isEnabled = document.getElementsByName("color_palette_enabled")[0];
+		if(!isEnabled) return;
+		var checked = isEnabled.checked;
+
+		function update(elm) {
+			elm.disabled = !checked;
+		}
+
+		for(let elm of document.getElementsByName("color_palette_value")) {
+			update(elm);
+		}
+		for(let elm of document.getElementsByClassName("color_palette_add")) {
+			update(elm);
+		}
+		for(let elm of document.getElementsByClassName("color_palette_rem")) {
+			update(elm);
+		}
+	}
+
+	function updateBgColorPaletteTableInputsEnabled() {
+		var isEnabled = document.getElementsByName("bg_color_palette_enabled")[0];
+		if(!isEnabled) return;
+		var checked = isEnabled.checked;
+
+		function update(elm) {
+			elm.disabled = !checked;
+		}
+
+		for(let elm of document.getElementsByName("bg_color_palette_value")) {
+			update(elm);
+		}
+		for(let elm of document.getElementsByClassName("bg_color_palette_add")) {
+			update(elm);
+		}
+		for(let elm of document.getElementsByClassName("bg_color_palette_rem")) {
+			update(elm);
+		}
+	}
+
+	function colorPaletteRemoveRow(evt, type) {
+		var elm = evt.target;
+		var row;
+		if(type == 'fg') {
+			row = closestClassName(elm, "color_palette_value_row");
+		} else if(type == 'bg') {
+			row = closestClassName(elm, "bg_color_palette_value_row");
+		}
+		if(row) {
+			row.remove();
+		}
+	}
+
+	function colorPaletteAddRow(type) {
+		let valueRows;
+		var color_palette_table;
+		var newRowIndicator;
+		if(type == 'fg') {
+			valueRows = document.getElementsByClassName("color_palette_value_row");
+			color_palette_table = document.getElementById("color_palette_table");
+			newRowIndicator = document.getElementById("color_palette_add_row");
+		} else if(type == 'bg') {
+			valueRows = document.getElementsByClassName("bg_color_palette_value_row");
+			color_palette_table = document.getElementById("bg_color_palette_table");
+			newRowIndicator = document.getElementById("bg_color_palette_add_row");
+		}
+
+		if(valueRows.length >= 300) {
+			return alert("Cannot add more than 300 palette values");
+		}
+
+		if(newRowIndicator) newRowIndicator.remove();
+
+		let newRow = document.createElement("tr");
+		let newRowBtnCnt = document.createElement("td");
+		let newRowBtn = document.createElement("button");
+		let newRowBtnLab = document.createElement("code");
+		let newRowValCnt = document.createElement("td");
+		let newRowVal = document.createElement("input");
+
+		newRow.appendChild(newRowBtnCnt);
+		newRow.appendChild(newRowValCnt);
+		newRowBtnCnt.appendChild(newRowBtn);
+		newRowValCnt.appendChild(newRowVal);
+		newRowBtn.appendChild(newRowBtnLab);
+
+		newRowBtn.onclick = colorPaletteRemoveRow;
+		newRowBtn.type = "button";
+		newRowBtnLab.innerText = "-";
+		newRowVal.value = "#";
+
+		if(type == 'fg') {
+			newRow.className = "color_palette_value_row";
+			newRowBtn.className = "color_palette_rem";
+			newRowVal.name = "color_palette_value";
+		} else if(type == 'bg') {
+			newRow.className = "bg_color_palette_value_row";
+			newRowBtn.className = "bg_color_palette_rem";
+			newRowVal.name = "bg_color_palette_value";
+		}
+
+		color_palette_table.appendChild(newRow);
+		color_palette_table.appendChild(newRowIndicator);
 	}
 </script>
 {% endblock %}
@@ -447,9 +568,83 @@
 	</div>
 
 	<div class="content_set">
-		<div class="content_set_title">Download Your World</div>
+		<div class="content_set_title">Color Palette</div>
 		<div class="content_set_content">
-			<span style="margin-left:1em"><a href="/accounts/download/{{ world }}/">Download</a></span>
+			{% if color_palette_message %}
+				<span style="font-size:80%"><i>{{ color_palette_message }}</i></span>
+			{% endif %}
+			<p class="set_description">
+				Limited color palette for your world (max 300). Use color formats such as #04D3D3, #FE0, or rgb(4, 211, 211).
+			</p>
+			<form method="POST" action="">
+				<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" />
+				<div>
+					<input type="checkbox" id="color_palette_enabled" name="color_palette_enabled"{%if color_palette_enabled%} checked{%endif%}>
+					Use custom text color palette
+				</div>
+				<div>
+					<input type="checkbox" id="bg_color_palette_enabled" name="bg_color_palette_enabled"{%if bg_color_palette_enabled%} checked{%endif%}>
+					Use custom background color palette
+				</div>
+				
+				<div style="display: flex">
+					<fieldset>
+						<legend>Text color list</legend>
+						<table id="color_palette_table">
+							<tbody>
+								{% for color in color_palette %}
+								<tr class="color_palette_value_row">
+									<td>
+										<button class="color_palette_rem" onclick="colorPaletteRemoveRow(event, 'fg')" type="button"><code>-</code></button>
+									</td>
+									<td>
+										<input name="color_palette_value" value="{{color}}">
+									</td>
+								</tr>
+								{% endfor %}
+								<tr id="color_palette_add_row">
+									<td>
+										<button class="color_palette_add" onclick="colorPaletteAddRow('fg')" type="button"><code>+</code></button>
+									</td>
+									<td>
+										<span>New text color</span>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</fieldset>
+
+					<fieldset>
+						<legend>Background color list</legend>
+						<table id="bg_color_palette_table">
+							<tbody>
+								{% for color in bg_color_palette %}
+								<tr class="bg_color_palette_value_row">
+									<td>
+										<button class="bg_color_palette_rem" onclick="colorPaletteRemoveRow(event, 'bg')" type="button"><code>-</code></button>
+									</td>
+									<td>
+										<input name="bg_color_palette_value" value="{{color}}">
+									</td>
+								</tr>
+								{% endfor %}
+								<tr id="bg_color_palette_add_row">
+									<td>
+										<button class="bg_color_palette_add" onclick="colorPaletteAddRow('bg')" type="button"><code>+</code></button>
+									</td>
+									<td>
+										<span>New background color</span>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</fieldset>
+				</div>
+
+
+				<input type="hidden" name="form" value="color_palette">
+				<input type="submit" value="Submit">
+			</form>
 		</div>
 	</div>
 
@@ -649,6 +844,13 @@
 					<input type="submit" value="Submit">
 				</form>
 			</div>
+		</div>
+	</div>
+
+	<div class="content_set">
+		<div class="content_set_title">Download Your World</div>
+		<div class="content_set_content">
+			<span style="margin-left:1em"><a href="/accounts/download/{{ world }}/">Download</a></span>
 		</div>
 	</div>
 

@@ -8,6 +8,7 @@ var owot, owotCtx, textInput;
 var linkElm, linkDiv;
 var colorInput, colorInputBg;
 var colorShortcuts, colorShortcutsBg;
+var colorPaletteCont, bgColorPaletteCont;
 function init_dom() {
 	owot = document.getElementById("owot");
 	owot.style.display = "block";
@@ -410,8 +411,7 @@ function addColorShortcuts() {
 	colorShortcuts.appendChild(rand);
 
 	var bgNone = document.createElement("span");
-	bgNone.id = "color_btn_no_cell";
-	bgNone.className = "color_btn";
+	bgNone.className = "color_btn color_btn_no_cell";
 	bgNone.style.backgroundColor = "#FFFFFF";
 	bgNone.title = "No background color";
 	bgNone.onclick = function() {
@@ -7223,11 +7223,11 @@ function buildBackgroundColorModal(modal) {
 	modal.onTabChange(function(evt) {
 		var tab = evt.id;
 		if(tab == "bg") {
-			colorShortcutsBg.style.display = "";
+			if(!state.worldModel.bg_color_palette) colorShortcutsBg.style.display = "";
 			colorShortcuts.style.display = "none";
 		} else if(tab == "fg") {
 			colorShortcutsBg.style.display = "none";
-			colorShortcuts.style.display = "";
+			if(!state.worldModel.color_palette) colorShortcuts.style.display = "";
 		}
 	});
 }
@@ -7258,6 +7258,7 @@ function resetColorModalVisibility() {
 function makeColorModal() {
 	var modal = new Modal();
 	modal.setMinimumSize(290, 128);
+	modal.setMaximumSize(800);
 	modal.createForm();
 	modal.setFormTitle("\n");
 	colorInput = modal.addEntry("Text color", "color").input;
@@ -7317,6 +7318,80 @@ function makeColorModal() {
 		modal.hideTab("fg");
 	}
 	w.ui.colorModal = modal;
+}
+
+function generateColorPaletteButtons(palette, isBg) {
+	let cont = document.createElement("div");
+	for(let i = 0; i < palette.length; i++) {
+		let elm = createColorButton(palette[i], isBg);
+		elm.style.width = "32px";
+		elm.style.height = "32px";
+		elm.style.borderRadius = "8px";
+		cont.appendChild(elm);
+	}
+	if(isBg) {
+		let bgNone = document.createElement("span");
+		bgNone.className = "color_btn color_btn_no_cell";
+		bgNone.style.backgroundColor = "#FFFFFF";
+		bgNone.title = "No background color";
+		bgNone.onclick = function() {
+			w.ui.colorModal.close(true); // close + cancel
+			disableBgColorPicker();
+			YourWorld.BgColor = -1;
+		}
+		bgNone.style.width = "32px";
+		bgNone.style.height = "32px";
+		bgNone.style.borderRadius = "8px";
+		cont.appendChild(bgNone);
+	}
+	return cont;
+}
+
+function updateColorModalPalette() {
+	let currentTab = w.ui.colorModal.currentTabCtx?.id;
+	if(state.worldModel.color_palette) {
+		if(w.ui.colorModal.tabIndex["fg"]) {
+			w.ui.colorModal.focusTab("fg");
+		}
+		colorShortcuts.style.display = "none";
+		w.ui.colorModal.hideForm();
+		if(colorPaletteCont) {
+			colorPaletteCont.remove();
+			colorPaletteCont = null;
+		}
+		colorPaletteCont = generateColorPaletteButtons(state.worldModel.color_palette);
+		w.ui.colorModal.appendContent(colorPaletteCont);
+	} else {
+		if(w.ui.colorModal.tabIndex["fg"]) {
+			w.ui.colorModal.focusTab("fg");
+		}
+		w.ui.colorModal.showForm();
+		if(colorPaletteCont) {
+			colorPaletteCont.style.display = "none";
+		}
+	}
+	if(w.ui.colorModal.tabIndex["bg"]) {
+		if(state.worldModel.bg_color_palette) {
+			w.ui.colorModal.focusTab("bg");
+			colorShortcutsBg.style.display = "none";
+			w.ui.colorModal.hideForm();
+			if(bgColorPaletteCont) {
+				bgColorPaletteCont.remove();
+				bgColorPaletteCont = null;
+			}
+			bgColorPaletteCont = generateColorPaletteButtons(state.worldModel.bg_color_palette, true);
+			w.ui.colorModal.appendContent(bgColorPaletteCont);
+		} else {
+			w.ui.colorModal.focusTab("bg");
+			w.ui.colorModal.showForm();
+			if(bgColorPaletteCont) {
+				bgColorPaletteCont.style.display = "none";
+			}
+		}
+	}
+	if(currentTab) {
+		w.ui.colorModal.focusTab(currentTab);
+	}
 }
 
 function makeSelectionModal() {
@@ -7588,6 +7663,7 @@ function reapplyProperties(props) {
 
 	updateScaleConsts();
 	resetColorModalVisibility();
+	updateColorModalPalette();
 	updateMenuEntryVisiblity();
 	updateWorldName();
 
@@ -7875,6 +7951,7 @@ var ws_functions = {
 	propUpdate: function(data) {
 		w.emit("propUpdate", data.props);
 		var props = data.props;
+		var paletteUpdated = false;
 		for(var p = 0; p < props.length; p++) {
 			var prop = props[p];
 			var type = prop.type;
@@ -7911,10 +7988,12 @@ var ws_functions = {
 				case "colorText":
 					state.worldModel.color_text = value;
 					resetColorModalVisibility();
+					updateColorModalPalette();
 					break;
 				case "colorCell":
 					state.worldModel.color_cell = value;
 					resetColorModalVisibility();
+					updateColorModalPalette();
 					break;
 				case "quickErase":
 					state.worldModel.quick_erase = value;
@@ -7940,9 +8019,20 @@ var ws_functions = {
 				case "writeInt":
 					w.setFlushInterval(value);
 					break;
+				case "colorPalette":
+					state.worldModel.color_palette = value;
+					paletteUpdated = true;
+					break;
+				case "bgColorPalette":
+					state.worldModel.bg_color_palette = value;
+					paletteUpdated = true;
+					break;
 			}
 		}
 		updateMenuEntryVisiblity();
+		if(paletteUpdated) {
+			updateColorModalPalette();
+		}
 	},
 	chat: function(data) {
 		var type = chatType(data.registered, data.nickname, data.realUsername);
@@ -8095,6 +8185,9 @@ function begin() {
 	makeSelectionModal();
 	addColorShortcuts();
 	updateColorPicker();
+	if(state.worldModel.color_palette || state.worldModel.bg_color_palette) {
+		updateColorModalPalette();
+	}
 
 	if(state.worldModel.square_chars) defaultSizes.cellW = 18;
 	if(state.worldModel.half_chars) defaultSizes.cellH = 20;

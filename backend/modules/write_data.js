@@ -41,6 +41,26 @@ function partitionMultiEdit(editOffset, tileX, tileY, char, color, bgColor, edit
 	return res;
 }
 
+function isInListBinaryLookup(list, val) {
+	if(!list.length) {
+		return false;
+	}
+	let low = 0;
+	let high = list.length - 1;
+	// binary search through the list
+	while(low <= high) {
+		let mid = (low + high) >> 1;
+		let item = list[mid];
+		if(item == val) return true;
+		if(item < val) {
+			low = mid + 1;
+		} else {
+			high = mid - 1;
+		}
+	}
+	return false;
+}
+
 /*
 REFACTOR:
 The job of this module should be to take a properly-sanitized array of edits
@@ -90,6 +110,10 @@ module.exports = async function(data, server, params) {
 	var no_log_edits = world.opts.noLogEdits;
 	var color_text = world.feature.colorText;
 	var color_cell = world.feature.colorCell;
+	var colorPaletteEnabled = world.opts.colorPaletteEnabled;
+	var colorPalette = world.opts.colorPalette;
+	var bgColorPaletteEnabled = world.opts.bgColorPaletteEnabled;
+	var bgColorPalette = world.opts.bgColorPalette;
 
 	var memkeyAccess = world.opts.memKey && world.opts.memKey == params.keyQuery;
 
@@ -201,6 +225,18 @@ module.exports = async function(data, server, params) {
 		if(rate_limiter.checkColorRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name, tileX, tileY)) {
 			color = 0;
 			bgColor = -1;
+		}
+
+		if(colorPaletteEnabled && colorPalette) {
+			if(!isInListBinaryLookup(colorPalette, color)) {
+				color = colorPalette[0];
+			}
+		}
+
+		if(bgColor != -1 && bgColorPaletteEnabled && bgColorPalette) {
+			if(!isInListBinaryLookup(bgColorPalette, bgColor)) {
+				bgColor = -1;
+			}
 		}
 
 		var testChar = advancedSplit(char);

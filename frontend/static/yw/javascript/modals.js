@@ -40,6 +40,7 @@ function Modal() {
 	this.formTitle = null;
 	this.formField = null;
 	this.formInputs = [];
+	this.formHidden = false;
 
 	this.footerCont = [];
 	this.footerField = null;
@@ -153,6 +154,24 @@ Modal.prototype.createForm = function() {
 }
 
 /*
+	Hides the existing form
+*/
+Modal.prototype.hideForm = function() {
+	if(!this.formField) return;
+	this.formField.style.display = "none";
+	this.formHidden = true;
+}
+
+/*
+	Shows the existing form
+*/
+Modal.prototype.showForm = function() {
+	if(!this.formField) return;
+	this.formField.style.display = "";
+	this.formHidden = false;
+}
+
+/*
 	Validates, processes, and submits the form.
 	This triggers the onSubmit callback.
 */
@@ -236,6 +255,7 @@ Modal.prototype.unalignForm = function() {
 	label: The label to be shown next to the input.
 	type (optional): 'text' or 'color'.
 	validation (optional): 'number'. Check if the entry contains a valid value.
+	Returns: {input}
 */
 Modal.prototype.addEntry = function(label, type, validation) {
 	if(!this.formField) {
@@ -266,17 +286,43 @@ Modal.prototype.addEntry = function(label, type, validation) {
 	if(isColor) {
 		window.jscolor.installByClassName("jscolor");
 	}
-	this.formInputs.push({
+	let entryData = {
 		input: inp,
 		value: inp.value,
 		validation: validation,
 		validationFailed: false,
 		type: type,
-		label: label
-	});
-	return {
-		input: inp
+		label: label,
+		labelElement: lab
 	};
+	this.formInputs.push(entryData);
+	return entryData;
+}
+
+/*
+	Remove an input entry from the form.
+	entryData: The entry instance to be removed.
+*/
+Modal.prototype.removeEntry = function(entryData) {
+	if(!this.formField) {
+		throw "No form exists";
+	}
+	let idx = this.formInputs.indexOf(entryData);
+	if(idx > -1) {
+		this.formInputs.splice(idx, 1);
+		this.inputField.removeChild(entryData.labelElement);
+		this.inputField.removeChild(entryData.input);
+	}
+}
+
+/*
+	Append content to the client area of the form
+*/
+Modal.prototype.appendContent = function(element) {
+	if(!this.formField) {
+		throw "No form exists";
+	}
+	this.client.appendChild(element);
 }
 
 /*
@@ -745,6 +791,16 @@ Modal.prototype.focusTab = function(id) {
 	curr.client.style.display = "";
 	curr.tabButton.style.height = "24px";
 	curr.tabButton.style.backgroundColor = "#E5E5FF";
+
+	prev.client = this.client;
+	prev.inputField = this.inputField;
+	prev.formTitle = this.formTitle;
+	prev.formField = this.formField;
+	prev.formInputs = this.formInputs;
+	prev.hasSubmitted = false;
+	prev.cbField = this.cbField;
+	prev.cbList = this.cbList;
+	prev.cbCallback = this.cbCallback;
 
 	// transfer context
 	this.client = curr.client;

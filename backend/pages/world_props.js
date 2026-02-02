@@ -64,7 +64,9 @@ module.exports.GET = async function(req, write, server, ctx) {
 			desc: world.opts.desc,
 			noChatGlobal: world.opts.noChatGlobal,
 			noCopy: world.opts.noCopy,
-			defaultScriptPath: world.opts.defaultScriptPath
+			defaultScriptPath: world.opts.defaultScriptPath,
+			colorPalette: world.opts.colorPaletteEnabled ? world.opts.colorPalette : null,
+			bgColorPalette: world.opts.bgColorPaletteEnabled ? world.opts.bgColorPalette : null
 		},
 		background: {
 			url: world.background.url,
