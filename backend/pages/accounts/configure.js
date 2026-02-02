@@ -907,7 +907,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 
 		if(isFgEnabled) {
 			if(!Array.isArray(fgColors) && typeof fgColors != "string") {
-				return write(null, 400);
+				fgColors = [];
 			}
 			if(typeof fgColors == "string") fgColors = [fgColors];
 			if(fgColors.length > 300) {
@@ -928,7 +928,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 		}
 		if(isBgEnabled) {
 			if(!Array.isArray(bgColors) && typeof bgColors != "string") {
-				return write(null, 400);
+				bgColors = [];
 			}
 			if(typeof bgColors == "string") bgColors = [bgColors];
 			if(bgColors.length > 300) {

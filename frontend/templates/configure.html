@@ -244,7 +244,7 @@
 		newRowValCnt.appendChild(newRowVal);
 		newRowBtn.appendChild(newRowBtnLab);
 
-		newRowBtn.onclick = colorPaletteRemoveRow;
+		newRowBtn.onclick = (evt) => colorPaletteRemoveRow(evt, type);
 		newRowBtn.type = "button";
 		newRowBtnLab.innerText = "-";
 		newRowVal.value = "#";
