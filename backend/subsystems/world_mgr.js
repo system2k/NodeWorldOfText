@@ -297,6 +297,7 @@ function convertColorPaletteToString(list) {
 	if(!list) return null;
 	return Buffer.from(
 		list.sort((a, b) => a - b)
+			.filter((elm, idx, arr) => elm != arr[idx - 1])
 			.map(v => [v >> 16 & 0xFF, v >> 8 & 0xFF, v & 0xFF])
 			.flat()
 	).toString("base64");

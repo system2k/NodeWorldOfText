@@ -936,7 +936,9 @@ module.exports.POST = async function(req, write, server, ctx) {
 					color_palette_message: "Only a maximum of 300 colors are allowed"
 				});
 			}
-			let colorListNorm = bgColors.map(resolveColorValue).filter(v => v != null).sort((a, b) => a - b);
+			let colorListNorm = bgColors.map(resolveColorValue).filter(v => v != null)
+				.sort((a, b) => a - b)
+				.filter((elm, idx, arr) => elm != arr[idx - 1]);
 			if(colorListNorm.length) {
 				modifyWorldProp(world, "opts/bgColorPaletteEnabled", true);
 				modifyWorldProp(world, "opts/bgColorPalette", colorListNorm);
