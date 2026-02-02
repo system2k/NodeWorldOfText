@@ -71,7 +71,7 @@ function resolveColorValue(val) {
 		let r = parseInt(rgbTest[1]);
 		let g = parseInt(rgbTest[2]);
 		let b = parseInt(rgbTest[3]);
-		if(!isInteger(r) || !isInteger(g) || !isInteger(b)) {
+		if(!Number.isInteger(r) || !Number.isInteger(g) || !Number.isInteger(b)) {
 			return null;
 		}
 		if(r < 0 || g < 0 || b < 0 || r > 255 || g > 255 || b > 255) {
