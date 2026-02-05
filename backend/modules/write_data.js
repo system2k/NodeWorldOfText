@@ -227,13 +227,13 @@ module.exports = async function(data, server, params) {
 			bgColor = -1;
 		}
 
-		if(colorPaletteEnabled && colorPalette) {
+		if(colorPaletteEnabled && colorPalette && !is_member) {
 			if(!isInListBinaryLookup(colorPalette, color)) {
 				color = colorPalette[0];
 			}
 		}
 
-		if(bgColor != -1 && bgColorPaletteEnabled && bgColorPalette) {
+		if(bgColor != -1 && bgColorPaletteEnabled && bgColorPalette && !is_member) {
 			if(!isInListBinaryLookup(bgColorPalette, bgColor)) {
 				bgColor = -1;
 			}

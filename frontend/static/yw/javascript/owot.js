@@ -7223,11 +7223,11 @@ function buildBackgroundColorModal(modal) {
 	modal.onTabChange(function(evt) {
 		var tab = evt.id;
 		if(tab == "bg") {
-			if(!state.worldModel.bg_color_palette) colorShortcutsBg.style.display = "";
+			if(!Permissions.has_text_color_palette(state.userModel, state.worldModel)) colorShortcutsBg.style.display = "";
 			colorShortcuts.style.display = "none";
 		} else if(tab == "fg") {
 			colorShortcutsBg.style.display = "none";
-			if(!state.worldModel.color_palette) colorShortcuts.style.display = "";
+			if(!Permissions.has_cell_color_palette(state.userModel, state.worldModel)) colorShortcuts.style.display = "";
 		}
 	});
 }
@@ -7349,7 +7349,7 @@ function generateColorPaletteButtons(palette, isBg) {
 
 function updateColorModalPalette() {
 	let currentTab = w.ui.colorModal.currentTabCtx?.id;
-	if(state.worldModel.color_palette) {
+	if(Permissions.has_text_color_palette(state.userModel, state.worldModel)) {
 		if(w.ui.colorModal.tabIndex["fg"]) {
 			w.ui.colorModal.focusTab("fg");
 		}
@@ -7371,7 +7371,7 @@ function updateColorModalPalette() {
 		}
 	}
 	if(w.ui.colorModal.tabIndex["bg"]) {
-		if(state.worldModel.bg_color_palette) {
+		if(Permissions.has_cell_color_palette(state.userModel, state.worldModel)) {
 			w.ui.colorModal.focusTab("bg");
 			colorShortcutsBg.style.display = "none";
 			w.ui.colorModal.hideForm();
@@ -8185,7 +8185,7 @@ function begin() {
 	makeSelectionModal();
 	addColorShortcuts();
 	updateColorPicker();
-	if(state.worldModel.color_palette || state.worldModel.bg_color_palette) {
+	if(Permissions.has_color_palette(state.userModel, state.worldModel)) {
 		updateColorModalPalette();
 	}
 

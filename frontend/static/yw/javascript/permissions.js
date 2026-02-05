@@ -70,6 +70,15 @@ var Permissions = {
 	can_color_cell: function(user, world) {
 		return Permissions.user_matches_perm(user, world, world.color_cell);
 	},
+	has_text_color_palette: function(user, world) {
+		return world.color_palette && !user.is_member;
+	},
+	has_cell_color_palette: function(user, world) {
+		return world.bg_color_palette && !user.is_member;
+	},
+	has_color_palette: function(user, world) {
+		return Permissions.has_text_color_palette(user, world) || Permissions.has_cell_color_palette(user, world);
+	},
 	user_matches_perm: function(user, world, perm) {
 		if(perm == -1) { // no one
 			return false;
