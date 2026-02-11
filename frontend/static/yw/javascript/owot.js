@@ -3977,7 +3977,7 @@ function event_wheel(e) {
 	if(Modal.isOpen) return;
 	if(!scrollingEnabled) return; // return if disabled
 	// if not focused on canvas, don't scroll world
-	if(!closest(e.target, elm.main_view)) return;
+	if(!closest(e.target, elm.main_view) && !closest(e.target, elm.link_div)) return;
 	if(e.ctrlKey) return; // don't scroll if ctrl is down (zooming)
 	var deltaX = Math.trunc(e.deltaX);
 	var deltaY = Math.trunc(e.deltaY);
