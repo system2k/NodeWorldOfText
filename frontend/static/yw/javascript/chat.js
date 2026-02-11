@@ -596,6 +596,8 @@ var emoteList = {
 	"blob_pride": [576, 0],
 	"blob_ally": [608, 0],
 	"blob_trans": [640, 0],
+	//fop
+	"fop": [672, 0],
 	// 16px faces
 	"ded": [0, 32],
 	"mad": [32, 32],
