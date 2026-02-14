@@ -98,6 +98,7 @@ var fontTemplate           = "$px 'Courier New', monospace";
 var specialFontTemplate    = "$px consolas, monospace";
 var fontOrder              = ["Courier New", "monospace"];
 var specialFontOrder       = ["consolas", "monospace"];
+var fontSize               = 16;
 var initiallyFetched       = false;
 var lastLinkHover          = null; // [tileX, tileY, charX, charY]
 var lastTileHover          = null; // [type, tileX, tileY, (charX, charY)]
@@ -746,10 +747,8 @@ function updateScaleConsts() {
 	tileWidth = Math.ceil(tileW);
 	tileHeight = Math.ceil(tileH);
 
-	var fontSize = normFontSize(16 * zoom);
-
-	font = fontTemplate.replace("$", fontSize);
-	specialCharFont = specialFontTemplate.replace("$", fontSize);
+	font = fontTemplate.replace("$", normFontSize(fontSize * zoom));
+	specialCharFont = specialFontTemplate.replace("$", normFontSize(16 * zoom));
 
 	textRenderCanvas.width = tileWidth + 5;
 	textRenderCanvas.height = tileHeight + 5;
