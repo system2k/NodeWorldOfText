@@ -605,7 +605,19 @@ var websockets = {
 	write: require("./backend/websockets/write.js"),
 	config: require("./backend/websockets/config.js"),
 	boundary: require("./backend/websockets/boundary.js"),
-	stats: require("./backend/websockets/stats.js")
+	stats: require("./backend/websockets/stats.js"),
+	uptime: require("./backend/websockets/uptime.js"),
+	whoami: require("./backend/websockets/whoami.js"),
+	chat_test: require("./backend/websockets/chat_test.js"),
+	chat_delete_req: require("./backend/websockets/chat_delete_req.js"),
+	worlds: require("./backend/websockets/worlds.js"),
+	chat_channel: require("./backend/websockets/chat_channel.js"),
+	mute: require("./backend/websockets/mute.js"),
+	clear_mutes: require("./backend/websockets/clear_mutes.js"),
+	block_special: require("./backend/websockets/block_special.js"),
+	block_id: require("./backend/websockets/block_id.js"),
+	block_user: require("./backend/websockets/block_user.js"),
+	unblock_all: require("./backend/websockets/unblock_all.js")
 };
 
 var modules = {
@@ -1918,7 +1930,6 @@ async function manageWebsocketConnection(ws, req) {
 		messageBackpressure: 0,
 		receiveContentUpdates: true,
 		descriptiveCmd: false,
-		passiveCmd: false,
 		handleCmdSockets: false,
 		cmdsSentInSecond: 0,
 		lastCmdSecond: 0,
@@ -2245,7 +2256,7 @@ async function manageWebsocketConnection(ws, req) {
 		}
 		if(!can_process_req_kind(kindLimits, kind)) return;
 		function send(msg) {
-			msg.kind = kind;
+			if(!msg.kind) msg.kind = kind;
 			if(requestID !== null) msg.request = requestID;
 			send_ws(JSON.stringify(msg));
 		}

@@ -780,6 +780,37 @@ function filterAdvancedChars(array, noSurrogates, noCombining) {
 	return array;
 }
 
+function calculateTimeDiff(difference) {
+	var str = "";
+	var days = Math.floor(difference / 86400000);
+	difference -= days * 86400000;
+	var hours = Math.floor(difference / 3600000);
+	difference -= hours * 3600000;
+	var minutes = Math.floor(difference / 60000);
+	difference -= minutes * 60000;
+	var seconds = Math.floor(difference / 1000);
+	difference -= seconds * 1000;
+
+	if(days > 0) {
+		if(str) str += ", ";
+		str += days + " day" + (days != 1 ? "s" : "");
+	}
+	if(hours > 0) {
+		if(str) str += ", ";
+		str += hours + " hour" + (hours != 1 ? "s" : "");
+	}
+	if(minutes > 0) {
+		if(str) str += ", ";
+		str += minutes + " minute" + (minutes != 1 ? "s" : "");
+	}
+	if(seconds > 0) {
+		if(str) str += ", ";
+		str += seconds + " second" + (seconds != 1 ? "s" : "");
+	}
+
+	return str;
+}
+
 if(!HTMLElement.prototype.append) {
 	HTMLElement.prototype.append = function(string) {
 		this.appendChild(document.createTextNode(string));
