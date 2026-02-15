@@ -39,6 +39,7 @@ module.exports = async function(data, server, params) {
 	var url = data.url;
 	var link_tileX = san_dp(data.link_tileX);
 	var link_tileY = san_dp(data.link_tileY);
+	var relative = data.relative;
 
 	var ipAddress;
 	var ipAddressVal;
@@ -114,11 +115,9 @@ module.exports = async function(data, server, params) {
 		try {
 			plugin.link({
 				ip: ipAddress,
-				is_owner, is_member,
 				tileX, tileY, charX, charY,
-				type,
-				url, link_tileX, link_tileY,
-				user, world
+				user, world, is_owner, is_member,
+				type, url, link_tileX, link_tileY, relative
 			});
 		} catch(e) {}
 	}
@@ -126,7 +125,7 @@ module.exports = async function(data, server, params) {
 	var resp = await tile_database.write(tile_database.types.link, {
 		tileX, tileY, charX, charY,
 		user, world, is_member, is_owner,
-		type, url, link_tileX, link_tileY,
+		type, url, link_tileX, link_tileY, relative,
 		channel, no_log_edits
 	});
 

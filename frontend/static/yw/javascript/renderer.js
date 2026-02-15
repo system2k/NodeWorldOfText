@@ -846,6 +846,8 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 			linkColor = defaultURLLinkColor;
 		} else if(linkType == "coord") {
 			linkColor = defaultCoordLinkColor;
+		} else if(linkType == "coordr") {
+			linkColor = defaultCoordRelativeLinkColor;
 		} else if(linkType == "note") {
 			isLink = false;
 			isTooltip = true;
@@ -1192,6 +1194,8 @@ function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, off
 				cellLinkType = tileColProps.link.type;
 				if(tileColProps.link.type == "url" && tileColProps.link.url.startsWith("note:")) {
 					cellLinkType = "note";
+				} else if(cellLinkType == "coord" && tileColProps.link.relative) {
+					cellLinkType = "coordr";
 				}
 			}
 			var protValue = writability;

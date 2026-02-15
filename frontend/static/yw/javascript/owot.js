@@ -159,6 +159,7 @@ var mSpecRendering         = true; // render special properties if a certain com
 var combiningCharsEnabled  = true;
 var surrogateCharsEnabled  = true;
 var defaultCoordLinkColor  = "#008000";
+var defaultCoordRelativeLinkColor = "#00E000";
 var defaultURLLinkColor    = "#0000FF";
 var defaultHighlightColor  = [0xFF, 0xFF, 0x99];
 var secureJSLink           = true; // display warning prompt when clicking on javascript links
@@ -637,7 +638,7 @@ function handleRegionSelection(coordA, coordB, regWidth, regHeight) {
 						if(link.type == "url") {
 							r_links.push("$u" + "\"" + escapeQuote(link.url) + "\"");
 						} else if(link.type == "coord") {
-							r_links.push("$c" + "[" + link.link_tileX + "," + link.link_tileY + "]");
+							r_links.push("$" + (link.relative?'C':'c') + "[" + link.link_tileX + "," + link.link_tileY + "]");
 						}
 					}
 				}
@@ -908,6 +909,7 @@ var linkAuto = {
 	url: "",
 	coordTileX: 0,
 	coordTileY: 0,
+	relative: false,
 	lastPos: null,
 	active: false
 }
@@ -1123,7 +1125,7 @@ function mousemove_linkAuto() {
 			if(linkAuto.mode == 0) {
 				ar.push([linkAuto.url])
 			} else if(linkAuto.mode == 1) {
-				ar.push([linkAuto.coordTileX, linkAuto.coordTileY]);
+				ar.push([linkAuto.coordTileX, linkAuto.coordTileY, linkAuto.relative]);
 			}
 			linkAuto.selected[ctileY + "," + ctileX + "," + ccharY + "," + ccharX] = ar;
 		}
@@ -1178,6 +1180,7 @@ function keydown_linkAuto(e) {
 				link_type = "coord";
 				data.x = linkData[0];
 				data.y = linkData[1];
+				data.relative = linkData[2];
 			}
 
 			network.link({
@@ -1830,6 +1833,7 @@ function doLink() {
 	} else if(w.link_input_type == 1) {
 		data.x = w.coord_input_x;
 		data.y = w.coord_input_y;
+		data.relative = w.coord_input_relative
 		link_type = "coord";
 	}
 	network.link({
@@ -2399,7 +2403,7 @@ function undoWrite() {
 		if(link.type == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
 			linkQueue.push(["url", tileX, tileY, charX, charY, link.url]);
 		} else if(link.type == "coord" && Permissions.can_coordlink(state.userModel, state.worldModel)) {
-			linkQueue.push(["coord", tileX, tileY, charX, charY, link.link_tileX, link.link_tileY]);
+			linkQueue.push(["coord", tileX, tileY, charX, charY, link.link_tileX, link.link_tileY, link.relative]);
 		}
 	}
 	renderCursor([edit[0], edit[1], edit[2], edit[3]]);
@@ -2434,7 +2438,7 @@ function redoWrite() {
 		if(link.type == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
 			linkQueue.push(["url", tileX, tileY, charX, charY, link.url]);
 		} else if(link.type == "coord" && Permissions.can_coordlink(state.userModel, state.worldModel)) {
-			linkQueue.push(["coord", tileX, tileY, charX, charY, link.link_tileX, link.link_tileY]);
+			linkQueue.push(["coord", tileX, tileY, charX, charY, link.link_tileX, link.link_tileY, link.relative]);
 		}
 	}
 	renderCursor([edit[0], edit[1], edit[2], edit[3]]);
@@ -2592,7 +2596,7 @@ function textcode_parser(value, coords, defaultColor, defaultBgColor) {
 				index += 2;
 				var lType = value[index];
 				index++;
-				if(lType == "c") { // coord
+				if(lType == "c" || lType == "C") { // coord (C = relative)
 					var strPoint = index;
 					var buf = "";
 					var mode = 0;
@@ -2617,6 +2621,7 @@ function textcode_parser(value, coords, defaultColor, defaultBgColor) {
 					buf = buf.split(",");
 					var coordTileX = parseFloat(buf[0].trim());
 					var coordTileY = parseFloat(buf[1].trim());
+					var relative = lType == "C";
 					var charPos = coordinateAdd(pos.tileX, pos.tileY, pos.charX, pos.charY,
 						off.tileX, off.tileY, off.charX, off.charY);
 					return {
@@ -2627,7 +2632,8 @@ function textcode_parser(value, coords, defaultColor, defaultBgColor) {
 						charX: charPos[2],
 						charY: charPos[3],
 						coord_tileX: coordTileX,
-						coord_tileY: coordTileY
+						coord_tileY: coordTileY,
+						relative: relative,
 					};
 				} else if(lType == "u") { // urllink
 					var strPoint = index;
@@ -2987,7 +2993,7 @@ function cyclePaste(parser, yieldItem) {
 		if(item.linkType == "url" && Permissions.can_urllink(state.userModel, state.worldModel)) {
 			linkQueue.push(["url", item.tileX, item.tileY, item.charX, item.charY, item.url]);
 		} else if(item.linkType == "coord" && Permissions.can_coordlink(state.userModel, state.worldModel)) {
-			linkQueue.push(["coord", item.tileX, item.tileY, item.charX, item.charY, item.coord_tileX, item.coord_tileY]);
+			linkQueue.push(["coord", item.tileX, item.tileY, item.charX, item.charY, item.coord_tileX, item.coord_tileY, item.relative]);
 		}
 		// a link was potentially put over a character that was changed to an identical character,
 		// meaning it did not get added to the undo buffer.
@@ -3563,7 +3569,7 @@ function setupLinkElement() {
 
 function coord_link_click(evt) {
 	if(!currentSelectedLink) return;
-	w.doGoToCoord(currentSelectedLink.link_tileY, currentSelectedLink.link_tileX);
+	w.doGoToCoord(currentSelectedLink.link_tileY, currentSelectedLink.link_tileX, currentSelectedLink.relative);
 }
 function url_link_click(evt) {
 	if(!currentSelectedLink) return;
@@ -3667,7 +3673,7 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 			linkElm.href = "javascript:void(0);";
 			linkElm.target = "";
 			var pos = link.link_tileX + "," + link.link_tileY;
-			linkElm.title = "Link to coordinates " + pos;
+			linkElm.title = "Link to coordinates " + pos + (link.relative?" (relative)":"");
 		}
 	} else {
 		currentSelectedLink = null;
@@ -6249,11 +6255,8 @@ var networkHTTP = {
 			url: "/ajax/urllink/",
 			data: {
 				world: state.worldModel.name,
-				tileX: tileX,
-				tileY: tileY,
-				charX: charX,
-				charY: charY,
-				url: url
+				tileX, tileY, charX, charY,
+				url
 			},
 			done: function(data) {
 				if(callback) callback(data);
@@ -6263,18 +6266,14 @@ var networkHTTP = {
 			}
 		});
 	},
-	coordlink: function(tileX, tileY, charX, charY, link_tileX, link_tileY, callback) {
+	coordlink: function(tileX, tileY, charX, charY, link_tileX, link_tileY, relative, callback) {
 		ajaxRequest({
 			type: "POST",
 			url: "/ajax/coordlink/",
 			data: {
 				world: state.worldModel.name,
-				tileX: tileX,
-				tileY: tileY,
-				charX: charX,
-				charY: charY,
-				link_tileX: link_tileX,
-				link_tileY: link_tileY
+				tileX, tileY, charX, charY,
+				link_tileX, link_tileY, relative
 			},
 			done: function(data) {
 				if(callback) callback(data);
@@ -6384,7 +6383,7 @@ var network = {
 	link: function(position, type, args) {
 		// position: {tileX, tileY, charX, charY}
 		// type: <url, coord>
-		// args: {url} or {x, y}
+		// args: {url} or {x, y, relative}
 		var data = {
 			tileY: position.tileY,
 			tileX: position.tileX,
@@ -6402,6 +6401,7 @@ var network = {
 		} else if(type == "coord") {
 			data.link_tileX = args.x;
 			data.link_tileY = args.y;
+			data.relative = args.relative;
 		}
 		network.transmit({
 			kind: "link",
@@ -6565,6 +6565,7 @@ Object.assign(w, {
 	url_input: "",
 	coord_input_x: 0,
 	coord_input_y: 0,
+	coord_input_relative: false,
 	link_input_type: 0, // 0 = link, 1 = coord,
 	protect_type: null, // null = unprotect, 0 = public, 1 = member, 2 = owner
 	protect_bg: "",
@@ -6644,14 +6645,19 @@ Object.assign(w, {
 	goToCoord: function() {
 		w.ui.coordGotoModal.open();
 	},
-	doGoToCoord: function(y, x) {
+	doGoToCoord: function(y, x, relative) {
 		var maxX = Number.MAX_SAFE_INTEGER / 160 / 4;
 		var maxY = Number.MAX_SAFE_INTEGER / 144 / 4;
 		if(x > maxX || x < -maxX || y > maxY || y < -maxY) {
 			return;
 		}
-		positionX = Math.floor(-x * tileW * coordSizeX);
-		positionY = Math.floor(y * tileH * coordSizeY);
+		if (relative) {
+			positionX += Math.floor(-x * tileW * coordSizeX);
+			positionY += Math.floor(y * tileH * coordSizeY);
+		} else {
+			positionX = Math.floor(-x * tileW * coordSizeX);
+			positionY = Math.floor(y * tileH * coordSizeY);
+		}
 		w.render();
 	},
 	doUrlLink: function(url) {
@@ -6671,15 +6677,17 @@ Object.assign(w, {
 		stopLinkUI();
 		w.ui.urlModal.open();
 	},
-	doCoordLink: function(y, x) {
+	doCoordLink: function(y, x, relative) {
 		linkAuto.active = true;
 		linkAuto.mode = 1;
 		linkAuto.coordTileY = y;
 		linkAuto.coordTileX = x;
+		linkAuto.relative = relative;
 
 		if(w.isLinking || w.isProtecting) return;
 		w.coord_input_x = x;
 		w.coord_input_y = y;
+		w.coord_input_relative = relative;
 		elm.owot.style.cursor = "pointer";
 		w.isLinking = true;
 		w.link_input_type = 1;
@@ -6906,6 +6914,7 @@ Object.assign(w, {
 		styles.public_text = "#000";
 		defaultURLLinkColor = "#1570F0";
 		defaultCoordLinkColor = "#409015";
+		defaultCoordRelativeLinkColor = "#50E020";
 		w.nightMode = 1;
 		if(ignoreUnloadedPattern) {
 			w.nightMode = 2;
@@ -6919,6 +6928,7 @@ Object.assign(w, {
 		w.nightMode = 0;
 		defaultURLLinkColor = "#0000FF";
 		defaultCoordLinkColor = "#008000";
+		defaultCoordRelativeLinkColor = "#00E000";
 		if(elm.owot.classList.contains("nightmode")) {
 			elm.owot.classList.remove("nightmode");
 		}
@@ -7168,12 +7178,17 @@ function enableBgColorPicker() {
 function makeCoordLinkModal() {
 	var modal = new Modal();
 	modal.createForm();
-	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a letter to create the link.\n");
+	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a character to create the link.\n");
 	var coordX = modal.addEntry("X", "text", "number").input;
 	var coordY = modal.addEntry("Y", "text", "number").input;
+	var relative = modal.addEntry("Relative", "checkbox").input;
+	relative.parentElement.title = `When checked, when clicking the link, the user will teleport to this location where their current position is 0,0.
+Relative coordinate links will appear brighter.`;
+	relative.type = "checkbox";
+	relative.style.width = "0.75em";
 	modal.setMaximumSize(360, 300);
 	modal.onSubmit(function() {
-		w.doCoordLink(parseFloat(coordY.value), parseFloat(coordX.value));
+		w.doCoordLink(parseFloat(coordY.value), parseFloat(coordX.value), relative.checked);
 	});
 	w.ui.coordLinkModal = modal;
 }
@@ -7885,7 +7900,7 @@ var ws_functions = {
 									tileX: tileX,
 									charY: charY,
 									charX: charX
-								}, "coord", { x: queueItem[5], y: queueItem[6] });
+								}, "coord", { x: queueItem[5], y: queueItem[6], relative: queueItem[7] });
 							}
 							linkQueue.splice(r, 1);
 							break;
