@@ -1703,11 +1703,11 @@ function defaultStyles() {
 function manageCoordHash() {
 	if(!Permissions.can_go_to_coord(state.userModel, state.worldModel)) return;
 	try {
-		var coord = window.location.hash.match(/#x:-?\d+,y:-?\d+$/);
+		var coord = window.location.hash.match(/#x:-?[\d\.]+,y:-?[\d\.]+$/);
 		if(coord) {
-			coord = window.location.hash.split(/#x:|,y:/).slice(1).map(function(a) {
-				return parseInt(a, 10);
-			});
+			coord = window.location.hash.split(/#x:|,y:/).slice(1);
+			coord[0] = parseFloat(coord[0]);
+			coord[1] = parseFloat(coord[1]);
 			homeX = coord[0];
 			homeY = coord[1];
 			w.doGoToCoord(coord[1], coord[0]);
