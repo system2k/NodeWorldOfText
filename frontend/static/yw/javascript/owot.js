@@ -3996,6 +3996,7 @@ function event_wheel(e) {
 		deltaY: -deltaY
 	});
 	w.render();
+	e.preventDefault();
 }
 
 function event_wheel_zoom(e) {
@@ -7092,7 +7093,7 @@ function setupDOMEvents() {
 	document.addEventListener("touchend", event_touchend);
 	document.addEventListener("touchmove", event_touchmove, { passive: false });
 	document.addEventListener("wheel", event_wheel_zoom, { passive: false });
-	document.addEventListener("wheel", event_wheel);
+	document.addEventListener("wheel", event_wheel, { passive: false });
 	document.addEventListener("mousemove", event_mousemove);
 	document.addEventListener("keydown", event_keydown);
 	document.addEventListener("keyup", event_keyup);
