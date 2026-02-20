@@ -103,12 +103,15 @@ function api_chat_send(message, opts) {
 	message = message.trim();
 	if(!message.length) return;
 	message = message.slice(0, msgLim);
-	chatWriteHistory.push(message);
-	if(chatWriteHistory.length > chatWriteHistoryMax) {
-		chatWriteHistory.shift();
+
+	if (!opts.privateMessageTo) {
+		chatWriteHistory.push(message);
+		if(chatWriteHistory.length > chatWriteHistoryMax) {
+			chatWriteHistory.shift();
+		}
+		chatWriteHistoryIdx = -1;
+		chatWriteTmpBuffer = "";
 	}
-	chatWriteHistoryIdx = -1;
-	chatWriteTmpBuffer = "";
 
 	var chatColor;
 	if(!opts.color) {
@@ -127,11 +130,13 @@ function api_chat_send(message, opts) {
 		args.shift();
 		if(client_commands.hasOwnProperty(command)) {
 			client_commands[command](args);
-			return;
+		} else {
+			clientChatResponse("Invalid command: " + message);
 		}
+		return;
 	}
 
-	network.chat(message, location, nick, chatColor, customMeta);
+	network.chat(message, location, nick, chatColor, customMeta, opts.privateMessageTo);
 }
 
 function clientChatResponse(message) {
@@ -149,6 +154,69 @@ function register_chat_command(command, callback, params, desc, example) {
 	// client_commands may be deprecated in the future
 	client_commands[command.toLowerCase()] = callback;
 }
+
+register_chat_command("help", function() {
+	var cmdList = [];
+	var htmlResp = "<div style=\"background-color: #DADADA; font-family: monospace; font-size: 13px;\">";
+	var cmdIdx = 0;
+
+	for(var cmd in chatCommandRegistry) {
+		var cliCmd = chatCommandRegistry[cmd];
+		cmdList.push({
+			command: cmd,
+			params: cliCmd.params,
+			desc: cliCmd.desc,
+			example: cliCmd.example
+		});
+	}
+
+	cmdList.sort(function(a, b) {
+		return a.command.localeCompare(b.command);
+	});
+
+	for(var i = 0; i < cmdList.length; i++) {
+		var info = cmdList[i];
+		var command = info.command;
+		var params = info.params;
+		var example = info.example;
+		var desc = info.desc;
+
+		// display command parameters
+		var param_desc = "";
+		if(params) {
+			param_desc += html_tag_esc("<");
+			for(var v = 0; v < params.length; v++) {
+				var arg = params[v];
+				param_desc += "<span style=\"font-style: italic\">" + html_tag_esc(arg) + "</span>";
+				if(v != params.length - 1) {
+					param_desc += ", ";
+				}
+			}
+			param_desc += html_tag_esc(">");
+		}
+
+		var exampleElm = "";
+		if(example && params) {
+			example = "/" + command + " " + example;
+			exampleElm = "title=\"" + html_tag_esc("Example: " + example) +"\"";
+		}
+
+		command = "<span " + exampleElm + "style=\"color: #00006F\">" + html_tag_esc(command) + "</span>";
+
+		var help_row = html_tag_esc("-> /") + command + " " + param_desc + " :: " + html_tag_esc(desc);
+
+		// alternating stripes
+		if(cmdIdx % 2 == 1) {
+			help_row = "<div style=\"background-color: #C3C3C3\">" + help_row + "</div>";
+		}
+
+		htmlResp += help_row;
+		cmdIdx++;
+	}
+	htmlResp += "</div>";
+
+	addChat(null, 0, "user", "[ Client ]", htmlResp, "Client", true, true, true, null, getDate());
+}, null, "list all commands", null);
 
 register_chat_command("nick", function (args) {
 	var newDisplayName = args.join(" ");
@@ -276,6 +344,250 @@ register_chat_command("stats", function() {
 		clientChatResponse(stat);
 	});
 }, null, "view stats of a world", null);
+
+register_chat_command("uptime", function() {
+	network.uptime(function(data) {
+		clientChatResponse("Server uptime: " + calculateTimeDiff(data.uptime));
+	});
+}, null, "get uptime of server", null);
+
+register_chat_command("whoami", function() {
+	network.whoami(function(data) {
+		var idstr = "Who Am I:\n";
+		idstr += "Login username: " + (data.user_login ?? "(anonymous)") + "\n";
+		idstr += "Display username: " + (data.user_disp ?? "(anonymous)") + "\n";
+		idstr += "Chat ID: " + w.clientId;
+		clientChatResponse(idstr);
+	});
+}, null, "display your identity", null);
+
+register_chat_command("test", function() {
+	var location = selectedChatTab == 0 ? "page" : "global";
+	var nickname = YourWorld.Nickname || state.userModel.username;
+
+	var color;
+	if(!YourWorld.Color) {
+		color = assignColor(nickname);
+	} else {
+		color = "#" + ("00000" + YourWorld.Color.toString(16)).slice(-6);
+	}
+
+	network.chat_test(location, nickname, color);
+}, null, "preview your appearance", null);
+
+register_chat_command("delete", function(args) {
+	var id = Number(args[0]);
+	var timestamp = Number(args[1]);
+	var location = selectedChatTab == 0 ? "page" : "global";
+
+	network.chat_delete_req(id, timestamp, location, function(data) {
+		if(data.success) {
+			if(data.count == 0) {
+				clientChatResponse("No messages deleted");
+			} else {
+				clientChatResponse("Deleted " + data.count + " message(s)");
+			}
+		} else {
+			if(data.error == "no_perm") {
+				clientChatResponse("You do not have permission to delete messages here");
+			}
+		}
+	});
+}, ["id", "timestamp"], "delete a chat message", "1220 1693147307895");
+
+register_chat_command("worlds", function() {
+	network.worlds(function(data) {
+		var worldList = "";
+		for(var i = 0; i < data.list.length; i++) {
+			var row = data.list[i];
+			if(row[1] == "") {
+				row[1] = "(main)"
+			} else {
+				row[1] = "/" + row[1];
+			}
+			worldList += "-> " + row[1] + " [" + row[0] + "]";
+			if(i != data.list.length - 1) worldList += "\n";
+		}
+		clientChatResponse("Currently loaded worlds (top " + data.topCount + "):\n" + worldList);
+	});
+}, null, "list all worlds", null);
+
+register_chat_command("channel", function() {
+	var location = selectedChatTab == 0 ? "page" : "global";
+
+	network.chat_channel(location, function(data) {
+		var infoLog = "Found " + data.channels.length + " channel(s) for this world:\n";
+		for(var i = 0; i < data.channels.length; i++) {
+			var ch = data.channels[i];
+			infoLog += "Name: " + ch.name + "\n";
+			infoLog += "Desc: " + ch.description + "\n";
+			infoLog += "Created: " + convertToDate(ch.date_created) + "\n";
+			infoLog += "----------------\n";
+		}
+
+		infoLog += "Default channel id: " + (data.default_channel ?? "<none>");
+		clientChatResponse(infoLog);
+	});
+}, null, "get info about a chat channel", null);
+
+register_chat_command("mute", function(args) {
+	var id = Number(args[0]);
+	var seconds = Number(args[1]);
+	var flag = args[2];
+	var location = selectedChatTab == 0 ? "page" : "global";
+
+	var timeSuffixMap = {
+		"h": 3600,
+		"d": 86400,
+		"w": 86400*7,
+		"m": 86400*30,
+		"y": 31556925.216 //average year length
+	};
+
+	if(flag in timeSuffixMap) {
+		seconds *= timeSuffixMap[flag];
+	} else {
+		if(flag) { //invalid flag
+			clientChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.");
+			return;
+		}
+	}
+
+	network.mute(id, seconds, location, function(data) {
+		if(data.success) {
+			clientChatResponse("Muted client until " + convertToDate(data.until));
+		} else {
+			if(data.error == "no_perm") {
+				clientChatResponse("You do not have permission to mute here");
+			} else if(data.error == "not_found") {
+				clientChatResponse("Client not found");
+			}
+		}
+	});
+}, ["id", "seconds", "[h/d/w/m/y]"], "mute a user completely", "1220 9999");
+
+register_chat_command("clearmutes", function() {
+	var location = selectedChatTab == 0 ? "page" : "global";
+
+	network.clear_mutes(location, function(data) {
+		if(data.success) {
+			clientChatResponse("Unmuted " + data.count + " user(s)");
+		} else {
+			if(data.error == "no_perm") {
+				clientChatResponse("You do not have permission to unmute here");
+			}
+		}
+	});
+}, null, "unmute all clients", null);
+
+register_chat_command("tell", function(args) {
+	var id = args[0];
+	var msg = args.slice(1).join(" ");
+
+	var opts = {
+		privateMessageTo: id
+	};
+
+	if(defaultChatColor != null) {
+		opts.color = "#" + ("00000" + defaultChatColor.toString(16)).slice(-6);
+	}
+
+	api_chat_send(msg, opts);
+}, ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)");
+
+register_chat_command("block", function(args) {
+	var id = args[0];
+	var location = selectedChatTab == 0 ? "page" : "global";
+
+	switch (id) {
+	case "*":
+		network.block_special(true, null, null, null);
+		clientChatResponse("Blocked all messages");
+		break;
+	case "tell":
+		network.block_special(null, true, null, null);
+		clientChatResponse("Blocked private messages");
+		break;
+	case "anon":
+		network.block_special(null, null, true, null);
+		clientChatResponse("Blocked messages from anonymous users");
+		break;
+	case "reg":
+		network.block_special(null, null, null, true);
+		clientChatResponse("Blocked messages from registered users");
+		break;
+	default:
+		id = Number(id);
+		network.block_id(id, location, true, function(data) {
+			if(data.success) {
+				clientChatResponse("Blocked chats from ID: " + id);
+			} else {
+				if(data.error == "too_many") {
+					clientChatResponse("Too many blocked IDs/users");
+				} else if(data.error == "bad_id") {
+					clientChatResponse("Invalid ID");
+				}
+			}
+		});
+	}
+}, ["id"], "block someone by id", "1220");
+
+register_chat_command("unblock", function(args) {
+	var id = args[0];
+	var location = selectedChatTab == 0 ? "page" : "global";
+
+	switch (id) {
+	case "*":
+		network.block_special(false, null, null, null);
+		clientChatResponse("Unblocked all messages");
+		break;
+	case "tell":
+		network.block_special(null, false, null, null);
+		clientChatResponse("Unblocked private messages");
+		break;
+	case "anon":
+		network.block_special(null, null, false, null);
+		clientChatResponse("Unblocked messages from anonymous users");
+		break;
+	case "reg":
+		network.block_special(null, null, null, false);
+		clientChatResponse("Unblocked messages from registered users");
+		break;
+	default:
+		id = Number(id);
+		network.block_id(id, location, false);
+		clientChatResponse("Unblocked chats from ID: " + id);
+	}
+
+}, ["id"], "unblock someone by id", "1220");
+
+register_chat_command("blockuser", function(args) {
+	var username = args[0];
+
+	network.block_user(username, true, function(data) {
+		if(data.success) {
+			clientChatResponse("Blocked chats from user: " + username);
+		} else {
+			if(data.error == "too_many") {
+				clientChatResponse("Too many blocked IDs/users");
+			} else if(data.error == "bad_username") {
+				clientChatResponse("Invalid username");
+			}
+		}
+	});
+}, ["username"], "block someone by username", "JohnDoe");
+
+register_chat_command("unblockuser", function(args) {
+	var username = args[0];
+
+	network.block_user(username, false);
+	clientChatResponse("Unblocked chats from user: " + username);
+}, ["username"], "unblock someone by username", "JohnDoe");
+
+register_chat_command("unblockall", function(args) {
+	network.unblock_all();
+	clientChatResponse("Cleared all blocks");
+}, null, "unblock all users", null);
 
 function sendChat() {
 	var chatText = elm.chatbar.value;
@@ -646,109 +958,6 @@ var emoteList = {
 	"fpdislikeaaa": [96, 96],
 	"fppinchaaa": [128, 96]
 };
-
-w.on("chatMod", function(e) {
-	if(e.id !== 0) return;
-	if(e.realUsername != "[ Server ]") return;
-	if(e.message.startsWith("Command")) {
-		var cmdList = [];
-		var htmlResp = "";
-		var remoteCmdList = e.message.split("\n");
-		var head = remoteCmdList[0];
-
-		htmlResp += head + "<br>";
-		htmlResp += "<div style=\"background-color: #DADADA; font-family: monospace; font-size: 13px;\">";
-
-		var cmdIdx = 0;
-		for(var i = 1; i < remoteCmdList.length; i++) {
-			var line = remoteCmdList[i];
-			if(!line.startsWith("/")) continue;
-			line = line.split(" -> ");
-			var cmdRaw = line[0].split(" ");
-			var params = cmdRaw[1];
-			var command = cmdRaw[0].slice(1);
-			if(params) {
-				params = params.slice(1, -1).split(",");
-			}
-			var descRaw = line[1];
-			var exampleStartIdx = descRaw.indexOf("(");
-			var example = "";
-			if(exampleStartIdx > -1) {
-				example = descRaw.slice(exampleStartIdx + 1, -1); // remove parentheses
-				descRaw = descRaw.slice(0, exampleStartIdx - 1);
-				example = example.split(" ").slice(1).join(" ");
-			}
-
-			cmdList.push({
-				command: command,
-				params: params,
-				desc: descRaw,
-				example: example
-			});
-		}
-
-		for(var cmd in chatCommandRegistry) {
-			var cliCmd = chatCommandRegistry[cmd];
-			cmdList.push({
-				command: cmd,
-				params: cliCmd.params,
-				desc: cliCmd.desc,
-				example: cliCmd.example
-			});
-		}
-
-		cmdList.sort(function(a, b) {
-			return a.command.localeCompare(b.command);
-		});
-
-		for(var i = 0; i < cmdList.length; i++) {
-			var info = cmdList[i];
-			var command = info.command;
-			var params = info.params;
-			var example = info.example;
-			var desc = info.desc;
-
-			// display command parameters
-			var param_desc = "";
-			if(params) {
-				param_desc += html_tag_esc("<");
-				for(var v = 0; v < params.length; v++) {
-					var arg = params[v];
-					param_desc += "<span style=\"font-style: italic\">" + html_tag_esc(arg) + "</span>";
-					if(v != params.length - 1) {
-						param_desc += ", ";
-					}
-				}
-				param_desc += html_tag_esc(">");
-			}
-
-			var exampleElm = "";
-			if(example && params) {
-				example = "/" + command + " " + example;
-				exampleElm = "title=\"" + html_tag_esc("Example: " + example) +"\"";
-			}
-
-			command = "<span " + exampleElm + "style=\"color: #00006F\">" + html_tag_esc(command) + "</span>";
-
-			var help_row = html_tag_esc("-> /") + command + " " + param_desc + " :: " + html_tag_esc(desc);
-
-			// alternating stripes
-			if(cmdIdx % 2 == 1) {
-				help_row = "<div style=\"background-color: #C3C3C3\">" + help_row + "</div>";
-			}
-
-			htmlResp += help_row;
-			cmdIdx++;
-		}
-		htmlResp += "</div>";
-
-		e.message = htmlResp;
-		// upgrade permissions to allow display of HTML
-		e.op = true;
-		e.admin = true;
-		e.staff = true;
-	}
-});
 
 /*
 	[type]:

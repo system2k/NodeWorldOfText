@@ -6464,14 +6464,15 @@ var network = {
 		}
 		network.transmit(fetchReq);
 	},
-	chat: function(message, location, nickname, color, customMeta) {
+	chat: function(message, location, nickname, color, customMeta, pmTo) {
 		network.transmit({
 			kind: "chat",
 			nickname: nickname,
 			message: message,
 			location: location,
 			color: color,
-			customMeta: customMeta
+			customMeta: customMeta,
+			privateMessageTo: pmTo
 		});
 	},
 	ping: function(callback) {
@@ -6548,6 +6549,140 @@ var network = {
 		network.transmit({
 			kind: "stats",
 			id: cb_id // optional: number
+		});
+	},
+	uptime: function(callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "uptime",
+			request: cb_id
+		});
+	},
+	whoami: function(callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "whoami",
+			request: cb_id
+		});
+	},
+	chat_test: function(location, nickname, color) {
+		network.transmit({
+			kind: "chat_test",
+			location,
+			nickname,
+			color
+		});
+	},
+	chat_delete_req: function(id, timestamp, location, callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "chat_delete_req",
+			id,
+			timestamp,
+			location,
+			request: cb_id
+		});
+	},
+	worlds: function(callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "worlds",
+			request: cb_id
+		});
+	},
+	chat_channel: function(location, callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "chat_channel",
+			location,
+			request: cb_id
+		});
+	},
+	mute: function(id, time, location, callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "mute",
+			id,
+			time,
+			location,
+			request: cb_id
+		});
+	},
+	clear_mutes: function(location, callback) {
+		var cb_id = void 0;
+		if(callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "clear_mutes",
+			location,
+			request: cb_id
+		});
+	},
+	block_id: function(id, location, block, callback) {
+		var cb_id = void 0;
+		if(block && callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "block_id",
+			id,
+			location,
+			block,
+			request: cb_id
+		});
+	},
+	block_user: function(username, block, callback) {
+		var cb_id = void 0;
+		if(block && callback) {
+			cb_id = network.latestID++;
+			network.callbacks[cb_id] = callback;
+		}
+		network.transmit({
+			kind: "block_user",
+			username,
+			block,
+			request: cb_id
+		});
+	},
+	block_special: function(all, tell, anon, reg) {
+		network.transmit({
+			kind: "block_special",
+			all,
+			tell,
+			anon,
+			reg
+		});
+	},
+	unblock_all: function() {
+		network.transmit({
+			kind: "unblock_all"
 		});
 	}
 };
@@ -8158,6 +8293,87 @@ var ws_functions = {
 			if(network.callbacks[data.id]) {
 				var cb = network.callbacks[data.id];
 				delete network.callbacks[data.id];
+				cb(data);
+			}
+		}
+	},
+	uptime: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	whoami: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	chat_delete_req: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	worlds: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	chat_channel: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	mute: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	clear_mutes: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	block_id: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
+				cb(data);
+			}
+		}
+	},
+	block_user: function(data) {
+		if(data.request) {
+			if(network.callbacks[data.request]) {
+				var cb = network.callbacks[data.request];
+				delete network.callbacks[data.request];
 				cb(data);
 			}
 		}

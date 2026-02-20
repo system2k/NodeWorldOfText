@@ -820,6 +820,37 @@ function checkURLParam(mask, url) {
 	return values;
 }
 
+function getClientIPByChatID(server, world_id, id, isGlobal) {
+	var client_ips = server.client_ips;
+
+	if(isGlobal) {
+		// since this is global, there is the potential for duplicate IDs.
+		// pick the one that has chatted the most recently.
+		var latestGCli = null;
+		var latestGCliTime = -1;
+		for(var cw in client_ips) {
+			var worldClients = client_ips[cw];
+			if(worldClients[id]) {
+				var gCli = worldClients[id];
+				if(gCli[3] != -1 && gCli[3] >= latestGCliTime) {
+					latestGCliTime = gCli[3];
+					latestGCli = gCli;
+				}
+			}
+		}
+		if(latestGCli) {
+			return latestGCli[0];
+		}
+	} else {
+		if(client_ips[world_id]) {
+			if(client_ips[world_id][id]) {
+				return client_ips[world_id][id][0];
+			}
+		}
+	}
+	return null;
+}
+
 module.exports = {
 	trimHTML,
 	create_date,
@@ -851,5 +882,6 @@ module.exports = {
 	trimSlash,
 	checkDuplicateCookie,
 	toHex64,
-	toInt64
+	toInt64,
+	getClientIPByChatID
 };
