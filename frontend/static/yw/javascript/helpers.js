@@ -1,10 +1,10 @@
 var enums = {};
 function makeEnum(vars) {
-	var enums = {};
+	var enumInProgress = {};
 	for(var i = 0; i < vars.length; i++) {
-		enums[vars[i]] = i;
+		enumInProgress[vars[i]] = i;
 	}
-	return enums;
+	return enumInProgress;
 }
 
 enums.edit = makeEnum(["tileY", "tileX", "charY", "charX", "time", "char", "id", "color"]);
