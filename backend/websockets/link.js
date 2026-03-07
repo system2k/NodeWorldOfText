@@ -11,13 +11,14 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var url = sData.url;
 	var link_tileX = sData.link_tileX;
 	var link_tileY = sData.link_tileY;
+	var relative = sData.relative;
 
 	var do_link = await modules.write_links({
 		type,
 		tileX, tileY,
 		charX, charY,
 		url,
-		link_tileX, link_tileY
+		link_tileX, link_tileY, relative
 	}, server, {
 		user: ctx.user,
 		channel: ctx.channel,

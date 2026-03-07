@@ -641,6 +641,7 @@ function tileWriteLinks(callID, tile, options) {
 	var url = options.url;
 	var link_tileX = options.link_tileX;
 	var link_tileY = options.link_tileY;
+	var relative = options.relative;
 
 	var index = charY * CONST.tileCols + charX;
 	var char_writability = tile.prop_char[index];
@@ -714,7 +715,8 @@ function tileWriteLinks(callID, tile, options) {
 		cellProps[charY][charX].link = {
 			type: "coord",
 			link_tileY: link_tileY,
-			link_tileX: link_tileX
+			link_tileX: link_tileX,
+			relative: relative
 		}
 	}
 	tile.props_updated = true;
@@ -1420,11 +1422,13 @@ function processTileLinkRequest(call_id, data) {
 					linkArch.link_type = 0;
 					linkArch.link_tileX = null;
 					linkArch.link_tileY = null;
+					linkArch.relative = null;
 					linkArch.url = data.url;
 				} else if(data.type == "coord") {
 					linkArch.link_type = 1;
 					linkArch.link_tileX = data.link_tileX;
 					linkArch.link_tileY = data.link_tileY;
+					linkArch.relative = data.relative;
 					linkArch.url = "";
 				}
 				var editData = "@" + JSON.stringify(linkArch);
