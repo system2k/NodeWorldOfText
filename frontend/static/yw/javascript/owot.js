@@ -160,7 +160,6 @@ var mSpecRendering         = true; // render special properties if a certain com
 var combiningCharsEnabled  = true;
 var surrogateCharsEnabled  = true;
 var defaultCoordLinkColor  = "#008000";
-var defaultCoordRelativeLinkColor = "#00E000";
 var defaultURLLinkColor    = "#0000FF";
 var defaultHighlightColor  = [0xFF, 0xFF, 0x99];
 var secureJSLink           = true; // display warning prompt when clicking on javascript links
@@ -3513,7 +3512,10 @@ function setupLinkElement() {
 		return false;
 	}
 	linkElm.onclick = function(e) {
+		var pageX = e.pageX * zoomRatio;
+		var pageY = e.pageY * zoomRatio;
 		if(linkParams.coord) {
+			updateHoveredLink(pageX, pageY, e);
 			coord_link_click(e);
 			return;
 		}
@@ -3671,8 +3673,13 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 			linkElm.target = "";
 			linkElm.href = "javascript:void(0);";
 			linkElm.target = "";
-			var pos = link.link_tileX + "," + link.link_tileY;
-			linkElm.title = "Link to coordinates " + pos + (link.relative?" (relative)":"");
+			if(link.relative) {
+				let pos = ((link.link_tileX >= 0) ? "+" : "") + link.link_tileX + "," + ((link.link_tileY >= 0) ? "+" : "") + link.link_tileY;
+				linkElm.title = "Relative link to coordinates " + pos;
+			} else {
+				let pos = link.link_tileX + "," + link.link_tileY;
+				linkElm.title = "Link to coordinates " + pos;
+			}
 		}
 	} else {
 		currentSelectedLink = null;
@@ -6914,7 +6921,6 @@ Object.assign(w, {
 		styles.public_text = "#000";
 		defaultURLLinkColor = "#1570F0";
 		defaultCoordLinkColor = "#409015";
-		defaultCoordRelativeLinkColor = "#50E020";
 		w.nightMode = 1;
 		if(ignoreUnloadedPattern) {
 			w.nightMode = 2;
@@ -6928,7 +6934,6 @@ Object.assign(w, {
 		w.nightMode = 0;
 		defaultURLLinkColor = "#0000FF";
 		defaultCoordLinkColor = "#008000";
-		defaultCoordRelativeLinkColor = "#00E000";
 		if(elm.owot.classList.contains("nightmode")) {
 			elm.owot.classList.remove("nightmode");
 		}
@@ -7178,12 +7183,11 @@ function enableBgColorPicker() {
 function makeCoordLinkModal() {
 	var modal = new Modal();
 	modal.createForm();
-	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a character to create the link.\n");
+	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a cell to create the link.\n");
 	var coordX = modal.addEntry("X", "text", "number").input;
 	var coordY = modal.addEntry("Y", "text", "number").input;
 	var relative = modal.addEntry("Relative", "checkbox").input;
-	relative.parentElement.title = `When checked, when clicking the link, the user will teleport to this location where their current position is 0,0.
-Relative coordinate links will appear brighter.`;
+	relative.parentElement.title = "When checked, this coord link will teleport the user relative to the coordinates provided";
 	relative.type = "checkbox";
 	relative.style.width = "0.75em";
 	modal.setMaximumSize(360, 300);
