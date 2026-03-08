@@ -1,14 +1,21 @@
-function Menu(titleEl, menuEl) {
+function Menu(titleEl, menuEl, menuCornerAreaEl) {
 	var _this = this;
+
 	this.titleEl = titleEl;
 	this.menuEl = menuEl;
+	this.menuCornerAreaEl = menuCornerAreaEl;
 	this.pinEl = null;
+	
 	this._SPEED = 250;
 	this.entries = [];
 	this.pinned = false;
 	this.visible = false;
 	this.lastEntryId = 1;
 	this.entriesById = {};
+
+	this.menuAnimationState = "up";
+	this.menuAnimationActive = false;
+	
 	this.addOption = function(text, action) {
 		var s = document.createElement("div");
 		s.innerText = text;
@@ -41,10 +48,27 @@ function Menu(titleEl, menuEl) {
 		}
 		return _this.addEntry(s);
 	}
+
+	this.addCornerButton = function(text, action) {
+		if(!_this.menuCornerAreaEl) throw "No corner button area element defined";
+		let btn = document.createElement("span");
+		btn.className = "ui-vis tab corner-tab";
+		let btnText = document.createElement("span");
+		btnText.className = "menuText";
+		btn.appendChild(btnText);
+		if(typeof text == "string") {
+			btnText.innerText = text;
+		} else {
+			btnText.appendChild(text);
+		}
+		btnText.onclick = action;
+		_this.menuCornerAreaEl.appendChild(btn);
+	}
+
 	this.hideNow = function() {
 		if(_this.pinned) return;
 		_this.visible = false;
-		slideMenu("up", _this.menuEl, _this._SPEED);
+		_this.slide("up", _this.menuEl, _this._SPEED);
 		_this.titleEl.classList.remove("hover");
 	}
 	this.cancelHide = false;
@@ -60,7 +84,7 @@ function Menu(titleEl, menuEl) {
 	this.show = function() {
 		_this.visible = true;
 		_this.cancelHide = true;
-		slideMenu("down", _this.menuEl, _this._SPEED);
+		_this.slide("down", _this.menuEl, _this._SPEED);
 		_this.titleEl.classList.add("hover");
 	}
 	this.getEntryContainer = function() {
@@ -156,6 +180,61 @@ function Menu(titleEl, menuEl) {
 			_this.pinEl.style.display = "none";
 		}
 	}
+
+	this.slide = function(direction, element, speed) {
+		if(_this.menuAnimationActive) return;
+		var interval = 13;
+		var menuMargin = 2;
+		if(_this.menuAnimationState == "up" && direction == "up") return;
+		if(_this.menuAnimationState == "down" && direction == "down") return;
+
+		_this.menuAnimationActive = true;
+		_this.menuAnimationState = direction;
+
+		element.style.overflow = "hidden";
+		element.style.marginTop = "0px";
+		element.style.marginBottom = "0px";
+
+		element.style.display = "block";
+		var destHeight = element.offsetHeight - menuMargin * 2;
+		if(direction == "down") element.style.height = "0px";
+		var start = getDate();
+		var end = start + speed;
+		var lapse = end - start;
+		var menu_int = setInterval(function() {
+			element.style.display = "block";
+			var duration = getDate() - start;
+			if(duration >= lapse) {
+				_this.menuAnimationActive = false;
+				clearInterval(menu_int);
+				if(direction == "down") {
+					element.style.display = "";
+				} else if(direction == "up") {
+					element.style.display = "none";
+				}
+				element.style.overflow = "";
+				element.style.marginTop = "";
+				element.style.marginBottom = "";
+				element.style.height = "";
+				element.style.paddingTop = "";
+				element.style.paddingBottom = "";
+				return;
+			}
+			var multiply = easeOutQuad(duration, 0, 1, speed);
+
+			var currentHeight = multiply * destHeight;
+			var currentPadding = multiply * menuMargin;
+
+			if(direction == "up") {
+				currentHeight = destHeight - currentHeight;
+				currentPadding = menuMargin - currentPadding;
+			}
+			element.style.height = currentHeight + "px";
+			element.style.paddingTop = currentPadding + "px";
+			element.style.paddingBottom = currentPadding + "px";
+		}, interval);
+	}
+
 	this.titleEl.style.display = "";
 
 	this.menuEl.style.top = (this.titleEl.getBoundingClientRect().top + document.body.scrollTop) + this.titleEl.offsetHeight + "px";
@@ -181,58 +260,3 @@ function Menu(titleEl, menuEl) {
 	}
 }
 
-var menuAnimationState = "up";
-var menuAnimationActive = false;
-function slideMenu(direction, element, speed) {
-	if(menuAnimationActive) return;
-	var interval = 13;
-	var menuMargin = 2;
-	if(menuAnimationState == "up" && direction == "up") return;
-	if(menuAnimationState == "down" && direction == "down") return;
-
-	menuAnimationActive = true;
-	menuAnimationState = direction;
-
-	element.style.overflow = "hidden";
-	element.style.marginTop = "0px";
-	element.style.marginBottom = "0px";
-
-	element.style.display = "block";
-	var destHeight = element.offsetHeight - menuMargin * 2;
-	if(direction == "down") element.style.height = "0px";
-	var start = getDate();
-	var end = start + speed;
-	var lapse = end - start;
-	var menu_int = setInterval(function() {
-		element.style.display = "block";
-		var duration = getDate() - start;
-		if(duration >= lapse) {
-			menuAnimationActive = false;
-			clearInterval(menu_int);
-			if(direction == "down") {
-				element.style.display = "";
-			} else if(direction == "up") {
-				element.style.display = "none";
-			}
-			element.style.overflow = "";
-			element.style.marginTop = "";
-			element.style.marginBottom = "";
-			element.style.height = "";
-			element.style.paddingTop = "";
-			element.style.paddingBottom = "";
-			return;
-		}
-		var multiply = easeOutQuad(duration, 0, 1, speed);
-
-		var currentHeight = multiply * destHeight;
-		var currentPadding = multiply * menuMargin;
-
-		if(direction == "up") {
-			currentHeight = destHeight - currentHeight;
-			currentPadding = menuMargin - currentPadding;
-		}
-		element.style.height = currentHeight + "px";
-		element.style.paddingTop = currentPadding + "px";
-		element.style.paddingBottom = currentPadding + "px";
-	}, interval);
-}

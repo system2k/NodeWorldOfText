@@ -20,11 +20,14 @@
 		<div id="topbar" class="ui">
 			<div id="topbar_inner">
 				<div id="announce_container"></div>
-				<span id="menu" class="ui-vis tab menu" style="display: none;">
-					<img src="/static/pin.svg" class="menuPin" style="display: none;">
-					<span class="menuText">Menu</span>
-					<span style="font-size:50%">▼</span>
-				</span>
+				<div class="menu-corner">
+					<div id="menu_corner_area"></div>
+					<span id="menu" class="ui-vis tab" style="display: none;">
+						<img src="/static/pin.svg" class="menuPin" style="display: none;">
+						<span class="menuText">Menu</span>
+						<span style="font-size:50%">▼</span>
+					</span>
+				</div>
 			</div>
 		</div>
 		<div id="nav" class="ui menu ui-vis" style="display: none;">
@@ -109,7 +112,7 @@
 					Global<b id="global_unread" class="unread" style="display: none;">(-)</b>
 				</div>
 				<span id="usr_online"></span>
-				<div id="chat_close">X</div>
+				<div id="chat_close" class="close_button">X</div>
 			</div>
 			<div class="chatfield" id="page_chatfield"></div>
 			<div class="chatfield" id="global_chatfield" style="display: none;"></div>

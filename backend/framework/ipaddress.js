@@ -220,6 +220,53 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 	return [ipAddress, ipAddressFam, ipAddressVal];
 }
 
+// convert ip integer range to ip string
+function reconIPv4(start, end) {
+	var range = end - start + 1;
+	var sub = 32 - Math.floor(Math.log2(range));
+	var dig1 = (start) & 0xff;
+	var dig2 = (start >> 8) & 0xff;
+	var dig3 = (start >> 16) & 0xff;
+	var dig4 = (start >> 24) & 0xff;
+	var ip = dig4 + "." + dig3 + "." + dig2 + "." + dig1;
+	if(sub != 32) ip += "/" + sub;
+	return ip;
+}
+
+function reconIPv6(start, end) {
+	var range = end - start + 1n;
+	var sub = 0;
+	for(var i = 0; i < 128; i++) {
+		if(range < 2n) {
+			break;
+		}
+		range /= 2n;
+		sub++;
+	}
+	sub = 128 - sub;
+	var s1 = ((start >> (16n*7n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s2 = ((start >> (16n*6n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s3 = ((start >> (16n*5n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s4 = ((start >> (16n*4n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s5 = ((start >> (16n*3n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s6 = ((start >> (16n*2n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s7 = ((start >> (16n*1n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var s8 = ((start) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
+	var ip = s1 + ":" + s2 + ":" + s3 + ":" + s4 + ":" + s5 + ":" + s6 + ":" + s7 + ":" + s8;
+	if(sub != 128) ip += "/" + sub;
+	return ip;
+}
+
+function reconIP(ipObj) {
+	let ipRange = ipObj[0];
+	let ipFam = ipObj[1];
+	if(ipFam == 4) {
+		return reconIPv4(ipRange[0], ipRange[1]);
+	} else if(ipFam == 6) {
+		return reconIPv6(ipRange[0], ipRange[1]);
+	}
+	return null;
+}
 
 
 module.exports = {
@@ -230,5 +277,8 @@ module.exports = {
 	ipv6_to_range,
 	is_cf_ipv4_int,
 	is_cf_ipv6_int,
-	evaluateIpAddress
+	evaluateIpAddress,
+	reconIPv4,
+	reconIPv6,
+	reconIP,
 };

@@ -556,6 +556,9 @@ var pages = {
 		verify_email: require("./backend/pages/accounts/verify_email.js")
 	},
 	admin: {
+		api: {
+			restrictions: require("./backend/pages/admin/api/restrictions.js")
+		},
 		administrator: require("./backend/pages/admin/administrator.js"),
 		backgrounds: require("./backend/pages/admin/backgrounds.js"),
 		manage_ranks: require("./backend/pages/admin/manage_ranks.js"),
@@ -1154,6 +1157,7 @@ function createEndpoints(server) {
 	server.registerEndpoint("administrator/monitor/", (settings && settings.monitor && settings.monitor.redirect) ? settings.monitor.redirect : null);
 	server.registerEndpoint("administrator/shell", pages.admin.shell);
 	server.registerEndpoint("administrator/restrictions", pages.admin.restrictions, { binary_post_data: true });
+	server.registerEndpoint("administrator/api/restrictions", pages.admin.api.restrictions);
 
 	server.registerEndpoint("script_manager/", pages.script_manager);
 	server.registerEndpoint("script_manager/edit/*", pages.script_edit);
@@ -1405,6 +1409,8 @@ function loadRestrictionsList() {
 			var list = restr_cache.toString("utf8").replace(/\r\n/g, "\n").split("\n");
 			var result = restrictions.procRest(list);
 			restrictions.setRestrictions(result.groups);
+			restrictions.setRestrictionsFlatList(result.raw);
+			restrictions.setRestrictionsFlatListStr(result.rawStr);
 		}
 		if(restr_cg1_cache) {
 			var list = restr_cg1_cache.toString("utf8").replace(/\r\n/g, "\n").split("\n");

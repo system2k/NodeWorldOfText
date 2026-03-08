@@ -430,7 +430,7 @@ elm.chat_open.addEventListener("click", function() {
 	if(!screenRatio) screenRatio = 1;
 	var virtWidth = owotWidth / screenRatio;
 	if(chatWidth > virtWidth) {
-		resizeChat(virtWidth - 2, chatHeight);
+		resizeElement(elm.chat_window, virtWidth - 2, chatHeight);
 	}
 	if(!initChatOpen) {
 		initChatOpen = true;
@@ -542,7 +542,7 @@ function resizable_chat() {
 		} else if(resize_right) {
 			width_delta = offX;
 		}
-		var res = resizeChat(chatWidth + width_delta, chatHeight + height_delta);
+		var res = resizeElement(elm.chat_window, chatWidth + width_delta, chatHeight + height_delta);
 		if(resize_top && !snap_bottom) {
 			chat_window.style.top = (elmY + (chatHeight - res[1])) + "px";
 		}

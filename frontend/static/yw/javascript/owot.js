@@ -272,7 +272,6 @@ defineElements({ // elm[<name>]
 	char_Y: byId("char_Y"),
 	char_X: byId("char_X"),
 	chatbar: byId("chatbar"),
-	color_input_form_input: byId("color_input_form_input"),
 	protect_precision: byId("protect_precision"),
 	erase_region: byId("erase_region"),
 	announce_container: byId("announce_container"),
@@ -280,6 +279,7 @@ defineElements({ // elm[<name>]
 	char_choice: byId("char_choice"),
 	menu_elm: byId("menu"),
 	nav_elm: byId("nav"),
+	menu_corner_area_elm: byId("menu_corner_area"),
 	coords: byId("coords"),
 	cursor_coords: byId("cursor_coords"),
 	cursor_on: byId("cursor_on"),
@@ -425,10 +425,13 @@ function addColorShortcuts() {
 
 var draggable_element_mousemove = [];
 var draggable_element_mouseup = [];
-function draggable_element(dragger, dragged, exclusions, onDrag) {
+var draggable_element_index_max = 100;
+function makeElementDraggable(dragger, dragged, exclusions, onDrag) {
 	if(!dragged) {
 		dragged = dragger;
 	}
+	dragged.style.zIndex = draggable_element_index_max++;
+
 	var elmX = 0;
 	var elmY = 0;
 	var elmHeight = 0;
@@ -453,6 +456,8 @@ function draggable_element(dragger, dragged, exclusions, onDrag) {
 		dragging = true;
 		clickX = e.pageX;
 		clickY = e.pageY;
+
+		dragged.style.zIndex = draggable_element_index_max++;
 	});
 	// when the element is being dragged
 	draggable_element_mousemove.push(function(e, arg_pageX, arg_pageY) {
@@ -494,24 +499,118 @@ function draggable_element(dragger, dragged, exclusions, onDrag) {
 	});
 }
 
-function resizeChat(width, height) {
+function resizeElement(element, width, height, minWidth, minHeight) {
 	// default: 400 x 300
-	if(width < 350) width = 350;
-	if(height < 57) height = 57;
-	elm.chat_window.style.width = width + "px";
-	elm.chat_window.style.height = height + "px";
+	minWidth ||= 350;
+	minHeight ||= 57;
+	if(width < minWidth) width = minWidth;
+	if(height < minHeight) height = minHeight;
+	element.style.width = width + "px";
+	element.style.height = height + "px";
 	return [width, height];
 }
 
+function makeElementResizable(element) {
+	let resizeStatus = {
+		elementIsResizing: false
+	};
+
+	var state = 0;
+	var isDown = false;
+	var downX = 0;
+	var downY = 0;
+	var elmX = 0;
+	var elmY = 0;
+	var elementWidth = 0;
+	var elementHeight = 0;
+	element.addEventListener("mousemove", function(e) {
+		if(isDown) return;
+		var posX = e.pageX - element.offsetLeft;
+		var posY = e.pageY - element.offsetTop;
+		var top = (posY) <= 4;
+		var left = (posX) <= 3;
+		var right = (element.offsetWidth - posX) <= 4;
+		var bottom = (element.offsetHeight - posY) <= 5;
+		var cursor = "";
+		if(left || right) cursor = "ew-resize";
+		if(top || bottom) cursor = "ns-resize";
+		if((top && left) || (right && bottom)) cursor = "nwse-resize";
+		if((bottom && left) || (top && right)) cursor = "nesw-resize";
+		element.style.cursor = cursor;
+		state = bottom << 3 | right << 2 | left << 1 | top;
+	});
+	element.addEventListener("mousedown", function(e) {
+		downX = e.pageX;
+		downY = e.pageY;
+		if(state) {
+			// subtract 2 for the borders
+			elementWidth = element.offsetWidth - 2;
+			elementHeight = element.offsetHeight - 2;
+			elmX = element.offsetLeft;
+			elmY = element.offsetTop;
+			isDown = true;
+			resizeStatus.elementIsResizing = true;
+		}
+	});
+	document.addEventListener("mouseup", function() {
+		isDown = false;
+		resizeStatus.elementIsResizing = false;
+	});
+	document.addEventListener("mousemove", function(e) {
+		if(!isDown) return;
+		var offX = e.pageX - downX;
+		var offY = e.pageY - downY;
+		var resize_bottom = state >> 3 & 1;
+		var resize_right = state >> 2 & 1;
+		var resize_left = state >> 1 & 1;
+		var resize_top = state & 1;
+
+		var width_delta = 0;
+		var height_delta = 0;
+		var abs_top = element.offsetTop;
+		var abs_left = element.offsetLeft;
+		var snap_bottom = element.style.bottom == "0px";
+		var snap_right = element.style.right == "0px";
+
+		if(resize_top) {
+			height_delta = -offY;
+		} else if(resize_bottom) {
+			height_delta = offY;
+		}
+		if(resize_left) {
+			width_delta = -offX;
+		} else if(resize_right) {
+			width_delta = offX;
+		}
+		var res = resizeElement(element, elementWidth + width_delta, elementHeight + height_delta);
+		if(resize_top && !snap_bottom) {
+			element.style.top = (elmY + (elementHeight - res[1])) + "px";
+		}
+		if(resize_bottom && snap_bottom) {
+			element.style.bottom = "";
+			element.style.top = abs_top + "px";
+		}
+		if(resize_right && snap_right) {
+			element.style.right = "";
+			element.style.left = abs_left + "px";
+		}
+		if(resize_left && !snap_right) {
+			element.style.left = (elmX + (elementWidth - res[0])) + "px";
+		}
+	});
+
+	return resizeStatus;
+}
+
 function makeChatInteractive() {
-	draggable_element(elm.chat_window, null, [
+	makeElementDraggable(elm.chat_window, null, [
 		elm.chatbar, elm.chatsend, elm.chat_close, elm.chat_page_tab, elm.chat_global_tab, elm.page_chatfield, elm.global_chatfield
 	], function() {
 		if(chatResizing) {
 			return -1;
 		}
 	});
-	draggable_element(elm.confirm_js, null, [
+	makeElementDraggable(elm.confirm_js, null, [
 		elm.confirm_js_code
 	]);
 	// from chat.js
@@ -5171,7 +5270,7 @@ function protectSelection() {
 }
 
 function buildMenu() {
-	menu = new Menu(elm.menu_elm, elm.nav_elm);
+	menu = new Menu(elm.menu_elm, elm.nav_elm, elm.menu_corner_area_elm);
 	w.menu = menu;
 	var homeLink = document.createElement("a");
 	var homeLinkIcon = document.createElement("img");
@@ -6556,6 +6655,20 @@ var network = {
 			kind: "stats",
 			id: cb_id // optional: number
 		});
+	},
+	config: function(param, value) {
+		/*
+			Supported configs:
+				- updates (bool) => receive any tile updates from the server
+				- localFilter (bool) => don't receive updates issued too far away
+				-- Superuser only:
+					- directAdminUpdates (bool) => receive direct edits with descriptive client data
+					- descriptiveCmd (bool) => populate cmd broadcasts with descriptive client data
+		*/
+		network.transmit({
+			kind: "config",
+			[param]: value
+		});
 	}
 };
 
@@ -7868,6 +7981,11 @@ var ws_functions = {
 		}
 		w.emit("afterTileUpdate", data);
 	},
+	tileUpdateDirect: function(data) {
+		if(w.wtwTracker) {
+			w.wtwTracker.handleUpdate(data);
+		}
+	},
 	write: function(data) {
 		if("request" in data) {
 			var id = data.request;
@@ -8251,7 +8369,9 @@ function begin() {
 	protectPrecisionOption(protectPrecision);
 
 	if(state.userModel.is_superuser) {
-		w.loadScript("/static/yw/javascript/world_tools.js");
+		w.loadScript("/static/yw/javascript/world_tools.js", function() {
+			w.wtwTracker = new WTWTracker(w);
+		});
 	}
 	
 	if(state.worldModel.default_script_path && window.URL) {

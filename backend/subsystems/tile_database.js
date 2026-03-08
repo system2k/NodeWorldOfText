@@ -100,6 +100,7 @@ module.exports.server_exit = async function() {
 }
 
 var tileClientUpdateQueue = {};
+var tileAdminClientUpdateQueue = {};
 var linkBandwidthInPeriod = 0;
 var linkBandwidthPeriod = 0;
 
@@ -121,7 +122,50 @@ function prepareTileUpdateMessage(tileObj, worldObj, channel) {
 	}
 }
 
-function generateFullTileUpdate(worldQueue, worldID) {
+function prepareAdminDirectTileUpdateMessage(type, tileObj, worldObj, dataObj) {
+	let worldID = worldObj.id;
+	let clientChannel = dataObj.channel;
+	let clientIp = dataObj.ip;
+
+	let updateObj = tileAdminClientUpdateQueue[worldID];
+	if(!updateObj) {
+		updateObj = {
+			maxSubjectId: 1,
+			subjectMap: {},
+			tiles: {}
+		};
+		tileAdminClientUpdateQueue[worldID] = updateObj;
+	}
+
+	let subjectLookupKey = `${clientChannel}/${clientIp}`;
+	let subject = updateObj.subjectMap[subjectLookupKey];
+	let subjectId;
+	if(!subject) {
+		subjectId = updateObj.maxSubjectId++;
+		subject = {
+			id: subjectId,
+			clientChannel, clientIp
+		};
+		updateObj.subjectMap[subjectLookupKey] = subject;
+	} else {
+		subjectId = subject.id;
+	}
+
+	for(let pos in tileObj) {
+		let tileWrites = tileObj[pos].map(arr => {
+			return [subjectId, ...arr];
+		});
+		if(!updateObj.tiles[type]) {
+			updateObj.tiles[type] = {};
+		}
+		if(!updateObj.tiles[type][pos]) {
+			updateObj.tiles[type][pos] = [];
+		}
+		updateObj.tiles[type][pos].push(...tileWrites);
+	}
+}
+
+function generateFullTileUpdate(worldQueue) {
 	var cliUpdData = {};
 	var totalUpdatedTiles = 0;
 	var channel = "Unavailable";
@@ -175,12 +219,31 @@ function generateFullTileUpdate(worldQueue, worldID) {
 		};
 	}
 
-	delete tileClientUpdateQueue[worldID];
 	return {
 		channel: channel,
 		kind: "tileUpdate",
 		source: "write",
 		tiles: cliUpdData
+	};
+}
+
+function generateAdminDirectTileUpdate(worldQueue) {
+	let subjectMap = worldQueue.subjectMap;
+	let tiles = worldQueue.tiles;
+
+	let subjectIdMap = {};
+	for(let subjectKey in subjectMap) {
+		let subject = subjectMap[subjectKey];
+		subjectIdMap[subject.id] = {
+			clientChannel: subject.clientChannel,
+			clientIp: subject.clientIp
+		};
+	}
+
+	return {
+		kind: "tileUpdateDirect",
+		subjects: subjectIdMap,
+		tiles: tiles
 	};
 }
 
@@ -238,24 +301,26 @@ function filterUpdatePacketDistance(client, packet) {
 
 function sendTileUpdatesToClients() {
 	if(server_exiting) return;
-	var hasUpdates = Object.keys(tileClientUpdateQueue).length > 0;
-	if(!hasUpdates) {
+	let hasUpdates = Object.keys(tileClientUpdateQueue).length > 0;
+	let hasUpdatesAdmin = Object.keys(tileAdminClientUpdateQueue).length > 0;
+	if(!hasUpdates && !hasUpdatesAdmin) {
 		intv.client_update_clock = setTimeout(sendTileUpdatesToClients, 1000 / 30);
 		return;
 	}
-	for(var world in tileClientUpdateQueue) {
-		var worldQueue = tileClientUpdateQueue[world];
-		var worldID = parseInt(world);
+	for(let world in tileClientUpdateQueue) {
+		let worldQueue = tileClientUpdateQueue[world];
+		let worldID = parseInt(world);
 
-		var cliUpdPkt = generateFullTileUpdate(worldQueue, world);
-		var pktBroadcast = JSON.stringify(cliUpdPkt);
+		let cliUpdPkt = generateFullTileUpdate(worldQueue);
+		delete tileClientUpdateQueue[worldID];
+		let pktBroadcast = JSON.stringify(cliUpdPkt);
 
 		wss.clients.forEach(function(client) {
 			if(!client.sdata) return;
 			if(!client.sdata.userClient) return;
 			if(!client.sdata.receiveContentUpdates) return;
 			if(client.sdata.world.id == worldID && client.readyState == WebSocket.OPEN) {
-				var filteredPacket = filterUpdatePacketDistance(client, cliUpdPkt);
+				let filteredPacket = filterUpdatePacketDistance(client, cliUpdPkt);
 				if(filteredPacket) {
 					// this client was found to be too far away from the location of the edits,
 					// so we must re-serialize the update message
@@ -265,6 +330,26 @@ function sendTileUpdatesToClients() {
 				} else {
 					wsSend(client, pktBroadcast);
 				}
+			}
+		});
+	}
+	for(let world in tileAdminClientUpdateQueue) {
+		let worldQueue = tileAdminClientUpdateQueue[world];
+		let worldID = parseInt(world);
+
+		let cliUpdPkt = generateAdminDirectTileUpdate(worldQueue);
+		delete tileAdminClientUpdateQueue[worldID];
+		let pktBroadcast = JSON.stringify(cliUpdPkt);
+
+		wss.clients.forEach(function(client) {
+			if(!client.sdata) return;
+			if(!client.sdata.userClient) return;
+			if(!client.sdata.receiveContentUpdates) return;
+			if(!client.sdata.user) return;
+			if(!client.sdata.user.authenticated) return;
+			if(!client.sdata.user.superuser) return;
+			if(client.sdata.world.id == worldID && client.readyState == WebSocket.OPEN) {
+				wsSend(client, pktBroadcast);
 			}
 		});
 	}
@@ -589,26 +674,31 @@ function tileWriteEdits(callID, tile, options, editData) {
 		} catch(e) {}
 	}
 
-	for(var e = 0; e < editData.length; e++) {
-		var edit = editData[e];
+	for(let e = 0; e < editData.length; e++) {
+		let edit = editData[e];
 
-		var tileY = edit[0];
-		var tileX = edit[1];
-		var charY = edit[2];
-		var charX = edit[3];
-		var time = edit[4]; // not used
-		var char = edit[5];
-		var editID = edit[6]; // returned to the client in a response
-		var color = edit[7]; // integer (0 - 16777215 or -1)
-		var bgcolor = edit[8]; // integer (-1 - 16777215) or null
+		let tileY = edit[0];
+		let tileX = edit[1];
+		let charY = edit[2];
+		let charX = edit[3];
+		let time = edit[4]; // not used
+		let char = edit[5];
+		let editID = edit[6]; // returned to the client in a response
+		let color = edit[7]; // integer (0 - 16777215 or -1)
+		let bgcolor = edit[8]; // integer (-1 - 16777215) or null
 
-		var charUpdated = writeChar(world, tile, charX, charY, char, color, bgcolor, is_owner, is_member, options);
+		let index = charY * CONST.tileCols + charX;
+		let prev_char = tile.content?.[index] || " ";
+		let prev_color = tile.prop_color?.[index] || 0;
+		let prev_bgcolor = tile.prop_bgcolor?.[index] || -1;
+
+		let charUpdated = writeChar(world, tile, charX, charY, char, color, bgcolor, is_owner, is_member, options);
 		if(charUpdated == -1) {
 			rejected[editID] = enums.write.noWritePerm;
 		} else {
 			accepted.push(editID);
 			if(charUpdated && !no_log_edits) {
-				var ar = [tileY, tileX, charY, charX, 0, char, editID];
+				let ar = [tileY, tileX, charY, charX, 0, char, editID];
 				if(color) ar.push(color);
 				if(bgcolor != -1) {
 					if(!color) ar.push(0);
@@ -619,6 +709,14 @@ function tileWriteEdits(callID, tile, options, editData) {
 			if(charUpdated) {
 				tile.last_accessed = Date.now();
 				sharedData.updatedTiles[tileY + "," + tileX] = tile;
+			}
+			if(!sharedData.updatedTilesDirect[tileY + "," + tileX]) {
+				sharedData.updatedTilesDirect[tileY + "," + tileX] = [];
+			}
+			if(charUpdated) {
+				sharedData.updatedTilesDirect[tileY + "," + tileX].push([charUpdated, charX, charY, char, color, bgcolor, prev_char, prev_color, prev_bgcolor]);
+			} else {
+				sharedData.updatedTilesDirect[tileY + "," + tileX].push([charUpdated, charX, charY, char, color, bgcolor]);
 			}
 		}
 	}
@@ -725,6 +823,7 @@ function tileWriteLinks(callID, tile, options) {
 	respData[0] = false;
 	respData[1] = true;
 	sharedData.updatedTile = tile;
+	sharedData.updatedTileDirect = [[charX, charY, type, url?.slice(0, 100), link_tileX, link_tileY, relative]];
 	IOProgress(callID);
 }
 
@@ -1347,11 +1446,13 @@ function processTileWriteRequest(call_id, data) {
 	cids[call_id].total = Object.keys(buckets).length;
 	cids[call_id].sharedData = {
 		editLog: [],
-		updatedTiles: {}
+		updatedTiles: {},
+		updatedTilesDirect: {}
 	};
 	cids[call_id].completionCall = function() { // when the write is completed
 		var sharedData = cids[call_id].sharedData;
 		var updatedTiles = sharedData.updatedTiles;
+		var updatedTilesDirect = sharedData.updatedTilesDirect;
 		if(Object.keys(updatedTiles).length > 0) {
 			var updTile = [];
 			for(var i in updatedTiles) {
@@ -1366,6 +1467,9 @@ function processTileWriteRequest(call_id, data) {
 				});
 			}
 			prepareTileUpdateMessage(updTile, world, data.channel);
+		}
+		if(Object.keys(updatedTilesDirect).length > 0) {
+			prepareAdminDirectTileUpdateMessage("write", updatedTilesDirect, world, data);
 		}
 		if(!data.no_log_edits) {
 			var tileGroups = {};
@@ -1406,10 +1510,12 @@ function processTileLinkRequest(call_id, data) {
 	cids[call_id].responseData = [false, false];
 	cids[call_id].total = 1;
 	cids[call_id].sharedData = {
-		updatedTile: null
+		updatedTile: null,
+		updatedTileDirect: null
 	};
 	cids[call_id].completionCall = function() {
 		var updatedTile = cids[call_id].sharedData.updatedTile;
+		var updatedTileDirect = cids[call_id].sharedData.updatedTileDirect;
 		if(updatedTile) {
 			prepareTileUpdateMessage([{tileX, tileY, tile: updatedTile}], world, data.channel);
 			if(!data.no_log_edits && editlog_cell_props) {
@@ -1434,6 +1540,11 @@ function processTileLinkRequest(call_id, data) {
 				var editData = "@" + JSON.stringify(linkArch);
 				appendToEditLogQueue(tileX, tileY, 0, editData, world.id, Date.now());
 			}
+		}
+		if(updatedTileDirect) {
+			prepareAdminDirectTileUpdateMessage("link", {
+				[tileY + "," + tileX]: updatedTileDirect
+			}, world, data);
 		}
 	}
 	var tile = getCachedTile(world.id, tileX, tileY);

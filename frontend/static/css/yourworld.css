@@ -91,8 +91,21 @@ a:visited {
 }
 .tab {
 	padding-top: 0;
-	top: 0px;
+}
+.corner-tab:hover {
+	background-color: #CCCCFF;
+	cursor: default;
+}
+.corner-tab:active {
+	color: white;
+	background-color: #B2B2FF;
+}
+.menu-corner {
 	position: absolute;
+	/* top: 0px; */
+	right: 0px;
+	display: flex;
+	gap: 4px;
 }
 .message {
 	margin-left: auto;
@@ -122,6 +135,7 @@ a:visited {
 }
 #menu {
 	cursor: pointer;
+	box-sizing: border-box;
 }
 #menu.hover {
 	color: #555;
@@ -302,6 +316,9 @@ a:visited {
 	flex-flow: column;
 }
 #chat_close {
+	float: right;
+}
+.close_button {
 	background-color: red;
 	width: 20px;
 	height: 20px;
@@ -312,7 +329,6 @@ a:visited {
 	font-family: monospace;
 	font-size: 16px;
 	cursor: default;
-	float: right;
 }
 #confirm_js {
 	width: 441px;
@@ -453,6 +469,16 @@ a:visited {
 }
 .color_btn_no_cell {
 	background: linear-gradient(to right top, white 47.75%, red 49.5%, red 55%, white 50%);
+}
+.worldtools-wtw-datatable {
+	border-collapse: collapse;
+}
+.worldtools-wtw-datatable td:not(:first-child),th:not(:first-child) {
+	border-left: solid 1px #b7b7b7;
+}
+.worldtools-wtw-datatable thead {
+	border-bottom: solid 1px #b7b7b7;
+	background-color: #c9c9c9;
 }
 .modal_corner_checkbox_label {
 	margin-left: 5px;

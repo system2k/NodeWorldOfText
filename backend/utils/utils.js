@@ -851,5 +851,5 @@ module.exports = {
 	trimSlash,
 	checkDuplicateCookie,
 	toHex64,
-	toInt64
+	toInt64,
 };

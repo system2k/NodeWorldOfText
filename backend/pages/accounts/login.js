@@ -12,7 +12,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	
 	if(accountSystem == "uvias") {
 		return write(null, null, {
-			redirect: uvias.loginPath
+			redirect: uvias.paths.loginPath
 		});
 	}
 

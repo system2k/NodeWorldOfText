@@ -126,7 +126,8 @@ module.exports = async function(data, server, params) {
 		tileX, tileY, charX, charY,
 		user, world, is_member, is_owner,
 		type, url, link_tileX, link_tileY, relative,
-		channel, no_log_edits
+		channel, no_log_edits,
+		ip: ipAddress,
 	});
 
 	rate_limiter.releaseHold(idLabel, world.id, tileX, tileY);

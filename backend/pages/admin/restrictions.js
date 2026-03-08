@@ -2,6 +2,8 @@ var restrictions = require("../../utils/restrictions.js");
 var procRest = restrictions.procRest;
 var procCoal = restrictions.procCoal;
 var setRestrictions = restrictions.setRestrictions;
+var setRestrictionsFlatList = restrictions.setRestrictionsFlatList;
+var setRestrictionsFlatListStr = restrictions.setRestrictionsFlatListStr;
 var setCoalition = restrictions.setCoalition;
 
 module.exports.GET = async function(req, write, server, ctx) {
@@ -44,11 +46,13 @@ module.exports.POST = async function(req, write, server, ctx) {
 	if(type == "1") { // restrictions
 		var result = procRest(list);
 		setRestrictions(result.groups);
-		saveRestrictions("main", result.raw);
+		setRestrictionsFlatList(result.raw);
+		setRestrictionsFlatListStr(result.rawStr);
+		saveRestrictions("main", result.rawStr.join("\n") + "\n");
 	} else if(type == "2") { // coalesce
 		var result = procCoal(list);
 		setCoalition(result.data);
-		saveRestrictions("cg1", result.raw);
+		saveRestrictions("cg1", result.rawStr.join("\n") + "\n");
 	}
 
 	write("SUCCESS");

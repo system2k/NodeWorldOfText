@@ -1,17 +1,33 @@
 var ipaddress = require("../framework/ipaddress.js");
 var ipv4_to_range = ipaddress.ipv4_to_range;
 var ipv6_to_range = ipaddress.ipv6_to_range;
+var reconIPv4 = ipaddress.reconIPv4;
+var reconIPv6 = ipaddress.reconIPv6;
 
-var restrictions = {};
+var restrictionsTree = {};
+var restrictionsFlatList = [];
+var restrictionsFlatListStr = [];
 var coalition = {
 	v4: [],
 	v6: []
 };
 function setRestrictions(obj) {
-	restrictions = obj;
+	restrictionsTree = obj;
 }
 function getRestrictions() {
-	return restrictions;
+	return restrictionsTree;
+}
+function setRestrictionsFlatList(array) {
+	restrictionsFlatList = array;
+}
+function getRestrictionsFlatList() {
+	return restrictionsFlatList;
+}
+function setRestrictionsFlatListStr(array) {
+	restrictionsFlatListStr = array;
+}
+function getRestrictionsFlatListStr() {
+	return restrictionsFlatListStr;
 }
 function setCoalition(list) {
 	coalition = list;
@@ -112,43 +128,6 @@ function procIP(str) {
 	return null;
 }
 
-// convert ip integer range to ip string
-function reconIPv4(start, end) {
-	var range = end - start + 1;
-	var sub = 32 - Math.floor(Math.log2(range));
-	var dig1 = (start) & 0xff;
-	var dig2 = (start >> 8) & 0xff;
-	var dig3 = (start >> 16) & 0xff;
-	var dig4 = (start >> 24) & 0xff;
-	var ip = dig4 + "." + dig3 + "." + dig2 + "." + dig1;
-	if(sub != 32) ip += "/" + sub;
-	return ip;
-}
-
-function reconIPv6(start, end) {
-	var range = end - start + 1n;
-	var sub = 0;
-	for(var i = 0; i < 128; i++) {
-		if(range < 2n) {
-			break;
-		}
-		range /= 2n;
-		sub++;
-	}
-	sub = 128 - sub;
-	var s1 = ((start >> (16n*7n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-	var s2 = ((start >> (16n*6n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-	var s3 = ((start >> (16n*5n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-	var s4 = ((start >> (16n*4n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-	var s5 = ((start >> (16n*3n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-	var s6 = ((start >> (16n*2n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-	var s7 = ((start >> (16n*1n)) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-	var s8 = ((start) & 0xffffn).toString(16).toUpperCase().padStart(4, 0);
-	var ip = s1 + ":" + s2 + ":" + s3 + ":" + s4 + ":" + s5 + ":" + s6 + ":" + s7 + ":" + s8;
-	if(sub != 128) ip += "/" + sub;
-	return ip;
-}
-
 function sortRestrictionListIPv4(list) {
 	list.sort(function(a, b) {
 		let dir = a.ip[0][0] - b.ip[0][0];
@@ -247,39 +226,24 @@ function divideGroupIntoRestrictionsTree(group) {
 	}
 }
 
-function procRest(list) {
-	let restrictionsList = [];
-	let groups = {
-		charrate: { ipv4: {}, ipv6: {}, cg1: {} },
-		linkrate: { ipv4: {}, ipv6: {}, cg1: {} },
-		color: { ipv4: {}, ipv6: {}, cg1: {} },
+function parseRestrictionsList(list) {
+	let parsed = {
+		charrate: { ipv4: [], ipv6: [], cg1: [] },
+		linkrate: { ipv4: [], ipv6: [], cg1: [] },
+		color: { ipv4: [], ipv6: [], cg1: [] },
 		daccess: {
 			site: { ipv4: [], ipv6: [] },
-			httpwrite: { ipv4: {}, ipv6: {}, cg1: {} }
-		}
+			httpwrite: { ipv4: [], ipv6: [], cg1: [] }
+		},
+		rawList: []
 	};
-	
-	let charrate_list_ipv4 = [];
-	let charrate_list_ipv6 = [];
-	let charrate_list_cg1 = [];
-	
-	let linkrate_list_ipv4 = [];
-	let linkrate_list_ipv6 = [];
-	let linkrate_list_cg1 = [];
-	
-	let color_list_ipv4 = [];
-	let color_list_ipv6 = [];
-	let color_list_cg1 = [];
-	
-	let httpwrite_list_ipv4 = [];
-	let httpwrite_list_ipv6 = [];
-	let httpwrite_list_cg1 = [];
 
 	for(let i = 0; i < list.length; i++) {
 		let item = list[i].split(";");
 		let itemtype = "";
 		let itemip = "";
 		let itemgroup = "";
+		let itemtag = "";
 		let props = {};
 		for(let x = 0; x < item.length; x++) {
 			let subitem = item[x].split("=");
@@ -291,6 +255,8 @@ function procRest(list) {
 				itemtype = val;
 			} else if(key == "group") {
 				itemgroup = val;
+			} else if(key == "tag") {
+				itemtag = val;
 			} else {
 				props[key] = val;
 			}
@@ -315,7 +281,7 @@ function procRest(list) {
 			if(rate > 1000000) rate = 1000000;
 			if(region && itemgroup) continue;
 			obj = {
-				type: "charrate",
+				type: "charrate", tag: itemtag,
 				rate, world, region
 			};
 		} else if(itemtype == "linkrate") {
@@ -331,7 +297,7 @@ function procRest(list) {
 			if(rate < 0) rate = 0;
 			if(rate > 1000000) rate = 1000000;
 			obj = {
-				type: "linkrate",
+				type: "linkrate", tag: itemtag,
 				rate, world
 			};
 		} else if(itemtype == "color") {
@@ -345,7 +311,7 @@ function procRest(list) {
 			region = procRegionString(region);
 			if(region && itemgroup) continue;
 			obj = {
-				type: "color",
+				type: "color", tag: itemtag,
 				region, world
 			};
 		} else if(itemtype == "daccess") {
@@ -360,7 +326,7 @@ function procRest(list) {
 				world = null;
 			}
 			obj = {
-				type: "daccess",
+				type: "daccess", tag: itemtag,
 				mode,
 				note,
 				world
@@ -375,112 +341,128 @@ function procRest(list) {
 				obj.group = itemgroup;
 			}
 			obj.index = i;
-			restrictionsList.push(obj);
+			parsed.rawList.push(obj);
 		}
 		if(obj && obj.world != ".") {
 			switch(obj.type) {
 				case "charrate":
 					if(itemip) {
 						if(obj.ip[1] == 4) {
-							charrate_list_ipv4.push(obj);
+							parsed.charrate.ipv4.push(obj);
 						} else if(obj.ip[1] == 6) {
-							charrate_list_ipv6.push(obj);
+							parsed.charrate.ipv6.push(obj);
 						}
 					} else if(itemgroup) {
-						charrate_list_cg1.push(obj);
+						parsed.charrate.cg1.push(obj);
 					}
 					break;
 				case "linkrate":
 					if(itemip) {
 						if(obj.ip[1] == 4) {
-							linkrate_list_ipv4.push(obj);
+							parsed.linkrate.ipv4.push(obj);
 						} else if(obj.ip[1] == 6) {
-							linkrate_list_ipv6.push(obj);
+							parsed.linkrate.ipv6.push(obj);
 						}
 					} else if(itemgroup) {
-						linkrate_list_cg1.push(obj);
+						parsed.linkrate.cg1.push(obj);
 					}
 					break;
 				case "color":
 					if(itemip) {
 						if(obj.ip[1] == 4) {
-							color_list_ipv4.push(obj);
+							parsed.color.ipv4.push(obj);
 						} else if(obj.ip[1] == 6) {
-							color_list_ipv6.push(obj);
+							parsed.color.ipv6.push(obj);
 						}
 					} else if(itemgroup) {
-						color_list_cg1.push(obj);
+						parsed.color.cg1.push(obj);
 					}
 					break;
 				case "daccess":
 					if(obj.mode == "site") {
 						if(itemip) {
 							if(obj.ip[1] == 4) {
-								groups.daccess.site.ipv4.push(obj);
+								parsed.daccess.site.ipv4.push(obj);
 							} else if(obj.ip[1] == 6) {
-								groups.daccess.site.ipv6.push(obj);
+								parsed.daccess.site.ipv6.push(obj);
 							}
 						}
 					} else if(obj.mode == "httpwrite") {
 						if(itemip) {
 							if(obj.ip[1] == 4) {
-								httpwrite_list_ipv4.push(obj);
+								parsed.daccess.httpwrite.ipv4.push(obj);
 							} else if(obj.ip[1] == 6) {
-								httpwrite_list_ipv6.push(obj);
+								parsed.daccess.httpwrite.ipv6.push(obj);
 							}
 						} else if(itemgroup) {
-							httpwrite_list_cg1.push(obj);
+							parsed.daccess.httpwrite.cg1.push(obj);
 						}
 					}
 			}
 		}
 	}
+
+	return parsed;
+}
+
+function procRest(list) {
+	let parsed = parseRestrictionsList(list);
+	let worldGroups = {
+		charrate: { ipv4: {}, ipv6: {}, cg1: {} },
+		linkrate: { ipv4: {}, ipv6: {}, cg1: {} },
+		color: { ipv4: {}, ipv6: {}, cg1: {} },
+		daccess: {
+			site: { ipv4: [], ipv6: [] },
+			httpwrite: { ipv4: {}, ipv6: {}, cg1: {} }
+		}
+	};
 	
-	sortRestrictionListIPv4(charrate_list_ipv4);
-	sortRestrictionListIPv6(charrate_list_ipv6);
+	sortRestrictionListIPv4(parsed.charrate.ipv4);
+	sortRestrictionListIPv6(parsed.charrate.ipv6);
 
-	sortRestrictionListIPv4(linkrate_list_ipv4);
-	sortRestrictionListIPv6(linkrate_list_ipv6);
+	sortRestrictionListIPv4(parsed.linkrate.ipv4);
+	sortRestrictionListIPv6(parsed.linkrate.ipv6);
 
-	sortRestrictionListIPv4(color_list_ipv4);
-	sortRestrictionListIPv6(color_list_ipv6);
+	sortRestrictionListIPv4(parsed.color.ipv4);
+	sortRestrictionListIPv6(parsed.color.ipv6);
 
-	sortRestrictionListIPv4(groups.daccess.site.ipv4);
-	sortRestrictionListIPv4(groups.daccess.site.ipv6);
+	sortRestrictionListIPv4(parsed.daccess.site.ipv4);
+	sortRestrictionListIPv4(parsed.daccess.site.ipv6);
 
-	sortRestrictionListIPv4(httpwrite_list_ipv4);
-	sortRestrictionListIPv4(httpwrite_list_ipv6);
+	sortRestrictionListIPv4(parsed.daccess.httpwrite.ipv4);
+	sortRestrictionListIPv4(parsed.daccess.httpwrite.ipv6);
 	
 	// we don't need to sort the cg1 lists nor build a restrictions tree for them
 	
 	// look through each list and split by worldname. the "." worldname represents all worlds.
-	divideRestrictionsIntoWorlds(charrate_list_ipv4, groups.charrate.ipv4);
-	divideRestrictionsIntoWorlds(charrate_list_ipv6, groups.charrate.ipv6);
-	divideRestrictionsIntoWorlds(charrate_list_cg1, groups.charrate.cg1);
+	divideRestrictionsIntoWorlds(parsed.charrate.ipv4, worldGroups.charrate.ipv4);
+	divideRestrictionsIntoWorlds(parsed.charrate.ipv6, worldGroups.charrate.ipv6);
+	divideRestrictionsIntoWorlds(parsed.charrate.cg1, worldGroups.charrate.cg1);
 	
-	divideRestrictionsIntoWorlds(linkrate_list_ipv4, groups.linkrate.ipv4);
-	divideRestrictionsIntoWorlds(linkrate_list_ipv6, groups.linkrate.ipv6);
-	divideRestrictionsIntoWorlds(linkrate_list_cg1, groups.linkrate.cg1);
+	divideRestrictionsIntoWorlds(parsed.linkrate.ipv4, worldGroups.linkrate.ipv4);
+	divideRestrictionsIntoWorlds(parsed.linkrate.ipv6, worldGroups.linkrate.ipv6);
+	divideRestrictionsIntoWorlds(parsed.linkrate.cg1, worldGroups.linkrate.cg1);
 	
-	divideRestrictionsIntoWorlds(color_list_ipv4, groups.color.ipv4);
-	divideRestrictionsIntoWorlds(color_list_ipv6, groups.color.ipv6);
-	divideRestrictionsIntoWorlds(color_list_cg1, groups.color.cg1);
+	divideRestrictionsIntoWorlds(parsed.color.ipv4, worldGroups.color.ipv4);
+	divideRestrictionsIntoWorlds(parsed.color.ipv6, worldGroups.color.ipv6);
+	divideRestrictionsIntoWorlds(parsed.color.cg1, worldGroups.color.cg1);
 	
-	divideRestrictionsIntoWorlds(httpwrite_list_ipv4, groups.daccess.httpwrite.ipv4);
-	divideRestrictionsIntoWorlds(httpwrite_list_ipv6, groups.daccess.httpwrite.ipv6);
-	divideRestrictionsIntoWorlds(httpwrite_list_cg1, groups.daccess.httpwrite.cg1);
+	divideRestrictionsIntoWorlds(parsed.daccess.httpwrite.ipv4, worldGroups.daccess.httpwrite.ipv4);
+	divideRestrictionsIntoWorlds(parsed.daccess.httpwrite.ipv6, worldGroups.daccess.httpwrite.ipv6);
+	divideRestrictionsIntoWorlds(parsed.daccess.httpwrite.cg1, worldGroups.daccess.httpwrite.cg1);
 	
-	divideGroupIntoRestrictionsTree(groups.charrate);
-	divideGroupIntoRestrictionsTree(groups.linkrate);
-	divideGroupIntoRestrictionsTree(groups.color);
-	divideGroupIntoRestrictionsTree(groups.daccess.httpwrite);
+	divideGroupIntoRestrictionsTree(worldGroups.charrate);
+	divideGroupIntoRestrictionsTree(worldGroups.linkrate);
+	divideGroupIntoRestrictionsTree(worldGroups.color);
+	divideGroupIntoRestrictionsTree(worldGroups.daccess.httpwrite);
 	
-	groups.daccess.site.ipv4 = buildRestrictionsTree(groups.daccess.site.ipv4);
-	groups.daccess.site.ipv6 = buildRestrictionsTree(groups.daccess.site.ipv6);
+	worldGroups.daccess.site.ipv4 = buildRestrictionsTree(parsed.daccess.site.ipv4);
+	worldGroups.daccess.site.ipv6 = buildRestrictionsTree(parsed.daccess.site.ipv6);
 	
 	return {
-		groups: groups,
-		raw: rebuildRestrictionsList(restrictionsList)
+		groups: worldGroups,
+		raw: parsed.rawList,
+		rawStr: rebuildRestrictionsList(parsed.rawList)
 	};
 }
 
@@ -513,18 +495,19 @@ function procCoal(list) {
 			v4: ranges4,
 			v6: ranges6
 		},
-		raw: rebuildCoalitionList(ranges4, ranges6)
+		rawStr: rebuildCoalitionList(ranges4, ranges6)
 	};
 }
 
 function rebuildRestrictionsList(restrictions) {
-	var rstr = "";
+	var rstr = [];
 	for(var i = 0; i < restrictions.length; i++) {
 		var restr = restrictions[i];
 
 		var type = restr.type;
 		var ip = restr.ip;
 		var group = restr.group;
+		var tag = restr.tag;
 
 		var identifier = "";
 
@@ -552,7 +535,10 @@ function rebuildRestrictionsList(restrictions) {
 			if(region != null) {
 				rstrLine.push("region=" + region.join(","));
 			}
-			rstr += rstrLine.join(";") + "\n";
+			if(tag) {
+				rstrLine.push("tag=" + tag);
+			}
+			rstr.push(rstrLine.join(";"));
 		} else if(type == "linkrate") {
 			var rate = restr.rate;
 			var world = restr.world;
@@ -560,7 +546,10 @@ function rebuildRestrictionsList(restrictions) {
 			if(world != null) {
 				rstrLine.push("world=" + world);
 			}
-			rstr += rstrLine.join(";") + "\n";
+			if(tag) {
+				rstrLine.push("tag=" + tag);
+			}
+			rstr.push(rstrLine.join(";"));
 		} else if(type == "color") {
 			var region = restr.region;
 			var world = restr.world;
@@ -571,7 +560,10 @@ function rebuildRestrictionsList(restrictions) {
 			if(region != null) {
 				rstrLine.push("region=" + region.join(","));
 			}
-			rstr += rstrLine.join(";") + "\n";
+			if(tag) {
+				rstrLine.push("tag=" + tag);
+			}
+			rstr.push(rstrLine.join(";"));
 		} else if(type == "daccess") {
 			var mode = restr.mode;
 			var note = restr.note;
@@ -584,19 +576,22 @@ function rebuildRestrictionsList(restrictions) {
 			if(world != null) {
 				rstrLine.push("world=" + world);
 			}
-			rstr += rstrLine.join(";") + "\n";
+			if(tag) {
+				rstrLine.push("tag=" + tag);
+			}
+			rstr.push(rstrLine.join(";"));
 		}
 	}
 	return rstr;
 }
 
 function rebuildCoalitionList(ranges4, ranges6) {
-	var cstr = "";
+	var cstr = [];
 	for(var i = 0; i < ranges4.length; i++) {
-		cstr += reconIPv4(ranges4[i][0], ranges4[i][1]) + "\n";
+		cstr.push(reconIPv4(ranges4[i][0], ranges4[i][1]));
 	}
 	for(var i = 0; i < ranges6.length; i++) {
-		cstr += reconIPv6(ranges6[i][0], ranges6[i][1]) + "\n";
+		cstr.push(reconIPv6(ranges6[i][0], ranges6[i][1]));
 	}
 	return cstr;
 }
@@ -739,6 +734,10 @@ module.exports = {
 	procCoal,
 	setRestrictions,
 	getRestrictions,
+	setRestrictionsFlatList,
+	getRestrictionsFlatList,
+	setRestrictionsFlatListStr,
+	getRestrictionsFlatListStr,
 	setCoalition,
 	checkCoalition,
 	rebuildRestrictionsList,
