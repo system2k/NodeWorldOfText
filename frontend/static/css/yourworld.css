@@ -629,3 +629,14 @@ a:visited {
 .longpress-option:active {
 	background-color: #CDCDFF;
 }
+.custom_ctx {
+	border: solid 1px #CCCCCC;
+    border-radius: 4px;
+	background-color: #AAAAAA;
+	padding: 2px;
+	position: absolute;
+	z-index: 200;
+}
+.custom_ctx_button {
+	padding: 0px 2px;
+}
