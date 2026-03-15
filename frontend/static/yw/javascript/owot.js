@@ -49,7 +49,7 @@ var textRenderCtx;
 var cellWidthPad, tileW, tileH, cellW, cellH, font, specialCharFont, tileC, tileR, tileArea;
 var tileWidth, tileHeight; // exact tile dimensions for determining rendering size of tiles
 var dTileW, dTileH; // locked tile sizes for background image generation
-var menu, menuStyle, ctxMenu;
+var menu, menuStyle, ctxMenu, ctxMenuStyle;
 
 var cursorCoords = null; // [tileX, tileY, charX, charY]; Coordinates of text cursor. If mouse is deselected, the value is null.
 var cursorCoordsCurrent = [0, 0, 0, 0, -1]; // [tileX, tileY, charX, charY]; cursorCoords that don't reset to null.
@@ -1782,6 +1782,88 @@ function menu_color(color) {
 		"#coords {" +
 			"background-color: " + bColor + ";" +
 			"color: " + tColor + ";" +
+		"}";
+}
+
+function context_menu_color(color) {
+	if(color.toLowerCase() == "#aaaaaa") {
+		if(window.ctxMenuStyle) {
+			window.ctxMenuStyle.remove();
+			window.ctxMenuStyle = null;
+		}
+		return;
+	}
+	// change context menu color
+	if(!window.ctxMenuStyle) {
+		ctxMenuStyle = document.createElement("style");
+		document.head.appendChild(ctxMenuStyle);
+	}
+	var rgb = int_to_rgb(resolveColorValue(color));
+	var value = Math.max(rgb[0], rgb[1], rgb[2]);
+	var buttonDelta = 60;         // 0xaaaaaa to 0xe6e6e6
+	var buttonHoverDelta = 45;    // to 0xd7
+	var buttonBorderDelta = 42;   // to 0x80
+	var buttonDisabledDelta = 20; // to 0xbe
+	var outlineDelta = 34;        // to 0x88
+	var tColor = "#CCCCCC";
+	var dColor = "#888888";
+	if(value > 128) {
+		buttonBorderDelta = -42;
+		outlineDelta = -34;
+		tColor = "#000000";
+		dColor = "#444444";
+	}
+
+	var buttonRgb = [
+		Math.min(255, rgb[0] + buttonDelta),
+		Math.min(255, rgb[1] + buttonDelta),
+		Math.min(255, rgb[2] + buttonDelta)
+	];
+	var buttonHoverRgb = [
+		Math.min(255, rgb[0] + buttonHoverDelta),
+		Math.min(255, rgb[1] + buttonHoverDelta),
+		Math.min(255, rgb[2] + buttonHoverDelta)
+	];
+	var buttonBorderRgb = [
+		Math.max(0, rgb[0] + buttonBorderDelta),
+		Math.max(0, rgb[1] + buttonBorderDelta),
+		Math.max(0, rgb[2] + buttonBorderDelta)
+	];
+	var buttonDisabledRgb = [
+		Math.min(255, rgb[0] + buttonDisabledDelta),
+		Math.min(255, rgb[1] + buttonDisabledDelta),
+		Math.min(255, rgb[2] + buttonDisabledDelta)
+	];
+	var outlineRgb = [
+		Math.max(0, rgb[0] + outlineDelta),
+		Math.max(0, rgb[1] + outlineDelta),
+		Math.max(0, rgb[2] + outlineDelta)
+	];
+
+	var buttonColor = int_to_hexcode(rgb_to_int(buttonRgb[0], buttonRgb[1], buttonRgb[2]));
+	var buttonHoverColor = int_to_hexcode(rgb_to_int(buttonHoverRgb[0], buttonHoverRgb[1], buttonHoverRgb[2]));
+	var buttonBorderColor = int_to_hexcode(rgb_to_int(buttonBorderRgb[0], buttonBorderRgb[1], buttonBorderRgb[2]));
+	var buttonDisabledColor = int_to_hexcode(rgb_to_int(buttonDisabledRgb[0], buttonDisabledRgb[1], buttonDisabledRgb[2]));
+	var outlineColor = int_to_hexcode(rgb_to_int(outlineRgb[0], outlineRgb[1], outlineRgb[2]));
+
+	ctxMenuStyle.innerHTML = ".custom_ctx {" +
+    		"background-color: " + color + ";" +
+			"border-color: " + outlineColor + ";" +
+		"}\n" +
+		".custom_ctx_button {" +
+			"background-color: " + buttonColor + ";" +
+			"border-color: " + buttonBorderColor + ";" +
+			"color: " + tColor + ";" +
+		"}\n" +
+		".custom_ctx_button:hover {" +
+			"background-color: " + buttonHoverColor + ";" +
+		"}\n" +
+		".custom_ctx_button:disabled {" +
+			"background-color: " + buttonDisabledColor + ";" +
+			"color: " + dColor + ";" +
+		"}\n" +
+		".custom_ctx_divisor {" +
+			"background-color: " + buttonColor + ";" + // repurposing
 		"}";
 }
 

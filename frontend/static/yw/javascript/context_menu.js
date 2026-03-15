@@ -6,21 +6,25 @@ function getContextMenuTop(menu) {
     return top;
 }
 class ContextMenu {
-	constructor() {
-		var _this = this;
-		this.frame = document.createElement("div");
+    constructor() {
+        var _this = this;
+        this.frame = document.createElement("div");
         this.frame.className = "custom_ctx";
-		this.frame.style.display = "none";
-		this.frame.style.flexDirection = "column";
-		document.body.appendChild(this.frame);
+        this.frame.style.display = "none";
+        this.frame.style.flexDirection = "column";
+        document.body.appendChild(this.frame);
 
-		document.addEventListener("click", function(e) {
-			if (e.target.className == "custom_ctx" || e.target.className == "custom_ctx_button") return;
-			_this.close();
-		});
-		this.frame.addEventListener("contextmenu", function(e) {
-			e.preventDefault();
-		});
+        document.addEventListener("click", function(e) {
+            if (
+                e.target.className == "custom_ctx" ||
+                e.target.className == "custom_ctx_button" ||
+                e.target.className == "custom_ctx_divisor"
+            ) return;
+            _this.close();
+        });
+        this.frame.addEventListener("contextmenu", function(e) {
+            e.preventDefault();
+        });
         document.addEventListener("keydown", function(e) {
             if (!checkKeyPress(e, keyConfig.reset)) return;
             _this.close();
@@ -50,7 +54,7 @@ class ContextMenu {
         this.height = null;
         this.isOpen = false;
         this.hoveringId = null;
-		this.entries = [];
+        this.entries = [];
         this.divisors = [];
 
         this.openFn = null;
@@ -64,14 +68,14 @@ class ContextMenu {
         this.timeoutMs = 400;
 
         ContextMenu.list.push(this);
-	}
-	addOption(text, action, rightAction, close = true) {
+    }
+    addOption(text, action, rightAction, close = true) {
         var _this = this;
-		var elm = document.createElement("button");
+        var elm = document.createElement("button");
         elm.className = "custom_ctx_button";
-		elm.innerText = text;
+        elm.innerText = text;
         elm.style.minWidth = `${this.width}px`;
-		elm.onclick = function(e) {
+        elm.onclick = function(e) {
             if (!action) return;
             action(e);
             if (close) {
@@ -80,7 +84,7 @@ class ContextMenu {
             }
             if (_this.submitFn) _this.submitFn(e);
         }
-		elm.oncontextmenu = function(e) {
+        elm.oncontextmenu = function(e) {
             if (!rightAction) return;
             rightAction(e);
             if (close) {
@@ -94,24 +98,21 @@ class ContextMenu {
             if (_this.dropdown) _this.closeDropdown();
         }
 
-		this.frame.appendChild(elm);
-		var id = this.entries.push({
-			elm,
-			action,
+        this.frame.appendChild(elm);
+        var id = this.entries.push({
+            elm,
+            action,
             rightAction
-		});
+        });
         return id - 1;
-	}
+    }
     rename(id, text) {
         if (!this.entries[id]) return;
         this.entries[id].elm.innerText = text;
     }
     addDivisor() {
         var divisor = document.createElement("div");
-        divisor.style.backgroundColor = "#EEEEEE";
-        divisor.style.border = "0px";
-        divisor.style.height = "1px";
-        divisor.style.margin = "1px";
+        divisor.className = "custom_ctx_divisor";
         this.frame.appendChild(divisor);
         var id = this.divisors.push(divisor);
         return id - 1;
@@ -128,34 +129,34 @@ class ContextMenu {
         this.divisors[id].style.display = "none";
     }
     move(x, y, spacingX = 0, spacingY = 0) {
-		var bounds = this.frame.getBoundingClientRect();
-		var curWidth = bounds.width;
-		var curHeight = bounds.height;
+        var bounds = this.frame.getBoundingClientRect();
+        var curWidth = bounds.width;
+        var curHeight = bounds.height;
         x = Math.min(Math.max(x, 0), innerWidth);
         y = Math.min(Math.max(y, 0), innerHeight);
-		if (innerWidth - x < curWidth && innerWidth > curWidth) x -= curWidth + spacingX - 1;
-		if (innerHeight - y < curHeight && innerHeight > curHeight) y -= curHeight + spacingY - 1;
+        if (innerWidth - x < curWidth && innerWidth > curWidth) x -= curWidth + spacingX - 1;
+        if (innerHeight - y < curHeight && innerHeight > curHeight) y -= curHeight + spacingY - 1;
         this.frame.style.left = `${x}px`;
-		this.frame.style.top = `${y}px`;
+        this.frame.style.top = `${y}px`;
         this.closeDropdown();
     }
-	resize(width, height) {
-		if (width) {
-			this.frame.style.minWidth = `${width}px`;
-			this.width = width;
+    resize(width, height) {
+        if (width) {
+            this.frame.style.minWidth = `${width}px`;
+            this.width = width;
         }
-		if (height) {
-			this.frame.style.minHeight = `${height}px`;
-			this.height = height;
+        if (height) {
+            this.frame.style.minHeight = `${height}px`;
+            this.height = height;
         }
         this.entries.forEach(entry => {
             if (width) entry.elm.style.minWidth = `${width}px`;
         });
-	}
+    }
     direction(string) {
         this.frame.style.flexDirection = string;
     }
-	open(x, y, spacingX = 0, spacingY = 0) {
+    open(x, y, spacingX = 0, spacingY = 0) {
         if (this.isOpen) {
             this.move(x, y, spacingX, spacingY);
             if (this.moveFn) this.moveFn(x, y, spacingX, spacingY);
@@ -170,16 +171,16 @@ class ContextMenu {
         this.frame.style.display = "flex";
         this.isOpen = true;
         if (this.openFn) this.openFn(x, y, spacingX, spacingY);
-		this.move(x, y, spacingX, spacingY);
-	}
-	close() {
+        this.move(x, y, spacingX, spacingY);
+    }
+    close() {
         if (!this.isOpen) return;
         ContextMenu.latest = null;
-		this.frame.style.display = "none";
+        this.frame.style.display = "none";
         this.isOpen = false;
         if (this.closeFn) this.closeFn();
         this.closeDropdown();
-	}
+    }
     openDropdown(id) {
         if (!this.entries[id]) return;
         var button = this.entries[id].elm;
