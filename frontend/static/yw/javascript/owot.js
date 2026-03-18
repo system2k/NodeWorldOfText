@@ -1840,31 +1840,33 @@ function context_menu_color(color) {
 		Math.max(0, rgb[2] + outlineDelta)
 	];
 
-	var buttonColor = int_to_hexcode(rgb_to_int(buttonRgb[0], buttonRgb[1], buttonRgb[2]));
-	var buttonHoverColor = int_to_hexcode(rgb_to_int(buttonHoverRgb[0], buttonHoverRgb[1], buttonHoverRgb[2]));
-	var buttonBorderColor = int_to_hexcode(rgb_to_int(buttonBorderRgb[0], buttonBorderRgb[1], buttonBorderRgb[2]));
-	var buttonDisabledColor = int_to_hexcode(rgb_to_int(buttonDisabledRgb[0], buttonDisabledRgb[1], buttonDisabledRgb[2]));
-	var outlineColor = int_to_hexcode(rgb_to_int(outlineRgb[0], outlineRgb[1], outlineRgb[2]));
+	var buttonColor = int_to_hexcode(rgb_to_int(...buttonRgb)); // applied to divisors as well
+	var buttonHoverColor = int_to_hexcode(rgb_to_int(...buttonHoverRgb));
+	var buttonBorderColor = int_to_hexcode(rgb_to_int(...buttonBorderRgb));
+	var buttonDisabledColor = int_to_hexcode(rgb_to_int(...buttonDisabledRgb));
+	var outlineColor = int_to_hexcode(rgb_to_int(...outlineRgb));
 
-	ctxMenuStyle.innerHTML = ".custom_ctx {" +
-    		"background-color: " + color + ";" +
-			"border-color: " + outlineColor + ";" +
-		"}\n" +
-		".custom_ctx_button {" +
-			"background-color: " + buttonColor + ";" +
-			"border-color: " + buttonBorderColor + ";" +
-			"color: " + tColor + ";" +
-		"}\n" +
-		".custom_ctx_button:hover {" +
-			"background-color: " + buttonHoverColor + ";" +
-		"}\n" +
-		".custom_ctx_button:disabled {" +
-			"background-color: " + buttonDisabledColor + ";" +
-			"color: " + dColor + ";" +
-		"}\n" +
-		".custom_ctx_divisor {" +
-			"background-color: " + buttonColor + ";" + // repurposing
-		"}";
+	ctxMenuStyle.innerHTML = `
+		.custom_ctx {
+			background-color: ${color};
+			border-color: ${outlineColor};
+		}
+		.custom_ctx_button {
+			background-color: ${buttonColor};
+			border-color: ${buttonBorderColor};
+			color: ${tColor};
+		}
+		.custom_ctx_button:hover {
+			background-color: ${buttonHoverColor};
+		}
+		.custom_ctx_button:disabled {
+			background-color: ${buttonDisabledColor};
+			color: ${dColor};
+		}
+		.custom_ctx_divisor {
+			background-color: ${buttonColor};
+		}
+	`;
 }
 
 function defaultStyles() {
