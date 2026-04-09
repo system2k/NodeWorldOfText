@@ -215,24 +215,28 @@ class InteractiveTable {
 /*
 	Imports: makeElementResizable, makeElementDraggable, RegionSelection, network, uncolorChar, colorChar, ajaxRequest
 	Utilizes objects: colorClasses, coloredChars, state
+	Utilizes constants: tileC
 */
 class WTWTracker {
 	world = null;
 	frame = null;
 	isVisible = false;
+	hasInitiallyOpened = false;
 	dataTable = null;
 	totalLog = {};
 	worldRecord = {};
 	rollbackRecord = {};
+	rollbackMaxDepth = 90;
 	linkRecord = {};
 	ipColorRef = {};
 	seqLookup = {};
 	ipSeq = 1;
 	coordRadius = null;
 	doShowChars = true;
-	doShowColors = true;
+	doShowColors = false;
 	doRegardLinks = true;
 	doEchoSelf = false;
+	doAutoselect = false;
 
 	constructor(_world) {
 		this.world = _world;
@@ -243,6 +247,10 @@ class WTWTracker {
 		this.hide();
 		this.world.menu.addCornerButton("RL", () => {
 			this.show();
+			if(!this.hasInitiallyOpened) {
+				this.toggleColors(true);
+			}
+			this.hasInitiallyOpened = true;
 		});
 
 		this.world.registerHook("renderchar", () => {
@@ -256,6 +264,7 @@ class WTWTracker {
 		this.world.on("mouseDown", ({tileX, tileY, charX, charY}) => {
 			if(!this.dataTable) return;
 			if(!this.isVisible) return;
+			if(!this.doAutoselect) return;
 			let idx = charY * tileC + charX;
 			let tilePos = tileY + "," + tileX;
 			let rec = this.worldRecord[tilePos]?.[idx];
@@ -345,6 +354,138 @@ class WTWTracker {
 		}
 	}
 
+	handleCharUpdate(type, tileX, tileY, tilePos, update, clientIp, inRangeForColor) {
+		let hasUpdated;
+		let charX;
+		let charY;
+		let char;
+		let color;
+		let bgColor;
+		let prev_char;
+		let prev_color;
+		let prev_bgColor;
+
+		if(type == "write") {
+			hasUpdated = update[1];
+			charX = update[2];
+			charY = update[3];
+			char = update[4];
+			color = update[5];
+			bgColor = update[6];
+			prev_char = update[7];
+			prev_color = update[8];
+			prev_bgColor = update[9];
+		} else if(type == "link") {
+			hasUpdated = true;
+			charX = update[1];
+			charY = update[2];
+		}
+
+		let charIdx = charY * tileC + charX;
+
+		let colorChannel, hColor;
+		let colorRef = this.ipColorRef[clientIp];
+		
+		if(!colorRef) {
+			hColor = this.generateRandomColor();
+			colorRef = {
+				hColor,
+				seq: this.ipSeq++,
+				rowColorBox: null
+			};
+			colorChannel = "." + colorRef.seq.toString();
+			this.ipColorRef[clientIp] = colorRef;
+			this.seqLookup[colorRef.seq] = clientIp;
+			colorClasses[colorChannel] = hColor;
+		} else {
+			colorChannel = "." + colorRef.seq.toString();
+			hColor = colorRef.hColor;
+		}
+
+		if(inRangeForColor && this.doShowColors && !(!this.doRegardLinks && type == "link")) {
+			uncolorChar(tileX, tileY, charX, charY);
+			colorChar(tileX, tileY, charX, charY, colorChannel);
+			this.world.setTileRedraw(tileX, tileY);
+		}
+
+		if(type == "write" && hasUpdated && (prev_char || prev_color || prev_bgColor)) {
+			let obj = this.rollbackRecord[tilePos] ??= {};
+			let arr = obj[charIdx] ??= [];
+			if(arr.at(-1)?.[0] != colorRef.seq) {
+				arr.push([colorRef.seq, prev_char, prev_color, prev_bgColor]);
+				if(arr.length > this.rollbackMaxDepth) {
+					arr.shift();
+				}
+			}
+		}
+		if(type == "link") {
+			let obj = this.linkRecord[tilePos] ??= {};
+			obj[charIdx] = colorRef.seq;
+		}
+
+		let log = this.totalLog[clientIp];
+		if(!log) {
+			log = {
+				editCount: 0,
+				linkCount: 0,
+				tiles: {},
+				reg4x4: {},
+				reg25x25: {},
+				tileRecord: {}
+			};
+			this.totalLog[clientIp] = log;
+
+			let ipAddrTextContainer = document.createElement("div");
+			ipAddrTextContainer.style.display = "flex";
+			let ipAddrText = document.createElement("span");
+			ipAddrText.innerText = clientIp;
+			ipAddrText.style.flex = "1";
+			let ipAddrCopy = document.createElement("button");
+			ipAddrCopy.innerText = "C";
+			ipAddrCopy.onclick = () => {
+				this.world.clipboard.copy(clientIp);
+			};
+			ipAddrTextContainer.appendChild(ipAddrText);
+			ipAddrTextContainer.appendChild(ipAddrCopy);
+
+			let rowData = this.dataTable.addRow(clientIp, {
+				ipAddr: ipAddrTextContainer,
+				edits: 0,
+				links: 0,
+				tiles: 0,
+				distinct4x4: 0,
+				distinct25x25: 0
+			});
+
+			colorRef.rowColorBox = rowData.columns.ipAddr?.cellElement;
+			if(colorRef.rowColorBox) {
+				colorRef.rowColorBox.style.color = "white";
+				colorRef.rowColorBox.style.textShadow = "1px 1px 2px black";
+				colorRef.rowColorBox.style.backgroundColor = hColor;
+			}
+		}
+
+		
+		if(inRangeForColor) {
+			(this.worldRecord[tilePos] ??= {})[charIdx] = colorRef.seq;
+		}
+
+		if(type == "write") {
+			log.editCount++;
+		} else if(type == "link") {
+			log.linkCount++;
+		}
+		log.tiles[tilePos] = 1;
+		log.reg4x4[Math.floor(tileY / 4) + "," + Math.floor(tileX / 4)] = 1;
+		log.reg25x25[Math.floor(tileY / 25) + "," + Math.floor(tileX / 25)] = 1;
+
+		this.dataTable.updateRowValue(clientIp, "edits", log.editCount);
+		this.dataTable.updateRowValue(clientIp, "links", log.linkCount);
+		this.dataTable.updateRowValue(clientIp, "tiles", Object.keys(log.tiles).length);
+		this.dataTable.updateRowValue(clientIp, "distinct4x4", Object.keys(log.reg4x4).length);
+		this.dataTable.updateRowValue(clientIp, "distinct25x25", Object.keys(log.reg25x25).length);
+	}
+
 	handleUpdate(data) {
 		let subjects = data.subjects;
 		let tiles = data.tiles;
@@ -374,133 +515,7 @@ class WTWTracker {
 						continue;
 					}
 
-					let hasUpdated;
-					let charX;
-					let charY;
-					let char;
-					let color;
-					let bgColor;
-					let prev_char;
-					let prev_color;
-					let prev_bgColor;
-
-					if(type == "write") {
-						hasUpdated = update[1];
-						charX = update[2];
-						charY = update[3];
-						char = update[4];
-						color = update[5];
-						bgColor = update[6];
-						prev_char = update[7];
-						prev_color = update[8];
-						prev_bgColor = update[9];
-					} else if(type == "link") {
-						hasUpdated = true;
-						charX = update[1];
-						charY = update[2];
-					}
-
-
-					let charIdx = charY * tileC + charX;
-
-					let colorChannel, hColor;
-					let colorRef = this.ipColorRef[clientIp];
-					
-					if(!colorRef) {
-						hColor = this.generateRandomColor();
-						colorRef = {
-							hColor,
-							seq: this.ipSeq++,
-							rowColorBox: null
-						};
-						colorChannel = "." + colorRef.seq.toString();
-						this.ipColorRef[clientIp] = colorRef;
-						this.seqLookup[colorRef.seq] = clientIp;
-						colorClasses[colorChannel] = hColor;
-					} else {
-						colorChannel = "." + colorRef.seq.toString();
-						hColor = colorRef.hColor;
-					}
-
-					if(inRangeForColor && this.doShowColors && !(!this.doRegardLinks && type == "link")) {
-						uncolorChar(tileX, tileY, charX, charY);
-						colorChar(tileX, tileY, charX, charY, colorChannel);
-						this.world.setTileRedraw(tileX, tileY);
-					}
-
-					if(type == "write" && hasUpdated && (prev_char || prev_color || prev_bgColor)) {
-						let obj = this.rollbackRecord[tilePos] ??= {};
-						let arr = obj[charIdx] ??= [];
-						if(arr.at(-1)?.[0] != colorRef.seq) {
-							arr.push([colorRef.seq, prev_char, prev_color, prev_bgColor]);
-						}
-					}
-					if(type == "link") {
-						let obj = this.linkRecord[tilePos] ??= {};
-						obj[charIdx] = colorRef.seq;
-					}
-
-					let log = this.totalLog[clientIp];
-					if(!log) {
-						log = {
-							editCount: 0,
-							linkCount: 0,
-							tiles: {},
-							reg4x4: {},
-							reg25x25: {},
-							tileRecord: {}
-						};
-						this.totalLog[clientIp] = log;
-
-						let ipAddrTextContainer = document.createElement("div");
-						ipAddrTextContainer.style.display = "flex";
-						let ipAddrText = document.createElement("span");
-						ipAddrText.innerText = clientIp;
-						ipAddrText.style.flex = "1";
-						let ipAddrCopy = document.createElement("button");
-						ipAddrCopy.innerText = "C";
-						ipAddrCopy.onclick = () => {
-							this.world.clipboard.copy(clientIp);
-						};
-						ipAddrTextContainer.appendChild(ipAddrText);
-						ipAddrTextContainer.appendChild(ipAddrCopy);
-
-						let rowData = this.dataTable.addRow(clientIp, {
-							ipAddr: ipAddrTextContainer,
-							edits: 0,
-							links: 0,
-							tiles: 0,
-							distinct4x4: 0,
-							distinct25x25: 0
-						});
-
-						colorRef.rowColorBox = rowData.columns.ipAddr?.cellElement;
-						if(colorRef.rowColorBox) {
-							colorRef.rowColorBox.style.color = "white";
-							colorRef.rowColorBox.style.textShadow = "1px 1px 2px black";
-							colorRef.rowColorBox.style.backgroundColor = hColor;
-						}
-					}
-
-					
-					if(inRangeForColor) {
-						(this.worldRecord[tilePos] ??= {})[charIdx] = colorRef.seq;
-					}
-
-					if(type == "write") {
-						log.editCount++;
-					} else if(type == "link") {
-						log.linkCount++;
-					}
-					log.tiles[tilePos] = 1;
-					log.reg4x4[Math.floor(tileY / 4) + "," + Math.floor(tileX / 4)] = 1;
-					log.reg25x25[Math.floor(tileY / 25) + "," + Math.floor(tileX / 25)] = 1;
-
-					this.dataTable.updateRowValue(clientIp, "edits", log.editCount);
-					this.dataTable.updateRowValue(clientIp, "links", log.linkCount);
-					this.dataTable.updateRowValue(clientIp, "tiles", Object.keys(log.tiles).length);
-					this.dataTable.updateRowValue(clientIp, "distinct4x4", Object.keys(log.reg4x4).length);
-					this.dataTable.updateRowValue(clientIp, "distinct25x25", Object.keys(log.reg25x25).length);
+					this.handleCharUpdate(type, tileX, tileY, tilePos, update, clientIp, inRangeForColor);
 				}
 			}
 		}
@@ -561,6 +576,10 @@ class WTWTracker {
 
 	toggleSelf(enabled) {
 		this.doEchoSelf = enabled;
+	}
+
+	toggleAutoselect(enabled) {
+		this.doAutoselect = enabled;
 	}
 
 	createToggleButton(state1, state2, defaultState, onChange) {
@@ -664,7 +683,7 @@ class WTWTracker {
 		if(regionRestriction[0] && regionRestriction[1] && regionRestriction[2] && regionRestriction[3]) {
 			region = "region=" + regionRestriction.join(",");
 		}
-		let type = ["type=charrate", "type=linkrate"][limType];
+		let type = ["type=charrate", "type=linkrate", "type=color", "type=daccess;mode=site"][limType];
 
 		for(let ip of ipAddresses) {
 			lines.push(["ip=" + ip, type, "rate=" + charRateLimit, location, region].filter(r => r != null).join(";"));
@@ -868,7 +887,7 @@ class WTWTracker {
 		let btn_tl_toggle_chars = this.createToggleButton("<+> chars", "<-> chars", 0, (state) => {
 			this.toggleChars(!Boolean(state));
 		});
-		let btn_tl_toggle_highlight = this.createToggleButton("<+> colors", "<-> colors", 0, (state) => {
+		let btn_tl_toggle_highlight = this.createToggleButton("<+> colors", "<-> colors", 1, (state) => {
 			this.toggleColors(!Boolean(state));
 		});
 		let btn_tl_toggle_filtering = this.createToggleButton("<+> filtering", "<-> filtering", 0, (state) => {
@@ -884,6 +903,9 @@ class WTWTracker {
 		let btn_tl_toggle_self = this.createToggleButton("<+> self", "<-> self", 1, (state) => {
 			this.toggleSelf(!Boolean(state));
 		});
+		let btn_tl_toggle_autosel = this.createToggleButton("<+> autoselect", "<-> autoselect", 1, (state) => {
+			this.toggleAutoselect(!Boolean(state));
+		});
 		controlButtonArea.appendChild(btn_tl_randomize);
 		controlButtonArea.appendChild(btn_tl_clearcolors);
 		controlButtonArea.appendChild(btn_tl_toggle_chars);
@@ -891,6 +913,7 @@ class WTWTracker {
 		controlButtonArea.appendChild(btn_tl_toggle_filtering);
 		controlButtonArea.appendChild(btn_tl_toggle_links);
 		controlButtonArea.appendChild(btn_tl_toggle_self);
+		controlButtonArea.appendChild(btn_tl_toggle_autosel);
 
 
 		let stat_limType = 0; // 0: char, 1: link, 2: colors, 3: site
