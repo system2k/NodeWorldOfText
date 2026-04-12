@@ -766,21 +766,12 @@ function drawBlockChar(charCode, textRender, x, y, cellW, cellH, altGrid) {
     }
 }
 
-function dispatchCharClientHook(cCode, textRender, tileX, tileY, x, y, clampW, clampH) {
+function dispatchCharClientHook(cCode, textRender, tileX, tileY, charX, charY, offsetX, offsetY, cellW, cellH) {
 	var funcs = specialClientHooks.renderchar;
 	if(!funcs.length) return false;
 	for(var i = 0; i < funcs.length; i++) {
 		var func = funcs[i];
-		// duplicate from drawBlockChar - needs refactoring
-		var tmpCellW = clampW / tileC;
-		var tmpCellH = clampH / tileR;
-		var sx = Math.floor(x * tmpCellW);
-		var sy = Math.floor(y * tmpCellH);
-		var ex = Math.floor((x + 1) * tmpCellW);
-		var ey = Math.floor((y + 1) * tmpCellH);
-		tmpCellW = ex - sx;
-		tmpCellH = ey - sy;
-		var status = func(cCode, textRender, tileX, tileY, x, y, sx, sy, tmpCellW, tmpCellH);
+		var status = func(cCode, textRender, tileX, tileY, charX, charY, offsetX, offsetY, cellW, cellH);
 		if(status) {
 			return true;
 		}
@@ -898,7 +889,7 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	}
 
 	if(((specialClientHookMap >> 0) & 1) && !isOverflow) {
-		var status = dispatchCharClientHook(cCode, textRender, tileX, tileY, charX, charY, cellW, cellH);
+		var status = dispatchCharClientHook(cCode, textRender, tileX, tileY, charX, charY, fontX, fontY, cellW, cellH);
 		if(status) {
 			return true;
 		}
