@@ -629,3 +629,32 @@ a:visited {
 .longpress-option:active {
 	background-color: #CDCDFF;
 }
+.custom_ctx {
+	background-color: #AAAAAA;
+	border: solid 1px;
+	border-color: #888888;
+	border-radius: 4px;
+	gap: 1px;
+	padding: 2px;
+	position: absolute;
+	z-index: 200;
+}
+.custom_ctx_button {
+	background-color: #E6E6E6;
+	border: solid 1px;
+	border-color: #808080;
+	border-radius: 4px;
+	padding: 0px 2px;
+}
+.custom_ctx_button:hover {
+	background-color: #D7D7D7;
+}
+.custom_ctx_button:disabled {
+	background-color: #BEBEBE;
+	color: #333333;
+}
+.custom_ctx_divisor {
+	background-color: #E6E6E6;
+	height: 1px;
+	margin: 1px;
+}

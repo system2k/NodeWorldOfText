@@ -49,7 +49,7 @@ var textRenderCtx;
 var cellWidthPad, tileW, tileH, cellW, cellH, font, specialCharFont, tileC, tileR, tileArea;
 var tileWidth, tileHeight; // exact tile dimensions for determining rendering size of tiles
 var dTileW, dTileH; // locked tile sizes for background image generation
-var menu, menuStyle;
+var menu, menuStyle, ctxMenu, ctxMenuStyle;
 
 var cursorCoords = null; // [tileX, tileY, charX, charY]; Coordinates of text cursor. If mouse is deselected, the value is null.
 var cursorCoordsCurrent = [0, 0, 0, 0, -1]; // [tileX, tileY, charX, charY]; cursorCoords that don't reset to null.
@@ -1785,6 +1785,90 @@ function menu_color(color) {
 		"}";
 }
 
+function context_menu_color(color) {
+	if(color.toLowerCase() == "#aaaaaa") {
+		if(window.ctxMenuStyle) {
+			window.ctxMenuStyle.remove();
+			window.ctxMenuStyle = null;
+		}
+		return;
+	}
+	// change context menu color
+	if(!window.ctxMenuStyle) {
+		ctxMenuStyle = document.createElement("style");
+		document.head.appendChild(ctxMenuStyle);
+	}
+	var rgb = int_to_rgb(resolveColorValue(color));
+	var value = Math.max(rgb[0], rgb[1], rgb[2]);
+	var buttonDelta = 60;         // 0xaaaaaa to 0xe6e6e6
+	var buttonHoverDelta = 45;    // to 0xd7
+	var buttonBorderDelta = 42;   // to 0x80
+	var buttonDisabledDelta = 20; // to 0xbe
+	var outlineDelta = 34;        // to 0x88
+	var tColor = "#CCCCCC";
+	var dColor = "#888888";
+	if(value > 128) {
+		buttonBorderDelta = -42;
+		outlineDelta = -34;
+		tColor = "#000000";
+		dColor = "#444444";
+	}
+
+	var buttonRgb = [
+		Math.min(255, rgb[0] + buttonDelta),
+		Math.min(255, rgb[1] + buttonDelta),
+		Math.min(255, rgb[2] + buttonDelta)
+	];
+	var buttonHoverRgb = [
+		Math.min(255, rgb[0] + buttonHoverDelta),
+		Math.min(255, rgb[1] + buttonHoverDelta),
+		Math.min(255, rgb[2] + buttonHoverDelta)
+	];
+	var buttonBorderRgb = [
+		Math.max(0, rgb[0] + buttonBorderDelta),
+		Math.max(0, rgb[1] + buttonBorderDelta),
+		Math.max(0, rgb[2] + buttonBorderDelta)
+	];
+	var buttonDisabledRgb = [
+		Math.min(255, rgb[0] + buttonDisabledDelta),
+		Math.min(255, rgb[1] + buttonDisabledDelta),
+		Math.min(255, rgb[2] + buttonDisabledDelta)
+	];
+	var outlineRgb = [
+		Math.max(0, rgb[0] + outlineDelta),
+		Math.max(0, rgb[1] + outlineDelta),
+		Math.max(0, rgb[2] + outlineDelta)
+	];
+
+	var buttonColor = int_to_hexcode(rgb_to_int(...buttonRgb)); // applied to divisors as well
+	var buttonHoverColor = int_to_hexcode(rgb_to_int(...buttonHoverRgb));
+	var buttonBorderColor = int_to_hexcode(rgb_to_int(...buttonBorderRgb));
+	var buttonDisabledColor = int_to_hexcode(rgb_to_int(...buttonDisabledRgb));
+	var outlineColor = int_to_hexcode(rgb_to_int(...outlineRgb));
+
+	ctxMenuStyle.innerHTML = `
+		.custom_ctx {
+			background-color: ${color};
+			border-color: ${outlineColor};
+		}
+		.custom_ctx_button {
+			background-color: ${buttonColor};
+			border-color: ${buttonBorderColor};
+			color: ${tColor};
+		}
+		.custom_ctx_button:hover {
+			background-color: ${buttonHoverColor};
+		}
+		.custom_ctx_button:disabled {
+			background-color: ${buttonDisabledColor};
+			color: ${dColor};
+		}
+		.custom_ctx_divisor {
+			background-color: ${buttonColor};
+		}
+	`;
+}
+
 function defaultStyles() {
 	return {
 		owner: "#ddd",
@@ -1812,6 +1896,7 @@ function manageCoordHash() {
 			homeY = coord[1];
 			w.doGoToCoord(coord[1], coord[0]);
 		}
+		updateContextMenu();
 	} catch(e) {
 		console.log(e);
 	}
@@ -5387,6 +5472,135 @@ function updateMenuEntryVisiblity() {
 	w.menu.setEntryVisibility(menuOptions.eraseArea, permEraseArea);
 }
 
+function buildContextMenu() {
+	ctxMenu = new ContextMenu();
+	w.ctxMenu = {};
+	ctxMenu.resize(60);
+
+	w.ctxMenu.Goto = ctxMenu.addOption("Go to", function() {
+		w.ui.coordGotoModal.open();
+	});
+	w.ctxMenu.Menu_Goto = new ContextMenu();
+	w.ctxMenu.Menu_Goto.addOption("Spawn", function() {
+		w.doGoToCoord(0, 0);
+	});
+	w.ctxMenu.Goto_Home = w.ctxMenu.Menu_Goto.addOption(`Home (${homeX}, ${homeY})`, function() {
+		w.doGoToCoord(homeY, homeX);
+	});
+	ctxMenu.setHover(w.ctxMenu.Goto, w.ctxMenu.Menu_Goto);
+
+	w.ctxMenu.Spawn = ctxMenu.addOption("Go to spawn", function() {
+		w.doGoToCoord(0, 0);
+	});
+	ctxMenu.hide(w.ctxMenu.Spawn);
+
+	w.ctxMenu.Color = ctxMenu.addOption("Color", function() {
+		w.ui.colorModal.open();
+	});
+	w.ctxMenu.Menu_Color = new ContextMenu();
+	w.ctxMenu.Color_Default = w.ctxMenu.Menu_Color.addOption("Default", function() {
+		w.changeColor(resolveColorValue(styles.text));
+	});
+	ctxMenu.setHover(w.ctxMenu.Color, w.ctxMenu.Menu_Color);
+
+	w.ctxMenu.Create = ctxMenu.addOption("Create");
+	w.ctxMenu.Menu_Create = new ContextMenu();
+	w.ctxMenu.Create_Coord = w.ctxMenu.Menu_Create.addOption("Coord link", function() {
+		w.ui.coordLinkModal.open();
+	});
+	w.ctxMenu.Create_URL = w.ctxMenu.Menu_Create.addOption("URL link", function() {
+		w.ui.urlModal.open();
+	});
+	w.ctxMenu.Create_Protection = w.ctxMenu.Menu_Create.addOption("Protection");
+	ctxMenu.setHover(w.ctxMenu.Create, w.ctxMenu.Menu_Create);
+	w.ctxMenu.Menu_Create_Protection = new ContextMenu();
+	w.ctxMenu.Create_Owner = w.ctxMenu.Menu_Create_Protection.addOption("Owner-only", function() {
+		w.doProtect("owner-only");
+	});
+	w.ctxMenu.Create_Member = w.ctxMenu.Menu_Create_Protection.addOption("Member-only", function() {
+		w.doProtect("member-only");
+	});
+	w.ctxMenu.Create_Public = w.ctxMenu.Menu_Create_Protection.addOption("Public", function() {
+		w.doProtect("public");
+	});
+	w.ctxMenu.Create_Default = w.ctxMenu.Menu_Create_Protection.addOption("Default", function() {
+		w.doUnprotect();
+	});
+	w.ctxMenu.Menu_Create.setHover(w.ctxMenu.Create_Protection, w.ctxMenu.Menu_Create_Protection);
+
+	w.ctxMenu.Erase = ctxMenu.addOption("Erase", function() {
+		startEraseUI();
+	});
+
+	w.ctxMenu.Divisor = ctxMenu.addDivisor();
+
+	w.ctxMenu.Zoom = ctxMenu.addOption("Zoom", function() {
+		changeZoom(100);
+	}, null, false);
+	w.ctxMenu.Menu_Zoom = new ContextMenu();
+	w.ctxMenu.Menu_Zoom.direction("row");
+	w.ctxMenu.Menu_Zoom.resize(20);
+	w.ctxMenu.Menu_Zoom.addOption("+", function() {
+		changeZoom((userZoom * 100) * 1.5);
+	}, null, false);
+	w.ctxMenu.Menu_Zoom.addOption("-", function() {
+		changeZoom((userZoom * 100) / 1.5);
+	}, null, false);
+	ctxMenu.setHover(w.ctxMenu.Zoom, w.ctxMenu.Menu_Zoom);
+
+	w.ctxMenu.Theme = ctxMenu.addOption("Theme");
+	w.ctxMenu.Menu_Theme = new ContextMenu();
+	w.ctxMenu.Menu_Theme.addOption("Default", function() {
+		w.day(true);
+	});
+	w.ctxMenu.Menu_Theme.addOption("Day", function() {
+		w.day();
+	});
+	w.ctxMenu.Menu_Theme.addOption("Night", function() {
+		w.night();
+	});
+	ctxMenu.setHover(w.ctxMenu.Theme, w.ctxMenu.Menu_Theme);
+
+	document.addEventListener("contextmenu", function(e) {
+		if (e.target != elm.main_view && e.target != elm.owot && e.target != elm.link_div) return;
+		e.preventDefault();
+		ctxMenu.open(e.pageX, e.pageY);
+	});
+}
+
+function updateContextMenu() {
+	var permGoToCoord = Permissions.can_go_to_coord(state.userModel, state.worldModel);
+	var permColorText = Permissions.can_color_text(state.userModel, state.worldModel);
+	var permColorCell = Permissions.can_color_cell(state.userModel, state.worldModel);
+	var permCoordLink = Permissions.can_coordlink(state.userModel, state.worldModel);
+	var permUrlLink = Permissions.can_urllink(state.userModel, state.worldModel);
+	var permMemberArea = Permissions.can_protect_tiles(state.userModel, state.worldModel);
+	var permOwnerArea = Permissions.can_admin(state.userModel, state.worldModel);
+	var permEraseArea = Permissions.can_erase(state.userModel, state.worldModel);
+
+	var showHome = permGoToCoord && (homeX != 0 || homeY != 0);
+	ctxMenu.showBoolean(w.ctxMenu.Goto, showHome);
+	ctxMenu.showBoolean(w.ctxMenu.Spawn, !showHome);
+	if (showHome) {
+		w.ctxMenu.Menu_Goto.rename(w.ctxMenu.Goto_Home, `Home (${homeX}, ${homeY})`);
+	}
+
+	ctxMenu.enableBoolean(w.ctxMenu.Color, permColorText || permColorCell);
+	w.ctxMenu.Menu_Color.enableBoolean(w.ctxMenu.Color_Default, permColorText);
+
+	w.ctxMenu.Menu_Create.enableBoolean(w.ctxMenu.Create_Coord, permCoordLink);
+	w.ctxMenu.Menu_Create.enableBoolean(w.ctxMenu.Create_URL, permUrlLink);
+	w.ctxMenu.Menu_Create.enableBoolean(w.ctxMenu.Create_Protection, permMemberArea);
+	if (permMemberArea) {
+		w.ctxMenu.Menu_Create_Protection.enableBoolean(w.ctxMenu.Create_Owner, permOwnerArea);
+		w.ctxMenu.Menu_Create_Protection.enable(w.ctxMenu.Create_Member);
+		w.ctxMenu.Menu_Create_Protection.enable(w.ctxMenu.Create_Member);
+	}
+	ctxMenu.enableBoolean(w.ctxMenu.Create, permCoordLink || permUrlLink || permMemberArea);
+
+	ctxMenu.enableBoolean(w.ctxMenu.Erase, permEraseArea);
+}
+
 function regionSelectionsActive() {
 	for(var i = 0; i < regionSelections.length; i++) {
 		if(regionSelections[i].isSelecting) return true;
@@ -7797,6 +8011,7 @@ function reapplyProperties(props) {
 	resetColorModalVisibility();
 	updateColorModalPalette();
 	updateMenuEntryVisiblity();
+	updateContextMenu();
 	updateWorldName();
 
 	w.reloadRenderer();
@@ -8167,6 +8382,7 @@ var ws_functions = {
 			}
 		}
 		updateMenuEntryVisiblity();
+		updateContextMenu();
 		if(paletteUpdated) {
 			updateColorModalPalette();
 		}
@@ -8345,6 +8561,8 @@ function begin() {
 
 	buildMenu();
 	updateMenuEntryVisiblity();
+	buildContextMenu();
+	updateContextMenu();
 	w.regionSelect.onselection(handleRegionSelection);
 
 	w.protectSelect.onselection(protectSelectionStart);
