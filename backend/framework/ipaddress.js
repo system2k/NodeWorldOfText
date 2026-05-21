@@ -175,48 +175,34 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 		}
 	}
 
-	if(ipAddress == "127.0.0.1" && realIp) {
-		ipAddress = realIp;
-		if(ipAddress.indexOf(".") > -1) {
-			ipAddressFam = 4;
+	function parseAnyIp(ip) {
+		if(!ip) return ["0.0.0.0", 4, 0];
+		if(ip.indexOf(".") > -1) {
+			var val = ipv4_to_int(ip);
+			return [ip, 4, val];
 		} else {
-			ipAddressFam = 6;
-			ipAddress = normalize_ipv6(ipAddress);
-		}
-		if(ipAddressFam == 4) {
-			ipAddressVal = ipv4_to_int(ipAddress);
-			if(is_cf_ipv4_int(ipAddressVal)) {
-				ipAddress = cfIp;
-				if(!ipAddress) {
-					ipAddress = "0.0.0.0";
-				}
-				if(ipAddress.indexOf(".") > -1) {
-					ipAddressFam = 4;
-					ipAddressVal = ipv4_to_int(ipAddress);
-				} else {
-					ipAddressFam = 6;
-					ipAddress = normalize_ipv6(ipAddress);
-					ipAddressVal = ipv6_to_int(ipAddress);
-				}
-			}
-		} else if(ipAddressFam == 6) {
-			ipAddressVal = ipv6_to_int(ipAddress);
-			if(is_cf_ipv6_int(ipAddressVal)) {
-				ipAddress = cfIp;
-				if(!ipAddress) {
-					ipAddress = "0.0.0.0";
-				}
-				if(ipAddress.indexOf(".") > -1) {
-					ipAddressFam = 4;
-					ipAddressVal = ipv4_to_int(ipAddress);
-				} else {
-					ipAddressFam = 6;
-					ipAddress = normalize_ipv6(ipAddress);
-					ipAddressVal = ipv6_to_int(ipAddress);
-				}
-			}
+			var norm = normalize_ipv6(ip);
+			var val = ipv6_to_int(norm);
+			return [norm, 6, val];
 		}
 	}
+
+	if((ipAddressFam == 4 && is_cf_ipv4_int(ipAddressVal)) || (ipAddressFam == 6 && is_cf_ipv6_int(ipAddressVal))) {
+		if(cfIp) return parseAnyIp(cfIp);
+	}
+
+	if(ipAddress == "127.0.0.1" && realIp) {
+		var parsedReal = parseAnyIp(realIp);
+		var pIp = parsedReal[0];
+		var pFam = parsedReal[1];
+		var pVal = parsedReal[2];
+
+		if((pFam == 4 && is_cf_ipv4_int(pVal)) || (pFam == 6 && is_cf_ipv6_int(pVal))) {
+			if(cfIp) return parseAnyIp(cfIp);
+		}
+		return [pIp, pFam, pVal];
+	}
+
 	return [ipAddress, ipAddressFam, ipAddressVal];
 }
 
