@@ -823,7 +823,7 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 	if(hasTagDom) {
 		tagDom = document.createElement("span");
 		if(dataObj.rankName) {
-			tagDom.innerHTML = "(" + dataObj.rankName + ")";
+			tagDom.textContent = "(" + dataObj.rankName + ")";
 			tagDom.style.color = dataObj.rankColor;
 			tagDom.style.fontWeight = "bold";
 			nickTitle.push(dataObj.rankName);
