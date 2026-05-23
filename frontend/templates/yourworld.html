@@ -34,9 +34,13 @@
 			<ul></ul>
 		</div>
 		<div id="coords" class="ui ui-vis" style="display: none;">
-			X: <span id="coord_X"></span>
-			Y: <span id="coord_Y"></span>
-			<div id="cursor_coords" style="display: none;">
+			<div id="coord_display" style="cursor: pointer; display: inline-block;" title="Click to copy coordinates">
+				X: <span id="coord_X"></span>
+				Y: <span id="coord_Y"></span>
+			</div>
+			<span id="toggle_cursor" style="cursor: pointer; font-size: 80%; padding-left: 3px;" title="Toggle cursor coordinates">▼</span>
+			<span id="coord_status" style="display: none; padding-left: 5px;">Copied!</span>
+			<div id="cursor_coords" style="display: none; cursor: pointer;" title="Click to copy cursor coordinates">
 				Cursor:
 				<span id="cursor_on" style="display: none;">
 					<span id="tile_X"></span>, <span id="tile_Y"></span> /

@@ -281,6 +281,9 @@ defineElements({ // elm[<name>]
 	nav_elm: byId("nav"),
 	menu_corner_area_elm: byId("menu_corner_area"),
 	coords: byId("coords"),
+	coord_display: byId("coord_display"),
+	toggle_cursor: byId("toggle_cursor"),
+	coord_status: byId("coord_status"),
 	cursor_coords: byId("cursor_coords"),
 	cursor_on: byId("cursor_on"),
 	cursor_off: byId("cursor_off"),
@@ -7249,15 +7252,42 @@ function setupDOMEvents() {
 		}
 	}
 
-	elm.coords.onclick = function() {
+	elm.toggle_cursor.onclick = function() {
 		showCursorCoordinates = !showCursorCoordinates;
 		if(showCursorCoordinates) {
 			elm.cursor_coords.style.display = "";
+			elm.toggle_cursor.innerText = "▲";
 			updateCoordDisplay();
 		} else {
 			elm.cursor_coords.style.display = "none";
+			elm.toggle_cursor.innerText = "▼";
 			updateCoordDisplay();
 		}
+	}
+
+	elm.coord_display.onclick = function() {
+		var x = elm.coord_X.innerText;
+		var y = elm.coord_Y.innerText;
+		var coordStr = "X: " + x + ", Y: " + y;
+		w.clipboard.copy(coordStr);
+		elm.coord_status.style.display = "";
+		setTimeout(function() {
+			elm.coord_status.style.display = "none";
+		}, 1000);
+	}
+
+	elm.cursor_coords.onclick = function() {
+		if(elm.cursor_on.style.display == "none") return;
+		var tx = elm.tile_X.innerText;
+		var ty = elm.tile_Y.innerText;
+		var cx = elm.char_X.innerText;
+		var cy = elm.char_Y.innerText;
+		var coordStr = "Tile: " + tx + ", " + ty + " / Char: " + cx + ", " + cy;
+		w.clipboard.copy(coordStr);
+		elm.coord_status.style.display = "";
+		setTimeout(function() {
+			elm.coord_status.style.display = "none";
+		}, 1000);
 	}
 	
 	window.onhashchange = function(e) {
