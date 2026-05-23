@@ -7323,12 +7323,52 @@ function enableBgColorPicker() {
 	colorInputBg.jscolor.fromString("#DCE943");
 }
 
+function handleCoordPaste(e, coordX, coordY) {
+	var data = (e.clipboardData || window.clipboardData).getData("text");
+	if(!data) return;
+
+	var match1 = data.match(/X:\s*([\d.-]+),\s*Y:\s*([\d.-]+)/i);
+	if(match1) {
+		coordX.value = match1[1];
+		coordY.value = match1[2];
+		e.preventDefault();
+		return;
+	}
+
+	var match2 = data.match(/Tile:\s*([\d.-]+),\s*([\d.-]+)\s*\/\s*Char:\s*([\d.-]+),\s*([\d.-]+)/i);
+	if(match2) {
+		var tx = parseFloat(match2[1]);
+		var ty = parseFloat(match2[2]);
+		var cx = parseFloat(match2[3]);
+		var cy = parseFloat(match2[4]);
+		coordX.value = (tx + (cx / 16)) / coordSizeX;
+		coordY.value = -(ty + (cy / 8)) / coordSizeY;
+		e.preventDefault();
+		return;
+	}
+
+	var match3 = data.match(/^\s*([\d.-]+),\s*([\d.-]+)\s*$/);
+	if(match3) {
+		coordX.value = match1 ? match1[1] : match3[1];
+		coordY.value = match1 ? match1[2] : match3[2];
+		e.preventDefault();
+		return;
+	}
+}
+
 function makeCoordLinkModal() {
 	var modal = new Modal();
 	modal.createForm();
 	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a cell to create the link.\n");
 	var coordX = modal.addEntry("X", "text", "number").input;
 	var coordY = modal.addEntry("Y", "text", "number").input;
+
+	var pasteFunc = function(e) {
+		handleCoordPaste(e, coordX, coordY);
+	};
+	coordX.addEventListener("paste", pasteFunc);
+	coordY.addEventListener("paste", pasteFunc);
+
 	var relative = modal.addEntry("Relative", "checkbox").input;
 	relative.parentElement.title = "When checked, this coord link will teleport the user relative to the coordinates provided";
 	relative.type = "checkbox";
@@ -7346,6 +7386,13 @@ function makeCoordGotoModal() {
 	modal.setFormTitle("Go to coordinates:\n");
 	var coordX = modal.addEntry("X", "text", "number").input;
 	var coordY = modal.addEntry("Y", "text", "number").input;
+
+	var pasteFunc = function(e) {
+		handleCoordPaste(e, coordX, coordY);
+	};
+	coordX.addEventListener("paste", pasteFunc);
+	coordY.addEventListener("paste", pasteFunc);
+
 	modal.onSubmit(function() {
 		w.doGoToCoord(parseFloat(coordY.value), parseFloat(coordX.value));
 	});
