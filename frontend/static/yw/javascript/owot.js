@@ -183,6 +183,7 @@ var cursorOutlineEnabled   = false;
 var showCursorCoordinates  = false; // show cursor coords in coordinate bar
 var textDecorationsEnabled = true; // bold, italic, underline, and strikethrough
 var longpressInterval      = 800; // how many milliseconds to wait until mobile touch is registered as a longpress
+var suppressImages         = getStoredSuppressImages();
 
 var keyConfig = {
 	reset: "ESC",
@@ -644,6 +645,50 @@ function storeConfig() {
 		cursorOutline: cursorOutlineEnabled
 	};
 	localStorage.setItem("config", JSON.stringify(conf));
+}
+
+function getStoredSuppressImages() {
+	var worldName = state.worldModel.name || "";
+	var enableByDefault = (worldName == "" || worldName == "main");
+	
+	if(!window.localStorage || !localStorage.getItem) {
+		return enableByDefault;
+	}
+	
+	var stored = localStorage.getItem("suppressImages");
+	if(stored == null) return enableByDefault;
+
+	var suppressed = {};
+	try {
+		suppressed = JSON.parse(stored);
+	} catch(e) {}
+	if(typeof suppressed == "object") {
+		let status = suppressed[worldName.toUpperCase()];
+		return Boolean(status);
+	}
+
+	return false;
+}
+
+function storeSuppressImages() {
+	if(!window.localStorage || !localStorage.setItem) return;
+
+	var worldName = state.worldModel.name || "";
+	var suppressed = {};
+
+	var stored = localStorage.getItem("suppressImages");
+	if(stored) {
+		try {
+			suppressed = JSON.parse(stored);
+		} catch(e) {}
+		if(!suppressed || typeof suppressed != "object" || Array.isArray(suppressed)) {
+			suppressed = {};
+		}
+	}
+
+	suppressed[worldName.toUpperCase()] = Boolean(suppressImages);
+
+	localStorage.setItem("suppressImages", JSON.stringify(suppressed));
 }
 
 function loadBackgroundData(cb, timeout_cb) {
@@ -1716,6 +1761,194 @@ function setupPoolCleanupInterval() {
 	}, 1000 * 10);
 }
 
+function setupImageChecker() {
+	let tileCache = new Array(9);
+	let cachedCenterX = null;
+	let cachedCenterY = null;
+	let stripColor = null;
+	let stripBgColor = null;
+	let stripWidth = 0;
+
+	let updateTileCache = (cx, cy) => {
+		if(cachedCenterX == cx && cachedCenterY == cy) return;
+		cachedCenterX = cx;
+		cachedCenterY = cy;
+		let idx = 0;
+		for(let ty = -1; ty <= 1; ty++)
+			for(let tx = -1; tx <= 1; tx++)
+				tileCache[idx++] = Tile.get(cx + tx, cy + ty);
+	};
+
+	let buildStrips = () => {
+		stripWidth = tileC + 4;
+		let len = 3 * stripWidth;
+		if(!stripColor || stripColor.length < len) {
+			stripColor = new Uint32Array(len);
+			stripBgColor = new Uint32Array(len);
+		}
+
+		for(let row = 0; row < 3; row++) {
+			let dy = row - 1; // -1, 0, +1
+			let rowBase = row * stripWidth;
+
+			let localRow, relTY;
+			if (dy < 0) {
+				relTY = -1;
+				localRow = tileR - 1; // last row of top neighbor
+			} else if (dy < tileR) {
+				relTY = 0;
+				localRow = dy;
+			} else {
+				relTY = 1;
+				localRow = 0;
+			}
+
+			for(let col = 0; col < stripWidth; col++) {
+				let sampleCol = col - 2; // absolute column relative to tile origin
+
+				let localCol, relTX;
+				if (sampleCol < 0) {
+					relTX = -1;
+					localCol = sampleCol + tileC;
+				} else if (sampleCol < tileC) {
+					relTX = 0;
+					localCol = sampleCol;
+				} else {
+					relTX = 1;
+					localCol = sampleCol - tileC;
+				}
+
+				let tile = tileCache[(relTY + 1) * 3 + (relTX + 1)];
+				let flatIdx = localRow * tileC + localCol;
+				let stripIdx = rowBase + col;
+
+				let fgColors = tile?.properties?.color;
+				stripColor[stripIdx] = (fgColors && fgColors[flatIdx] != null)
+					? fgColors[flatIdx] : 0;
+
+				let bgColors = tile?.properties?.bgcolor;
+				stripBgColor[stripIdx] = (bgColors && bgColors[flatIdx] != null)
+					? bgColors[flatIdx] : 0;
+			}
+		}
+	};
+
+	let makeFreq = () => {
+		let map = new Map();
+		let unique = 0;
+		return {
+			add(c) {
+				if(c == 0) return;
+				let n = map.get(c);
+				if(n == undefined) {
+					map.set(c, 1);
+					unique++;
+				} else {
+					map.set(c, n + 1);
+				}
+			},
+			remove(c) {
+				if(c == 0) return;
+				let n = map.get(c);
+				if(n == 1) {
+					map.delete(c);
+					unique--;
+				} else {
+					map.set(c, n - 1);
+				}
+			},
+			clear() {
+				map.clear();
+				unique = 0;
+			},
+			get count() {
+				return unique;
+			}
+		};
+	};
+
+	let fgFreq = makeFreq();
+	let bgFreq = makeFreq();
+
+	let addCol = (stripX) => {
+		fgFreq.add(stripColor[0 * stripWidth + stripX]);
+		fgFreq.add(stripColor[1 * stripWidth + stripX]);
+		fgFreq.add(stripColor[2 * stripWidth + stripX]);
+		bgFreq.add(stripBgColor[0 * stripWidth + stripX]);
+		bgFreq.add(stripBgColor[1 * stripWidth + stripX]);
+		bgFreq.add(stripBgColor[2 * stripWidth + stripX]);
+	};
+
+	let removeCol = (stripX) => {
+		fgFreq.remove(stripColor[0 * stripWidth + stripX]);
+		fgFreq.remove(stripColor[1 * stripWidth + stripX]);
+		fgFreq.remove(stripColor[2 * stripWidth + stripX]);
+		bgFreq.remove(stripBgColor[0 * stripWidth + stripX]);
+		bgFreq.remove(stripBgColor[1 * stripWidth + stripX]);
+		bgFreq.remove(stripBgColor[2 * stripWidth + stripX]);
+	};
+
+	w.on("tileDraw", function(data) {
+		if(!suppressImages) return;
+
+		let { tileX, tileY, tile } = data;
+		if(!tile) return;
+
+		let hasFg = !!tile.properties?.color;
+		let hasBg = !!tile.properties?.bgcolor;
+		if(!hasFg && !hasBg) return;
+
+		updateTileCache(tileX, tileY);
+		buildStrips();
+
+		let bitmapLen = Math.ceil(tileArea / 8);
+
+		if(hasFg) {
+			if (!tile.color_bitmap || tile.color_bitmap.length < bitmapLen) {
+				tile.color_bitmap = new Uint8Array(bitmapLen);
+			} else {
+				tile.color_bitmap.fill(0);
+			}
+		}
+		if(hasBg) {
+			if (!tile.bgcolor_bitmap || tile.bgcolor_bitmap.length < bitmapLen) {
+				tile.bgcolor_bitmap = new Uint8Array(bitmapLen);
+			} else {
+				tile.bgcolor_bitmap.fill(0);
+			}
+		}
+
+		let colorBitmap = tile.color_bitmap;
+		let bgcolorBitmap = tile.bgcolor_bitmap;
+
+		for(let cy = 0; cy < tileR; cy++) {
+			fgFreq.clear();
+			bgFreq.clear();
+			for(let col = 0; col <= 4; col++) {
+				addCol(col);
+			}
+
+			for(let cx = 0; cx < tileC; cx++) {
+				let idx = cy * tileC + cx;
+				let byte = idx >> 3;
+				let bit = 1 << (idx & 7);
+
+				if(hasFg && fgFreq.count > 5) {
+					colorBitmap[byte] |= bit;
+				}
+				if(hasBg && bgFreq.count > 5) {
+					bgcolorBitmap[byte] |= bit;
+				}
+
+				if(cx < tileC - 1) {
+					removeCol(cx);
+					addCol(cx + 5);
+				}
+			}
+		}
+	});
+}
+
 function checkTextColorOverride() {
 	textColorOverride = 0;
 	var public = 4;
@@ -1810,6 +2043,7 @@ function manageCoordHash() {
 			coord[1] = parseFloat(coord[1]);
 			homeX = coord[0];
 			homeY = coord[1];
+			suppressImages = true;
 			w.doGoToCoord(coord[1], coord[0]);
 		}
 	} catch(e) {
@@ -5336,6 +5570,13 @@ function buildMenu() {
 		w.disableColors();
 		setRedrawPatterned("square");
 	}, true);
+	menuOptions.colorsEnabled = menu.addCheckboxOption("Suppress images", function() {
+		w.enableImageSuppression();
+		setRedrawPatterned("square");
+	}, function() {
+		w.disableImageSuppression();
+		setRedrawPatterned("square");
+	}, suppressImages);
 	if(state.background) {
 		menuOptions.backgroundEnabled = menu.addCheckboxOption("Background", function() {
 			backgroundEnabled = true;
@@ -7012,6 +7253,16 @@ Object.assign(w, {
 		colorsEnabled = false;
 		if(!nr) w.redraw();
 	},
+	enableImageSuppression: function(nr) {
+		suppressImages = true;
+		storeSuppressImages();
+		if(!nr) w.redraw();
+	},
+	disableImageSuppression: function(nr) {
+		suppressImages = false;
+		storeSuppressImages();
+		if(!nr) w.redraw();
+	},
 	basic: function() {
 		w.disableSurrogates(1);
 		w.disableCombining(1);
@@ -8314,6 +8565,7 @@ function begin() {
 	setupFlashAnimation();
 	setWriteInterval();
 	setupPoolCleanupInterval();
+	setupImageChecker();
 
 	makeCoordLinkModal();
 	makeCoordGotoModal();
