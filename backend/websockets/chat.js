@@ -139,6 +139,13 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		return;
 	}
 
+	if(location == "global" && accountSystem == "uvias") {
+		if(typeof user.id !== "string" || !user.id.startsWith("x")) {
+			serverChatResponse("Sign in to send messages in global chat.", location);
+			return;
+		}
+	}
+
 	var isMuted = false;
 	var isTestMessage = false;
 	var muteInfo = null;
