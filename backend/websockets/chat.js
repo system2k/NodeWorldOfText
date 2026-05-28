@@ -138,7 +138,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		serverChatResponse("The global channel is not available", location);
 		return;
 	}
-
 	var isMuted = false;
 	var isTestMessage = false;
 	var muteInfo = null;
