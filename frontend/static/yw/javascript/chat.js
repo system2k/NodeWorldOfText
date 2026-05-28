@@ -782,6 +782,8 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 }
 
 function buildChatElement(field, id, type, nickname, message, realUsername, op, admin, staff, color, date, dataObj) {
+	var rawNickname = nickname;
+	var rawMessage = message;
 	var dateStr = "";
 	if(date) dateStr = convertToDate(date);
 	var pm = dataObj.privateMessage;
@@ -1013,8 +1015,9 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 		field: field,
 		element: chatGroup,
 		type: type,
-		nickname: nickname,
+		rawNickname: rawNickname,
 		realUsername: realUsername,
+		rawMessage: rawMessage,
 		message: message,
 		dataObj: dataObj
 	};
@@ -1060,9 +1063,9 @@ function isChatMessageDuplicateRecord(chatRec, message) {
 	if(!chatRec || !chatRec.element || !chatRec.element._duplicateData) return false;
 	return chatRec.id === message.id
 		&& chatRec.type === message.type
-		&& chatRec.nickname === message.nickname
+		&& chatRec.rawNickname === message.nickname
 		&& chatRec.realUsername === message.realUsername
-		&& chatRec.message === message.message
+		&& chatRec.rawMessage === message.message
 		&& ((chatRec.dataObj && chatRec.dataObj.privateMessage) || "") === ((message.dataObj && message.dataObj.privateMessage) || "");
 }
 
