@@ -139,11 +139,11 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		return;
 	}
 
-	if(location == "global" && accountSystem == "uvias") {
-		if(typeof user.id !== "string" || !user.id.startsWith("x")) {
+	if (location == "global" && accountSystem == "uvias") {
+    	if (!user.realUsername || user.realUsername.trim() === "") {
 			serverChatResponse("Sign in to send messages in global chat.", location);
-			return;
-		}
+        	return;
+    	}
 	}
 
 	var isMuted = false;
