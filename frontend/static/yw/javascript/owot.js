@@ -4501,11 +4501,15 @@ function checkKeyPatterns(combination) {
 	}
 	return true;
 }
-
+/*
 function createWsPath() {
 	var search = window.location.search;
 	if(!search) search = "";
 	return "ws" + (window.location.protocol == "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/" + search;
+}*/
+
+function createWsPath() {
+	return "wss://ourworldoftext.com/ws/";
 }
 
 function createSocket(getChatHist) {
