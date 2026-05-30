@@ -139,8 +139,14 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		return;
 	}
 
-	if (location == "global" && accountSystem == "uvias") {
-    	if (!user.realUsername || user.realUsername.trim() === "") {
+	var username_to_display = user.username;
+	if(accountSystem == "uvias") {
+		username_to_display = user.display_username;
+	}
+	var has_chat_username = typeof username_to_display == "string" && !!username_to_display.trim();
+
+	if(location == "global") {
+		if(!user.authenticated || !has_chat_username) {
 			serverChatResponse("Sign in to send messages in global chat.", location);
         	return;
     	}
@@ -203,11 +209,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 	if(data.hasOwnProperty("customMeta")) {
 		data.customMeta = sanitizeCustomMeta(data.customMeta);
-	}
-
-	var username_to_display = user.username;
-	if(accountSystem == "uvias") {
-		username_to_display = user.display_username;
 	}
 
 	var chatBlockLimit = 1280;
