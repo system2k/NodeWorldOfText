@@ -146,10 +146,23 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var has_chat_username = typeof username_to_display == "string" && !!username_to_display.trim();
 
 	if(location == "global") {
-		if(!user.authenticated || !has_chat_username) {
+		var chatGlobalNoAnon = getServerSetting("chatGlobalNoAnon") == "1";
+		if(chatGlobalNoAnon && !user.authenticated) {
 			serverChatResponse("Sign in to send messages in global chat.", location);
-        	return;
-    	}
+			return;
+		}
+		if(user.authenticated && !has_chat_username) {
+			serverChatResponse("Your account needs a username to send messages in global chat.", location);
+			return;
+			// I'm not sure if this case can actually happen, but just in case - Alan
+		}
+	} //elseif?
+
+	if(location == "page") {
+		if(world.opts.noAnonChat && !user.authenticated) {
+			serverChatResponse("Sign in to send messages in this world.", location);
+			return;
+		}
 	}
 
 	var isMuted = false;
