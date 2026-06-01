@@ -86,7 +86,8 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		custom_ranks,
 		client_version: getClientVersion(),
 		csrftoken,
-		global_chat_enabled: getServerSetting("chatGlobalEnabled") == "1"
+		global_chat_enabled: getServerSetting("chatGlobalEnabled") == "1",
+		global_chat_no_anon: getServerSetting("chatGlobalNoAnon") == "1"
 	};
 
 	write(render("administrator.html", data));
@@ -133,6 +134,14 @@ module.exports.POST = async function(req, write, server, ctx) {
 			}
 		} else {
 			updateServerSetting("chatGlobalEnabled", "0");
+		}
+		if("set_chat_global_no_anon" in post_data) {
+			var isNoAnon = post_data.set_chat_global_no_anon;
+			if(isNoAnon == "on") {
+				updateServerSetting("chatGlobalNoAnon", "1");
+			}
+		} else {
+			updateServerSetting("chatGlobalNoAnon", "0");
 		}
 	}
 	if("announcement" in post_data) {

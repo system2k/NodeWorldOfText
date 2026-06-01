@@ -8366,6 +8366,9 @@ var ws_functions = {
 				case "noCopy":
 					state.worldModel.no_copy = value;
 					break;
+				case "noAnonChat":
+					state.worldModel.no_anon_chat = value;
+					break;
 				case "chat":
 					state.worldModel.chat_permission = value;
 					elm.chatbar.disabled = !Permissions.can_chat(state.userModel, state.worldModel);

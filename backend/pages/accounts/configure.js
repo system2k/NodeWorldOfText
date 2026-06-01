@@ -276,6 +276,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		square_chars,
 		no_log_edits: world.opts.noLogEdits,
 		no_chat_global: world.opts.noChatGlobal,
+		no_anon_chat: world.opts.noAnonChat,
 		no_copy: world.opts.noCopy,
 		half_chars,
 		mixed_chars,
@@ -534,6 +535,10 @@ module.exports.POST = async function(req, write, server, ctx) {
 		}
 		if(modifyWorldProp(world, "feature/memberTilesAddRemove", Boolean(membertiles_addremove))) {
 			featureUpdates.push({type: "memberTilesAddRemove", value: Boolean(membertiles_addremove)});
+		}
+		var no_anon_chat = post_data.no_anon_chat == "1";
+		if(modifyWorldProp(world, "opts/noAnonChat", no_anon_chat)) {
+			featureUpdates.push({type: "noAnonChat", value: no_anon_chat});
 		}
 
 		if(featureUpdates.length) {
