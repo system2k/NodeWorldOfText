@@ -73,6 +73,7 @@ var world_default_props = {
 	square_chars: false,
 	no_log_edits: false,
 	no_chat_global: false,
+	no_anon_chat: false,
 	no_copy: false,
 	half_chars: false,
 	char_rate: "",
@@ -216,6 +217,7 @@ function makeWorldObject() {
 			squareChars: false,
 			noLogEdits: false,
 			noChatGlobal: false,
+			noAnonChat: false,
 			noCopy: false,
 			halfChars: false,
 			charRate: "",
@@ -341,6 +343,7 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.opts.squareChars = getAndProcWorldProp(wprops, "square_chars");
 	wobj.opts.noLogEdits = getAndProcWorldProp(wprops, "no_log_edits");
 	wobj.opts.noChatGlobal = getAndProcWorldProp(wprops, "no_chat_global");
+	wobj.opts.noAnonChat = getAndProcWorldProp(wprops, "no_anon_chat");
 	wobj.opts.noCopy = getAndProcWorldProp(wprops, "no_copy");
 	wobj.opts.halfChars = getAndProcWorldProp(wprops, "half_chars");
 	wobj.opts.charRate = getAndProcWorldProp(wprops, "char_rate");
@@ -502,6 +505,7 @@ async function commitWorld(world) {
 		"opts/squareChars",
 		"opts/noLogEdits",
 		"opts/noChatGlobal",
+		"opts/noAnonChat",
 		"opts/noCopy",
 		"opts/halfChars",
 		"opts/charRate",
@@ -539,6 +543,7 @@ async function commitWorld(world) {
 		square_chars: world.opts.squareChars,
 		no_log_edits: world.opts.noLogEdits,
 		no_chat_global: world.opts.noChatGlobal,
+		no_anon_chat: world.opts.noAnonChat,
 		no_copy: world.opts.noCopy,
 		half_chars: world.opts.halfChars,
 		char_rate: world.opts.charRate,
