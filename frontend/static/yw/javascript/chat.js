@@ -150,6 +150,19 @@ function register_chat_command(command, callback, params, desc, example) {
 	client_commands[command.toLowerCase()] = callback;
 }
 
+var blockGuests = false;
+
+register_chat_command("hideguests", function(args) {
+	blockGuests = !blockGuests;
+	clientChatResponse("Guest hiding is now " + (blockGuests ? "enabled" : "disabled"));
+}, null, "hide messages from guests", null);
+
+OWOT.on("chat", function(e) {
+	if(blockGuests && e.realUsername && e.realUsername.startsWith("Guest-")) {
+		e.hide = true;
+	}
+});
+
 register_chat_command("nick", function (args) {
 	var newDisplayName = args.join(" ");
 	if(!newDisplayName) {
