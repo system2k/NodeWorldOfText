@@ -63,6 +63,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 			writeInt: world.opts.writeInt,
 			desc: world.opts.desc,
 			noChatGlobal: world.opts.noChatGlobal,
+			noAnonChat: world.opts.noAnonChat,
 			noCopy: world.opts.noCopy,
 			defaultScriptPath: world.opts.defaultScriptPath,
 			colorPalette: world.opts.colorPaletteEnabled ? world.opts.colorPalette : null,
