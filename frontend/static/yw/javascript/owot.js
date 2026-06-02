@@ -8661,4 +8661,4 @@ function begin() {
 	});
 }
 
-begin();
+window._beginAfterCaptcha = begin;

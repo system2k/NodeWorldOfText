@@ -571,6 +571,7 @@ var pages = {
 		shell: require("./backend/pages/admin/shell.js")
 	},
 	other: {
+		altcha: require("./backend/pages/other/altcha.js"),
 		ipaddress: require("./backend/pages/other/ipaddress.js"),
 		load_backgrounds: require("./backend/pages/other/load_backgrounds.js"),
 		random_color: require("./backend/pages/other/random_color.js"),
@@ -1166,6 +1167,7 @@ function createEndpoints(server) {
 	server.registerEndpoint("world_style", pages.world_style);
 	server.registerEndpoint("world_props", pages.world_props);
 
+	server.registerEndpoint("other/altcha", pages.other.altcha, { no_login: true });
 	server.registerEndpoint("other/random_color", pages.other.random_color, { no_login: true });
 	server.registerEndpoint("other/backgrounds/*", pages.other.load_backgrounds, { no_login: true });
 	server.registerEndpoint("other/test/*", pages.other.test, { no_login: true });

@@ -49,6 +49,15 @@
 		</div>
 
 		<div id="modal_overlay" style="display: none;"></div>
+		<div id="captcha_overlay" style="display: none;">
+			<div class="captcha_frame">
+				<div class="captcha_client">
+					<div class="captcha_title">Verify you are human</div>
+					<altcha-widget challenge="/other/altcha" id="altcha-widget"></altcha-widget>
+					<div id="captcha_error" style="display: none;">Verification failed. Please try again.</div>
+				</div>
+			</div>
+		</div>
 		<div id="link_tooltip" class="tooltip" style="display: none;"></div>
 
 		<h1 id="loading">Loading...</h1>
@@ -146,5 +155,56 @@
 		<script src="/static/yw/javascript/chat.js{{ staticVersion }}"></script>
 		<script src="/static/yw/javascript/renderer.js{{ staticVersion }}"></script>
 		<script src="/static/yw/javascript/owot.js{{ staticVersion }}"></script>
+		<script src="/static/lib/altcha-wrapped.min.js{{ staticVersion }}"></script>
+		<script>
+		(function() {
+			var overlay = document.getElementById("captcha_overlay");
+			var errorEl = document.getElementById("captcha_error");
+			var widget = document.getElementById("altcha-widget");
+			var verified = false;
+
+			function proceed() {
+				verified = true;
+				overlay.style.display = "none";
+				if(window._beginAfterCaptcha) {
+					try {
+						window._beginAfterCaptcha();
+					} catch(e) {
+						console.error("begin() failed:", e);
+						errorEl.textContent = "Initialization error: " + e.message;
+						errorEl.style.display = "";
+					}
+				}
+			}
+
+			widget.addEventListener("statechange", function(ev) {
+				if(ev.detail.state === "verified" && !verified) {
+					var payload = ev.detail.payload;
+					if(!payload) return;
+					errorEl.style.display = "none";
+					fetch("/other/altcha", {
+						method: "POST",
+						body: new URLSearchParams({ altcha: payload })
+					}).then(function(r) { return r.json(); }).then(function(data) {
+						if(data.verified) {
+							proceed();
+						} else {
+							errorEl.style.display = "";
+							widget.reset();
+						}
+					}).catch(function() {
+						errorEl.style.display = "";
+						widget.reset();
+					});
+				} else if(ev.detail.state === "error") {
+					errorEl.style.display = "";
+				} else if(ev.detail.state !== "verified") {
+					errorEl.style.display = "none";
+				}
+			});
+
+			overlay.style.display = "";
+		})();
+		</script>
 	</body>
 </html>
