@@ -1,7 +1,7 @@
 var db;
 var intv;
 module.exports.main = function(server) {
-	db = server.db;
+	db = server.world_db || server.db;
 	intv = server.intv;
 
 	fetchTimer();

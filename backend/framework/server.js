@@ -388,27 +388,36 @@ class RequestHandler {
 				info.Location = params.redirect;
 			}
 		}
-		if(params.mime) {
-			info["Content-Type"] = params.mime;
-		}
-		if(params.headers) {
-			for(var i in params.headers) {
-				info[i] = params.headers[i];
-			}
-		}
 		if(!status_code) {
 			status_code = 200;
 		}
 		if(!data) {
 			data = "";
 		}
+		var responseMime = params.mime;
+		if(!responseMime && typeof data == "string" && data.length) {
+			var trimmed = data.trimStart();
+			if(trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html") || trimmed.startsWith("<HTML")) {
+				responseMime = "text/html; charset=utf-8";
+			} else {
+				responseMime = "text/plain; charset=utf-8";
+			}
+		}
+		if(responseMime) {
+			info["Content-Type"] = responseMime;
+		}
+		if(params.headers) {
+			for(var i in params.headers) {
+				info[i] = params.headers[i];
+			}
+		}
 		if(this.gzip && (this.encoding.includes("gzip") || this.encoding.includes("*") && !this.requestStreaming)) {
 			var doNotEncode = false;
 			if(data.length < 1450) {
 				doNotEncode = true;
 			}
-			if(typeof params.mime == "string") {
-				if(params.mime.indexOf("text") == -1 && params.mime.indexOf("javascript") == -1 && params.mime.indexOf("json") == -1) {
+			if(typeof responseMime == "string") {
+				if(responseMime.indexOf("text") == -1 && responseMime.indexOf("javascript") == -1 && responseMime.indexOf("json") == -1) {
 					doNotEncode = true;
 				}
 			} else {

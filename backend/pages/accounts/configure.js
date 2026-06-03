@@ -699,7 +699,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 			if(ratelim_val == 0 && ratelim_per == 0) {
 				if(modifyWorldProp(world, "opts/charRate", "")) {
 					charrateUpdated = true;
-					newCharrate = [20480, 1000];
+					newCharrate = server.resolveWorldCharRate("", server.rate_limits);
 				}
 			} else {
 				if(modifyWorldProp(world, "opts/charRate", ratelim_val + "/" + ratelim_per)) {

@@ -22,6 +22,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var accountSystem = server.accountSystem;
 	var createCSRF = server.createCSRF;
 	var getServerSetting = server.getServerSetting;
+	var resolveWorldCharRate = server.resolveWorldCharRate;
 
 	var world_name = path;
 
@@ -84,14 +85,14 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		if(accountSystem == "uvias") {
 			username = user.display_username;
 		}
-		var char_rate = world.opts.charRate;
-		if(char_rate) {
-			char_rate = char_rate.split("/").map(Number);
-		} else {
-			char_rate = [20480, 1000];
+		var char_rate = resolveWorldCharRate(world.opts.charRate, server.rate_limits);
+		var char_rate_unlimited = !world.opts.charRate && server.isDefaultWorldCharRateDisabled(server.rate_limits);
+		if(server.rate_limits && server.rate_limits.disabled) {
+			char_rate_unlimited = true;
 		}
 		var write_int = world.opts.writeInt;
 		if(write_int == -1) write_int = 1000;
+		if(char_rate_unlimited) write_int = 0;
 
 		var announcement = getServerSetting("announcement");
 		var isGlobalEnabled = getServerSetting("chatGlobalEnabled") == "1";
@@ -122,6 +123,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 				quick_erase: world.feature.quickErase,
 				show_cursor: world.feature.showCursor,
 				char_rate: char_rate,
+				char_rate_unlimited: char_rate_unlimited,
 				write_interval: write_int,
 				no_copy: world.opts.noCopy,
 				no_chat_global: world.opts.noChatGlobal || !isGlobalEnabled,

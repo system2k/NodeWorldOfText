@@ -5,8 +5,14 @@ var linkRateLimits = {};
 var tileRateLimits = {};
 var tileHolds = {};
 
+var limitsDisabled = false;
+
+function setLimitsDisabled(disabled) {
+	limitsDisabled = !!disabled;
+}
+
 function checkCharRateLimit(ipObj, cRate, editCount) {
-	if(!cRate) return false;
+	if(limitsDisabled || !cRate) return true;
 	var date = Date.now();
 	if(!ipObj.value) {
 		ipObj.periodEpoch = 0;
@@ -26,7 +32,7 @@ function checkCharRateLimit(ipObj, cRate, editCount) {
 }
 
 function checkTileRateLimit(ipObj, tRate, tileX, tileY, worldId) {
-	if(!tRate) return false;
+	if(limitsDisabled || !tRate) return true;
 	var per = Math.floor((Date.now() - ipObj.periodEpoch) / ipObj.periodLength);
 	var currentPer = ipObj.currentPeriod;
 	var pos = tileY + "," + tileX + "," + worldId;
@@ -88,6 +94,7 @@ function checkHTTPWriteRestr(restGroups, ipVal, ipFam, isGrouped, world) {
 }
 
 function setHold(id, worldId, tileX, tileY) {
+	if(limitsDisabled) return true;
 	if(!tileHolds[id]) tileHolds[id] = {
 		count: 0,
 		tiles: {}
@@ -95,7 +102,7 @@ function setHold(id, worldId, tileX, tileY) {
 	var holdObj = tileHolds[id];
 	var pos = worldId + "," + tileY + "," + tileX;
 	if(!holdObj.tiles[pos]) {
-		if(holdObj.count >= 100) {
+		if(holdObj.count >= 512) {
 			return false;
 		}
 		holdObj.count++;
@@ -151,6 +158,7 @@ module.exports = {
 	editRateLimits,
 	linkRateLimits,
 	tileRateLimits,
+	setLimitsDisabled,
 	checkCharRateLimit,
 	checkTileRateLimit,
 	prepareRateLimiter,

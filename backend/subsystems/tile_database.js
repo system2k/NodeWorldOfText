@@ -19,6 +19,9 @@ var memTileCache;
 var broadcastMonitorEvent;
 var wsSend;
 var loadPlugin;
+var publishSidecarTileUpdate;
+var rateLimitsDisabled = false;
+var sidecarTilesEnabled = false;
 
 var server_exiting = false;
 var editlog_cell_props = false;
@@ -43,7 +46,7 @@ var tileIterationTempMem = {};
 var tileCacheTimeLimit = 1000 * 60 * 1;
 
 module.exports.main = function(server) {
-	db = server.db;
+	db = server.world_db || server.db;
 	db_edits = server.db_edits;
 	handle_error = server.handle_error;
 	intv = server.intv;
@@ -52,6 +55,9 @@ module.exports.main = function(server) {
 	broadcastMonitorEvent = server.broadcastMonitorEvent;
 	wsSend = server.wsSend;
 	loadPlugin = server.loadPlugin;
+	publishSidecarTileUpdate = server.publishSidecarTileUpdate || null;
+	sidecarTilesEnabled = !!server.sidecarTilesEnabled;
+	rateLimitsDisabled = !!(server.rate_limits && server.rate_limits.disabled);
 
 	databaseClock();
 	editLogClock();
@@ -314,6 +320,10 @@ function sendTileUpdatesToClients() {
 		let cliUpdPkt = generateFullTileUpdate(worldQueue);
 		delete tileClientUpdateQueue[worldID];
 		let pktBroadcast = JSON.stringify(cliUpdPkt);
+
+		if(publishSidecarTileUpdate) {
+			publishSidecarTileUpdate(worldID, pktBroadcast);
+		}
 
 		wss.clients.forEach(function(client) {
 			if(!client.sdata) return;
@@ -1201,6 +1211,7 @@ function bulkWriteEdits(edits) {
 }
 
 async function iterateDatabaseChanges() {
+	if(sidecarTilesEnabled) return 0;
 	let writeQueue = [];
 	let modTileCount = 0;
 	for(let worldID in memTileCache) {
@@ -1817,7 +1828,7 @@ function appendToTileIterationsQueue(world, callID, type, user) {
 function processPublicClearIteration(call_id, data) {
 	var world = data.world;
 	var user = data.user;
-	if(!user.superuser) {
+	if(!user.superuser && !rateLimitsDisabled) {
 		if(check_ratelimit("world_clear", world.id)) {
 			IOProgress(call_id);
 			return;
@@ -1838,7 +1849,7 @@ function processPublicClearIteration(call_id, data) {
 function processEraseWorldIteration(call_id, data) {
 	var world = data.world;
 	var user = data.user;
-	if(!user.superuser) {
+	if(!user.superuser && !rateLimitsDisabled) {
 		if(check_ratelimit("world_clear", world.id)) {
 			IOProgress(call_id);
 			return;

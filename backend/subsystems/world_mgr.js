@@ -10,7 +10,7 @@ var server_exiting = false;
 module.exports.main = async function(server) {
 	intv = server.intv;
 	handle_error = server.handle_error;
-	db = server.db;
+	db = server.world_db || server.db;
 	broadcastMonitorEvent = server.broadcastMonitorEvent;
 
 	intv.worldCacheInvalidation = setInterval(function() {

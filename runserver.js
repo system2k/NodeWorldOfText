@@ -93,6 +93,9 @@ initializeDirectoryStruct();
 
 const settings = require(SETTINGS_PATH);
 
+var rateLimitSettings = require("./backend/utils/rate_limit_settings.js");
+const rateLimitSettingsLoaded = rateLimitSettings.load(settings);
+
 var serverPort     = settings.port;
 var serverDBPath   = settings.paths.database;
 var editsDBPath    = settings.paths.edits;
@@ -135,9 +138,18 @@ var serverLoaded = false;
 var isStopping = false;
 
 var closed_client_limit = 1000 * 60 * 20; // 20 min
-var ws_req_per_second = 1000;
+var ws_req_per_second = 0;
 var pw_encryption = "sha512WithRSAEncryption";
-var connections_per_ip = 50;
+var connections_per_ip = rateLimitSettingsLoaded.connections_per_ip;
+var rateLimitsDisabled = rateLimitSettingsLoaded.disabled === true;
+if(rateLimitsDisabled) {
+	rate_limiter.setLimitsDisabled(true);
+}
+if(settings.sidecar && settings.sidecar.ws_req_per_second != null) {
+	ws_req_per_second = settings.sidecar.ws_req_per_second;
+} else if(!rateLimitsDisabled) {
+	ws_req_per_second = 1000;
+}
 var static_path = "./frontend/static/";
 var static_path_web = "static/";
 var templates_path = "./frontend/templates/";
@@ -157,7 +169,8 @@ var db,
 	db_edits,
 	db_chat,
 	db_img,
-	db_misc;
+	db_misc,
+	world_db;
 
 // Global
 CONST = {};
@@ -593,7 +606,10 @@ var pages = {
 	urllink: require("./backend/pages/urllink.js"),
 	world_props: require("./backend/pages/world_props.js"),
 	world_style: require("./backend/pages/world_style.js"),
-	yourworld: require("./backend/pages/yourworld.js")
+	yourworld: require("./backend/pages/yourworld.js"),
+	internal: {
+		ws_relay: require("./backend/pages/internal/ws_relay.js")
+	}
 };
 
 var websockets = {
@@ -611,6 +627,8 @@ var websockets = {
 	boundary: require("./backend/websockets/boundary.js"),
 	stats: require("./backend/websockets/stats.js")
 };
+
+pages.internal.ws_relay.loadPages({ websockets });
 
 var modules = {
 	fetch_tiles: require("./backend/modules/fetch_tiles.js"),
@@ -750,6 +768,13 @@ class AsyncDBManager {
 	}
 }
 
+function initSqliteConcurrency(database, busyMs) {
+	if(!database) return;
+	if(busyMs == null) busyMs = 10000;
+	database.configure("busyTimeout", busyMs);
+	database.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=" + busyMs + ";");
+}
+
 function loadDbSystems() {
 	var database = new sql.Database(serverDBPath);
 	var edits_db = new sql.Database(editsDBPath);
@@ -757,11 +782,23 @@ function loadDbSystems() {
 	var image_db = new sql.Database(imageDBPath);
 	var misc_db = new sql.Database(miscDBPath);
 
+	initSqliteConcurrency(database);
+	initSqliteConcurrency(edits_db);
+	initSqliteConcurrency(chat_history);
+	initSqliteConcurrency(image_db);
+	initSqliteConcurrency(misc_db);
+
 	db = new AsyncDBManager(database);
 	db_edits = new AsyncDBManager(edits_db);
 	db_chat = new AsyncDBManager(chat_history);
 	db_img = new AsyncDBManager(image_db);
 	db_misc = new AsyncDBManager(misc_db);
+
+	world_db = db;
+	if(settings.pg_worlds && settings.pg_worlds.enabled) {
+		world_db = require("./backend/subsystems/world_pg_db").create(settings.pg_worlds);
+		console.log("PostgreSQL world store enabled:", settings.pg_worlds.database);
+	}
 }
 
 async function loadEmail() {
@@ -891,6 +928,7 @@ async function initializeServer() {
 	await initialize_image_db();
 
 	global_data.db = db;
+	global_data.world_db = world_db;
 	global_data.db_img = db_img;
 	global_data.db_misc = db_misc;
 	global_data.db_edits = db_edits;
@@ -1160,6 +1198,8 @@ function createEndpoints(server) {
 	server.registerEndpoint("administrator/restrictions", pages.admin.restrictions, { binary_post_data: true });
 	server.registerEndpoint("administrator/api/restrictions", pages.admin.api.restrictions);
 
+	server.registerEndpoint("internal/ws-relay", pages.internal.ws_relay, { no_login: true, binary_post_data: true });
+
 	server.registerEndpoint("script_manager/", pages.script_manager);
 	server.registerEndpoint("script_manager/edit/*", pages.script_edit);
 	server.registerEndpoint("script_manager/view/*", pages.script_view);
@@ -1183,26 +1223,32 @@ function createEndpoints(server) {
 
 	// set rate limits
 
-	server.setHTTPRateLimit(pages.accounts.login, 2);
-	server.setHTTPRateLimit(pages.accounts.logout, 2);
-	server.setHTTPRateLimit(pages.accounts.register, 1);
-	server.setHTTPRateLimit(pages.accounts.profile, 2, "GET");
-	server.setHTTPRateLimit(pages.accounts.profile, 10, "POST");
-	server.setHTTPRateLimit(pages.accounts.configure, 2);
-	server.setHTTPRateLimit(pages.accounts.member_autocomplete, 4);
-	server.setHTTPRateLimit(pages.accounts.download, 2);
-	server.setHTTPRateLimit(pages.accounts.tabular, 2);
-	server.setHTTPRateLimit(pages.accounts.sso, 3);
-	server.setHTTPRateLimit(pages.protect, 16);
-	server.setHTTPRateLimit(pages.unprotect, 16);
-	server.setHTTPRateLimit(pages.protect_char, 16);
-	server.setHTTPRateLimit(pages.unprotect_char, 16);
-	server.setHTTPRateLimit(pages.coordlink, 16);
-	server.setHTTPRateLimit(pages.urllink, 16);
-	server.setHTTPRateLimit(pages.yourworld, 16, "POST");
-	server.setHTTPRateLimit(pages.yourworld, 6, "GET");
-	server.setHTTPRateLimit(pages.world_style, 2);
-	server.setHTTPRateLimit(pages.world_props, 2);
+	var httpLimits = rateLimitSettingsLoaded.http;
+	function httpRate(v) {
+		if(httpLimits.disabled) return Number.MAX_SAFE_INTEGER;
+		return v;
+	}
+
+	server.setHTTPRateLimit(pages.accounts.login, httpRate(httpLimits.login));
+	server.setHTTPRateLimit(pages.accounts.logout, httpRate(httpLimits.logout));
+	server.setHTTPRateLimit(pages.accounts.register, httpRate(httpLimits.register));
+	server.setHTTPRateLimit(pages.accounts.profile, httpRate(httpLimits.profile_get), "GET");
+	server.setHTTPRateLimit(pages.accounts.profile, httpRate(httpLimits.profile_post), "POST");
+	server.setHTTPRateLimit(pages.accounts.configure, httpRate(httpLimits.configure));
+	server.setHTTPRateLimit(pages.accounts.member_autocomplete, httpRate(httpLimits.member_autocomplete));
+	server.setHTTPRateLimit(pages.accounts.download, httpRate(httpLimits.download));
+	server.setHTTPRateLimit(pages.accounts.tabular, httpRate(httpLimits.tabular));
+	server.setHTTPRateLimit(pages.accounts.sso, httpRate(httpLimits.sso));
+	server.setHTTPRateLimit(pages.protect, httpRate(httpLimits.protect));
+	server.setHTTPRateLimit(pages.unprotect, httpRate(httpLimits.unprotect));
+	server.setHTTPRateLimit(pages.protect_char, httpRate(httpLimits.protect_char));
+	server.setHTTPRateLimit(pages.unprotect_char, httpRate(httpLimits.unprotect_char));
+	server.setHTTPRateLimit(pages.coordlink, httpRate(httpLimits.coordlink));
+	server.setHTTPRateLimit(pages.urllink, httpRate(httpLimits.urllink));
+	server.setHTTPRateLimit(pages.yourworld, httpRate(httpLimits.yourworld_post), "POST");
+	server.setHTTPRateLimit(pages.yourworld, httpRate(httpLimits.yourworld_get), "GET");
+	server.setHTTPRateLimit(pages.world_style, httpRate(httpLimits.world_style));
+	server.setHTTPRateLimit(pages.world_props, httpRate(httpLimits.world_props));
 }
 
 function new_token(len) {
@@ -1570,14 +1616,22 @@ function broadcastUserCount() {
 }
 
 async function loopClearExpiredSessions(no_timeout) {
-	// clear expired sessions
-	await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
-	// clear expired registration keys
-	await db.each("SELECT id FROM auth_user WHERE is_active=0 AND ? - date_joined >= ? AND (SELECT COUNT(*) FROM registration_registrationprofile WHERE user_id=auth_user.id) > 0",
-		[Date.now(), ms.day * settings.activation_key_days_expire], async function(data) {
-		var id = data.id;
-		await db.run("DELETE FROM registration_registrationprofile WHERE user_id=?", id);
-	});
+	try {
+		// clear expired sessions
+		await db.run("DELETE FROM auth_session WHERE expire_date <= ?", Date.now());
+		// clear expired registration keys
+		await db.each("SELECT id FROM auth_user WHERE is_active=0 AND ? - date_joined >= ? AND (SELECT COUNT(*) FROM registration_registrationprofile WHERE user_id=auth_user.id) > 0",
+			[Date.now(), ms.day * settings.activation_key_days_expire], async function(data) {
+			var id = data.id;
+			await db.run("DELETE FROM registration_registrationprofile WHERE user_id=?", id);
+		});
+	} catch(e) {
+		if(e && e.sqlite_error && e.sqlite_error.code === "SQLITE_BUSY") {
+			// Shared DB with Rust WS sidecars; retry on next interval
+		} else {
+			handle_error(e);
+		}
+	}
 
 	if(!no_timeout) intv.clearExpiredSessions = setTimeout(loopClearExpiredSessions, ms.minute);
 }
@@ -1825,19 +1879,7 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 	return [ipAddress, ipAddressFam, ipAddressVal];
 }
 
-var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
-	chat:			[256, 1000, 0], // rate-limiting handled separately
-	chathistory:	[4, 500, 0],
-	clear_tile:		[512, 1000, 0],
-	cmd_opt:		[10, 1000, 0],
-	cmd:			[256, 1000, 0],
-	debug:			[10, 1000, 0],
-	fetch:			[256, 1000, 0], // TODO: fetch rate limits
-	link:			[400, 1000, 0], // TODO: fix link limits
-	protect:		[400, 1000, 0],
-	write:			[256, 1000, 0], // rate-limiting handled separately
-	cursor:			[70, 1000, 0]
-};
+var ws_limits = rateLimitSettingsLoaded.websocket;
 
 function can_process_req_kind(lims, kind) {
 	if(!ws_limits[kind]) return true;
@@ -1871,6 +1913,7 @@ function get_ip_kind_limits(ip) {
 }
 
 function can_connect_ip_address(ip) {
+	if(rateLimitsDisabled || !connections_per_ip) return true;
 	if(!ip_address_conn_limit[ip] || !ip || ip == "0.0.0.0") return true;
 	if(ip_address_conn_limit[ip] >= connections_per_ip) return false;
 	return true;
@@ -2060,6 +2103,7 @@ async function manageWebsocketConnection(ws, req) {
 	var reqs_second = 0; // requests received at current second
 	var current_second = Math.floor(Date.now() / 1000);
 	function can_process_req() { // limit requests per second
+		if(rateLimitsDisabled || !ws_req_per_second) return true;
 		var compare_second = Math.floor(Date.now() / 1000);
 		reqs_second++;
 		if(compare_second == current_second) {
@@ -2349,14 +2393,24 @@ async function start_server() {
 	});
 	global_data.wss = wss;
 
-	wss.on("connection", async function(ws, req) {
-		try {
-			manageWebsocketConnection(ws, req);
-		} catch(e) {
-			// failed to initialize
-			handle_error(e);
-		}
-	});
+	if(settings.sidecar && settings.sidecar.enabled) {
+		console.log("\x1b[93mWebSocket handled by Rust sidecar (sidecar.enabled)\x1b[0m");
+	} else {
+		wss.on("connection", async function(ws, req) {
+			try {
+				manageWebsocketConnection(ws, req);
+			} catch(e) {
+				handle_error(e);
+			}
+		});
+	}
+
+	if(settings.sidecar && settings.sidecar.enabled) {
+		var sidecar_broadcast = require("./backend/subsystems/sidecar_broadcast.js");
+		await sidecar_broadcast.init(settings.sidecar.redis_url || "redis://127.0.0.1:6379");
+		global_data.publishSidecarTileUpdate = sidecar_broadcast.publishTileUpdate;
+	}
+	global_data.sidecarTilesEnabled = !!(settings.sidecar && settings.sidecar.enabled);
 
 	await sysLoad(); // initialize the subsystems (tile database; chat manager)
 
@@ -2372,6 +2426,7 @@ async function start_server() {
 var global_data = {
 	website: settings.website,
 	db: null,
+	world_db: null,
 	db_img: null,
 	db_misc: null,
 	db_edits: null,
@@ -2418,12 +2473,17 @@ var global_data = {
 	runShellScript,
 	loadPlugin,
 	rate_limiter,
+	rate_limits: rateLimitSettingsLoaded,
+	resolveWorldCharRate: rateLimitSettings.resolveWorldCharRate,
+	isDefaultWorldCharRateDisabled: rateLimitSettings.isDefaultWorldCharRateDisabled,
 	getClientVersion,
 	setClientVersion,
 	deployNewClientVersion,
 	staticShortcuts,
 	setupStaticShortcuts,
-	getServerUptime
+	getServerUptime,
+	publishSidecarTileUpdate: null,
+	sidecarTilesEnabled: false
 };
 
 async function sysLoad() {

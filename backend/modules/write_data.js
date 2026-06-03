@@ -90,11 +90,16 @@ module.exports = async function(data, server, params) {
 	var tile_database = server.tile_database;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
 	var rate_limiter = server.rate_limiter;
+	var writeLimits = server.rate_limits && server.rate_limits.write ? server.rate_limits.write : {};
+	var writeLimitsDisabled = writeLimits.disabled === true;
+	var defaultWorldRateDisabled = server.isDefaultWorldCharRateDisabled && server.isDefaultWorldCharRateDisabled(server.rate_limits);
+	var worldHasCharRate = !!world.opts.charRate;
 
-	var editReqLimit = 512;
-	var superuserEditReqLimit = 1280;
-	var defaultCharRatePerSecond = 20480;
-	var tileRatePerSecond = 256;
+	var editReqLimit = writeLimitsDisabled ? Infinity : (writeLimits.edits_per_request ?? 16);
+	var superuserEditReqLimit = writeLimitsDisabled ? Infinity : (writeLimits.superuser_edits_per_request ?? 64);
+	var defaultCharRatePerSecond = writeLimitsDisabled ? null : (writeLimits.chars_per_second ?? 20);
+	var tileRatePerSecond = writeLimitsDisabled ? null : (writeLimits.tiles_per_second ?? 4);
+	var writePeriodMs = writeLimits.period_ms ?? 1000;
 
 	var restr = getRestrictions();
 	var isGrouped = checkCoalition(ipAddressVal, ipAddressFam);
@@ -137,8 +142,8 @@ module.exports = async function(data, server, params) {
 
 	var idLabel = isGrouped ? "cg1" : ipAddress;
 	
-	var tileLimiter = rate_limiter.prepareRateLimiter(rate_limiter.tileRateLimits, 1000, idLabel);
-	var editLimiter = rate_limiter.prepareRateLimiter(rate_limiter.editRateLimits, 1000, idLabel);
+	var tileLimiter = rate_limiter.prepareRateLimiter(rate_limiter.tileRateLimits, writePeriodMs, idLabel);
+	var editLimiter = rate_limiter.prepareRateLimiter(rate_limiter.editRateLimits, writePeriodMs, idLabel);
 
 	var customLimit = world.opts.charRate;
 	var customLimiter = null;
@@ -186,10 +191,12 @@ module.exports = async function(data, server, params) {
 			charRatePerSecond = rrate;
 		}
 
-		if(!rate_limiter.checkCharRateLimit(editLimiter, charRatePerSecond, 1)) {
-			rejected[editId] = enums.write.charRateLimit;
-			if(charRatePerSecond == 0) rejected[editId] = enums.write.zeroRateLimit;
-			continue;
+		if(!writeLimitsDisabled && !(defaultWorldRateDisabled && !worldHasCharRate && rrate == null)) {
+			if(!rate_limiter.checkCharRateLimit(editLimiter, charRatePerSecond, 1)) {
+				rejected[editId] = enums.write.charRateLimit;
+				if(charRatePerSecond == 0) rejected[editId] = enums.write.zeroRateLimit;
+				continue;
+			}
 		}
 		if(customLimiter && rrate == null) {
 			if(!rate_limiter.checkCharRateLimit(customLimiter, charsPerPeriod, 1)) {
@@ -210,7 +217,7 @@ module.exports = async function(data, server, params) {
 
 		var tileStr = world.id + "," + tileY + "," + tileX;
 		if(!tiles[tileStr]) {
-			if(!rate_limiter.checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world.id)) {
+			if(!writeLimitsDisabled && !rate_limiter.checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world.id)) {
 				rejected[editId] = enums.write.tileRateLimit;
 				continue;
 			}

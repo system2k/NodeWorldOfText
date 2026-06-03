@@ -178,6 +178,34 @@ var unobstructCursor       = false; // render cursor on top of characters that m
 var shiftOptimization      = false;
 var transparentBackground  = true;
 var writeFlushRate         = state.worldModel.write_interval;
+
+function isUnlimitedClientRate() {
+	return !!(state.worldModel && state.worldModel.char_rate_unlimited);
+}
+
+function clientWriteBatchSize() {
+	return isUnlimitedClientRate() ? 4096 : 512;
+}
+
+function clientAreaOpsPerSecond() {
+	return isUnlimitedClientRate() ? 100000 : 450;
+}
+
+function clientAreaOpTickMs() {
+	return isUnlimitedClientRate() ? 0 : 1000 / 80;
+}
+
+function clientPasteCellsPerSecond(baseSpeed) {
+	if(isUnlimitedClientRate()) return 100000;
+	if(state.userModel.is_member || state.userModel.is_owner) return 280;
+	return baseSpeed;
+}
+
+function canClientWriteInput() {
+	return isUnlimitedClientRate()
+		|| state.worldModel.char_rate[0] > 0
+		|| state.userModel.is_member;
+}
 var bufferLargeChars       = true; // prevents certain large characters from being cut off by the grid
 var cursorOutlineEnabled   = false;
 var showCursorCoordinates  = false; // show cursor coords in coordinate bar
@@ -971,7 +999,7 @@ function changeZoom(percentage, isPartial) {
 		positionY /= zoom;
 	}
 	userZoom = percentage / 100;
-	if(userZoom < 0.2) userZoom = 0.2;
+	if(userZoom < 0.05) userZoom = 0.05;
 	if(userZoom > 10) userZoom = 10;
 	updateRendererZoom(userZoom * deviceRatio() * 100);
 	if(!isPartial) {
@@ -2494,7 +2522,7 @@ function is_link(tileX, tileY, charX, charY) {
 
 function flushWrites() {
 	if(w.socket.socket.readyState != WebSocket.OPEN) return;
-	network.write(writeBuffer.splice(0, 512));
+	network.write(writeBuffer.splice(0, clientWriteBatchSize()));
 }
 
 function setWriteInterval() {
@@ -2558,7 +2586,7 @@ function isCharLatestInUndoBuffer(tileX, tileY, charX, charY) {
 }
 
 function doBackspace() {
-	if(state.worldModel.char_rate[0] > 0 || state.userModel.is_member) {
+	if(canClientWriteInput()) {
 		moveCursor("left", true);
 		writeChar("\x08", true, null, false, 1);
 	}
@@ -3142,8 +3170,7 @@ function _timedPaste(pasteValue, tileX, tileY, charX, charY) {
 	if(base > 60 * 1000) base = 60 * 1000;
 	var speed = Math.floor(1000 / base * rate[0]) - 1;
 	if(speed < 1) speed = 1;
-	if(speed > 280) speed = 280;
-	if(state.userModel.is_member || state.userModel.is_owner) speed = 280;
+	speed = clientPasteCellsPerSecond(speed);
 
 	if(pasteInterval) clearInterval(pasteInterval);
 	pasteInterval = setInterval(function() {
@@ -3164,7 +3191,7 @@ function _timedPaste(pasteValue, tileX, tileY, charX, charY) {
 }
 
 function event_input(e) {
-	if(state.worldModel.char_rate[0] == 0 && !state.userModel.is_member) return;
+	if(!canClientWriteInput()) return;
 	var inputType = e.inputType;
 	var inputData = e.data;
 	var textareaValue = elm.textInput.value.replace(/\x7F/g, "");
@@ -3550,12 +3577,12 @@ function event_keydown(e) {
 		elm.textInput.value = "\x7F".repeat(5);
 	}
 	if(checkKeyPress(e, keyConfig.cellErase)) {
-		if(state.worldModel.char_rate[0] > 0 || state.userModel.is_member) {
+		if(canClientWriteInput()) {
 			writeChar("\x08", true);
 		}
 	}
 	if(checkKeyPress(e, keyConfig.tab)) { // tab
-		if(state.worldModel.char_rate[0] > 0 || state.userModel.is_member) {
+		if(canClientWriteInput()) {
 			for(var i = 0; i < 4; i++) writeChar(" ");
 			e.preventDefault();
 		}
@@ -5352,34 +5379,41 @@ function protectSelectionStart(start, end, width, height) {
 
 	// full tiles
 	var tidx = 0;
-	var tprot = setInterval(function() {
+	var areaOpTick = clientAreaOpTickMs();
+	var runProtectBatch = function() {
 		if(tidx >= tileList.length) {
-			clearInterval(tprot);
 			return;
 		}
-		var pos = tileList[tidx];
-		var tileX = pos[0];
-		var tileY = pos[1];
-		var charRange = pos[2];
-		if(charRange) {
-			network.protect({
-				tileX: tileX,
-				tileY: tileY,
-				charX: charRange[0],
-				charY: charRange[1],
-				charWidth: charRange[2],
-				charHeight: charRange[3]
-			}, protType);
-		} else {
-			network.protect({
-				tileX: tileX,
-				tileY: tileY
-			}, protType);
+		var batch = isUnlimitedClientRate() ? tileList.length - tidx : 1;
+		for(var n = 0; n < batch && tidx < tileList.length; n++) {
+			var pos = tileList[tidx];
+			var tileX = pos[0];
+			var tileY = pos[1];
+			var charRange = pos[2];
+			if(charRange) {
+				network.protect({
+					tileX: tileX,
+					tileY: tileY,
+					charX: charRange[0],
+					charY: charRange[1],
+					charWidth: charRange[2],
+					charHeight: charRange[3]
+				}, protType);
+			} else {
+				network.protect({
+					tileX: tileX,
+					tileY: tileY
+				}, protType);
+			}
+			tidx++;
+			autoTotal--;
+			updateAutoProg();
 		}
-		tidx++;
-		autoTotal--;
-		updateAutoProg();
-	}, 1000 / 80);
+		if(tidx < tileList.length) {
+			setTimeout(runProtectBatch, areaOpTick);
+		}
+	};
+	runProtectBatch();
 	w.protectSelect.startSelection();
 }
 
@@ -5447,17 +5481,24 @@ function eraseSelectionStart(start, end, width, height) {
 		}
 	}
 
-	var tileRatePerSecond = 450;
+	var tileRatePerSecond = clientAreaOpsPerSecond();
 	var prevTime = Date.now();
+	var areaOpTick = clientAreaOpTickMs();
 
 	// full tiles
 	var tidx = 0;
-	var tprot = setInterval(function() {
+	var runEraseBatch = function() {
 		if(tidx >= tileList.length) {
-			clearInterval(tprot);
+			if(eraseRegionMode == 0) {
+				stopEraseUI();
+			} else if(eraseRegionMode == 1) {
+				w.eraseSelect.startSelection();
+			}
 			return;
 		}
-		var amount = Math.floor((Date.now() - prevTime) / (1000 / tileRatePerSecond));
+		var amount = isUnlimitedClientRate()
+			? tileList.length - tidx
+			: Math.floor((Date.now() - prevTime) / (1000 / tileRatePerSecond));
 		amount = Math.min(tileRatePerSecond, amount);
 		if(amount <= 0) amount = 1;
 		prevTime = Date.now();
@@ -5480,13 +5521,15 @@ function eraseSelectionStart(start, end, width, height) {
 			network.clear_tile(pkt);
 			tidx++;
 		}
-	}, 1000 / 80);
-
-	if(eraseRegionMode == 0) {
-		stopEraseUI();
-	} else if(eraseRegionMode == 1) {
-		w.eraseSelect.startSelection();
-	}
+		if(tidx < tileList.length) {
+			setTimeout(runEraseBatch, areaOpTick);
+		} else if(eraseRegionMode == 0) {
+			stopEraseUI();
+		} else if(eraseRegionMode == 1) {
+			w.eraseSelect.startSelection();
+		}
+	};
+	runEraseBatch();
 }
 
 function protectSelectionCancel() {
@@ -7436,7 +7479,9 @@ Object.assign(w, {
 		w.menu.moveEntryLast(w.menu.zoombarId);
 	},
 	setFlushInterval: function(rate) {
-		if(typeof rate != "number" || rate < 0 || isNaN(rate) || !isFinite(rate) || rate > 1000000) rate = 1000;
+		if(isUnlimitedClientRate()) rate = 0;
+		if(typeof rate != "number" || isNaN(rate) || !isFinite(rate) || rate > 1000000) rate = 1000;
+		if(rate < 0) rate = 1000;
 		writeFlushRate = rate;
 		setWriteInterval();
 	},
@@ -8051,6 +8096,9 @@ function reapplyProperties(props) {
 	updateWorldName();
 
 	w.reloadRenderer();
+	if(isUnlimitedClientRate()) {
+		state.worldModel.write_interval = 0;
+	}
 	w.setFlushInterval(state.worldModel.write_interval);
 }
 
@@ -8405,10 +8453,10 @@ var ws_functions = {
 					updateWorldName();
 					break;
 				case "charRate":
-					state.worldModel.char_rate = value;
+					if(!isUnlimitedClientRate()) state.worldModel.char_rate = value;
 					break;
 				case "writeInt":
-					w.setFlushInterval(value);
+					w.setFlushInterval(isUnlimitedClientRate() ? 0 : value);
 					break;
 				case "colorPalette":
 					state.worldModel.color_palette = value;
@@ -8567,6 +8615,9 @@ function begin() {
 	setupClientEvents();
 	setupFlashAnimation();
 	setWriteInterval();
+	if(isUnlimitedClientRate()) {
+		w.setFlushInterval(0);
+	}
 	setupPoolCleanupInterval();
 	setupImageChecker();
 

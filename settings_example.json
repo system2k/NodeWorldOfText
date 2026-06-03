@@ -25,6 +25,30 @@
 		}
 	},
 
+	"sidecar": {
+		"enabled": false,
+		"ws_port": 6770,
+		"ws_ip": "127.0.0.1",
+		"instances": 2,
+		"redis_url": "redis://127.0.0.1:6379",
+		"node_relay_url": "http://127.0.0.1:8080/internal/ws-relay/",
+		"database": "../nwotdata/nwot.sqlite",
+		"tile_cache_redis": true,
+		"tile_cache_ttl_secs": 3600,
+		"max_connections_per_ip": 50,
+		"ws_req_per_second": 100
+	},
+
+	"pg_worlds": {
+		"enabled": false,
+		"host": "127.0.0.1",
+		"port": 6432,
+		"user": "owot_worlds",
+		"password": null,
+		"database": "owot_worlds",
+		"pool_size": 8
+	},
+
 	"account_system": "local",
 
 	"pg_db": {
@@ -63,5 +87,40 @@
 		"display_email": "\"Our World of Text\" <email@site.com>"
 	},
 
-	"activation_key_days_expire": 3
+	"activation_key_days_expire": 3,
+
+	"rate_limits": {
+		"connections_per_ip": 50,
+		"write": null,
+		"default_world_char_rate": null,
+		"websocket": null,
+		"http": {
+			"login": 2,
+			"logout": 2,
+			"register": 1,
+			"profile_get": 2,
+			"profile_post": 10,
+			"configure": 2,
+			"member_autocomplete": 4,
+			"download": 2,
+			"tabular": 2,
+			"sso": 3,
+			"protect": 16,
+			"unprotect": 16,
+			"protect_char": 16,
+			"unprotect_char": 16,
+			"coordlink": 16,
+			"urllink": 16,
+			"yourworld_post": 4,
+			"yourworld_get": 6,
+			"world_style": 2,
+			"world_props": 2
+		},
+		"chat": {
+			"global_per_second": 2,
+			"page_member_per_second": 8,
+			"page_owner_per_second": 512,
+			"command_per_second": 512
+		}
+	}
 }

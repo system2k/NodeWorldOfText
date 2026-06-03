@@ -75,6 +75,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var loadPlugin = server.loadPlugin;
 	var getServerSetting = server.getServerSetting;
 	var getServerUptime = server.getServerUptime;
+	var chatLimits = server.rate_limits && server.rate_limits.chat ? server.rate_limits.chat : {};
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
 	var remove_from_chatlog = chat_mgr.remove_from_chatlog;
@@ -735,12 +736,14 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	// chat limiter
 	var msNow = Date.now();
 	var second = Math.floor(msNow / 1000);
-	var chatsEverySecond = 2;
+	var chatsEverySecond = chatLimits.disabled ? Number.MAX_SAFE_INTEGER : (chatLimits.global_per_second ?? 2);
 	if(location == "page") {
-		if(is_member) chatsEverySecond = 8;
-		if(is_owner) chatsEverySecond = 512;
+		if(is_member) chatsEverySecond = chatLimits.disabled ? Number.MAX_SAFE_INTEGER : (chatLimits.page_member_per_second ?? 8);
+		if(is_owner) chatsEverySecond = chatLimits.disabled ? Number.MAX_SAFE_INTEGER : (chatLimits.page_owner_per_second ?? 512);
 	}
-	if(isCommand && commandType != "tell") chatsEverySecond = 512;
+	if(isCommand && commandType != "tell") {
+		chatsEverySecond = chatLimits.disabled ? Number.MAX_SAFE_INTEGER : (chatLimits.command_per_second ?? 512);
+	}
 
 	if(!chat_ip_limits[ipHeaderAddr]) {
 		chat_ip_limits[ipHeaderAddr] = {};
