@@ -911,10 +911,10 @@ function tileWriteProtections(callID, tile, options) {
 		// a single cell counts as a 1x1 region.
 		for(var y = 0; y < charHeight; y++) {
 			var curCharY = charY + y;
-			if(charY >= CONST.tileRows) break;
+			if(curCharY >= CONST.tileRows) break;
 			for(var x = 0; x < charWidth; x++) {
 				var curCharX = charX + x;
-				if(charX >= CONST.tileCols) break;
+				if(curCharX >= CONST.tileCols) break;
 				var stat = setCellProtection(tile, curCharX, curCharY, protect_type, tile_writability, can_owner, can_member);
 				if(stat) {
 					has_modified = true;
