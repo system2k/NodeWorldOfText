@@ -74,11 +74,12 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		if(client.readyState == 1 && client.sdata.world.id == world.id) {
 			if(!client.sdata.handleCmdSockets) return;
 			if(client.sdata.user && client.sdata.user.superuser && client.sdata.descriptiveCmd) {
-				wsSend(client, JSON.stringify(Object.assign(cdata, {
+				wsSend(client, JSON.stringify({
+					...cdata,
 					username: accountSystem == "uvias" ? user.display_username : user.username,
 					id: user.authenticated ? (accountSystem == "uvias" ? user.id.substr(1).toUpperCase().padStart(16, "0") : user.id) : void 0,
 					ip: ws.sdata.ipAddress
-				})));
+				}));
 			} else {
 				wsSend(client, data);
 			}
