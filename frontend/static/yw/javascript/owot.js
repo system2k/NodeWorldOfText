@@ -3793,9 +3793,13 @@ var actions = {
 	day: (args, coords) => w.day(),
 	theme: (args, coords) => {
 		var charInfo = getCharInfo(coords[0], coords[1], coords[2], coords[3]);
-		var restrict = state.worldModel.name == "" && charInfo.protection == 0;
+		var restrict = isMainPage() && charInfo.protection == 0;
 		if(restrict) {
-			var acpt = confirm("Do you want to perform this action?\n" + string);
+			var argstrings = [];
+			for (let value of Object.entries(args)) {
+				argstrings.push(`${value[0]}: ${value[1]}`);
+			}
+			var acpt = confirm("Do you want to change to this theme?\n" + argstrings.join(', '));
 			if(!acpt) {
 				return false;
 			}
