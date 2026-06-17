@@ -282,6 +282,9 @@ defineElements({ // elm[<name>]
 	nav_elm: byId("nav"),
 	menu_corner_area_elm: byId("menu_corner_area"),
 	coords: byId("coords"),
+	coord_display: byId("coord_display"),
+	toggle_cursor: byId("toggle_cursor"),
+	coord_status: byId("coord_status"),
 	cursor_coords: byId("cursor_coords"),
 	cursor_on: byId("cursor_on"),
 	cursor_off: byId("cursor_off"),
@@ -7500,15 +7503,42 @@ function setupDOMEvents() {
 		}
 	}
 
-	elm.coords.onclick = function() {
+	elm.toggle_cursor.onclick = function() {
 		showCursorCoordinates = !showCursorCoordinates;
 		if(showCursorCoordinates) {
 			elm.cursor_coords.style.display = "";
+			elm.toggle_cursor.innerText = "▲";
 			updateCoordDisplay();
 		} else {
 			elm.cursor_coords.style.display = "none";
+			elm.toggle_cursor.innerText = "▼";
 			updateCoordDisplay();
 		}
+	}
+
+	elm.coord_display.onclick = function() {
+		var x = elm.coord_X.innerText;
+		var y = elm.coord_Y.innerText;
+		var coordStr = "X: " + x + ", Y: " + y;
+		w.clipboard.copy(coordStr);
+		elm.coord_status.style.display = "";
+		setTimeout(function() {
+			elm.coord_status.style.display = "none";
+		}, 1000);
+	}
+
+	elm.cursor_coords.onclick = function() {
+		if(elm.cursor_on.style.display == "none") return;
+		var tx = elm.tile_X.innerText;
+		var ty = elm.tile_Y.innerText;
+		var cx = elm.char_X.innerText;
+		var cy = elm.char_Y.innerText;
+		var coordStr = "Tile: " + tx + ", " + ty + " / Char: " + cx + ", " + cy;
+		w.clipboard.copy(coordStr);
+		elm.coord_status.style.display = "";
+		setTimeout(function() {
+			elm.coord_status.style.display = "none";
+		}, 1000);
 	}
 	
 	window.onhashchange = function(e) {
@@ -7544,12 +7574,52 @@ function enableBgColorPicker() {
 	colorInputBg.jscolor.fromString("#DCE943");
 }
 
+function handleCoordPaste(e, coordX, coordY) {
+	var data = (e.clipboardData || window.clipboardData).getData("text");
+	if(!data) return;
+
+	var match1 = data.match(/X:\s*([\d.-]+),\s*Y:\s*([\d.-]+)/i);
+	if(match1) {
+		coordX.value = match1[1];
+		coordY.value = match1[2];
+		e.preventDefault();
+		return;
+	}
+
+	var match2 = data.match(/Tile:\s*([\d.-]+),\s*([\d.-]+)\s*\/\s*Char:\s*([\d.-]+),\s*([\d.-]+)/i);
+	if(match2) {
+		var tx = parseFloat(match2[1]);
+		var ty = parseFloat(match2[2]);
+		var cx = parseFloat(match2[3]);
+		var cy = parseFloat(match2[4]);
+		coordX.value = (tx + (cx / 16)) / coordSizeX;
+		coordY.value = -(ty + (cy / 8)) / coordSizeY;
+		e.preventDefault();
+		return;
+	}
+
+	var match3 = data.match(/^\s*([\d.-]+),\s*([\d.-]+)\s*$/);
+	if(match3) {
+		coordX.value = match1 ? match1[1] : match3[1];
+		coordY.value = match1 ? match1[2] : match3[2];
+		e.preventDefault();
+		return;
+	}
+}
+
 function makeCoordLinkModal() {
 	var modal = new Modal();
 	modal.createForm();
 	modal.setFormTitle("Enter the coordinates to create a link to. You can then click on a cell to create the link.\n");
 	var coordX = modal.addEntry("X", "text", "number").input;
 	var coordY = modal.addEntry("Y", "text", "number").input;
+
+	var pasteFunc = function(e) {
+		handleCoordPaste(e, coordX, coordY);
+	};
+	coordX.addEventListener("paste", pasteFunc);
+	coordY.addEventListener("paste", pasteFunc);
+
 	var relative = modal.addEntry("Relative", "checkbox").input;
 	relative.parentElement.title = "When checked, this coord link will teleport the user relative to the coordinates provided";
 	relative.type = "checkbox";
@@ -7567,6 +7637,13 @@ function makeCoordGotoModal() {
 	modal.setFormTitle("Go to coordinates:\n");
 	var coordX = modal.addEntry("X", "text", "number").input;
 	var coordY = modal.addEntry("Y", "text", "number").input;
+
+	var pasteFunc = function(e) {
+		handleCoordPaste(e, coordX, coordY);
+	};
+	coordX.addEventListener("paste", pasteFunc);
+	coordY.addEventListener("paste", pasteFunc);
+
 	modal.onSubmit(function() {
 		w.doGoToCoord(parseFloat(coordY.value), parseFloat(coordX.value));
 	});
