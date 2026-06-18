@@ -933,8 +933,10 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	}
 
 	if(isMuted) {
-		var expTime = muteInfo[0];
-		serverChatResponse("You are temporarily muted (" + calculateTimeDiff(expTime - Date.now()) + ")", location);
+		var expIdTime = muteInfo.id;
+		var expUserTime = muteInfo.user;
+		var longestTime = Math.max(muteInfo.id, muteInfo.user);
+		serverChatResponse("You are temporarily muted (" + calculateTimeDiff(longestTime - Date.now()) + ")", location);
 		return;
 	}
 	var websocketChatData = Object.assign({
