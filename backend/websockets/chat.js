@@ -170,7 +170,10 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 	var isMuted = false;
 	var isTestMessage = false;
-	var muteInfo = null;
+	var muteInfo = {
+		id: null,
+		user: null
+	};
 	var worldChatMutes = blocked_ips_by_world_id[world.id];
 	var worldChatUserMutes = blocked_users_by_world_id[world.id];
 	if(location == "global") {
@@ -178,25 +181,29 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		worldChatUserMutes = blocked_users_by_world_id[0];
 	}
 	if(worldChatMutes) {
-		muteInfo = {
-			id: worldChatMutes[ipHeaderAddr],
-			user: worldChatUserMutes[username_to_display]
-		};
-		if(muteInfo.id || muteInfo.user) {
-			isMuted = true;
-		}
+		muteInfo.id = worldChatMutes[ipHeaderAddr];
+	}
+	if(worldChatUserMutes) {
+		muteInfo.user = worldChatUserMutes[username_to_display];
+	}
+	if(muteInfo.id || muteInfo.user) {
+		isMuted = true;
 	}
 
 	if(isMuted) {
-		var expIdTime = muteInfo.id;
-		var expUserTime = muteInfo.user;
-		if(!expIdTime || typeof expIdTime != "number" || Date.now() >= expIdTime) {
-			isMuted = muteInfo.user; // can still be muted by username
-			delete worldChatMutes[ipHeaderAddr];
+		if (muteInfo.id) {
+			var expIdTime = muteInfo.id[0];
+			if(!expIdTime || typeof expIdTime != "number" || Date.now() >= expIdTime) {
+				isMuted = Boolean(muteInfo.user); // can still be muted by username
+				delete worldChatMutes[ipHeaderAddr];
+			}
 		}
-		if(!expUserTime || typeof expUserTime != "number" || Date.now() >= expUserTime) {
-			isMuted = muteInfo.id; // can still be muted by id
-			delete worldChatUserMutes[username_to_display];
+		if (muteInfo.user) {
+			var expUserTime = muteInfo.user[0];
+			if(!expUserTime || typeof expUserTime != "number" || Date.now() >= expUserTime) {
+				isMuted = Boolean(muteInfo.id); // can still be muted by id
+				delete worldChatUserMutes[username_to_display];
+			}
 		}
 	}
 
@@ -690,7 +697,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				return serverChatResponse("Invalid location", location);
 			}
 			if(!blocked_users_by_world_id[mute_wid]) blocked_users_by_world_id[mute_wid] = {};
-			blocked_users_by_world_id[mute_wid][muted_ip] = [muteDate];
+			blocked_users_by_world_id[mute_wid][username] = [muteDate];
 			return serverChatResponse("Muted client by username until " + create_date(muteDate), location);
 		},
 		clearmutes: function() {
@@ -933,10 +940,14 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	}
 
 	if(isMuted) {
-		var expIdTime = muteInfo.id;
-		var expUserTime = muteInfo.user;
-		var longestTime = Math.max(muteInfo.id, muteInfo.user);
-		serverChatResponse("You are temporarily muted (" + calculateTimeDiff(longestTime - Date.now()) + ")", location);
+		var expTime = 0;
+		if (muteInfo.id) {
+			expTime = muteInfo.id[0];
+		}
+		if (muteInfo.user) {
+			expTime = Math.max(expTime, muteInfo.user[0]);
+		}
+		serverChatResponse("You are temporarily muted (" + calculateTimeDiff(expTime - Date.now()) + ")", location);
 		return;
 	}
 	var websocketChatData = Object.assign({
