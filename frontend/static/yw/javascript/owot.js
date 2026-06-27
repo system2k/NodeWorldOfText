@@ -4566,7 +4566,7 @@ function createSocket(getChatHist) {
 
 	socket.onclose = function() {
 		console.log("Socket has closed. Reconnecting...");
-		w.emit("socketClose", false); // bool: before default behavior?
+		w.emit("socketClose", true); // bool: before default behavior?
 		for(var i in network.callbacks) {
 			var cb = network.callbacks[i];
 			if(typeof cb == "function") {
@@ -4579,7 +4579,7 @@ function createSocket(getChatHist) {
 				w.doAnnounce("Connection lost. Please wait until the client reconnects.", "err_connect");
 			}, 1000 * 2);
 		}
-		w.emit("socketClose", true);
+		w.emit("socketClose", false);
 	}
 
 	socket.onerror = function(err) {
