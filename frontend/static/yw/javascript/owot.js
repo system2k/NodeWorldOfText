@@ -4529,6 +4529,13 @@ function createSocket(getChatHist) {
 
 	socket.onopen = function(msg) {
 		console.log("Connected socket");
+		var event = {
+			beforeDefault: true,
+			socket: socket,
+			cancel: false
+		};
+		w.emit("socketOpen", event);
+		if (event.cancel) return true;
 		clearAllGuestCursors();
 		for(var tile in tiles) {
 			if(tiles[tile] == null) {
@@ -4557,10 +4564,13 @@ function createSocket(getChatHist) {
 		w.doAnnounce("", "err_access");
 		w.doAnnounce("", "err_limit");
 		disconnectTimeout = null;
+		event.beforeDefault = false;
+		w.emit("socketOpen", event);
 	}
 
 	socket.onclose = function() {
 		console.log("Socket has closed. Reconnecting...");
+		w.emit("socketClose", true); // bool: before default behavior?
 		for(var i in network.callbacks) {
 			var cb = network.callbacks[i];
 			if(typeof cb == "function") {
@@ -4573,6 +4583,7 @@ function createSocket(getChatHist) {
 				w.doAnnounce("Connection lost. Please wait until the client reconnects.", "err_connect");
 			}, 1000 * 2);
 		}
+		w.emit("socketClose", false);
 	}
 
 	socket.onerror = function(err) {
