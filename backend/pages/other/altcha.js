@@ -9,6 +9,8 @@ function getHmacKey() {
 	return hmacKey;
 }
 
+module.exports.getHmacKey = getHmacKey;
+
 module.exports.GET = async function(req, write, server, ctx) {
 	var challenge = await createChallenge({
 		algorithm: "SHA-256",

@@ -163,18 +163,16 @@
 			var widget = document.getElementById("altcha-widget");
 			var verified = false;
 
-			function proceed() {
-				verified = true;
+			function hideOverlay() {
+				verified = false;
 				overlay.style.display = "none";
-				if(window._beginAfterCaptcha) {
-					try {
-						window._beginAfterCaptcha();
-					} catch(e) {
-						console.error("begin() failed:", e);
-						errorEl.textContent = "Initialization error: " + e.message;
-						errorEl.style.display = "";
-					}
-				}
+				errorEl.style.display = "none";
+			}
+
+			function showOverlay() {
+				verified = false;
+				overlay.style.display = "";
+				widget.reset();
 			}
 
 			widget.addEventListener("statechange", function(ev) {
@@ -182,20 +180,24 @@
 					var payload = ev.detail.payload;
 					if(!payload) return;
 					errorEl.style.display = "none";
-					fetch("/other/altcha", {
-						method: "POST",
-						body: new URLSearchParams({ altcha: payload })
-					}).then(function(r) { return r.json(); }).then(function(data) {
-						if(data.verified) {
-							proceed();
-						} else {
+					if(window._captchaSolveCallback) {
+						window._captchaSolveCallback(payload);
+					} else {
+						fetch("/other/altcha", {
+							method: "POST",
+							body: new URLSearchParams({ altcha: payload })
+						}).then(function(r) { return r.json(); }).then(function(data) {
+							if(data.verified) {
+								hideOverlay();
+							} else {
+								errorEl.style.display = "";
+								widget.reset();
+							}
+						}).catch(function() {
 							errorEl.style.display = "";
 							widget.reset();
-						}
-					}).catch(function() {
-						errorEl.style.display = "";
-						widget.reset();
-					});
+						});
+					}
 				} else if(ev.detail.state === "error") {
 					errorEl.style.display = "";
 				} else if(ev.detail.state !== "verified") {
@@ -203,7 +205,10 @@
 				}
 			});
 
-			overlay.style.display = "";
+			window._captchaOverlay = {
+				show: showOverlay,
+				hide: hideOverlay
+			};
 		})();
 		</script>
 	</body>

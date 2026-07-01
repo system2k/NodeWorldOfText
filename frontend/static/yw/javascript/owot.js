@@ -8556,10 +8556,35 @@ var ws_functions = {
 				cb(data);
 			}
 		}
+	},
+	captcha_required: function(data) {
+		if(window._captchaOverlay) {
+			window._captchaSolveCallback = function(payload) {
+				network.transmit({
+					kind: "captcha_solve",
+					payload: payload
+				});
+			};
+			window._captchaOverlay.show();
+		}
+	},
+	captcha_solved: function(data) {
+		window._captchaSolveCallback = null;
+		if(window._captchaOverlay) {
+			if(data.verified) {
+				window._captchaOverlay.hide();
+			} else {
+				var errorEl = document.getElementById("captcha_error");
+				var widget = document.getElementById("altcha-widget");
+				if(errorEl) errorEl.style.display = "";
+				if(widget) widget.reset();
+			}
+		}
 	}
 };
 
 function begin() {
+	console.log("begin() called");
 	init_dom();
 
 	getStoredConfig();
@@ -8669,3 +8694,10 @@ function begin() {
 }
 
 window._beginAfterCaptcha = begin;
+console.log("owot.js loaded, _beginAfterCaptcha assigned");
+// start when DOM is ready
+if(document.readyState === "loading") {
+	document.addEventListener("DOMContentLoaded", begin);
+} else {
+	begin();
+}
