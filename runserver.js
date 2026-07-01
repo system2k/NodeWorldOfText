@@ -25,6 +25,7 @@ const zip         = require("adm-zip");
 const bin_packet   = require("./backend/utils/bin_packet.js");
 const utils        = require("./backend/utils/utils.js");
 const rate_limiter = require("./backend/utils/rate_limiter.js");
+const captcha_manager = require("./backend/utils/captcha_manager.js");
 const ipaddress    = require("./backend/framework/ipaddress.js");
 const prompt       = require("./backend/utils/prompt.js");
 const restrictions = require("./backend/utils/restrictions.js");
@@ -572,6 +573,7 @@ var pages = {
 		shell: require("./backend/pages/admin/shell.js")
 	},
 	other: {
+		altcha: require("./backend/pages/other/altcha.js"),
 		ipaddress: require("./backend/pages/other/ipaddress.js"),
 		load_backgrounds: require("./backend/pages/other/load_backgrounds.js"),
 		random_color: require("./backend/pages/other/random_color.js"),
@@ -1167,6 +1169,7 @@ function createEndpoints(server) {
 	server.registerEndpoint("world_style", pages.world_style);
 	server.registerEndpoint("world_props", pages.world_props);
 
+	server.registerEndpoint("other/altcha", pages.other.altcha, { no_login: true });
 	server.registerEndpoint("other/random_color", pages.other.random_color, { no_login: true });
 	server.registerEndpoint("other/backgrounds/*", pages.other.load_backgrounds, { no_login: true });
 	server.registerEndpoint("other/test/*", pages.other.test, { no_login: true });
@@ -2181,6 +2184,15 @@ async function manageWebsocketConnection(ws, req) {
 		initial_user_count
 	}));
 
+	if(captcha_manager.hasPendingChallenge(ws.sdata.ipAddress)) {
+		ws.sdata.captchaRequired = true;
+		var challenge = await captcha_manager.requireCaptcha(ws.sdata.ipAddress);
+		send_ws(JSON.stringify({
+			kind: "captcha_required",
+			challenge: challenge
+		}));
+	}
+
 	if(client_cursor_pos[world.id]) {
 		var world_cursors = client_cursor_pos[world.id];
 		for(var csr_channel in world_cursors) {
@@ -2246,11 +2258,42 @@ async function manageWebsocketConnection(ws, req) {
 			}
 			return send_ws(JSON.stringify(res)); 
 		}
+		if(kind == "captcha_solve") {
+			var solved = await captcha_manager.verifyAndSolve(ws.sdata.ipAddress, msg.payload);
+			if(solved) {
+				ws.sdata.captchaRequired = false;
+			}
+			send_ws(JSON.stringify({
+				kind: "captcha_solved",
+				verified: solved
+			}));
+			return;
+		}
+
+		if(ws.sdata.captchaRequired) return;
+
 		// Begin calling a websocket function for the necessary request
 		if(!websockets.hasOwnProperty(kind)) {
 			return;
 		}
 		if(!can_process_req_kind(kindLimits, kind)) return;
+
+		if(kind == "write" || kind == "chat") {
+			console.log("[CAPTCHA_DIAG] kind=" + kind + " worldId=" + world.id + " count=" + captcha_manager.getWorldTrafficCount(world.id));
+			captcha_manager.incrementWorldTraffic(world.id);
+			var required = captcha_manager.isCaptchaRequired(ws.sdata.ipAddress, world.id);
+			var postStatus = captcha_manager.getStatus(null, world.id);
+			console.log("[CAPTCHA_DIAG] required=" + required + " postTraffic=" + JSON.stringify(postStatus));
+			if(required) {
+				var challenge = await captcha_manager.requireCaptcha(ws.sdata.ipAddress);
+				send_ws(JSON.stringify({
+					kind: "captcha_required",
+					challenge: challenge
+				}));
+				return;
+			}
+		}
+
 		function send(msg) {
 			msg.kind = kind;
 			if(requestID !== null) msg.request = requestID;
@@ -2418,6 +2461,7 @@ var global_data = {
 	runShellScript,
 	loadPlugin,
 	rate_limiter,
+	captcha_manager,
 	getClientVersion,
 	setClientVersion,
 	deployNewClientVersion,
