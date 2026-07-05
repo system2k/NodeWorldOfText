@@ -1059,14 +1059,19 @@ function updateDuplicateChatGroup(chatGroup) {
 	}
 }
 
-function isChatMessageDuplicateRecord(chatRec, message) {
+function isChatMessageDuplicateRecord(chatRec, message, loose) {
 	if(!chatRec || !chatRec.element || !chatRec.element._duplicateData) return false;
-	return chatRec.id === message.id
-		&& chatRec.type === message.type
-		&& chatRec.rawNickname === message.nickname
-		&& chatRec.realUsername === message.realUsername
-		&& chatRec.rawMessage === message.message
-		&& ((chatRec.dataObj && chatRec.dataObj.privateMessage) || "") === ((message.dataObj && message.dataObj.privateMessage) || "");
+	if(chatRec.type !== message.type) return false;
+	if(chatRec.rawMessage !== message.message) return false;
+	if(((chatRec.dataObj && chatRec.dataObj.privateMessage) || "") !== ((message.dataObj && message.dataObj.privateMessage) || "")) return false;
+	if(message.type == "anon" || message.type == "anon_nick") {
+		return chatRec.id === message.id
+			&& chatRec.rawNickname === message.nickname
+			&& chatRec.realUsername === message.realUsername;
+	}
+	if(!loose && chatRec.id !== message.id) return false;
+	return chatRec.rawNickname === message.nickname
+		&& chatRec.realUsername === message.realUsername;
 }
 
 function insertNewChatElementsIntoChatfield(chatfield, messageQueue) {
@@ -1074,9 +1079,21 @@ function insertNewChatElementsIntoChatfield(chatfield, messageQueue) {
 	for(var i = 0; i < messageQueue.length; i++) {
 		var message = messageQueue[i];
 		var lastRec = records.length ? records[records.length - 1] : null;
-		if(lastRec && isChatMessageDuplicateRecord(lastRec, message)) {
+		if(lastRec && isChatMessageDuplicateRecord(lastRec, message, false)) {
 			lastRec.element._duplicateData.count++;
 			updateDuplicateChatGroup(lastRec.element);
+			continue;
+		}
+		var matchRec = null;
+		for(var j = records.length - 2; j >= 0; j--) {
+			if(isChatMessageDuplicateRecord(records[j], message, true)) {
+				matchRec = records[j];
+				break;
+			}
+		}
+		if(matchRec) {
+			matchRec.element._duplicateData.count++;
+			updateDuplicateChatGroup(matchRec.element);
 			continue;
 		}
 		buildChatElement(chatfield,
