@@ -3,6 +3,8 @@ var html_tag_esc = utils.html_tag_esc;
 var san_nbr = utils.san_nbr;
 var calculateTimeDiff = utils.calculateTimeDiff;
 var create_date = utils.create_date;
+var getTimeFlagValue = utils.getTimeFlagValue;
+var sanitize_username = utils.sanitize_username;
 
 function sanitizeColor(col) {
 	var masks = ["#XXXXXX", "#XXX"];
@@ -55,6 +57,7 @@ function sanitizeCustomMeta(meta) {
 var chat_ip_limits = {};
 var tell_blocks = {};
 var blocked_ips_by_world_id = {}; // id 0 = global
+var blocked_users_by_world_id = {};
 
 module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var channel = ctx.channel;
@@ -167,23 +170,40 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 	var isMuted = false;
 	var isTestMessage = false;
-	var muteInfo = null;
+	var muteInfo = {
+		id: null,
+		user: null
+	};
 	var worldChatMutes = blocked_ips_by_world_id[world.id];
+	var worldChatUserMutes = blocked_users_by_world_id[world.id];
 	if(location == "global") {
 		worldChatMutes = blocked_ips_by_world_id[0];
+		worldChatUserMutes = blocked_users_by_world_id[0];
 	}
 	if(worldChatMutes) {
-		muteInfo = worldChatMutes[ipHeaderAddr];
-		if(muteInfo) {
-			isMuted = true;
-		}
+		muteInfo.id = worldChatMutes[ipHeaderAddr];
+	}
+	if(worldChatUserMutes) {
+		muteInfo.user = worldChatUserMutes[username_to_display];
+	}
+	if(muteInfo.id || muteInfo.user) {
+		isMuted = true;
 	}
 
 	if(isMuted) {
-		var expTime = muteInfo[0];
-		if(!expTime || typeof expTime != "number" || Date.now() >= expTime) {
-			isMuted = false;
-			delete worldChatMutes[ipHeaderAddr];
+		if (muteInfo.id) {
+			var expIdTime = muteInfo.id[0];
+			if(!expIdTime || typeof expIdTime != "number" || Date.now() >= expIdTime) {
+				isMuted = Boolean(muteInfo.user); // can still be muted by username
+				delete worldChatMutes[ipHeaderAddr];
+			}
+		}
+		if (muteInfo.user) {
+			var expUserTime = muteInfo.user[0];
+			if(!expUserTime || typeof expUserTime != "number" || Date.now() >= expUserTime) {
+				isMuted = Boolean(muteInfo.id); // can still be muted by id
+				delete worldChatUserMutes[username_to_display];
+			}
 		}
 	}
 
@@ -246,6 +266,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "unblockuser", ["username"], "unblock someone by username", "JohnDoe"],
 		[0, "unblockall", null, "unblock all users", null],
 		[0, "mute", ["id", "seconds", "[h/d/w/m/y]"], "mute a user completely", "1220 9999"], // check for permission
+		[0, "muteuser", ["username", "seconds", "[h/d/w/m/y]"], "mute a user by their username completely", "JohnDoe 9999"], // check for permission
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
 		[0, "delete", ["id", "timestamp"], "delete a chat message", "1220 1693147307895"], // check for permission
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
@@ -282,7 +303,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			var desc = row[3];
 			var example = row[4];
 
-			if(command == "mute" || command == "clearmutes" || command == "delete") {
+			if(command == "mute" || command == "muteuser" || command == "clearmutes" || command == "delete") {
 				if(!user.staff && !is_owner) {
 					continue;
 				}
@@ -391,15 +412,12 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		},
 		blockuser: function(username) {
 			var blocks = ws.sdata.chat_blocks;
-			if(typeof username != "string" || !username) {
+
+			var username_value = sanitize_username(username);
+			if (username_value == null) {
 				serverChatResponse("Invalid username", location);
 				return;
 			}
-
-			if (!/^[^\s\x00-\x20]+$/.test(username)) return;
-
-			// The case-insensitive value to be stored in chat_blocks.
-			var username_value = username.toUpperCase();
 
 			// Ensure maximum block count not exceeded, and check if it already exists.
 			if ((blocks.id.length + blocks.user.length) >= chatBlockLimit)
@@ -445,13 +463,12 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		},
 		unblockuser: function(username) {
 			var blocks = ws.sdata.chat_blocks;
-			if(typeof username != "string" || !username) {
+
+			var username_value = sanitize_username(username);
+			if (username_value == null) {
 				serverChatResponse("Invalid username", location);
 				return;
 			}
-
-			// The case-insensitive value to be stored in chat_blocks.
-			var username_value = username.toUpperCase();
 
 			var idx = blocks.user.indexOf(username_value);
 			if(idx == -1) return;
@@ -615,27 +632,18 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		},
 		mute: function(id, time, flag) {
 			if(!is_owner && !user.staff) return;
+			if(location == "global" && !user.staff) {
+				return serverChatResponse("You do not have permission to mute on global", location);
+			}
+
 			id = san_nbr(id);
 			time = san_nbr(time); // in seconds
 
-			var timeSuffixMap = {
-				"h": 3600,
-				"d": 86400,
-				"w": 86400*7,
-				"m": 86400*30,
-				"y": 31556925.216 //average year length
-			};
-
-			if(flag in timeSuffixMap) {
-				time *= timeSuffixMap[flag];
-			} else { 
-				if(flag) { //invalid flag
-					return serverChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.")
-				}
-			}
-
-			if(location == "global" && !user.staff) {
-				return serverChatResponse("You do not have permission to mute on global", location);
+			var timeMultiplier = getTimeFlagValue(flag);
+			if (timeMultiplier == null) {
+				if (flag) return serverChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.");
+			} else {
+				time *= timeMultiplier;
 			}
 
 			var muted_ip = getClientIPByChatID(id, location == "global");
@@ -653,26 +661,69 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				}
 				if(!blocked_ips_by_world_id[mute_wid]) blocked_ips_by_world_id[mute_wid] = {};
 				blocked_ips_by_world_id[mute_wid][muted_ip] = [muteDate];
-				return serverChatResponse("Muted client until " + create_date(muteDate), location);
+				return serverChatResponse("Muted client by IP until " + create_date(muteDate), location);
 			} else {
 				return serverChatResponse("Client not found", location);
 			}
 		},
+		muteuser: function(username, time, flag) {
+			if(!is_owner && !user.staff) return;
+			if(location == "global" && !user.staff) {
+				return serverChatResponse("You do not have permission to mute on global", location);
+			}
+
+			var username_value = sanitize_username(username);
+			if (username_value == null) {
+				serverChatResponse("Invalid username", location);
+				return;
+			}
+
+			time = san_nbr(time); // in seconds
+			var timeMultiplier = getTimeFlagValue(flag);
+			if (timeMultiplier == null) {
+				if (flag) return serverChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.");
+			} else {
+				time *= timeMultiplier;
+			}
+
+			var muteDate = Date.now() + (time * 1000);
+			var mute_wid = null;
+			if(location == "global") {
+				mute_wid = 0;
+			} else if(location == "page") {
+				mute_wid = world.id;
+			}
+			if(mute_wid == null) {
+				return serverChatResponse("Invalid location", location);
+			}
+			if(!blocked_users_by_world_id[mute_wid]) blocked_users_by_world_id[mute_wid] = {};
+			blocked_users_by_world_id[mute_wid][username] = [muteDate];
+			return serverChatResponse("Muted client by username until " + create_date(muteDate), location);
+		},
 		clearmutes: function() {
 			if(!is_owner && !user.staff) return;
-			var cnt = 0;
+			var ipCnt = 0;
+			var userCnt = 0;
 			if(location == "global" && user.staff) {
 				if(blocked_ips_by_world_id["0"]) {
-					cnt = Object.keys(blocked_ips_by_world_id["0"]).length;
+					ipCnt = Object.keys(blocked_ips_by_world_id["0"]).length;
 					delete blocked_ips_by_world_id["0"];
+				}
+				if(blocked_users_by_world_id["0"]) {
+					userCnt = Object.keys(blocked_users_by_world_id["0"]).length;
+					delete blocked_users_by_world_id["0"];
 				}
 			} else {
 				if(blocked_ips_by_world_id[world.id]) {
-					cnt = Object.keys(blocked_ips_by_world_id[world.id]).length;
+					ipCnt = Object.keys(blocked_ips_by_world_id[world.id]).length;
 					delete blocked_ips_by_world_id[world.id];
 				}
+				if(blocked_users_by_world_id[world.id]) {
+					userCnt = Object.keys(blocked_users_by_world_id[world.id]).length;
+					delete blocked_users_by_world_id[world.id];
+				}
 			}
-			return serverChatResponse("Unmuted " + cnt + " user(s)", location);
+			return serverChatResponse("Unmuted " + ipCnt + " IP(s), " + userCnt + " user(s)", location);
 		},
 		whoami: function() {
 			var idstr = "Who Am I:\n";
@@ -799,6 +850,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			case "mute":
 				com.mute(commandArgs[1], commandArgs[2], commandArgs[3]);
 				return;
+			case "muteuser":
+				com.muteuser(commandArgs[1], commandArgs[2], commandArgs[3]);
+				return;
 			case "clearmutes":
 				com.clearmutes();
 				return;
@@ -886,7 +940,13 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	}
 
 	if(isMuted) {
-		var expTime = muteInfo[0];
+		var expTime = 0;
+		if (muteInfo.id) {
+			expTime = muteInfo.id[0];
+		}
+		if (muteInfo.user) {
+			expTime = Math.max(expTime, muteInfo.user[0]);
+		}
 		serverChatResponse("You are temporarily muted (" + calculateTimeDiff(expTime - Date.now()) + ")", location);
 		return;
 	}
