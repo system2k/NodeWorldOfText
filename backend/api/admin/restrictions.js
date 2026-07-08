@@ -1,5 +1,5 @@
-var restrictions = require("../../../utils/restrictions.js");
-var ipaddress = require("../../../framework/ipaddress.js");
+var restrictions = require("../../utils/restrictions.js");
+var ipaddress = require("../../framework/ipaddress.js");
 
 var reconIP = ipaddress.reconIP;
 

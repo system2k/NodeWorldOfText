@@ -699,7 +699,7 @@ class WTWTracker {
 		let rules = this.assembleRestrRules(ipAddresses, limType, locationStat, regionRestriction, charRateLimit, restrictColor);
 		ajaxRequest({
 			type: "POST",
-			url: "/administrator/api/restrictions",
+			url: "/api/admin/restrictions",
 			data: {
 				kind: "prepend",
 				rules: JSON.stringify(rules.map(r => r + ";tag=rl"))
@@ -716,7 +716,7 @@ class WTWTracker {
 	retrieveRateLimits(callback) {
 		ajaxRequest({
 			type: "GET",
-			url: "/administrator/api/restrictions",
+			url: "/api/admin/restrictions",
 			data: {
 				tag: "rl"
 			},

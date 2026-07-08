@@ -169,6 +169,14 @@ CONST.tileArea = CONST.tileCols * CONST.tileRows;
 // 3 levels: world_id -> tile_y -> tile_x
 var memTileCache = {};
 
+// whitelist cache (Map); gets overwritten after being loaded from the db
+var siteWhitelistCache = {
+	ip: new Map(),
+	user: new Map(),
+	world: new Map()
+};
+var siteWhitelistStatus = new Map();
+
 var clientVersion = "";
 var ranks_cache = { users: {} };
 var restr_cache = "";
@@ -538,6 +546,13 @@ function setupZipLog() {
 console.log("Loading page files");
 
 var pages = {
+	api: {
+		admin: {
+			restrictions: require("./backend/api/admin/restrictions.js"),
+			whitelist: require("./backend/api/admin/whitelist.js"),
+			user: require("./backend/api/admin/user.js")
+		}
+	},
 	accounts: {
 		configure: require("./backend/pages/accounts/configure.js"),
 		download: require("./backend/pages/accounts/download.js"),
@@ -557,9 +572,6 @@ var pages = {
 		verify_email: require("./backend/pages/accounts/verify_email.js")
 	},
 	admin: {
-		api: {
-			restrictions: require("./backend/pages/admin/api/restrictions.js")
-		},
 		administrator: require("./backend/pages/admin/administrator.js"),
 		backgrounds: require("./backend/pages/admin/backgrounds.js"),
 		manage_ranks: require("./backend/pages/admin/manage_ranks.js"),
@@ -569,13 +581,13 @@ var pages = {
 		users_by_id: require("./backend/pages/admin/users_by_id.js"),
 		users_by_username: require("./backend/pages/admin/users_by_username.js"),
 		restrictions: require("./backend/pages/admin/restrictions.js"),
+		whitelist: require("./backend/pages/admin/whitelist.js"),
 		shell: require("./backend/pages/admin/shell.js")
 	},
 	other: {
 		ipaddress: require("./backend/pages/other/ipaddress.js"),
 		load_backgrounds: require("./backend/pages/other/load_backgrounds.js"),
-		random_color: require("./backend/pages/other/random_color.js"),
-		test: require("./backend/pages/other/test.js")
+		random_color: require("./backend/pages/other/random_color.js")
 	},
 	"404": require("./backend/pages/404.js"),
 	activate_complete: require("./backend/pages/activate_complete.js"),
@@ -889,6 +901,7 @@ async function initializeServer() {
 	await initialize_ranks_db();
 	await initialize_edits_db();
 	await initialize_image_db();
+	await initialize_site_whitelist_db();
 
 	global_data.db = db;
 	global_data.db_img = db_img;
@@ -993,6 +1006,97 @@ async function initialize_ranks_db() {
 	for(var i = 0; i < user_ranks.length; i++) {
 		var ur = user_ranks[i];
 		ranks_cache.users[ur.userid] = ur.rank;
+	}
+}
+
+async function initialize_site_whitelist_db() {
+	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='site_whitelist'")) {
+		await db_misc.run(`
+			CREATE TABLE 'site_whitelist' (
+				id INTEGER PRIMARY KEY NOT NULL,
+				
+				user_id TEXT,
+				world_name TEXT,
+				ip TEXT,
+				id_type TEXT,
+				
+				write INTEGER,
+				load_tile INTEGER,
+				color INTEGER,
+				own_color INTEGER,
+				chat INTEGER,
+				chat_dm INTEGER,
+				load_chat INTEGER,
+				profile INTEGER,
+				uc_picto INTEGER,
+				uc_dot INTEGER,
+				uc_nonletter INTEGER,
+				own_uc_special INTEGER,
+				no_captcha INTEGER,
+				few_captcha INTEGER,
+				pchat_anon INTEGER
+			)
+		`);
+	}
+	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='site_whitelist_status'")) {
+		await db_misc.run(`
+			CREATE TABLE 'site_whitelist_status' (
+				code TEXT,
+				status TEXT
+			)
+		`);
+		await db_misc.run(`
+			INSERT INTO site_whitelist_status (code, status)
+			VALUES
+			('write', 'public'),
+			('load_tile', 'public'),
+			('color', 'public'),
+			('own_color', 'public'),
+			('chat', 'public'),
+			('chat_dm', 'public'),
+			('load_chat', 'public'),
+			('profile', 'public'),
+			('uc_picto', 'public'),
+			('uc_dot', 'public'),
+			('uc_nonletter', 'public'),
+			('own_uc_special', 'public'),
+			('no_captcha', 'public'),
+			('few_captcha', 'public'),
+			('pchat_anon', 'public')
+		`);
+	}
+
+	// fetch all whitelist rows including rowid for identification
+	let wl_list = await db_misc.all("SELECT rowid AS id, * FROM site_whitelist");
+
+	// fetch status settings
+	let wl_status = await db_misc.all("SELECT code, status FROM site_whitelist_status");
+
+	siteWhitelistStatus.clear();
+	siteWhitelistCache.user.clear();
+	siteWhitelistCache.ip.clear();
+	siteWhitelistCache.world.clear();
+
+	wl_status.forEach(function(row) {
+		siteWhitelistStatus.set(row.code, row.status);
+	});
+
+	for(let i = 0; i < wl_list.length; i++) {
+		let entry = wl_list[i];
+		if(!entry) continue;
+		let id_type = entry.id_type;
+
+		let user_id = entry.user_id;
+		let world_name = entry.world_name;
+		let ip = entry.ip;
+
+		if(id_type == "user") {
+			siteWhitelistCache.user.set(user_id, entry);
+		} else if(id_type == "ip") {
+			siteWhitelistCache.ip.set(ip, entry);
+		} else if(id_type == "world") {
+			siteWhitelistCache.world.set(world_name, entry);
+		}
 	}
 }
 
@@ -1122,6 +1226,10 @@ function createEndpoints(server) {
 	server.registerEndpoint("home", pages.home);
 	server.registerEndpoint(".well-known/*", null);
 
+	server.registerEndpoint("api/admin/restrictions", pages.api.admin.restrictions);
+	server.registerEndpoint("api/admin/whitelist", pages.api.admin.whitelist);
+	server.registerEndpoint("api/admin/user", pages.api.admin.user);
+
 	server.registerEndpoint("accounts/login", pages.accounts.login);
 	server.registerEndpoint("accounts/logout", pages.accounts.logout);
 	server.registerEndpoint("accounts/register", pages.accounts.register);
@@ -1158,7 +1266,7 @@ function createEndpoints(server) {
 	server.registerEndpoint("administrator/monitor/", (settings && settings.monitor && settings.monitor.redirect) ? settings.monitor.redirect : null);
 	server.registerEndpoint("administrator/shell", pages.admin.shell);
 	server.registerEndpoint("administrator/restrictions", pages.admin.restrictions, { binary_post_data: true });
-	server.registerEndpoint("administrator/api/restrictions", pages.admin.api.restrictions);
+	server.registerEndpoint("administrator/whitelist", pages.admin.whitelist, { binary_post_data: true });
 
 	server.registerEndpoint("script_manager/", pages.script_manager);
 	server.registerEndpoint("script_manager/edit/*", pages.script_edit);
@@ -1169,7 +1277,6 @@ function createEndpoints(server) {
 
 	server.registerEndpoint("other/random_color", pages.other.random_color, { no_login: true });
 	server.registerEndpoint("other/backgrounds/*", pages.other.load_backgrounds, { no_login: true });
-	server.registerEndpoint("other/test/*", pages.other.test, { no_login: true });
 	server.registerEndpoint("other/ipaddress", pages.other.ipaddress);
 
 	server.registerEndpoint("static/*", pages.static, { no_login: true });
@@ -1826,7 +1933,7 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 }
 
 var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
-	chat:			[256, 1000, 0], // rate-limiting handled separately
+	chat:			[16, 1000, 0], // rate-limiting handled separately
 	chathistory:	[4, 500, 0],
 	clear_tile:		[512, 1000, 0],
 	cmd_opt:		[10, 1000, 0],
@@ -2316,6 +2423,10 @@ async function start_server() {
 				if(ws.sdata.messageBackpressure > 1) {
 					broadcastMonitorEvent("Backpressure", "Warning - backpressure of " + ws.sdata.messageBackpressure + " (" + ws.sdata.ipAddress + ")");
 				}
+				if(ws.sdata.messageBackpressure > 250) {
+					ws.sdata.terminated = true;
+					ws.close();
+				}
 			});
 		}
 	}, 1000);
@@ -2423,7 +2534,9 @@ var global_data = {
 	deployNewClientVersion,
 	staticShortcuts,
 	setupStaticShortcuts,
-	getServerUptime
+	getServerUptime,
+	siteWhitelistCache,
+	siteWhitelistStatus,
 };
 
 async function sysLoad() {

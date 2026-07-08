@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}
+	Manage Whitelist | Our World of Text
+{% endblock %}
+
+{% block header %}
+	<h1>Manage Whitelist</h1>
+	<span><a href="/administrator/">« Back to Admin Panel</a></span>
+{% endblock %}
+
+{% block content %}
+	<div class="content_set">
+		<div class="content_set_title">Whitelist Features</div>
+		<div class="content_set_content">
+			<div id="whitelist_features"></div>
+			<div style="margin-top:1rem;">
+				<button id="save_status">Save Status</button>
+			</div>
+		</div>
+	</div>
+	<div class="content_set" style="width: auto; display: table;" id="wl_user">
+		<div class="content_set_title">Whitelisted Users</div>
+		<div class="content_set_content">
+			<div style="margin-bottom:0.5rem;">
+				<div>
+					<input id="wl_add_user_id">
+					<button id="add_by_uid">Add by User ID</button>
+				</div>
+				<div>
+					<input id="wl_add_username">
+					<button id="add_by_username">Add by Username</button>
+				</div>
+			</div>
+			<table class="whitelist_table">
+				<thead>
+					<tr class="whitelist_header"></tr>
+				</thead>
+				<tbody>
+				</tbody>
+			</table>
+			<div style="margin-top:1rem;">
+				<button class="submit_changes" id="wl_sub_user">Submit Changes</button>
+			</div>
+		</div>
+	</div>
+	<div class="content_set" style="width: auto; display: table;" id="wl_ip">
+		<div class="content_set_title">Whitelisted IP Addresses</div>
+		<div class="content_set_content">
+			<div style="margin-bottom:0.5rem;">
+				<div>
+					<input id="wl_add_ip">
+					<button id="add_by_ip">Add by IP</button>
+				</div>
+			</div>
+			<table class="whitelist_table">
+				<thead>
+					<tr class="whitelist_header"></tr>
+				</thead>
+				<tbody>
+				</tbody>
+			</table>
+			<div style="margin-top:1rem;">
+				<button class="submit_changes" id="wl_sub_ip">Submit Changes</button>
+			</div>
+		</div>
+	</div>
+	<div class="content_set" style="width: auto; display: table;" id="wl_world">
+		<div class="content_set_title">Whitelisted Worlds</div>
+		<div class="content_set_content">
+			<div style="margin-bottom:0.5rem;">
+				<div>
+					<input id="wl_add_world_name">
+					<button id="add_by_world_name">Add by World Name</button>
+				</div>
+			</div>
+			<table class="whitelist_table">
+				<thead>
+					<tr class="whitelist_header"></tr>
+				</thead>
+				<tbody>
+				</tbody>
+			</table>
+			<div style="margin-top:1rem;">
+				<button class="submit_changes" id="wl_sub_world">Submit Changes</button>
+			</div>
+		</div>
+	</div>
+	<style>
+
+	</style>
+	<script>
+		var csrftoken = "{{csrftoken}}";
+
+		var statusLookup = {
+			write: "Canvas write, link, protect, clea",
+			load_tile: "Fetch tile regions",
+			color: "Write text with colors",
+			own_color: "Write text with colors on owned world",
+			chat: "Send chat message",
+			chat_dm: "Send direct private chat message",
+			load_chat: "Fetch chat history",
+			profile: "Profile management (claiming worlds, configuring worlds)",
+			uc_picto: "Unicode pictographs/emojis",
+			uc_dot: "Unicode 2x3/2x4 dot characters",
+			uc_nonletter: "Unicode non-letter characters",
+			own_uc_special: "Special Unicode characters on owned world",
+			no_captcha: "Exemption from captcha",
+			few_captcha: "Provide captcha once",
+			pchat_anon: "Allow usage of front page and global chats as an anon"
+		};
+
+		var lastWhitelistId = 1;
+		var whitelistHeaders = [
+			"write", "load_tile",
+			"color", "own_color",
+			"chat", "chat_dm", "load_chat",
+			"profile",
+			"uc_picto", "uc_dot", "uc_nonletter", "own_uc_special",
+			"no_captcha", "few_captcha",
+			"pchat_anon"
+		];
+
+		// console.log({whitelistData, statusData})
+
+		// add_by_uid / wl_add_user_id
+		// add_by_ip / wl_add_ip
+		// add_by_username / wl_add_username
+		// add_by_world_name / wl_add_world_name
+		
+		// wl_sub_user / wl_sub_ip / wl_sub_world
+
+
+		// var whitelistStatus = [];
+		var updatedWhitelistFeatures = {};
+
+		var submittingStatus = {
+			features: false
+		};
+
+		function populateWhitelistTable(panel, type, data) {
+			var table = panel.querySelector(".whitelist_table>tbody");
+			var whitelist_header = panel.querySelector(".whitelist_header");
+
+			let effectiveHeaders = [
+				"id",
+				...(type == "user" ? ["username"]: []),
+				...whitelistHeaders
+			];
+
+			for(let i = 0; i < effectiveHeaders.length; i++) {
+				let text = effectiveHeaders[i];
+				let head = document.createElement("th");
+				head.innerText = text;
+				whitelist_header.appendChild(head);
+			}
+
+			// console.log(data)
+
+			// console.log(panel, type, data)
+			for(let i = 0; i < data.length; i++) {
+				let entry = data[i];
+				let id = entry.id;
+				let id_type = entry.id_type;
+				let user_id = entry.user_id;
+				let username = entry.username;
+				let ip = entry.ip;
+				let world_name = entry.world_name;
+
+				let eRow = document.createElement("tr");
+				// console.log({effectiveHeaders})
+				for(let h = 0; h < effectiveHeaders.length; h++) {
+					let head = effectiveHeaders[h];
+					let eCell = document.createElement("td");
+					if(whitelistHeaders.includes(head)) {
+						let eCheck = document.createElement("input");
+						eCheck.type = "checkbox";
+						eCheck.checked = Boolean(Number(entry[head]));
+						eCell.appendChild(eCheck);
+					} else {
+						eCell.innerText = entry[head];
+					}
+					eRow.appendChild(eCell);
+				}
+
+				table.appendChild(eRow);
+			}
+		}
+
+		function buildDropdown(keyValueList) {
+			let eInput = document.createElement("select");
+			for(let i = 0; i < keyValueList.length; i++) {
+				let kv = keyValueList[i];
+				let eOpt = document.createElement("option");
+				eOpt.value = kv[0];
+				eOpt.innerText = kv[1];
+				eInput.appendChild(eOpt);
+			}
+			return eInput;
+		}
+
+		function initializeEvents() {
+			let save_status = document.getElementById("save_status");
+
+			save_status.addEventListener("click", async function() {
+				submittingStatus.features = true;
+				save_status.disabled = true;
+				fetch("/api/admin/whitelist", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						type: "features",
+						changes: updatedWhitelistFeatures
+					})
+				}).then(function() {
+					updatedWhitelistFeatures = {};
+				}).catch(function() {
+					alert("Failed to update whitelist features");
+				}).finally(function() {
+					save_status.disabled = false;
+				});
+			});
+		}
+
+		async function fetchWhitelistData(after, limit, withStatus) {
+			let params = new URLSearchParams({ after, limit });
+			if(withStatus) {
+				params.append("include_status", "1");
+			}
+			let endpoint = "/api/admin/whitelist?" + params;
+			let data = await fetch(endpoint, {
+				method: "GET"
+			});
+			return await data.json();
+		}
+
+		async function getIdFromUsername(username) {
+			let params = new URLSearchParams({ username });
+			let endpoint = "/api/admin/user?" + params;
+			let data = await fetch(endpoint, {
+				method: "GET"
+			});
+			if(data.status >= 400 && data.status < 500) {
+				return null;
+			}
+			let response = await data.json();
+			return response.id;
+		}
+
+		async function preload() {
+			let data = await fetchWhitelistData(lastWhitelistId, 50, true);
+
+			let wlFeatures = document.getElementById("whitelist_features");
+			let rules = data.rules;
+
+			for(let statusCode in data.status) {
+				let status = data.status[statusCode];
+				let desc = statusLookup[status] || "";
+
+				let eLabel = document.createElement("label");
+				eLabel.innerText = `${statusCode}: `;
+
+				let dropdownOpts = [
+					["public", "Public"],
+					["authenticated", "Authenticated"],
+					["whitelisted", "Whitelisted"]
+				];
+				let optIdx = dropdownOpts.findIndex(e => e[0] == status) ?? -1;
+				let eList = buildDropdown(dropdownOpts);
+				eList.selectedIndex = optIdx;
+				eList.addEventListener("input", function(evt) {
+					updatedWhitelistFeatures[statusCode] = evt.target.value;
+				});
+
+				let eRow = document.createElement("div");
+				eRow.appendChild(eLabel);
+				eRow.appendChild(eList);
+
+				wlFeatures.appendChild(eRow);
+			}
+
+			populateWhitelistTable(document.getElementById("wl_user"), "user", rules.filter(f => f.id_type == "user"));
+			populateWhitelistTable(document.getElementById("wl_ip"), "ip", rules.filter(f => f.id_type == "ip"));
+			populateWhitelistTable(document.getElementById("wl_world"), "world", rules.filter(f => f.id_type == "world"));
+		}
+
+		preload();
+		initializeEvents();
+	</script>
+{% endblock %}

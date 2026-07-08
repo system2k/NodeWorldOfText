@@ -15,6 +15,42 @@ function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
 
+function checkWhitelistFeature(user, ipAddressVal, ipAddressFam, code, server, is_owner) {
+	if(!server.siteWhitelistCache || !server.siteWhitelistStatus) {
+		return true;
+	}
+
+	var status = server.siteWhitelistStatus[code];
+	if(!status) status = "public";
+
+	if(status == "public") return true;
+
+	if(status == "authenticated") {
+		return user && user.is_authenticated;
+	}
+
+	if(status == "whitelisted") {
+		if(!user || !user.id) return false;
+
+		var cache = server.siteWhitelistCache;
+		if(!cache) return false;
+
+		if(cache.byUserId && cache.byUserId.has(user.id)) {
+			var entry = cache.byUserId.get(user.id);
+			if(entry && entry[code]) return true;
+		}
+
+		if(cache.byIP && cache.byIP.has(ipAddressVal)) {
+			var entry = cache.byIP.get(ipAddressVal);
+			if(entry && entry[code]) return true;
+		}
+
+		return false;
+	}
+
+	return true;
+}
+
 function partitionMultiEdit(editOffset, tileX, tileY, char, color, bgColor, editId) {
 	var res = [];
 	for(var i = 0; i < char.length; i++) {
@@ -129,6 +165,11 @@ module.exports = async function(data, server, params) {
 	if(color_cell == enums.perm.member && !is_member) can_color_cell = false;
 	if(color_cell == enums.perm.owner && !is_owner) can_color_cell = false;
 
+	var wl_can_write = checkWhitelistFeature(user, ipAddressVal, ipAddressFam, "write", server, is_owner);
+	var wl_can_color = checkWhitelistFeature(user, ipAddressVal, ipAddressFam, is_owner ? "own_color" : "color", server, is_owner);
+
+	console.log({wl_can_write, wl_can_color})
+
 	var edits = data.edits;
 	if(!edits) return emptyWriteResponse;
 	if(!Array.isArray(edits)) return emptyWriteResponse;
@@ -175,6 +216,11 @@ module.exports = async function(data, server, params) {
 		var bgColor = edit[8];
 
 		if(typeof char != "string") continue;
+
+		if(!wl_can_write) {
+			rejected[editId] = enums.write.zeroRateLimit;
+			continue;
+		}
 
 		var editOffset = charY * CONST.tileCols + charX;
 		if(editOffset < 0 || editOffset >= CONST.tileArea) continue;
@@ -227,6 +273,11 @@ module.exports = async function(data, server, params) {
 			bgColor = -1;
 		}
 
+		if(!wl_can_color) {
+			color = 0;
+			bgColor = -1;
+		}
+
 		if(colorPaletteEnabled && colorPalette && !is_member) {
 			if(!isInListBinaryLookup(colorPalette, color)) {
 				color = colorPalette[0];
@@ -243,7 +294,14 @@ module.exports = async function(data, server, params) {
 		if(testChar.length == 0) { // empty edit
 			char = "\0";
 		} else if(char.length > 1 && (user.superuser || is_member || is_owner)) { // multi-char edit
-			validEdits.push(...partitionMultiEdit(editOffset, tileX, tileY, testChar, color, bgColor, editId));
+			// Check whitelist permission for "uc_picto" code
+			var whitelistPictoCode = is_owner ? "own_uc_picto" : "uc_picto";
+			if(checkWhitelistFeature(user, ipAddressVal, ipAddressFam, whitelistPictoCode, server, is_owner)) {
+				validEdits.push(...partitionMultiEdit(editOffset, tileX, tileY, testChar, color, bgColor, editId));
+			} else {
+				// Substitute with ? if unicode pictograph denied
+				char = "?";
+			}
 			continue;
 		}
 

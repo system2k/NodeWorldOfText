@@ -89,8 +89,8 @@ class RequestHandler {
 		this.callbacks = callbacks;
 		res.on("close", function() {
 			self.requestEnded = true;
-			for(var i = 0; i < self.requestPromises.length; i++) {
-				var prom = self.requestPromises[i];
+			for(let i = 0; i < self.requestPromises.length; i++) {
+				let prom = self.requestPromises[i];
 				prom();
 			}
 		});
@@ -107,7 +107,7 @@ class RequestHandler {
 	}
 
 	// wait for the client to upload form data to the server
-	loadPostData(binary_post_data, raise_limit) {
+	loadPostData(binary_post_data, json_post_data, raise_limit) {
 		var self = this;
 		var sizeLimit = 1000000;
 		if(raise_limit) sizeLimit = 100000000;
@@ -188,7 +188,7 @@ class RequestHandler {
 		var restr = restrictions.getRestrictions();
 		var deniedPages = this.server.checkHTTPRestr(restr, this.ipAddressVal, this.ipAddressFam);
 		if(deniedPages.siteAccess) {
-			var deny_notes = "None";
+			let deny_notes = "None";
 			if(deniedPages.siteAccessNote) {
 				deny_notes = deniedPages.siteAccessNote;
 			}
@@ -202,17 +202,17 @@ class RequestHandler {
 	
 		var page_aborted = false;
 		var page_resolved = false;
-		for(var i in this.server.urlPatterns) {
-			var pattern = this.server.urlPatterns[i];
-			var urlReg = pattern[0];
-			var pageRes = pattern[1];
-			var options = pattern[2];
+		for(let i in this.server.urlPatterns) {
+			let pattern = this.server.urlPatterns[i];
+			let urlReg = pattern[0];
+			let pageRes = pattern[1];
+			let options = pattern[2];
 	
 			if(!pagePath.match(urlReg)) {
 				continue;
 			}
 	
-			var status = await this.processPage(pageRes, options, pagePath);
+			let status = await this.processPage(pageRes, options, pagePath);
 			if(status == RequestHandler.RESOLVED) {
 				page_resolved = true;
 			} else if(status == RequestHandler.ABORTED) {
@@ -226,9 +226,9 @@ class RequestHandler {
 		}
 	
 		if(!this.isResolved()) {
-			var endpoint = this.server.urlErrorEndpoints["404"];
+			let endpoint = this.server.urlErrorEndpoints["404"];
 			if(endpoint) {
-				var status = await this.processPage(endpoint, {}, pagePath);
+				let status = await this.processPage(endpoint, {}, pagePath);
 				if(status == RequestHandler.RESOLVED) {
 					page_resolved = true;
 				}
@@ -277,8 +277,8 @@ class RequestHandler {
 			this.setTemplateData("user", this.user);
 			// check if user is logged in
 			if(!this.cookies.csrftoken) {
-				var token = this.server.globals.new_token(32);
-				var date = Date.now();
+				let token = this.server.globals.new_token(32);
+				let date = Date.now();
 				// TODO: introduce only for forms
 				this.addCookie("csrftoken=" + token + "; expires=" + http_time(date + this.server.globals.ms.year) + "; path=/;");
 				this.user.csrftoken = token;
@@ -287,7 +287,12 @@ class RequestHandler {
 			}
 		}
 		if(method == "POST") {
-			var dat = await this.loadPostData(binary_post_data, this.user.superuser);
+			let isJSON = false;
+			if(this.req.headers["content-type"] == "application/json") {
+				isJSON = true;
+			}
+			// if(this.req.headers["Content-Type"] == "application/json")
+			let dat = await this.loadPostData(binary_post_data, isJSON, this.user.superuser);
 			if(dat) {
 				this.post_data = dat;
 			}
@@ -534,12 +539,12 @@ class HTTPServer {
 
 	releaseStuckRequests() {
 		var currentTime = Date.now();
-		for(var ip in this.httpReqHolds) {
-			for(var http_idx in this.httpReqHolds[ip]) {
-				var rateLimData = this.httpReqHolds[ip][http_idx];
-				var startTimes = rateLimData.startTimeById;
-				for(var id in startTimes) {
-					var start = startTimes[id];
+		for(let ip in this.httpReqHolds) {
+			for(let http_idx in this.httpReqHolds[ip]) {
+				let rateLimData = this.httpReqHolds[ip][http_idx];
+				let startTimes = rateLimData.startTimeById;
+				for(let id in startTimes) {
+					let start = startTimes[id];
 					if(start == -1) continue;
 					if(currentTime - start >= 1000 * 60) {
 						this.releaseHTTPRateLimit(ip, parseInt(http_idx), parseInt(id));
@@ -556,11 +561,11 @@ class HTTPServer {
 	checkHTTPRateLimit(ip, func, method) {
 		var idx = -1;
 		var max = 0;
-		for(var i = 0; i < this.httpRateLimits.length; i++) {
-			var line = this.httpRateLimits[i];
-			var lf = line[0]; // function
-			var lc = line[1]; // number of requests at a time to process
-			var lm = line[2]; // method (optional)
+		for(let i = 0; i < this.httpRateLimits.length; i++) {
+			let line = this.httpRateLimits[i];
+			let lf = line[0]; // function
+			let lc = line[1]; // number of requests at a time to process
+			let lm = line[2]; // method (optional)
 			if(lf != func) continue;
 			if(lm && lm != method) continue;
 			idx = i;
@@ -590,7 +595,7 @@ class HTTPServer {
 			// we want this request to wait for those requests to finish first.
 			// since this request hasn't executed yet, we do not increment 'holds'
 			// until this request is ready to be executed.
-			var id = obj.maxId++;
+			let id = obj.maxId++;
 			obj.startTimeById[id] = -1;
 			return new Promise(function(res) {
 				obj.resp.push([res, idx, id]);
@@ -615,12 +620,12 @@ class HTTPServer {
 			diff = lim.resp.length;
 			lim.holds = 0;
 		}
-		for(var i = 0; i < diff; i++) {
-			var funcData = lim.resp[0];
+		for(let i = 0; i < diff; i++) {
+			let funcData = lim.resp[0];
 			if(!funcData) continue;
-			var func = funcData[0];
-			var funcIdx = funcData[1];
-			var funcId = funcData[2];
+			let func = funcData[0];
+			let funcIdx = funcData[1];
+			let funcId = funcData[2];
 			if(lim.holds < lim.max) {
 				lim.holds++;
 				lim.startTimeById[funcId] = Date.now();
@@ -728,8 +733,8 @@ class HTTPServer {
 		var self = this;
 		this.processRequest(req, res, callbacks).then(function() {
 			cbExecuted = true;
-			for(var i = 0; i < callbacks.length; i++) {
-				var cb = callbacks[i];
+			for(let i = 0; i < callbacks.length; i++) {
+				let cb = callbacks[i];
 				cb();
 			}
 		}).catch(function(e) {
@@ -740,8 +745,8 @@ class HTTPServer {
 				if(cbExecuted) {
 					console.log("An error has occurred while executing request callbacks");
 				} else {
-					for(var i = 0; i < callbacks.length; i++) {
-						var cb = callbacks[i];
+					for(let i = 0; i < callbacks.length; i++) {
+						let cb = callbacks[i];
 						cb();
 					}
 				}

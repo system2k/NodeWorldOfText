@@ -5570,7 +5570,7 @@ function buildMenu() {
 		w.disableColors();
 		setRedrawPatterned("square");
 	}, true);
-	menuOptions.colorsEnabled = menu.addCheckboxOption("Suppress images", function() {
+	menuOptions.suppressImages = menu.addCheckboxOption("Suppress images", function() {
 		w.enableImageSuppression();
 		setRedrawPatterned("square");
 	}, function() {
