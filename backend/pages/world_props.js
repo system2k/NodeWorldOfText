@@ -41,7 +41,8 @@ module.exports.GET = async function(req, write, server, ctx) {
 			showCursor: world.feature.showCursor,
 			colorText: world.feature.colorText,
 			colorCell: world.feature.colorCell,
-			quickErase: world.feature.quickErase
+			quickErase: world.feature.quickErase,
+			redirect: world.feature.redirect
 		},
 		theme: {
 			bg: world.theme.bg,
