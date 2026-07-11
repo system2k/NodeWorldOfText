@@ -592,8 +592,7 @@ async function commitWorld(world) {
 		"theme/guestCursor",
 		"theme/color",
 		"theme/tileOwner",
-		"theme/tileMember",
-		"feature/redirect",
+		"theme/tileMember"
 	];
 
 	var cols = {

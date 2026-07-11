@@ -537,9 +537,6 @@ module.exports.POST = async function(req, write, server, ctx) {
 		if(modifyWorldProp(world, "feature/memberTilesAddRemove", Boolean(membertiles_addremove))) {
 			featureUpdates.push({type: "memberTilesAddRemove", value: Boolean(membertiles_addremove)});
 		}
-		if(modifyWorldProp(world, "feature/redirect", redirect)) {
-			featureUpdates.push({type: "redirect", value: redirect});
-		}
 		var no_anon_chat = post_data.no_anon_chat == "1";
 		if(modifyWorldProp(world, "opts/noAnonChat", no_anon_chat)) {
 			featureUpdates.push({type: "noAnonChat", value: no_anon_chat});
