@@ -258,6 +258,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		color_cell: world.feature.colorCell,
 		quick_erase: world.feature.quickErase,
 		show_cursor: world.feature.showCursor,
+		redirect_value: world.feature.redirect,
 
 		color,
 		cursor_color,
@@ -536,6 +537,9 @@ module.exports.POST = async function(req, write, server, ctx) {
 		if(modifyWorldProp(world, "feature/memberTilesAddRemove", Boolean(membertiles_addremove))) {
 			featureUpdates.push({type: "memberTilesAddRemove", value: Boolean(membertiles_addremove)});
 		}
+		if(modifyWorldProp(world, "feature/redirect", redirect)) {
+			featureUpdates.push({type: "redirect", value: redirect});
+		}
 		var no_anon_chat = post_data.no_anon_chat == "1";
 		if(modifyWorldProp(world, "opts/noAnonChat", no_anon_chat)) {
 			featureUpdates.push({type: "noAnonChat", value: no_anon_chat});
@@ -783,6 +787,15 @@ module.exports.POST = async function(req, write, server, ctx) {
 			modifyWorldProp(world, "opts/desc", mdesc);
 		} else {
 			modifyWorldProp(world, "opts/desc", "");
+		}
+
+		if(post_data.redirect_value) {
+			var redir = post_data.redirect_value;
+			if(typeof redir != "string") redir = "";
+			redir = redir.trim().replace(/\r|\n/g, "");
+			modifyWorldProp(world, "feature/redirect", redir);
+		} else {
+			modifyWorldProp(world, "feature/redirect", "");
 		}
 
 		if(post_data.priv_note) {

@@ -55,6 +55,7 @@
 		<div style="display:none"><input type="hidden" name="csrfmiddlewaretoken" value="{{ csrftoken }}" /></div>
 		<script>
 			var state = {{ state|safe }};
+			if(state.worldModel.redirect!=""){location.pathname=state.worldModel.redirect}
 		</script>
 
 		<textarea autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" style="left: -1000px; top: -1000px; position: absolute;" id="textInput"></textarea>
