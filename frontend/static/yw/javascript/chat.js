@@ -1084,18 +1084,6 @@ function insertNewChatElementsIntoChatfield(chatfield, messageQueue) {
 			updateDuplicateChatGroup(lastRec.element);
 			continue;
 		}
-		var matchRec = null;
-		for(var j = records.length - 2; j >= 0; j--) {
-			if(isChatMessageDuplicateRecord(records[j], message, true)) {
-				matchRec = records[j];
-				break;
-			}
-		}
-		if(matchRec) {
-			matchRec.element._duplicateData.count++;
-			updateDuplicateChatGroup(matchRec.element);
-			continue;
-		}
 		buildChatElement(chatfield,
 				message.id, message.type, message.nickname, message.message,
 				message.realUsername, message.op, message.admin, message.staff,

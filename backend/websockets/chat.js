@@ -54,11 +54,6 @@ function sanitizeCustomMeta(meta) {
 	return output;
 }
 
-var chat_ip_limits = {};
-var tell_blocks = {};
-var blocked_ips_by_world_id = {}; // id 0 = global
-var blocked_users_by_world_id = {};
-
 module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var channel = ctx.channel;
 	var user = ctx.user;
@@ -78,6 +73,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var loadPlugin = server.loadPlugin;
 	var getServerSetting = server.getServerSetting;
 	var getServerUptime = server.getServerUptime;
+	var getUserIdFromUsername = server.getUserIdFromUsername;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
 	var remove_from_chatlog = chat_mgr.remove_from_chatlog;
@@ -132,6 +128,11 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	if(!(data.location == "global" || data.location == "page")) data.location = "page";
 	location = data.location;
 
+	var effectiveWorldID = world.id;
+	if(location == "global") {
+		effectiveWorldID = 0;
+	}
+
 	if(location == "page" && !can_chat) {
 		serverChatResponse("You do not have permission to chat here", location);
 		return;
@@ -157,55 +158,23 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		if(user.authenticated && !has_chat_username) {
 			serverChatResponse("Your account needs a username to send messages in global chat.", location);
 			return;
-			// I'm not sure if this case can actually happen, but just in case - Alan
 		}
-	} //elseif?
-
-	if(location == "page") {
+	} else if(location == "page") {
 		if(world.opts.noAnonChat && !user.authenticated) {
 			serverChatResponse("Sign in to send messages in this world.", location);
 			return;
 		}
+	} else {
+		serverChatResponse("Unrecognized location", location);
+		return;
 	}
 
-	var isMuted = false;
 	var isTestMessage = false;
-	var muteInfo = {
-		id: null,
-		user: null
-	};
-	var worldChatMutes = blocked_ips_by_world_id[world.id];
-	var worldChatUserMutes = blocked_users_by_world_id[world.id];
-	if(location == "global") {
-		worldChatMutes = blocked_ips_by_world_id[0];
-		worldChatUserMutes = blocked_users_by_world_id[0];
-	}
-	if(worldChatMutes) {
-		muteInfo.id = worldChatMutes[ipHeaderAddr];
-	}
-	if(worldChatUserMutes) {
-		muteInfo.user = worldChatUserMutes[username_to_display];
-	}
-	if(muteInfo.id || muteInfo.user) {
-		isMuted = true;
-	}
 
-	if(isMuted) {
-		if (muteInfo.id) {
-			var expIdTime = muteInfo.id[0];
-			if(!expIdTime || typeof expIdTime != "number" || Date.now() >= expIdTime) {
-				isMuted = Boolean(muteInfo.user); // can still be muted by username
-				delete worldChatMutes[ipHeaderAddr];
-			}
-		}
-		if (muteInfo.user) {
-			var expUserTime = muteInfo.user[0];
-			if(!expUserTime || typeof expUserTime != "number" || Date.now() >= expUserTime) {
-				isMuted = Boolean(muteInfo.id); // can still be muted by id
-				delete worldChatUserMutes[username_to_display];
-			}
-		}
-	}
+	var isMuted = (
+		chat_mgr.checkMuteByIP(effectiveWorldID, ipHeaderAddr) ||
+		(user.authenticated && chat_mgr.checkMuteByUserID(effectiveWorldID, user.id))
+	);
 
 	var nick = "";
 	if(data.nickname) {
@@ -398,14 +367,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			
 			var blocked_ip = getClientIPByChatID(id, location == "global");
 			if(blocked_ip) {
-				var blist = tell_blocks[ipHeaderAddr];
-				if(!blist) {
-					blist = {};
-					tell_blocks[ipHeaderAddr] = blist;
-				}
-				if(!blist[blocked_ip]) {
-					blist[blocked_ip] = Date.now();
-				}
+				chat_mgr.setTellBlockByIP(ipHeaderAddr, blocked_ip);
 			}
 
 			serverChatResponse("Blocked chats from ID: " + id, location);
@@ -453,10 +415,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			
 			var unblocked_ip = getClientIPByChatID(id, location == "global");
 			if(unblocked_ip) {
-				var blist = tell_blocks[ipHeaderAddr];
-				if(blist) {
-					delete blist[unblocked_ip];
-				}
+				chat_mgr.unsetTellBlockByIP(ipHeaderAddr, blocked_ip);
 			}
 
 			serverChatResponse("Unblocked chats from ID: " + id, location);
@@ -484,12 +443,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			ws.sdata.chat_blocks.no_anon = false;
 			ws.sdata.chat_blocks.no_reg = false;
 			
-			var tblocks = tell_blocks[ipHeaderAddr];
-			if(tblocks) {
-				for(var b in tblocks) {
-					delete tblocks[b];
-				}
-			}
+			chat_mgr.unsetAllTellBlocksByIP(ipHeaderAddr);
 			serverChatResponse("Cleared all blocks", location);
 		},
 		uptime: function() {
@@ -593,8 +547,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			}
 				
 			// user has blocked the TELLer by IP
-			var tellblock = tell_blocks[client.sdata.ipAddress];
-			if(tellblock && tellblock[ipHeaderAddr]) {
+			if(chat_mgr.checkTellBlockByIP(ipHeaderAddr)) {
 				return;
 			}
 
@@ -606,9 +559,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		},
 		channel: async function() {
 			if(!user.staff) return;
-			var worldId = world.id;
-			if(location == "global") worldId = 0;
-			var channels = await db_chat.all("SELECT * FROM channels WHERE world_id=?", worldId);
+			var channels = await db_chat.all("SELECT * FROM channels WHERE world_id=?", effectiveWorldID);
 			var count = channels.length;
 			var infoLog = "Found " + count + " channel(s) for this world:\n";
 			for(var i = 0; i < count; i++) {
@@ -621,7 +572,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				infoLog += "Created: " + create_date(date) + "\n";
 				infoLog += "----------------\n";
 			}
-			var def = await db_chat.get("SELECT * FROM default_channels WHERE world_id=?", worldId);
+			var def = await db_chat.get("SELECT * FROM default_channels WHERE world_id=?", effectiveWorldID);
 			if(def && def.channel_id) {
 				def = def.channel_id;
 			} else {
@@ -650,23 +601,13 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 			if(muted_ip) {
 				var muteDate = Date.now() + (time * 1000);
-				var mute_wid = null;
-				if(location == "global") {
-					mute_wid = 0;
-				} else if(location == "page") {
-					mute_wid = world.id;
-				}
-				if(mute_wid == null) {
-					return serverChatResponse("Invalid location", location);
-				}
-				if(!blocked_ips_by_world_id[mute_wid]) blocked_ips_by_world_id[mute_wid] = {};
-				blocked_ips_by_world_id[mute_wid][muted_ip] = [muteDate];
+				chat_mgr.muteByIP(effectiveWorldID, ipHeaderAddr, muteDate, user.id);
 				return serverChatResponse("Muted client by IP until " + create_date(muteDate), location);
 			} else {
 				return serverChatResponse("Client not found", location);
 			}
 		},
-		muteuser: function(username, time, flag) {
+		muteuser: async function(username, time, flag) {
 			if(!is_owner && !user.staff) return;
 			if(location == "global" && !user.staff) {
 				return serverChatResponse("You do not have permission to mute on global", location);
@@ -675,6 +616,12 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			var username_value = sanitize_username(username);
 			if (username_value == null) {
 				serverChatResponse("Invalid username", location);
+				return;
+			}
+
+			var user_id = await getUserIdFromUsername(username_value);
+			if(!user_id) {
+				serverChatResponse("Could not resolve username to account", location);
 				return;
 			}
 
@@ -687,41 +634,22 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			}
 
 			var muteDate = Date.now() + (time * 1000);
-			var mute_wid = null;
-			if(location == "global") {
-				mute_wid = 0;
-			} else if(location == "page") {
-				mute_wid = world.id;
-			}
-			if(mute_wid == null) {
-				return serverChatResponse("Invalid location", location);
-			}
-			if(!blocked_users_by_world_id[mute_wid]) blocked_users_by_world_id[mute_wid] = {};
-			blocked_users_by_world_id[mute_wid][username] = [muteDate];
+			chat_mgr.muteByUserID(effectiveWorldID, user_id, muteDate, user.id);
 			return serverChatResponse("Muted client by username until " + create_date(muteDate), location);
 		},
 		clearmutes: function() {
 			if(!is_owner && !user.staff) return;
 			var ipCnt = 0;
 			var userCnt = 0;
+
 			if(location == "global" && user.staff) {
-				if(blocked_ips_by_world_id["0"]) {
-					ipCnt = Object.keys(blocked_ips_by_world_id["0"]).length;
-					delete blocked_ips_by_world_id["0"];
-				}
-				if(blocked_users_by_world_id["0"]) {
-					userCnt = Object.keys(blocked_users_by_world_id["0"]).length;
-					delete blocked_users_by_world_id["0"];
-				}
+				let cleared = chat_mgr.clearMutesByWorldID(0);
+				ipCnt = cleared.ip;
+				userCnt = cleared.user;
 			} else {
-				if(blocked_ips_by_world_id[world.id]) {
-					ipCnt = Object.keys(blocked_ips_by_world_id[world.id]).length;
-					delete blocked_ips_by_world_id[world.id];
-				}
-				if(blocked_users_by_world_id[world.id]) {
-					userCnt = Object.keys(blocked_users_by_world_id[world.id]).length;
-					delete blocked_users_by_world_id[world.id];
-				}
+				let cleared = chat_mgr.clearMutesByWorldID(world.id);
+				ipCnt = cleared.ip;
+				userCnt = cleared.user;
 			}
 			return serverChatResponse("Unmuted " + ipCnt + " IP(s), " + userCnt + " user(s)", location);
 		},
@@ -786,29 +714,22 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	// chat limiter
 	var msNow = Date.now();
 	var second = Math.floor(msNow / 1000);
-	var chatsEverySecond = 2;
-	if(location == "page") {
-		if(is_member) chatsEverySecond = 8;
-		if(is_owner) chatsEverySecond = 512;
-	}
-	if(isCommand && commandType != "tell") chatsEverySecond = 512;
 
-	if(!chat_ip_limits[ipHeaderAddr]) {
-		chat_ip_limits[ipHeaderAddr] = {};
+	var messageRate = 2;
+	if(location == "page") {
+		if(is_member) messageRate = 8;
+		if(is_owner) messageRate = 32;
 	}
-	var cil = chat_ip_limits[ipHeaderAddr];
-	if(cil.lastChatSecond != second) {
-		cil.lastChatSecond = second;
-		cil.chatsSentInSecond = 0;
-	} else {
-		if(cil.chatsSentInSecond >= chatsEverySecond - 1) {
-			if(!user.staff) {
-				serverChatResponse("You are chatting too fast.", location);
-				return;
-			}
-		} else {
-			cil.chatsSentInSecond++;
-		}
+	if(isCommand && commandType != "tell") messageRate = 32;
+	if(user.staff) {
+		messageRate = 32;
+	}
+
+	var canSend = chat_mgr.canSendMessage(ipHeaderAddr, messageRate);
+
+	if(!canSend) {
+		serverChatResponse("You are chatting too fast.", location);
+		return;
 	}
 
 	if(isCommand) {
@@ -940,14 +861,16 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	}
 
 	if(isMuted) {
-		var expTime = 0;
-		if (muteInfo.id) {
-			expTime = muteInfo.id[0];
+		let expIP = chat_mgr.getMuteByIP(effectiveWorldID, ipHeaderAddr) || 0;
+		let expUser = user.authenticated ? chat_mgr.getMuteByUserID(effectiveWorldID, user.id) : 0;
+		let maxMute = expIP == -1 || expUser == -1 ? -1 : Math.max(expIP, expUser);
+		if(maxMute) {
+			if(maxMute == -1) {
+				serverChatResponse("You are muted", location);
+			} else {
+				serverChatResponse("You are temporarily muted (" + calculateTimeDiff(maxMute - Date.now()) + ")", location);
+			}
 		}
-		if (muteInfo.user) {
-			expTime = Math.max(expTime, muteInfo.user[0]);
-		}
-		serverChatResponse("You are temporarily muted (" + calculateTimeDiff(expTime - Date.now()) + ")", location);
 		return;
 	}
 	var websocketChatData = Object.assign({
