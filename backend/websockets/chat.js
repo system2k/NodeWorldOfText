@@ -668,6 +668,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		},
 		listmutes: async function() {
 			if(!is_owner && !user.staff) return;
+			if(location == "global" && !user.staff) {
+				return;
+			}
 			let mutedUsers = chat_mgr.getUserMutes(effectiveWorldID);
 			let userList = "";
 			for(let i = 0; i < mutedUsers.length; i++) {

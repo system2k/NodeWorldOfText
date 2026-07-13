@@ -1263,6 +1263,33 @@ async function getUserIdFromUsername(username) {
 	}
 }
 
+async function getUsernameFromUserId(uid) {
+	if(!uid) return null;
+	if(accountSystem == "uvias") {
+		uid = uid.toLowerCase();
+		if(uid.charAt(0) == "x") uid = uid.substr(1);
+
+		let id_alpha = "0123456789abcdef";
+		if(uid.length < 1 || user_id.uid > 16) return null;
+		for(let i = 0; i < uid.length; i++) {
+			if(id_alpha.indexOf(uid.charAt(i)) == -1) {
+				return null;
+			}
+		}
+
+		let d_inf = await uvias.get("SELECT username FROM accounts.users WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", uid);
+
+		return d_inf.username;
+	} else if(accountSystem == "local") {
+		let user_info = await db.get("SELECT * FROM auth_user WHERE id=?", uid);
+		if(!user_info) {
+			return null;
+		}
+		return user_info.username;
+	}
+	return null;
+}
+
 // TODO: cache user data (only care about uvias)
 async function getUserInfo(cookies, is_websocket, dispatch) {
 	/*
@@ -2456,6 +2483,7 @@ var global_data = {
 	setupStaticShortcuts,
 	getServerUptime,
 	getUserIdFromUsername,
+	getUsernameFromUserId,
 };
 
 async function sysLoad() {

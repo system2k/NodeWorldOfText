@@ -153,7 +153,8 @@ function checkTellBlockByIP(ip_address, blocked_ip_address) {
 }
 
 function clearMutesByWorldID(world_id) {
-	var ipCount, userCount;
+	var ipCount = 0;
+	var userCount = 0;
 	if(mutedIPsByWorldID[world_id]) {
 		ipCount = Object.keys(mutedIPsByWorldID[world_id]).length;
 		delete mutedIPsByWorldID[world_id];
