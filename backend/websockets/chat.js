@@ -74,6 +74,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var getServerSetting = server.getServerSetting;
 	var getServerUptime = server.getServerUptime;
 	var getUserIdFromUsername = server.getUserIdFromUsername;
+	var getUsernameFromUserId = server.getUsernameFromUserId;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
 	var remove_from_chatlog = chat_mgr.remove_from_chatlog;
@@ -337,7 +338,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			return;
 		},
 		help: function(modifier) {
-			return serverChatResponse(generate_command_list(), location);
+			serverChatResponse(generate_command_list(), location);
 		},
 		block: function(id) {
 			var blocks = ws.sdata.chat_blocks;
@@ -579,7 +580,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				def = "<none>";
 			}
 			infoLog += "Default channel id: " + def;
-			return serverChatResponse(infoLog, location);
+			serverChatResponse(infoLog, location);
 		},
 		mute: function(id, time, flag) {
 			if(!is_owner && !user.staff) return;
@@ -663,7 +664,34 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				ipCnt = cleared.ip;
 				userCnt = cleared.user;
 			}
-			return serverChatResponse("Unmuted " + ipCnt + " IP(s), " + userCnt + " user(s)", location);
+			serverChatResponse("Unmuted " + ipCnt + " IP(s), " + userCnt + " user(s)", location);
+		},
+		listmutes: async function() {
+			if(!is_owner && !user.staff) return;
+			let mutedUsers = chat_mgr.getUserMutes(effectiveWorldID);
+			let userList = "";
+			for(let i = 0; i < mutedUsers.length; i++) {
+				let id = mutedUsers[i];
+				let user = await getUsernameFromUserId(id);
+				if(!user) user = "<Unknown>";
+				if(i != 0) userList += "\n";
+				userList += `${id} => ${user}`;
+			}
+			if(!mutedUsers.length) {
+				userList = "<None>";
+			}
+
+			let mutedIPs = chat_mgr.getIPMutes(effectiveWorldID);
+			let ipList = "";
+			if(user.superuser) {
+				ipList = mutedIPs.join("\n");
+			} else {
+				ipList = `${mutedIPs.length} total`;
+			}
+			if(!mutedIPs.length) {
+				ipList = "<None>";
+			}
+			serverChatResponse(`Muted users:\n${userList}\nMuted IPs:\n${ipList}`, location);
 		},
 		whoami: function() {
 			var idstr = "Who Am I:\n";
@@ -680,7 +708,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			idstr += "Login username: " + user_login + "\n";
 			idstr += "Display username: " + user_disp + "\n";
 			idstr += "Chat ID: " + clientId;
-			return serverChatResponse(idstr, location);
+			serverChatResponse(idstr, location);
 		},
 		delete: async function(id, timestamp) {
 			if(!is_owner && !user.staff) return;
@@ -702,7 +730,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				id: id,
 				time: timestamp
 			});
-			return serverChatResponse("Deleted " + res + " message(s)", location);
+			serverChatResponse("Deleted " + res + " message(s)", location);
 		},
 		passive: function(mode) {
 			if(mode == "on") {
@@ -788,6 +816,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				return;
 			case "clearmutes":
 				com.clearmutes();
+				return;
+			case "listmutes":
+				com.listmutes();
 				return;
 			case "whoami":
 				com.whoami();

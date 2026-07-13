@@ -179,6 +179,22 @@ function muteByUserID(world_id, user_id, expiration_date, issuer_user_id) {
 	(muteDBUpdates.mute_user_id[world_id] ??= {})[user_id] = {expiration_date, issuer_user_id};
 }
 
+function getUserMutes(world_id) {
+	if(mutedUsersByWorldID[world_id]) {
+		return Object.keys(mutedUsersByWorldID[world_id]);
+	} else {
+		return [];
+	}
+}
+
+function getIPMutes(world_id) {
+	if(mutedIPsByWorldID[world_id]) {
+		return Object.keys(mutedIPsByWorldID[world_id]);
+	} else {
+		return [];
+	}
+}
+
 function unmuteByIP(world_id, ip) {
 	if(mutedIPsByWorldID[world_id]) {
 		delete mutedIPsByWorldID[world_id][ip];
@@ -536,6 +552,8 @@ module.exports = {
 	canSendMessage,
 	muteByIP,
 	muteByUserID,
+	getUserMutes,
+	getIPMutes,
 	unmuteByIP,
 	unmuteByUserID,
 	checkMuteByIP,
