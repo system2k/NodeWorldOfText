@@ -547,7 +547,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			}
 				
 			// user has blocked the TELLer by IP
-			if(chat_mgr.checkTellBlockByIP(ipHeaderAddr)) {
+			if(chat_mgr.checkTellBlockByIP(client.sdata.ipAddress, ipHeaderAddr)) {
 				return;
 			}
 
@@ -590,21 +590,27 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			id = san_nbr(id);
 			time = san_nbr(time); // in seconds
 
-			var timeMultiplier = getTimeFlagValue(flag);
-			if (timeMultiplier == null) {
-				if (flag) return serverChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.");
-			} else {
-				time *= timeMultiplier;
+			if(time != -1) {
+				var timeMultiplier = getTimeFlagValue(flag);
+				if (timeMultiplier == null) {
+					if (flag) return serverChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.");
+				} else {
+					time *= timeMultiplier;
+				}
 			}
 
 			var muted_ip = getClientIPByChatID(id, location == "global");
 
 			if(muted_ip) {
-				var muteDate = Date.now() + (time * 1000);
+				var muteDate = time != -1 ? Date.now() + (time * 1000) : -1;
 				chat_mgr.muteByIP(effectiveWorldID, ipHeaderAddr, muteDate, user.id);
-				return serverChatResponse("Muted client by IP until " + create_date(muteDate), location);
+				if(muteDate == -1) {
+					serverChatResponse("Muted client indefinitely", location);
+				} else {
+					serverChatResponse("Muted client by username until " + create_date(muteDate), location);
+				}
 			} else {
-				return serverChatResponse("Client not found", location);
+				serverChatResponse("Client not found", location);
 			}
 		},
 		muteuser: async function(username, time, flag) {
@@ -626,16 +632,22 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			}
 
 			time = san_nbr(time); // in seconds
-			var timeMultiplier = getTimeFlagValue(flag);
-			if (timeMultiplier == null) {
-				if (flag) return serverChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.");
-			} else {
-				time *= timeMultiplier;
+			if(time != -1) {
+				var timeMultiplier = getTimeFlagValue(flag);
+				if (timeMultiplier == null) {
+					if (flag) return serverChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.");
+				} else {
+					time *= timeMultiplier;
+				}
 			}
 
-			var muteDate = Date.now() + (time * 1000);
+			var muteDate = time != -1 ? Date.now() + (time * 1000) : -1;
 			chat_mgr.muteByUserID(effectiveWorldID, user_id, muteDate, user.id);
-			return serverChatResponse("Muted client by username until " + create_date(muteDate), location);
+			if(muteDate == -1) {
+				serverChatResponse("Muted client indefinitely", location);
+			} else {
+				serverChatResponse("Muted client by username until " + create_date(muteDate), location);
+			}
 		},
 		clearmutes: function() {
 			if(!is_owner && !user.staff) return;

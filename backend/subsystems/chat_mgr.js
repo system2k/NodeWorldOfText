@@ -149,6 +149,7 @@ function checkTellBlockByIP(ip_address, blocked_ip_address) {
 	if(tellBlocks[ip_address]) {
 		return !!tellBlocks[ip_address][blocked_ip_address];
 	}
+	return false;
 }
 
 function clearMutesByWorldID(world_id) {
