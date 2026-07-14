@@ -62,6 +62,12 @@ if(state.userModel.is_staff) {
 	elm.chatbar.maxLength = 400;
 }
 
+chatbar.addEventListener("input", function(evt) {
+	if(evt.target.value.includes("\n") || evt.target.value.includes("\r")) {
+		evt.target.value = evt.target.value.replace(/[\r\n]/g, "");
+	}
+});
+
 var canChat = Permissions.can_chat(state.userModel, state.worldModel);
 if(!canChat) {
 	selectedChatTab = 1;
@@ -329,6 +335,7 @@ elm.chatsend.addEventListener("click", function() {
 
 elm.chatbar.addEventListener("keypress", function(e) {
 	if(e.key == "Enter" || e.keyCode == 13) { // Enter
+		e.preventDefault();
 		sendChat();
 	}
 });

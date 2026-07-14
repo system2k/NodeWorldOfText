@@ -219,6 +219,18 @@ a:visited {
 	text-align: center;
 	color: white;
 }
+#chatbar {
+	width: 100%;
+	margin: 3px;
+	margin-right: 0px;
+	resize: none;
+	font-family: Arial, system-ui, Roboto, Ubuntu, Verdana, monospace;
+	white-space: nowrap;
+	overflow: hidden;
+	padding-inline: 1px;
+	padding-block: 2px;
+	font-size: 10pt;
+}
 #chat_open {
 	position: absolute;
 	bottom: 0px;
