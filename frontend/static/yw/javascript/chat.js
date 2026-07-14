@@ -782,6 +782,8 @@ function addChat(chatfield, id, type, nickname, message, realUsername, op, admin
 }
 
 function buildChatElement(field, id, type, nickname, message, realUsername, op, admin, staff, color, date, dataObj) {
+	var rawNickname = nickname;
+	var rawMessage = message;
 	var dateStr = "";
 	if(date) dateStr = convertToDate(date);
 	var pm = dataObj.privateMessage;
@@ -994,10 +996,30 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 		field.scrollTop = maxScroll;
 	}
 
+	chatGroup._duplicateData = {
+		count: 1,
+		singleMessageHtml: msgDom.innerHTML,
+		expanded: false,
+		msgDom: msgDom
+	};
+	chatGroup.addEventListener("click", function() {
+		var data = this._duplicateData;
+		if(data && data.count > 1) {
+			data.expanded = !data.expanded;
+			updateDuplicateChatGroup(this);
+		}
+	});
+
 	var chatRec = {
 		id: id, date: date,
 		field: field,
-		element: chatGroup
+		element: chatGroup,
+		type: type,
+		rawNickname: rawNickname,
+		realUsername: realUsername,
+		rawMessage: rawMessage,
+		message: message,
+		dataObj: dataObj
 	};
 	if(field == elm.page_chatfield) {
 		chatRecordsPage.push(chatRec);
@@ -1014,9 +1036,54 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 	}
 }
 
+function updateDuplicateChatGroup(chatGroup) {
+	var data = chatGroup._duplicateData;
+	if(!data) return;
+	if(data.count <= 1) {
+		chatGroup.style.cursor = "default";
+		chatGroup.title = "";
+		data.expanded = false;
+		data.msgDom.innerHTML = data.singleMessageHtml;
+		return;
+	}
+	chatGroup.style.cursor = "pointer";
+	chatGroup.title = "Click to expand repeated messages";
+	if(data.expanded) {
+		var repeated = [];
+		for(var i = 0; i < data.count; i++) {
+			repeated.push(data.singleMessageHtml);
+		}
+		data.msgDom.innerHTML = repeated.join("<br>");
+	} else {
+		data.msgDom.innerHTML = data.singleMessageHtml + " [x" + data.count + "]";
+	}
+}
+
+function isChatMessageDuplicateRecord(chatRec, message, loose) {
+	if(!chatRec || !chatRec.element || !chatRec.element._duplicateData) return false;
+	if(chatRec.type !== message.type) return false;
+	if(chatRec.rawMessage !== message.message) return false;
+	if(((chatRec.dataObj && chatRec.dataObj.privateMessage) || "") !== ((message.dataObj && message.dataObj.privateMessage) || "")) return false;
+	if(message.type == "anon" || message.type == "anon_nick") {
+		return chatRec.id === message.id
+			&& chatRec.rawNickname === message.nickname
+			&& chatRec.realUsername === message.realUsername;
+	}
+	if(!loose && chatRec.id !== message.id) return false;
+	return chatRec.rawNickname === message.nickname
+		&& chatRec.realUsername === message.realUsername;
+}
+
 function insertNewChatElementsIntoChatfield(chatfield, messageQueue) {
+	var records = chatfield == elm.page_chatfield ? chatRecordsPage : chatRecordsGlobal;
 	for(var i = 0; i < messageQueue.length; i++) {
 		var message = messageQueue[i];
+		var lastRec = records.length ? records[records.length - 1] : null;
+		if(lastRec && isChatMessageDuplicateRecord(lastRec, message, false)) {
+			lastRec.element._duplicateData.count++;
+			updateDuplicateChatGroup(lastRec.element);
+			continue;
+		}
 		buildChatElement(chatfield,
 				message.id, message.type, message.nickname, message.message,
 				message.realUsername, message.op, message.admin, message.staff,

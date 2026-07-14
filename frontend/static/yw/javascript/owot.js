@@ -3793,9 +3793,13 @@ var actions = {
 	day: (args, coords) => w.day(),
 	theme: (args, coords) => {
 		var charInfo = getCharInfo(coords[0], coords[1], coords[2], coords[3]);
-		var restrict = state.worldModel.name == "" && charInfo.protection == 0;
+		var restrict = isMainPage() && charInfo.protection == 0;
 		if(restrict) {
-			var acpt = confirm("Do you want to perform this action?\n" + string);
+			var argstrings = [];
+			for (let value of Object.entries(args)) {
+				argstrings.push(`${value[0]}: ${value[1]}`);
+			}
+			var acpt = confirm("Do you want to change to this theme?\n" + argstrings.join(', '));
 			if(!acpt) {
 				return false;
 			}
@@ -4525,6 +4529,13 @@ function createSocket(getChatHist) {
 
 	socket.onopen = function(msg) {
 		console.log("Connected socket");
+		var event = {
+			beforeDefault: true,
+			socket: socket,
+			cancel: false
+		};
+		w.emit("socketOpen", event);
+		if (event.cancel) return true;
 		clearAllGuestCursors();
 		for(var tile in tiles) {
 			if(tiles[tile] == null) {
@@ -4553,10 +4564,13 @@ function createSocket(getChatHist) {
 		w.doAnnounce("", "err_access");
 		w.doAnnounce("", "err_limit");
 		disconnectTimeout = null;
+		event.beforeDefault = false;
+		w.emit("socketOpen", event);
 	}
 
 	socket.onclose = function() {
 		console.log("Socket has closed. Reconnecting...");
+		w.emit("socketClose", true); // bool: before default behavior?
 		for(var i in network.callbacks) {
 			var cb = network.callbacks[i];
 			if(typeof cb == "function") {
@@ -4569,6 +4583,7 @@ function createSocket(getChatHist) {
 				w.doAnnounce("Connection lost. Please wait until the client reconnects.", "err_connect");
 			}, 1000 * 2);
 		}
+		w.emit("socketClose", false);
 	}
 
 	socket.onerror = function(err) {

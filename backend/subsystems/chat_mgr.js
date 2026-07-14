@@ -3,7 +3,8 @@ var intv;
 var handle_error;
 var db;
 var broadcastMonitorEvent;
-module.exports.main = async function(server) {
+
+async function main(server) {
 	db_chat = server.db_chat;
 	intv = server.intv;
 	handle_error = server.handle_error;
@@ -11,6 +12,7 @@ module.exports.main = async function(server) {
 	broadcastMonitorEvent = server.broadcastMonitorEvent;
 
 	await init_chat_history();
+	await init_chat_mutes();
 
 	// every 5 minutes, clear the chat cache
 	intv.invalidate_chat_cache = setInterval(function() {
@@ -20,11 +22,246 @@ module.exports.main = async function(server) {
 	}, 60000 * 5);
 }
 
+var chat_cache = {};
+var chatIsCleared = {};
+var chatMsgDeletions = {};
+var global_chat_additions = [];
+var world_chat_additions = [];
+
+var chatDatabaseBusy = false;
 var server_exiting = false;
 
 module.exports.server_exit = async function() {
 	server_exiting = true;
 	await chatDatabaseClock(true);
+}
+
+var ipRateLimits = {};
+var tellBlocks = {};
+var mutedIPsByWorldID = {}; // id 0 = global
+var mutedUsersByWorldID = {};
+var muteDBUpdates = {
+	mute_ip: {},
+	mute_user_id: {},
+	clear_world: {}
+};
+
+async function init_chat_mutes() {
+	var mutes = await db_chat.all("SELECT * FROM mutes");
+	for(let i = 0; i < mutes.length; i++) {
+		let mute = mutes[i];
+		let mute_id = mute.id;
+		let world_id = mute.world_id;
+		let ip = mute.ip;
+		let user_id = mute.user_id;
+		let expiration_date = mute.expiration_date;
+		if(!expiration_date || (expiration_date != -1 && expiration_date < Date.now())) {
+			// expired
+			await db_chat.run("DELETE FROM mutes WHERE id=?", mute_id);
+		} else {
+			if(ip) {
+				(mutedIPsByWorldID[world_id] ??= {})[ip] = expiration_date;
+			}
+			if(user_id) {
+				(mutedUsersByWorldID[world_id] ??= {})[user_id] = expiration_date;
+			}
+		}
+	}
+}
+
+async function commit_chat_mutes_db() {
+	var upd_mute_ip = muteDBUpdates.mute_ip;
+	var upd_mute_user_id = muteDBUpdates.mute_user_id;
+	var upd_clear_world = muteDBUpdates.clear_world;
+	muteDBUpdates.mute_ip = {};
+	muteDBUpdates.mute_user_id = {};
+	muteDBUpdates.clear_world = {};
+
+	await db_chat.run("BEGIN");
+
+	for(let world_id in upd_clear_world) {
+		await db_chat.run("DELETE FROM mutes WHERE world_id=?", world_id);
+	}
+	for(let world_id in upd_mute_ip) {
+		for(let ip in upd_mute_ip[world_id]) {
+			let mute_info = upd_mute_ip[world_id][ip];
+			await db_chat.run("DELETE FROM mutes WHERE world_id=? AND ip=?", [world_id, ip]);
+			if(mute_info.expiration_date != 0) {
+				await db_chat.run("INSERT INTO mutes (ip, world_id, expiration_date, date_issued, issuer_user_id) VALUES (?, ?, ?, ?, ?)", [
+					ip, world_id, mute_info.expiration_date, Date.now(), mute_info.issuer_user_id
+				]);
+			}
+		}
+	}
+	for(let world_id in upd_mute_user_id) {
+		for(let user_id in upd_mute_user_id[world_id]) {
+			await db_chat.run("DELETE FROM mutes WHERE world_id=? AND user_id=?", [world_id, user_id]);
+			let mute_info = upd_mute_user_id[world_id][user_id];
+			if(mute_info.expiration_date != 0) {
+			await db_chat.run("INSERT INTO mutes (user_id, world_id, expiration_date, date_issued, issuer_user_id) VALUES (?, ?, ?, ?, ?)", [
+					user_id, world_id, mute_info.expiration_date, Date.now(), mute_info.issuer_user_id
+				]);
+			}
+		}
+	}
+
+	await db_chat.run("COMMIT");
+}
+
+function canSendMessage(ipAddress, messageLimit) {
+	let lim = ipRateLimits[ipAddress];
+	if(!messageLimit) messageLimit = 2;
+	let period = Math.floor(Date.now() / 1000);
+	if(!lim) {
+		lim = {
+			currentPeriod: period,
+			value: 0
+		};
+		ipRateLimits[ipAddress] = lim;
+	}
+	if(period != lim.currentPeriod) {
+		lim.value = 1;
+		lim.currentPeriod = period;
+		return true;
+	}
+	lim.value++;
+	if(lim.value > messageLimit) {
+		return false;
+	}
+	return true;
+}
+
+function setTellBlockByIP(ip_address, blocked_ip_address) {
+	(tellBlocks[ip_address] ??= {})[blocked_ip_address] = Date.now();
+}
+
+function unsetTellBlockByIP(ip_address, blocked_ip_address) {
+	if(tellBlocks[ip_address]) {
+		delete tellBlocks[ip_address][blocked_ip_address];
+	}
+}
+
+function unsetAllTellBlocksByIP(ip_address) {
+	delete tellBlocks[ip_address];
+}
+
+function checkTellBlockByIP(ip_address, blocked_ip_address) {
+	if(tellBlocks[ip_address]) {
+		return !!tellBlocks[ip_address][blocked_ip_address];
+	}
+	return false;
+}
+
+function clearMutesByWorldID(world_id) {
+	var ipCount = 0;
+	var userCount = 0;
+	if(mutedIPsByWorldID[world_id]) {
+		ipCount = Object.keys(mutedIPsByWorldID[world_id]).length;
+		delete mutedIPsByWorldID[world_id];
+	}
+	if(mutedUsersByWorldID[world_id]) {
+		userCount = Object.keys(mutedUsersByWorldID[world_id]).length;
+		delete mutedUsersByWorldID[world_id];
+	}
+	if(ipCount > 0 || userCount > 0) {
+		muteDBUpdates.clear_world[world_id] = true;
+	}
+
+	return {ip: ipCount, user: userCount};
+}
+
+function muteByIP(world_id, ip, expiration_date, issuer_user_id) {
+	(mutedIPsByWorldID[world_id] ??= {})[ip] = expiration_date;
+	(muteDBUpdates.mute_ip[world_id] ??= {})[ip] = {expiration_date, issuer_user_id};
+}
+
+function muteByUserID(world_id, user_id, expiration_date, issuer_user_id) {
+	(mutedUsersByWorldID[world_id] ??= {})[user_id] = expiration_date;
+	(muteDBUpdates.mute_user_id[world_id] ??= {})[user_id] = {expiration_date, issuer_user_id};
+}
+
+function getUserMutes(world_id) {
+	if(mutedUsersByWorldID[world_id]) {
+		return Object.keys(mutedUsersByWorldID[world_id]);
+	} else {
+		return [];
+	}
+}
+
+function getIPMutes(world_id) {
+	if(mutedIPsByWorldID[world_id]) {
+		return Object.keys(mutedIPsByWorldID[world_id]);
+	} else {
+		return [];
+	}
+}
+
+function unmuteByIP(world_id, ip) {
+	if(mutedIPsByWorldID[world_id]) {
+		delete mutedIPsByWorldID[world_id][ip];
+	}
+	if(muteDBUpdates.mute_ip[world_id]) {
+		muteDBUpdates.mute_ip[world_id][ip] = {expiration_date: 0, issuer_user_id: null};
+	}
+}
+
+function unmuteByUserID(world_id, user_id) {
+	if(mutedUsersByWorldID[world_id]) {
+		delete mutedUsersByWorldID[world_id][user_id];
+	}
+	if(muteDBUpdates.mute_user_id[world_id]) {
+		muteDBUpdates.mute_user_id[world_id][user_id] = {expiration_date: 0, issuer_user_id: null};
+	}
+}
+
+function getMuteByIP(world_id, ip) {
+	let expiration_date = mutedIPsByWorldID[world_id]?.[ip];
+	if(!expiration_date) {
+		return null;
+	}
+	return expiration_date;
+}
+
+function getMuteByUserID(world_id, user_id) {
+	let expiration_date = mutedUsersByWorldID[world_id]?.[user_id];
+	if(!expiration_date) {
+		return null;
+	}
+	return expiration_date;
+}
+
+function checkMuteByIP(world_id, ip) {
+	let expiration_date = mutedIPsByWorldID[world_id]?.[ip];
+	if(!expiration_date) {
+		return false;
+	}
+	if(expiration_date == -1) {
+		return true;
+	}
+	if(Date.now() >= expiration_date) {
+		// past expiration date
+		delete mutedIPsByWorldID[world_id]?.[ip];
+		return false;
+	} else {
+		return true;
+	}
+}
+
+function checkMuteByUserID(world_id, user_id) {
+	let expiration_date = mutedUsersByWorldID[world_id]?.[user_id];
+	if(!expiration_date) {
+		return false;
+	}
+	if(expiration_date == -1) {
+		return true;
+	}
+	if(Date.now() >= expiration_date) {
+		// past expiration date
+		delete mutedUsersByWorldID[world_id]?.[user_id];
+		return false;
+	} else {
+		return true;
+	}
 }
 
 async function init_chat_history() {
@@ -47,8 +284,6 @@ async function init_chat_history() {
 	}
 	chatDatabaseClock();
 }
-
-var chat_cache = {};
 
 function queue_chat_cache(world_id) {
 	return new Promise(function(res) {
@@ -200,12 +435,6 @@ async function remove_from_chatlog(world_id, chat_id, chat_date) {
 	return Math.max(cache_rem, add_rem);
 }
 
-var chatIsCleared = {};
-var chatMsgDeletions = {};
-
-var global_chat_additions = [];
-var world_chat_additions = [];
-
 function clearChatlog(world_id) {
 	// clear from cache if it exists
 	if(chat_cache[world_id] && chat_cache[world_id].loaded) {
@@ -290,7 +519,6 @@ async function doUpdateChatLogData() {
 	await db_chat.run("COMMIT");
 }
 
-var chatDatabaseBusy = false;
 async function chatDatabaseClock(serverExit) {
 	if(chatDatabaseBusy) return;
 	chatDatabaseBusy = true;
@@ -302,6 +530,7 @@ async function chatDatabaseClock(serverExit) {
 		if(gc_len > 0 || wc_len > 0 || cc_len > 0 || cd_len > 0) {
 			await doUpdateChatLogData();
 		}
+		await commit_chat_mutes_db();
 		broadcastMonitorEvent("Chat", "Clock cycle executed");
 	} catch(e) {
 		handle_error(e);
@@ -314,7 +543,27 @@ async function chatDatabaseClock(serverExit) {
 	}
 }
 
-module.exports.retrieveChatHistory = retrieveChatHistory;
-module.exports.add_to_chatlog = add_to_chatlog;
-module.exports.remove_from_chatlog = remove_from_chatlog;
-module.exports.clearChatlog = clearChatlog;
+module.exports = {
+	main,
+	retrieveChatHistory,
+	add_to_chatlog,
+	remove_from_chatlog,
+	clearChatlog,
+
+	canSendMessage,
+	muteByIP,
+	muteByUserID,
+	getUserMutes,
+	getIPMutes,
+	unmuteByIP,
+	unmuteByUserID,
+	checkMuteByIP,
+	checkMuteByUserID,
+	getMuteByIP,
+	getMuteByUserID,
+	clearMutesByWorldID,
+	setTellBlockByIP,
+	unsetTellBlockByIP,
+	unsetAllTellBlocksByIP,
+	checkTellBlockByIP
+};

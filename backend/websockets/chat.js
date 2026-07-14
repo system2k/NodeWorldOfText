@@ -3,6 +3,8 @@ var html_tag_esc = utils.html_tag_esc;
 var san_nbr = utils.san_nbr;
 var calculateTimeDiff = utils.calculateTimeDiff;
 var create_date = utils.create_date;
+var getTimeFlagValue = utils.getTimeFlagValue;
+var sanitize_username = utils.sanitize_username;
 
 function sanitizeColor(col) {
 	var masks = ["#XXXXXX", "#XXX"];
@@ -52,10 +54,6 @@ function sanitizeCustomMeta(meta) {
 	return output;
 }
 
-var chat_ip_limits = {};
-var tell_blocks = {};
-var blocked_ips_by_world_id = {}; // id 0 = global
-
 module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var channel = ctx.channel;
 	var user = ctx.user;
@@ -75,6 +73,8 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var loadPlugin = server.loadPlugin;
 	var getServerSetting = server.getServerSetting;
 	var getServerUptime = server.getServerUptime;
+	var getUserIdFromUsername = server.getUserIdFromUsername;
+	var getUsernameFromUserId = server.getUsernameFromUserId;
 
 	var add_to_chatlog = chat_mgr.add_to_chatlog;
 	var remove_from_chatlog = chat_mgr.remove_from_chatlog;
@@ -129,6 +129,11 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	if(!(data.location == "global" || data.location == "page")) data.location = "page";
 	location = data.location;
 
+	var effectiveWorldID = world.id;
+	if(location == "global") {
+		effectiveWorldID = 0;
+	}
+
 	if(location == "page" && !can_chat) {
 		serverChatResponse("You do not have permission to chat here", location);
 		return;
@@ -154,38 +159,23 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		if(user.authenticated && !has_chat_username) {
 			serverChatResponse("Your account needs a username to send messages in global chat.", location);
 			return;
-			// I'm not sure if this case can actually happen, but just in case - Alan
 		}
-	} //elseif?
-
-	if(location == "page") {
+	} else if(location == "page") {
 		if(world.opts.noAnonChat && !user.authenticated) {
 			serverChatResponse("Sign in to send messages in this world.", location);
 			return;
 		}
+	} else {
+		serverChatResponse("Unrecognized location", location);
+		return;
 	}
 
-	var isMuted = false;
 	var isTestMessage = false;
-	var muteInfo = null;
-	var worldChatMutes = blocked_ips_by_world_id[world.id];
-	if(location == "global") {
-		worldChatMutes = blocked_ips_by_world_id[0];
-	}
-	if(worldChatMutes) {
-		muteInfo = worldChatMutes[ipHeaderAddr];
-		if(muteInfo) {
-			isMuted = true;
-		}
-	}
 
-	if(isMuted) {
-		var expTime = muteInfo[0];
-		if(!expTime || typeof expTime != "number" || Date.now() >= expTime) {
-			isMuted = false;
-			delete worldChatMutes[ipHeaderAddr];
-		}
-	}
+	var isMuted = (
+		chat_mgr.checkMuteByIP(effectiveWorldID, ipHeaderAddr) ||
+		(user.authenticated && chat_mgr.checkMuteByUserID(effectiveWorldID, user.id))
+	);
 
 	var nick = "";
 	if(data.nickname) {
@@ -246,6 +236,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "unblockuser", ["username"], "unblock someone by username", "JohnDoe"],
 		[0, "unblockall", null, "unblock all users", null],
 		[0, "mute", ["id", "seconds", "[h/d/w/m/y]"], "mute a user completely", "1220 9999"], // check for permission
+		[0, "muteuser", ["username", "seconds", "[h/d/w/m/y]"], "mute a user by their username completely", "JohnDoe 9999"], // check for permission
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
 		[0, "delete", ["id", "timestamp"], "delete a chat message", "1220 1693147307895"], // check for permission
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
@@ -282,7 +273,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			var desc = row[3];
 			var example = row[4];
 
-			if(command == "mute" || command == "clearmutes" || command == "delete") {
+			if(command == "mute" || command == "muteuser" || command == "clearmutes" || command == "delete") {
 				if(!user.staff && !is_owner) {
 					continue;
 				}
@@ -347,7 +338,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			return;
 		},
 		help: function(modifier) {
-			return serverChatResponse(generate_command_list(), location);
+			serverChatResponse(generate_command_list(), location);
 		},
 		block: function(id) {
 			var blocks = ws.sdata.chat_blocks;
@@ -377,29 +368,19 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			
 			var blocked_ip = getClientIPByChatID(id, location == "global");
 			if(blocked_ip) {
-				var blist = tell_blocks[ipHeaderAddr];
-				if(!blist) {
-					blist = {};
-					tell_blocks[ipHeaderAddr] = blist;
-				}
-				if(!blist[blocked_ip]) {
-					blist[blocked_ip] = Date.now();
-				}
+				chat_mgr.setTellBlockByIP(ipHeaderAddr, blocked_ip);
 			}
 
 			serverChatResponse("Blocked chats from ID: " + id, location);
 		},
 		blockuser: function(username) {
 			var blocks = ws.sdata.chat_blocks;
-			if(typeof username != "string" || !username) {
+
+			var username_value = sanitize_username(username);
+			if (username_value == null) {
 				serverChatResponse("Invalid username", location);
 				return;
 			}
-
-			if (!/^[^\s\x00-\x20]+$/.test(username)) return;
-
-			// The case-insensitive value to be stored in chat_blocks.
-			var username_value = username.toUpperCase();
 
 			// Ensure maximum block count not exceeded, and check if it already exists.
 			if ((blocks.id.length + blocks.user.length) >= chatBlockLimit)
@@ -435,23 +416,19 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			
 			var unblocked_ip = getClientIPByChatID(id, location == "global");
 			if(unblocked_ip) {
-				var blist = tell_blocks[ipHeaderAddr];
-				if(blist) {
-					delete blist[unblocked_ip];
-				}
+				chat_mgr.unsetTellBlockByIP(ipHeaderAddr, blocked_ip);
 			}
 
 			serverChatResponse("Unblocked chats from ID: " + id, location);
 		},
 		unblockuser: function(username) {
 			var blocks = ws.sdata.chat_blocks;
-			if(typeof username != "string" || !username) {
+
+			var username_value = sanitize_username(username);
+			if (username_value == null) {
 				serverChatResponse("Invalid username", location);
 				return;
 			}
-
-			// The case-insensitive value to be stored in chat_blocks.
-			var username_value = username.toUpperCase();
 
 			var idx = blocks.user.indexOf(username_value);
 			if(idx == -1) return;
@@ -467,12 +444,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			ws.sdata.chat_blocks.no_anon = false;
 			ws.sdata.chat_blocks.no_reg = false;
 			
-			var tblocks = tell_blocks[ipHeaderAddr];
-			if(tblocks) {
-				for(var b in tblocks) {
-					delete tblocks[b];
-				}
-			}
+			chat_mgr.unsetAllTellBlocksByIP(ipHeaderAddr);
 			serverChatResponse("Cleared all blocks", location);
 		},
 		uptime: function() {
@@ -576,8 +548,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			}
 				
 			// user has blocked the TELLer by IP
-			var tellblock = tell_blocks[client.sdata.ipAddress];
-			if(tellblock && tellblock[ipHeaderAddr]) {
+			if(chat_mgr.checkTellBlockByIP(client.sdata.ipAddress, ipHeaderAddr)) {
 				return;
 			}
 
@@ -589,9 +560,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		},
 		channel: async function() {
 			if(!user.staff) return;
-			var worldId = world.id;
-			if(location == "global") worldId = 0;
-			var channels = await db_chat.all("SELECT * FROM channels WHERE world_id=?", worldId);
+			var channels = await db_chat.all("SELECT * FROM channels WHERE world_id=?", effectiveWorldID);
 			var count = channels.length;
 			var infoLog = "Found " + count + " channel(s) for this world:\n";
 			for(var i = 0; i < count; i++) {
@@ -604,75 +573,128 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				infoLog += "Created: " + create_date(date) + "\n";
 				infoLog += "----------------\n";
 			}
-			var def = await db_chat.get("SELECT * FROM default_channels WHERE world_id=?", worldId);
+			var def = await db_chat.get("SELECT * FROM default_channels WHERE world_id=?", effectiveWorldID);
 			if(def && def.channel_id) {
 				def = def.channel_id;
 			} else {
 				def = "<none>";
 			}
 			infoLog += "Default channel id: " + def;
-			return serverChatResponse(infoLog, location);
+			serverChatResponse(infoLog, location);
 		},
 		mute: function(id, time, flag) {
 			if(!is_owner && !user.staff) return;
+			if(location == "global" && !user.staff) {
+				return serverChatResponse("You do not have permission to mute on global", location);
+			}
+
 			id = san_nbr(id);
 			time = san_nbr(time); // in seconds
 
-			var timeSuffixMap = {
-				"h": 3600,
-				"d": 86400,
-				"w": 86400*7,
-				"m": 86400*30,
-				"y": 31556925.216 //average year length
-			};
-
-			if(flag in timeSuffixMap) {
-				time *= timeSuffixMap[flag];
-			} else { 
-				if(flag) { //invalid flag
-					return serverChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.")
+			if(time != -1) {
+				var timeMultiplier = getTimeFlagValue(flag);
+				if (timeMultiplier == null) {
+					if (flag) return serverChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.");
+				} else {
+					time *= timeMultiplier;
 				}
-			}
-
-			if(location == "global" && !user.staff) {
-				return serverChatResponse("You do not have permission to mute on global", location);
 			}
 
 			var muted_ip = getClientIPByChatID(id, location == "global");
 
 			if(muted_ip) {
-				var muteDate = Date.now() + (time * 1000);
-				var mute_wid = null;
-				if(location == "global") {
-					mute_wid = 0;
-				} else if(location == "page") {
-					mute_wid = world.id;
+				var muteDate = time != -1 ? Date.now() + (time * 1000) : -1;
+				chat_mgr.muteByIP(effectiveWorldID, ipHeaderAddr, muteDate, user.id);
+				if(muteDate == -1) {
+					serverChatResponse("Muted client indefinitely", location);
+				} else {
+					serverChatResponse("Muted client by username until " + create_date(muteDate), location);
 				}
-				if(mute_wid == null) {
-					return serverChatResponse("Invalid location", location);
-				}
-				if(!blocked_ips_by_world_id[mute_wid]) blocked_ips_by_world_id[mute_wid] = {};
-				blocked_ips_by_world_id[mute_wid][muted_ip] = [muteDate];
-				return serverChatResponse("Muted client until " + create_date(muteDate), location);
 			} else {
-				return serverChatResponse("Client not found", location);
+				serverChatResponse("Client not found", location);
+			}
+		},
+		muteuser: async function(username, time, flag) {
+			if(!is_owner && !user.staff) return;
+			if(location == "global" && !user.staff) {
+				return serverChatResponse("You do not have permission to mute on global", location);
+			}
+
+			var username_value = sanitize_username(username);
+			if (username_value == null) {
+				serverChatResponse("Invalid username", location);
+				return;
+			}
+
+			var user_id = await getUserIdFromUsername(username_value);
+			if(!user_id) {
+				serverChatResponse("Could not resolve username to account", location);
+				return;
+			}
+
+			time = san_nbr(time); // in seconds
+			if(time != -1) {
+				var timeMultiplier = getTimeFlagValue(flag);
+				if (timeMultiplier == null) {
+					if (flag) return serverChatResponse("Invalid flag used for muting, must be h, d, w, m, or y.");
+				} else {
+					time *= timeMultiplier;
+				}
+			}
+
+			var muteDate = time != -1 ? Date.now() + (time * 1000) : -1;
+			chat_mgr.muteByUserID(effectiveWorldID, user_id, muteDate, user.id);
+			if(muteDate == -1) {
+				serverChatResponse("Muted client indefinitely", location);
+			} else {
+				serverChatResponse("Muted client by username until " + create_date(muteDate), location);
 			}
 		},
 		clearmutes: function() {
 			if(!is_owner && !user.staff) return;
-			var cnt = 0;
+			var ipCnt = 0;
+			var userCnt = 0;
+
 			if(location == "global" && user.staff) {
-				if(blocked_ips_by_world_id["0"]) {
-					cnt = Object.keys(blocked_ips_by_world_id["0"]).length;
-					delete blocked_ips_by_world_id["0"];
-				}
+				let cleared = chat_mgr.clearMutesByWorldID(0);
+				ipCnt = cleared.ip;
+				userCnt = cleared.user;
 			} else {
-				if(blocked_ips_by_world_id[world.id]) {
-					cnt = Object.keys(blocked_ips_by_world_id[world.id]).length;
-					delete blocked_ips_by_world_id[world.id];
-				}
+				let cleared = chat_mgr.clearMutesByWorldID(world.id);
+				ipCnt = cleared.ip;
+				userCnt = cleared.user;
 			}
-			return serverChatResponse("Unmuted " + cnt + " user(s)", location);
+			serverChatResponse("Unmuted " + ipCnt + " IP(s), " + userCnt + " user(s)", location);
+		},
+		listmutes: async function() {
+			if(!is_owner && !user.staff) return;
+			if(location == "global" && !user.staff) {
+				return;
+			}
+			let mutedUsers = chat_mgr.getUserMutes(effectiveWorldID);
+			let userList = "";
+			for(let i = 0; i < mutedUsers.length; i++) {
+				let id = mutedUsers[i];
+				let user = await getUsernameFromUserId(id);
+				if(!user) user = "<Unknown>";
+				if(i != 0) userList += "\n";
+				userList += `${id} => ${user}`;
+			}
+			if(!mutedUsers.length) {
+				userList = "<None>";
+			}
+
+			let mutedIPs = chat_mgr.getIPMutes(effectiveWorldID);
+			let ipList = "";
+			if(user.superuser) {
+				ipList = mutedIPs.join("\n");
+			} else {
+				ipList = `${mutedIPs.length} total`;
+			}
+			if(!mutedIPs.length) {
+				ipList = "<None>";
+			}
+			serverChatResponse(`Muted users:\n${userList}\nMuted IPs:\n${ipList}`, location);
 		},
 		whoami: function() {
 			var idstr = "Who Am I:\n";
@@ -689,7 +711,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			idstr += "Login username: " + user_login + "\n";
 			idstr += "Display username: " + user_disp + "\n";
 			idstr += "Chat ID: " + clientId;
-			return serverChatResponse(idstr, location);
+			serverChatResponse(idstr, location);
 		},
 		delete: async function(id, timestamp) {
 			if(!is_owner && !user.staff) return;
@@ -711,7 +733,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				id: id,
 				time: timestamp
 			});
-			return serverChatResponse("Deleted " + res + " message(s)", location);
+			serverChatResponse("Deleted " + res + " message(s)", location);
 		},
 		passive: function(mode) {
 			if(mode == "on") {
@@ -735,29 +757,22 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	// chat limiter
 	var msNow = Date.now();
 	var second = Math.floor(msNow / 1000);
-	var chatsEverySecond = 2;
-	if(location == "page") {
-		if(is_member) chatsEverySecond = 8;
-		if(is_owner) chatsEverySecond = 512;
-	}
-	if(isCommand && commandType != "tell") chatsEverySecond = 512;
 
-	if(!chat_ip_limits[ipHeaderAddr]) {
-		chat_ip_limits[ipHeaderAddr] = {};
+	var messageRate = 2;
+	if(location == "page") {
+		if(is_member) messageRate = 8;
+		if(is_owner) messageRate = 32;
 	}
-	var cil = chat_ip_limits[ipHeaderAddr];
-	if(cil.lastChatSecond != second) {
-		cil.lastChatSecond = second;
-		cil.chatsSentInSecond = 0;
-	} else {
-		if(cil.chatsSentInSecond >= chatsEverySecond - 1) {
-			if(!user.staff) {
-				serverChatResponse("You are chatting too fast.", location);
-				return;
-			}
-		} else {
-			cil.chatsSentInSecond++;
-		}
+	if(isCommand && commandType != "tell") messageRate = 32;
+	if(user.staff) {
+		messageRate = 32;
+	}
+
+	var canSend = chat_mgr.canSendMessage(ipHeaderAddr, messageRate);
+
+	if(!canSend) {
+		serverChatResponse("You are chatting too fast.", location);
+		return;
 	}
 
 	if(isCommand) {
@@ -799,8 +814,14 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			case "mute":
 				com.mute(commandArgs[1], commandArgs[2], commandArgs[3]);
 				return;
+			case "muteuser":
+				com.muteuser(commandArgs[1], commandArgs[2], commandArgs[3]);
+				return;
 			case "clearmutes":
 				com.clearmutes();
+				return;
+			case "listmutes":
+				com.listmutes();
 				return;
 			case "whoami":
 				com.whoami();
@@ -886,8 +907,16 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	}
 
 	if(isMuted) {
-		var expTime = muteInfo[0];
-		serverChatResponse("You are temporarily muted (" + calculateTimeDiff(expTime - Date.now()) + ")", location);
+		let expIP = chat_mgr.getMuteByIP(effectiveWorldID, ipHeaderAddr) || 0;
+		let expUser = user.authenticated ? chat_mgr.getMuteByUserID(effectiveWorldID, user.id) : 0;
+		let maxMute = expIP == -1 || expUser == -1 ? -1 : Math.max(expIP, expUser);
+		if(maxMute) {
+			if(maxMute == -1) {
+				serverChatResponse("You are muted", location);
+			} else {
+				serverChatResponse("You are temporarily muted (" + calculateTimeDiff(maxMute - Date.now()) + ")", location);
+			}
+		}
 		return;
 	}
 	var websocketChatData = Object.assign({

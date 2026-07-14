@@ -901,6 +901,7 @@ async function initializeServer() {
 	await initialize_ranks_db();
 	await initialize_edits_db();
 	await initialize_image_db();
+	await initialize_mutes_db();
 	await initialize_site_whitelist_db();
 
 	global_data.db = db;
@@ -965,6 +966,24 @@ async function initialize_edits_db() {
 async function initialize_image_db() {
 	if(!await db_img.get("SELECT name FROM sqlite_master WHERE type='table' AND name='images'")) {
 		await db_img.run("CREATE TABLE 'images' (id INTEGER NOT NULL PRIMARY KEY, name TEXT, date_created INTEGER, mime TEXT, data BLOB)");
+	}
+}
+
+async function initialize_mutes_db() {
+	if(!await db_chat.get("SELECT name FROM sqlite_master WHERE type='table' AND name='mutes'")) {
+		await db_chat.run(`
+			CREATE TABLE 'mutes' (
+				id INTEGER NOT NULL PRIMARY KEY,
+				ip TEXT,
+				user_id TEXT,
+				world_id INTEGER,
+				channel_id INTEGER,
+				is_poisoned INTEGER,
+				expiration_date INTEGER,
+				date_issued INTEGER,
+				issuer_user_id TEXT
+			)
+		`);
 	}
 }
 
@@ -1337,6 +1356,45 @@ function parseToken(token) {
 		uid,
 		session_id
 	};
+}
+
+async function getUserIdFromUsername(username) {
+	if(accountSystem == "uvias") {
+		var db_user = await uvias.get("SELECT to_hex(uid) AS uid FROM accounts.users WHERE lower(username)=lower($1::text)", username);
+		if(!db_user) return null;
+		return "x" + db_user.uid;
+	} else if(accountSystem == "local") {
+		var db_user = await db.get("SELECT id FROM auth_user WHERE username=? COLLATE NOCASE", username);
+		if(!db_user) return null;
+		return db_user.id;
+	}
+}
+
+async function getUsernameFromUserId(uid) {
+	if(!uid) return null;
+	if(accountSystem == "uvias") {
+		uid = uid.toLowerCase();
+		if(uid.charAt(0) == "x") uid = uid.substr(1);
+
+		let id_alpha = "0123456789abcdef";
+		if(uid.length < 1 || user_id.uid > 16) return null;
+		for(let i = 0; i < uid.length; i++) {
+			if(id_alpha.indexOf(uid.charAt(i)) == -1) {
+				return null;
+			}
+		}
+
+		let d_inf = await uvias.get("SELECT username FROM accounts.users WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", uid);
+
+		return d_inf.username;
+	} else if(accountSystem == "local") {
+		let user_info = await db.get("SELECT * FROM auth_user WHERE id=?", uid);
+		if(!user_info) {
+			return null;
+		}
+		return user_info.username;
+	}
+	return null;
 }
 
 // TODO: cache user data (only care about uvias)
@@ -2535,6 +2593,8 @@ var global_data = {
 	staticShortcuts,
 	setupStaticShortcuts,
 	getServerUptime,
+	getUserIdFromUsername,
+	getUsernameFromUserId,
 	siteWhitelistCache,
 	siteWhitelistStatus,
 };

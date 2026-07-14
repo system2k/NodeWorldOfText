@@ -820,6 +820,26 @@ function checkURLParam(mask, url) {
 	return values;
 }
 
+function getTimeFlagValue(flag) { // used in chat mutes
+	var timeSuffixMap = {
+		"h": 3600,
+		"d": 86400,
+		"w": 86400*7,
+		"m": 86400*30,
+		"y": 31556925.216 //average year length
+	};
+	
+	return timeSuffixMap[flag];
+}
+
+function sanitize_username(username) { // used in chat blocking and muting
+	var validUsernameRegex = /^[^\s\x00-\x20]+$/;
+	if(typeof username != "string" || !username || !validUsernameRegex.test(username)) return null;
+
+	// case-insensitive
+	return username.toUpperCase();
+}
+
 module.exports = {
 	trimHTML,
 	create_date,
@@ -852,4 +872,6 @@ module.exports = {
 	checkDuplicateCookie,
 	toHex64,
 	toInt64,
+	getTimeFlagValue,
+	sanitize_username
 };
