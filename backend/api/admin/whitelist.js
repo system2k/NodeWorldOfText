@@ -6,52 +6,6 @@ var san_nbr = utils.san_nbr;
 
 // var reconIP = ipaddress.reconIP;
 
-async function resolveUsernameToUid(uvias, db, accountSystem, username) {
-	if(!username) return null;
-	if(accountSystem == "uvias") {
-		var db_user = await uvias.get("SELECT to_hex(uid) AS uid FROM accounts.users WHERE lower(username)=lower($1::text)", username);
-		if(!db_user) return null;
-		return "x" + db_user.uid;
-	} else if(accountSystem == "local") {
-		var db = server.db;
-		var db_user = await db.get("SELECT id FROM auth_user WHERE username=? COLLATE NOCASE", username);
-		if(!db_user) return null;
-		return db_user.id;
-	}
-	return null;
-}
-
-async function resolveUidToUsername(uvias, db, accountSystem, uid) {
-	if(!uid) return null;
-	var user_info;
-	if(accountSystem == "uvias") {
-		uid = uid.toLowerCase();
-		if(uid.charAt(0) == "x") uid = uid.substr(1);
-
-		var id_valid = true;
-		var id_alpha = "0123456789abcdef";
-		if(uid.length < 1 || user_id.uid > 16) id_valid = false;
-		for(var i = 0; i < uid.length; i++) {
-			if(id_alpha.indexOf(uid.charAt(i)) == -1) {
-				id_valid = false;
-			}
-		}
-		if(!id_valid) return null;
-
-		var d_inf = await uvias.get("SELECT username FROM accounts.users WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", uid);
-		console.log({d_inf})
-
-		return d_inf.username;
-	} else if(accountSystem == "local") {
-		user_info = await db.get("SELECT * FROM auth_user WHERE id=?", uid);
-		if(!user_info) {
-			return null;
-		}
-		return user_info.username;
-	}
-	return null;
-}
-
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var user = ctx.user;
 	var query_data = ctx.query_data;
