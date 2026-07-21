@@ -114,6 +114,8 @@ class RequestHandler {
 		var queryData;
 		if(binary_post_data) {
 			queryData = Buffer.from([]);
+		} else if(json_post_data) {
+			queryData = "";
 		} else {
 			queryData = "";
 		}
@@ -151,6 +153,8 @@ class RequestHandler {
 				try {
 					if(binary_post_data) {
 						resolve(queryData);
+					} else if(json_post_data) {
+						resolve(JSON.parse(queryData));
 					} else {
 						resolve(querystring.parse(queryData, null, null, { maxKeys: 256 }));
 					}
@@ -291,7 +295,6 @@ class RequestHandler {
 			if(this.req.headers["content-type"] == "application/json") {
 				isJSON = true;
 			}
-			// if(this.req.headers["Content-Type"] == "application/json")
 			let dat = await this.loadPostData(binary_post_data, isJSON, this.user.superuser);
 			if(dat) {
 				this.post_data = dat;

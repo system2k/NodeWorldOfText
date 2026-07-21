@@ -123,30 +123,135 @@
 
 		// console.log({whitelistData, statusData})
 
-		// add_by_uid / wl_add_user_id
-		// add_by_ip / wl_add_ip
-		// add_by_username / wl_add_username
-		// add_by_world_name / wl_add_world_name
-		
-		// wl_sub_user / wl_sub_ip / wl_sub_world
 
 
+		var tempIdMax = 1;
 		// var whitelistStatus = [];
 		var updatedWhitelistFeatures = {};
+		var updatedWhitelistOptions = { // category => id => type:status
+			user: {},
+			ip: {},
+			world: {}
+		};
+		var addedWhitelistOptions = { // category => temp-id => {options: {type:status}, user_id: int}
+			user: {},
+			ip: {},
+			world: {}
+		};
+		var removedWhitelistOptions = { // category => id => type
+			user: {},
+			ip: {},
+			world: {}
+		};
 
 		var submittingStatus = {
-			features: false
+			features: false,
+			whitelistUser: false,
+			whitelistIp: false,
+			whitelistWorld: false
 		};
+
+		function checkInputCallback(evt) {
+			let target = evt.target;
+			if(!target || target.type != "checkbox") {
+				console.error("Element is not checkbox");
+				return;
+			}
+			let parCb = target.closest("[data-wl-head]");
+			if(!parCb) {
+				console.error("Cannot find parent container");
+				return;
+			}
+			let headName = parCb.dataset.wlHead;
+			let parRow = target.closest("[data-wl-entry-id]");
+			if(!parRow) {
+				console.error("Cannot find parent row");
+				return;
+			}
+			let parTable = target.closest("[data-wl-type]");
+			if(!parTable) {
+				console.error("Cannot find parent table");
+				return;
+			}
+			let ruleId = String(parRow.dataset.wlEntryId);
+			let checked = target.checked;
+			let type = parTable.dataset.wlType;
+
+			let isNew = ruleId.startsWith("-");
+
+			if(isNew) {
+				let opt = addedWhitelistOptions[type][ruleId];
+				opt.options[headName] = checked;
+			} else {
+				(updatedWhitelistOptions[type][ruleId] ??= {})[headName] = checked;
+			}
+		}
+
+		function getEffectiveHeaders(type) {
+			return [
+				"id",
+				...(type == "user" ? ["username", "user_id"]: []),
+				...(type == "ip" ? ["ip"]: []),
+				...(type == "world" ? ["world_name"]: []),
+				...whitelistHeaders,
+				"Delete"
+			];
+		}
+
+		function addDataToWhitelistTable(table, type, entry, prepend) {
+			let effectiveHeaders = getEffectiveHeaders(type);
+
+			let id = entry.id;
+			let id_type = entry.id_type;
+			let user_id = entry.user_id;
+			let username = entry.username;
+			let ip = entry.ip;
+			let world_name = entry.world_name;
+
+			let eRow = document.createElement("tr");
+			eRow.dataset.wlEntryId = id;
+			// console.log({effectiveHeaders})
+			for(let h = 0; h < effectiveHeaders.length; h++) {
+				let head = effectiveHeaders[h];
+				let eCell = document.createElement("td");
+				eCell.dataset.wlHead = head;
+				if(whitelistHeaders.includes(head)) {
+					let eCheck = document.createElement("input");
+					eCheck.type = "checkbox";
+					eCheck.checked = Boolean(Number(entry[head]));
+					eCheck.oninput = checkInputCallback;
+					eCell.appendChild(eCheck);
+				} else if(head == "Delete") {
+					let btn = document.createElement("button");
+					btn.innerText = "X";
+					btn.onclick = () => {
+						eRow.remove();
+						delete addedWhitelistOptions[type][id];
+						if(!String(id).startsWith("-")) {
+							removedWhitelistOptions[type][id] = true;
+						}
+					};
+					eCell.appendChild(btn);
+				} else {
+					eCell.innerText = entry[head];
+				}
+				eRow.appendChild(eCell);
+			}
+
+			if(prepend) {
+				table.prepend(eRow);
+			} else {
+				table.appendChild(eRow);
+			}
+		}
 
 		function populateWhitelistTable(panel, type, data) {
 			var table = panel.querySelector(".whitelist_table>tbody");
 			var whitelist_header = panel.querySelector(".whitelist_header");
 
-			let effectiveHeaders = [
-				"id",
-				...(type == "user" ? ["username"]: []),
-				...whitelistHeaders
-			];
+			table.dataset.wlType = type;
+
+			let effectiveHeaders = getEffectiveHeaders(type);
 
 			for(let i = 0; i < effectiveHeaders.length; i++) {
 				let text = effectiveHeaders[i];
@@ -155,35 +260,8 @@
 				whitelist_header.appendChild(head);
 			}
 
-			// console.log(data)
-
-			// console.log(panel, type, data)
 			for(let i = 0; i < data.length; i++) {
-				let entry = data[i];
-				let id = entry.id;
-				let id_type = entry.id_type;
-				let user_id = entry.user_id;
-				let username = entry.username;
-				let ip = entry.ip;
-				let world_name = entry.world_name;
-
-				let eRow = document.createElement("tr");
-				// console.log({effectiveHeaders})
-				for(let h = 0; h < effectiveHeaders.length; h++) {
-					let head = effectiveHeaders[h];
-					let eCell = document.createElement("td");
-					if(whitelistHeaders.includes(head)) {
-						let eCheck = document.createElement("input");
-						eCheck.type = "checkbox";
-						eCheck.checked = Boolean(Number(entry[head]));
-						eCell.appendChild(eCheck);
-					} else {
-						eCell.innerText = entry[head];
-					}
-					eRow.appendChild(eCell);
-				}
-
-				table.appendChild(eRow);
+				addDataToWhitelistTable(table, type, data[i]);
 			}
 		}
 
@@ -201,6 +279,22 @@
 
 		function initializeEvents() {
 			let save_status = document.getElementById("save_status");
+
+			let add_by_uid = document.getElementById("add_by_uid");
+			let wl_add_user_id = document.getElementById("wl_add_user_id");
+
+			let add_by_ip = document.getElementById("add_by_ip");
+			let wl_add_ip = document.getElementById("wl_add_ip");
+
+			let add_by_username = document.getElementById("add_by_username");
+			let wl_add_username = document.getElementById("wl_add_username");
+
+			let add_by_world_name = document.getElementById("add_by_world_name");
+			let wl_add_world_name = document.getElementById("wl_add_world_name");
+
+			let wl_sub_user = document.getElementById("wl_sub_user");
+			let wl_sub_ip = document.getElementById("wl_sub_ip");
+			let wl_sub_world = document.getElementById("wl_sub_world");
 
 			save_status.addEventListener("click", async function() {
 				submittingStatus.features = true;
@@ -221,6 +315,66 @@
 				}).finally(function() {
 					save_status.disabled = false;
 				});
+			});
+
+			// add_by_uid / wl_add_user_id
+			// add_by_ip / wl_add_ip
+			// add_by_username / wl_add_username
+			// add_by_world_name / wl_add_world_name
+
+			// wl_sub_user / wl_sub_ip / wl_sub_world
+
+			wl_sub_user.addEventListener("click", function() {
+				let updates = updatedWhitelistOptions.user;
+				let additions = addedWhitelistOptions.user;
+				let removals = removedWhitelistOptions.user;
+
+				submittingStatus.whitelistUser = true;
+				wl_sub_user.disabled = true;
+
+				fetch("/api/admin/whitelist", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						type: "options",
+						category: "user",
+						changes: updates,
+						additions: additions,
+						removals: removals
+					})
+				}).then(function() {
+					updatedWhitelistOptions.user = {};
+				}).catch(function() {
+					alert("Failed to update options for 'user'");
+				}).finally(function() {
+					wl_sub_user.disabled = false;
+				});
+			});
+
+
+			add_by_username.addEventListener("click", async function() {
+				let user_id = await getIdFromUsername(wl_add_username.value);
+				if(!user_id) {
+					alert("Could not resolve username");
+					return;
+				}
+				let newId = "-" + tempIdMax++;
+				let optMap = Object.fromEntries(whitelistHeaders.map(h => [h, true]));
+
+				addDataToWhitelistTable(document.getElementById("wl_user").querySelector(".whitelist_table>tbody"), "user", {
+					id: newId,
+					user_id: String(user_id),
+					username: wl_add_username.value,
+					id_type: "user",
+					...optMap
+				}, true);
+
+				addedWhitelistOptions["user"][newId] ??= {
+					options: optMap,
+					user_id: user_id
+				};
 			});
 		}
 
@@ -250,7 +404,7 @@
 		}
 
 		async function preload() {
-			let data = await fetchWhitelistData(lastWhitelistId, 50, true);
+			let data = await fetchWhitelistData(lastWhitelistId, 250, true);
 
 			let wlFeatures = document.getElementById("whitelist_features");
 			let rules = data.rules;

@@ -6848,7 +6848,7 @@ var network = {
 		});
 	},
 	clear_tile: function(position) {
-		// position: {tileX, tileY, [charX, charY, [width, height]]]}
+		// position: {tileX, tileY, [charX, charY, [charWidth, charHeight]]]}
 		var data = {
 			tileX: position.tileX,
 			tileY: position.tileY
