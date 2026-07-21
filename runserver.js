@@ -1270,7 +1270,7 @@ async function getUsernameFromUserId(uid) {
 		if(uid.charAt(0) == "x") uid = uid.substr(1);
 
 		let id_alpha = "0123456789abcdef";
-		if(uid.length < 1 || user_id.uid > 16) return null;
+		if(uid.length < 1 || uid.uid > 16) return null;
 		for(let i = 0; i < uid.length; i++) {
 			if(id_alpha.indexOf(uid.charAt(i)) == -1) {
 				return null;
