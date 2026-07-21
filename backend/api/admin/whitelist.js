@@ -34,7 +34,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	limit = Math.min(Math.max(limit, 0), 250);
 
 	var whitelistRules = await db_misc.all(`
-		SELECT * FROM site_whitelist WHERE id >= $id AND ($id_type IS NULL OR id_type=$id_type) LIMIT $limit
+		SELECT * FROM site_whitelist WHERE id > $id AND ($id_type IS NULL OR id_type=$id_type) LIMIT $limit
 	`, {
 		$id: after,
 		$limit: limit,
@@ -153,6 +153,10 @@ module.exports.POST = async function(req, write, server, ctx) {
 					optionAdditionIdMapping[tid] = resp.lastID;
 				}
 			}
+		}
+
+		for(let id in removals) {
+			await db_misc.run("DELETE FROM site_whitelist WHERE id=?", id);
 		}
 
 		write(JSON.stringify({

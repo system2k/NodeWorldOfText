@@ -13,34 +13,29 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var db = server.db;
 	var uvias = server.uvias;
 	var accountSystem = server.accountSystem;
+	var getUserIdFromUsername = server.getUserIdFromUsername;
+	var getUsernameFromUserId = server.getUsernameFromUserId;
 
 	if(!user.superuser) {
 		return write(null, 403);
 	}
 
 	let username = query_data.username;
-	let userObject = null;
+	let uid = query_data.uid;
 
-	if(accountSystem == "uvias") {
-		var db_user = await uvias.get("SELECT to_hex(uid) AS uid FROM accounts.users WHERE lower(username)=lower($1::text)", username);
-		if(!db_user) return write(null, 404);
-		userObject = {
-			id: "x" + db_user.uid
-		};
-	} else if(accountSystem == "local") {
-		var db = server.db;
-		var db_user = await db.get("SELECT id FROM auth_user WHERE username=? COLLATE NOCASE", username);
-		if(!db_user) return write(null, 404);
-		userObject = {
-			id: db_user.id
-		};
+	if(username) {
+		let r_uid = await getUserIdFromUsername(username);
+		if(!r_uid) {
+			return write(null, 404);
+		}
+		return write(String(r_uid));
+	} else if(uid) {
+		let r_username = await getUsernameFromUserId(uid);
+		if(!r_username) {
+			return write(null, 404);
+		}
+		return write(String(r_username));
 	}
 
-	if(!userObject) {
-		return write(null, 400);
-	}
-
-	write(JSON.stringify(userObject), null, {
-		mime: "application/json"
-	});
+	write(null, 400);
 }
