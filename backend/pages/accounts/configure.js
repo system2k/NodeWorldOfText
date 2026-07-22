@@ -258,6 +258,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		color_cell: world.feature.colorCell,
 		quick_erase: world.feature.quickErase,
 		show_cursor: world.feature.showCursor,
+		redirect_value: world.feature.redirect,
 
 		color,
 		cursor_color,
@@ -783,6 +784,15 @@ module.exports.POST = async function(req, write, server, ctx) {
 			modifyWorldProp(world, "opts/desc", mdesc);
 		} else {
 			modifyWorldProp(world, "opts/desc", "");
+		}
+
+		if(post_data.redirect_value) {
+			var redir = post_data.redirect_value;
+			if(typeof redir != "string") redir = "";
+			redir = redir.trim().replace(/\r|\n/g, "");
+			modifyWorldProp(world, "feature/redirect", redir);
+		} else {
+			modifyWorldProp(world, "feature/redirect", "");
 		}
 
 		if(post_data.priv_note) {

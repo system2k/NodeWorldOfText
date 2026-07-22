@@ -93,7 +93,8 @@ var world_default_props = {
 	color_palette_enabled: false,
 	color_palette: null,
 	bg_color_palette_enabled: false,
-	bg_color_palette: null
+	bg_color_palette: null,
+	redirect: ""
 };
 
 function validateWorldname(name) {
@@ -129,6 +130,7 @@ async function insertWorld(name) {
 	var writability = 0;
 	var readability = 0;
 	var properties = JSON.stringify({});
+	var redirect = "";
 
 	var rw = await db.run(`
 		INSERT INTO world (id, name, owner_id, created_at, feature_go_to_coord, feature_membertiles_addremove, feature_paste,
@@ -198,7 +200,8 @@ function makeWorldObject() {
 			showCursor: 0,
 			colorText: 0,
 			colorCell: 0,
-			quickErase: 0
+			quickErase: 0,
+			redirect: "",
 		},
 		theme: {
 			bg: "",
@@ -327,6 +330,7 @@ function loadWorldIntoObject(world, wobj) {
 	wobj.feature.colorText = getAndProcWorldProp(wprops, "color_text");
 	wobj.feature.colorCell = getAndProcWorldProp(wprops, "color_cell");
 	wobj.feature.quickErase = getAndProcWorldProp(wprops, "quick_erase");
+	wobj.feature.redirect = getAndProcWorldProp(wprops, "redirect");
 
 	wobj.theme.bg = world.custom_bg;
 	wobj.theme.cursor = world.custom_cursor;
@@ -497,6 +501,7 @@ async function commitWorld(world) {
 		"feature/colorText",
 		"feature/colorCell",
 		"feature/quickErase",
+		"feature/redirect",
 		"theme/menu",
 		"theme/publicText",
 		"theme/memberText",
@@ -535,6 +540,7 @@ async function commitWorld(world) {
 		color_text: world.feature.colorText,
 		color_cell: world.feature.colorCell,
 		quick_erase: world.feature.quickErase,
+		redirect: world.feature.redirect,
 		custom_menu_color: world.theme.menu,
 		custom_public_text_color: world.theme.publicText,
 		custom_member_text_color: world.theme.memberText,

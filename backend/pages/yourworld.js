@@ -108,6 +108,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 			},
 			worldModel: {
 				feature_membertiles_addremove: world.feature.memberTilesAddRemove,
+				redirect: world.feature.redirect,
 				writability: world.writability,
 				feature_url_link: world.feature.urlLink,
 				feature_go_to_coord: world.feature.goToCoord,
