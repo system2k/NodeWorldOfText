@@ -1062,7 +1062,8 @@ function updateDuplicateChatGroup(chatGroup) {
 		}
 		data.msgDom.innerHTML = repeated.join("<br>");
 	} else {
-		data.msgDom.innerHTML = data.singleMessageHtml + " [x" + data.count + "]";
+		//data.msgDom.innerHTML = data.singleMessageHtml + " [x" + data.count + "]";
+		data.msgDom.innerHTML = data.singleMessageHtml + ' <div class="multiplier">[x' + data.count + ']</div>';
 	}
 }
 

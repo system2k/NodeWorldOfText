@@ -119,6 +119,11 @@ a:visited {
 .message a {
 	color: blue;
 }
+.multiplier {
+	display: inline;
+	font-size: 10pt;
+	color: blue;
+}
 #loading {
 	font-family: Verdana;
 }
