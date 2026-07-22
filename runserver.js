@@ -116,7 +116,8 @@ var sql_edits_init = "./backend/edits.sql";
 var serverSettings = {
 	announcement: "",
 	chatGlobalEnabled: "1",
-	chatGlobalNoAnon: "0"
+	chatGlobalNoAnon: "0",
+	chatAgeRestriction: "0"
 };
 var serverSettingsStatus = {};
 

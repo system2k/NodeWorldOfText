@@ -306,6 +306,10 @@
 					Global chat: prevent anonymous users:
 					<input type="checkbox" name="set_chat_global_no_anon" id="set_chat_global_no_anon"{%if global_chat_no_anon%} checked{%endif%}>
 				</div>
+				<div>
+					Required account age for chat (hours):
+					<input type="number" name="set_chat_age_restriction" id="set_chat_age_restriction" value="{{ chat_age_restriction }}" min="0" style="width: 60px;">
+				</div>
 				<input type="submit" value="Set">
 			</form>
 		</div>
