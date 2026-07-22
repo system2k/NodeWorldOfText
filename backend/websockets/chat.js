@@ -170,6 +170,16 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		return;
 	}
 
+	if(user.authenticated && user.date_joined) {
+		var accountAge = Date.now() - user.date_joined;
+		var minimumAge = 24 * 60 * 60 * 1000; // 24 hours
+		if(accountAge < minimumAge) {
+			var timeRemaining = calculateTimeDiff(minimumAge - accountAge);
+			serverChatResponse("Your account is too new. You must wait " + timeRemaining + " before chatting.", location);
+			return;
+		}
+	}
+
 	var isTestMessage = false;
 
 	var isMuted = (

@@ -1322,10 +1322,11 @@ async function getUserInfo(cookies, is_websocket, dispatch) {
 			user = JSON.parse(s_data.session_data);
 			if(cookies.csrftoken == user.csrftoken) { // verify csrftoken
 				user.authenticated = true;
-				var userauth = (await db.get("SELECT level, is_active, email FROM auth_user WHERE id=?", user.id));
+				var userauth = (await db.get("SELECT level, is_active, email, date_joined FROM auth_user WHERE id=?", user.id));
 				var level = userauth.level;
 				user.is_active = !!userauth.is_active;
 				user.email = userauth.email;
+				user.date_joined = userauth.date_joined;
 
 				user.operator = level == 3;
 				user.superuser = level == 2 || level == 3;
@@ -1357,7 +1358,7 @@ async function getUserInfo(cookies, is_websocket, dispatch) {
 			var session = await uvias.get("SELECT * FROM accounts.get_session($1::bigint, $2::bytea)", [uid, session_id]);
 			if(session) {
 				// both guests and users are included
-				var user_account = await uvias.get("SELECT to_hex(uid) as uid, username, rank_id FROM accounts.users WHERE uid=$1::bigint", uid);
+				var user_account = await uvias.get("SELECT to_hex(uid) as uid, username, rank_id, created FROM accounts.users WHERE uid=$1::bigint", uid);
 				if(user_account) {
 					success = true;
 					var session_expire = session.expires.getTime();
@@ -1375,6 +1376,7 @@ async function getUserInfo(cookies, is_websocket, dispatch) {
 					user.authenticated = true;
 					user.display_username = user_account.username;
 					user.uv_rank = user_account.rank_id;
+					user.date_joined = user_account.created.getTime();
 					if(links_local) {
 						user.is_active = links_local.email_verified;
 						user.email = links_local.email;
