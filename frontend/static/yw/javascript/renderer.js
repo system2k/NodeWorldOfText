@@ -5,10 +5,33 @@ var renderQueueMap = new Map();
 var canBypassRenderDefer = true;
 var renderSerial = 1;
 var rgbStringCache = Object.create(null);
+var wasmSpatialVersion = (document.currentScript && document.currentScript.src.match(/[?&]v=([^&]+)/) || [0, ""])[1];
+var wasmSpatial = null;
+var wasmSpatialOut = null;
+
+function loadWasmSpatial() {
+	return fetch("/static/wasm/spatial.wasm" + (wasmSpatialVersion ? "?v=" + wasmSpatialVersion : "")).then(function(resp) {
+		return resp.arrayBuffer();
+	}).then(function(bytes) {
+		return WebAssembly.instantiate(bytes);
+	}).then(function(mod) {
+		wasmSpatial = mod.instance.exports;
+		wasmSpatialOut = new Int32Array(wasmSpatial.memory.buffer, 0, 4);
+	});
+}
+
+function getWasmTileRange(margin, buffer) {
+	wasmSpatial.getTileRange(positionX, positionY, owotWidth, owotHeight, tileW, tileH, margin || 0, buffer || 0, 0);
+	return [[wasmSpatialOut[0], wasmSpatialOut[1]], [wasmSpatialOut[2], wasmSpatialOut[3]]];
+}
 
 function getRGBString(color) {
 	color = color & 0xFFFFFF;
 	return rgbStringCache[color] || (rgbStringCache[color] = "rgb(" + (color >> 16 & 255) + "," + (color >> 8 & 255) + "," + (color & 255) + ")");
+}
+
+function isViewportMoving() {
+	return isDragging || momentumFrame || Math.abs(panVelocityX) + Math.abs(panVelocityY) > 18;
 }
 
 function isTileQueued(x, y) {
@@ -314,34 +337,21 @@ function getTileScreenPosition(tileX, tileY) {
 
 function getVisibleTileRange(margin) {
 	if(!margin) margin = 0;
-	var halfW = Math.trunc(owotWidth / 2);
-	var halfH = Math.trunc(owotHeight / 2);
-	var startXRaw = Math.floor(((0 - margin) - positionX - halfW) / tileW);
-	var startYRaw = Math.floor(((0 - margin) - positionY - halfH) / tileH);
-	var endXRaw = Math.floor(((owotWidth - 1 + margin) - positionX - halfW) / tileW);
-	var endYRaw = Math.floor(((owotHeight - 1 + margin) - positionY - halfH) / tileH);
-	var startX = clipIntMax(startXRaw);
-	var startY = clipIntMax(startYRaw);
-	var endX = clipIntMax(endXRaw);
-	var endY = clipIntMax(endYRaw);
-	if(startX > endX || startY > endY || (endXRaw - startXRaw + 1) > 100000 || (endYRaw - startYRaw + 1) > 100000) {
+	var range = getWasmTileRange(margin, 0);
+	if(range[0][0] > range[1][0] || range[0][1] > range[1][1] ||
+		(range[1][0] - range[0][0] + 1) > 100000 || (range[1][1] - range[0][1] + 1) > 100000) {
 		throw "Invalid ranges";
 	}
-	return [[startX, startY], [endX, endY]];
+	return range;
 }
 
 function getBufferedTileRange(buffer) {
 	if(!buffer) buffer = 0;
-	var range = getVisibleTileRange(0);
-	var startX = range[0][0] - buffer;
-	var startY = range[0][1] - buffer;
-	var endX = range[1][0] + buffer;
-	var endY = range[1][1] + buffer;
-	return [[clipIntMax(startX), clipIntMax(startY)], [clipIntMax(endX), clipIntMax(endY)]];
+	return getWasmTileRange(0, buffer);
 }
 
 function tileInRange(tileX, tileY, range) {
-	return tileX >= range[0][0] && tileX <= range[1][0] && tileY >= range[0][1] && tileY <= range[1][1];
+	return !!wasmSpatial.tileInRange(tileX, tileY, range[0][0], range[0][1], range[1][0], range[1][1]);
 }
 
 function getVisibleTiles(margin) {
@@ -352,16 +362,14 @@ function getVisibleTiles(margin) {
 
 function getWidth(margin) {
 	if(!margin) margin = 0;
-	var halfW = Math.trunc(owotWidth / 2);
-	return Math.floor(((owotWidth - 1 + margin) - positionX - halfW) / tileW) -
-		Math.floor(((0 - margin) - positionX - halfW) / tileW) + 1;
+	var range = getVisibleTileRange(margin);
+	return range[1][0] - range[0][0] + 1;
 }
 
 function getHeight(margin) {
 	if(!margin) margin = 0;
-	var halfH = Math.trunc(owotHeight / 2);
-	return Math.floor(((owotHeight - 1 + margin) - positionY - halfH) / tileH) -
-		Math.floor(((0 - margin) - positionY - halfH) / tileH) + 1;
+	var range = getVisibleTileRange(margin);
+	return range[1][1] - range[0][1] + 1;
 }
 
 function getArea(margin) {
@@ -1470,6 +1478,7 @@ function renderNextTilesInQueue() {
 	var start = performance.now();
 	var size = renderQueue.length;
 	var fastQueue = true;
+	var frameBudget = isViewportMoving() ? 4 : 16;
 	var bakeRange = getBufferedTileRange(3);
 	for(var i = 0; i < size; i++) {
 		var tileCoords = renderQueue[i];
@@ -1496,7 +1505,7 @@ function renderNextTilesInQueue() {
 		}
 		var end = performance.now();
 		var diff = end - start;
-		if(diff >= 16 && (!fastQueue || diff > 700)) {
+		if(diff >= frameBudget && (!fastQueue || diff > 700)) {
 			i++;
 			break;
 		}

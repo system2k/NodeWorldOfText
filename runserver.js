@@ -170,7 +170,7 @@ CONST.tileArea = CONST.tileCols * CONST.tileRows;
 // 3 levels: world_id -> tile_y -> tile_x
 var memTileCache = {};
 
-var clientVersion = "20260723-v18";
+var clientVersion = "20260723-v23";
 var ranks_cache = { users: {} };
 var restr_cache = "";
 var restr_cg1_cache = "";

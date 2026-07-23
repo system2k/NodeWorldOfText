@@ -9118,7 +9118,10 @@ var ws_functions = {
 
 function begin() {
 	init_dom();
+	loadWasmSpatial().then(beginReady);
+}
 
+function beginReady() {
 	getStoredConfig();
 	getStoredNickname();
 	makeChatInteractive();
