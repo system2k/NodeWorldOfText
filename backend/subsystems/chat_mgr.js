@@ -200,18 +200,14 @@ function unmuteByIP(world_id, ip) {
 	if(mutedIPsByWorldID[world_id]) {
 		delete mutedIPsByWorldID[world_id][ip];
 	}
-	if(muteDBUpdates.mute_ip[world_id]) {
-		muteDBUpdates.mute_ip[world_id][ip] = {expiration_date: 0, issuer_user_id: null};
-	}
+	(muteDBUpdates.mute_ip[world_id] ??= {})[ip] = {expiration_date: 0, issuer_user_id: null};
 }
 
 function unmuteByUserID(world_id, user_id) {
 	if(mutedUsersByWorldID[world_id]) {
 		delete mutedUsersByWorldID[world_id][user_id];
 	}
-	if(muteDBUpdates.mute_user_id[world_id]) {
-		muteDBUpdates.mute_user_id[world_id][user_id] = {expiration_date: 0, issuer_user_id: null};
-	}
+	(muteDBUpdates.mute_user_id[world_id] ??= {})[user_id] = {expiration_date: 0, issuer_user_id: null};
 }
 
 function getMuteByIP(world_id, ip) {

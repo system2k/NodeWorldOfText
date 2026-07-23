@@ -236,7 +236,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "unblockuser", ["username"], "unblock someone by username", "JohnDoe"],
 		[0, "unblockall", null, "unblock all users", null],
 		[0, "mute", ["id", "seconds", "[h/d/w/m/y]"], "mute a user completely", "1220 9999"], // check for permission
+		[0, "unmute", ["id"], "unmute a user muted by id", "1220"], // check for permission
 		[0, "muteuser", ["username", "seconds", "[h/d/w/m/y]"], "mute a user by their username completely", "JohnDoe 9999"], // check for permission
+		[0, "unmuteuser", ["username"], "unmute a user muted by their username", "JohnDoe"], // check for permission
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
 		[0, "delete", ["id", "timestamp"], "delete a chat message", "1220 1693147307895"], // check for permission
 		[0, "tell", ["id", "message"], "tell someone a secret message", "1220 The coordinates are (392, 392)"],
@@ -273,7 +275,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			var desc = row[3];
 			var example = row[4];
 
-			if(command == "mute" || command == "muteuser" || command == "clearmutes" || command == "delete") {
+			if(["mute", "unmute", "muteuser", "unmuteuser", "clearmutes", "delete"].includes(command)) {
 				if(!user.staff && !is_owner) {
 					continue;
 				}
@@ -614,6 +616,22 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				serverChatResponse("Client not found", location);
 			}
 		},
+		unmute: function(id) {
+			if(!is_owner && !user.staff) return;
+			if(location == "global" && !user.staff) {
+				return serverChatResponse("You do not have permission to unmute on global", location);
+			}
+
+			id = san_nbr(id);
+			var muted_ip = getClientIPByChatID(id, location == "global");
+
+			if(muted_ip) {
+				chat_mgr.unmuteByIP(effectiveWorldID, muted_ip);
+				serverChatResponse("Unmuted client", location);
+			} else {
+				serverChatResponse("Client not found", location);
+			}
+		},
 		muteuser: async function(username, time, flag) {
 			if(!is_owner && !user.staff) return;
 			if(location == "global" && !user.staff) {
@@ -649,6 +667,27 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			} else {
 				serverChatResponse("Muted client by username until " + create_date(muteDate), location);
 			}
+		},
+		unmuteuser: async function(username) {
+			if(!is_owner && !user.staff) return;
+			if(location == "global" && !user.staff) {
+				return serverChatResponse("You do not have permission to unmute on global", location);
+			}
+
+			var username_value = sanitize_username(username);
+			if (username_value == null) {
+				serverChatResponse("Invalid username", location);
+				return;
+			}
+
+			var user_id = await getUserIdFromUsername(username_value);
+			if(!user_id) {
+				serverChatResponse("Could not resolve username to account", location);
+				return;
+			}
+
+			chat_mgr.unmuteByUserID(effectiveWorldID, user_id);
+			serverChatResponse("Unmuted client", location);
 		},
 		clearmutes: function() {
 			if(!is_owner && !user.staff) return;
@@ -814,8 +853,14 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			case "mute":
 				com.mute(commandArgs[1], commandArgs[2], commandArgs[3]);
 				return;
+			case "unmute":
+				com.unmute(commandArgs[1]);
+				return;
 			case "muteuser":
 				com.muteuser(commandArgs[1], commandArgs[2], commandArgs[3]);
+				return;
+			case "unmuteuser":
+				com.unmuteuser(commandArgs[1]);
 				return;
 			case "clearmutes":
 				com.clearmutes();
