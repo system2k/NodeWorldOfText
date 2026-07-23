@@ -236,6 +236,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		[0, "unblockuser", ["username"], "unblock someone by username", "JohnDoe"],
 		[0, "unblockall", null, "unblock all users", null],
 		[0, "mute", ["id", "seconds", "[h/d/w/m/y]"], "mute a user completely", "1220 9999"], // check for permission
+		[0, "unmute", ["id"], "unmute a user muted by id", "1220"], // check for permission
 		[0, "muteuser", ["username", "seconds", "[h/d/w/m/y]"], "mute a user by their username completely", "JohnDoe 9999"], // check for permission
 		[0, "unmuteuser", ["username"], "unmute a user muted by their username", "JohnDoe"], // check for permission
 		[0, "clearmutes", null, "unmute all clients"], // check for permission
@@ -274,7 +275,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			var desc = row[3];
 			var example = row[4];
 
-			if(["mute", "muteuser", "unmuteuser", "clearmutes", "delete"].includes(command)) {
+			if(["mute", "unmute", "muteuser", "unmuteuser", "clearmutes", "delete"].includes(command)) {
 				if(!user.staff && !is_owner) {
 					continue;
 				}
@@ -615,6 +616,22 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				serverChatResponse("Client not found", location);
 			}
 		},
+		unmute: function(id) {
+			if(!is_owner && !user.staff) return;
+			if(location == "global" && !user.staff) {
+				return serverChatResponse("You do not have permission to unmute on global", location);
+			}
+
+			id = san_nbr(id);
+			var muted_ip = getClientIPByChatID(id, location == "global");
+
+			if(muted_ip) {
+				chat_mgr.unmuteByIP(effectiveWorldID, muted_ip);
+				serverChatResponse("Unmuted client", location);
+			} else {
+				serverChatResponse("Client not found", location);
+			}
+		},
 		muteuser: async function(username, time, flag) {
 			if(!is_owner && !user.staff) return;
 			if(location == "global" && !user.staff) {
@@ -835,6 +852,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				return;
 			case "mute":
 				com.mute(commandArgs[1], commandArgs[2], commandArgs[3]);
+				return;
+			case "unmute":
+				com.unmute(commandArgs[1]);
 				return;
 			case "muteuser":
 				com.muteuser(commandArgs[1], commandArgs[2], commandArgs[3]);
