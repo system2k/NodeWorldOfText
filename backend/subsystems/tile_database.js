@@ -26,6 +26,8 @@ var editlog_cell_props = false;
 var fetch_tile_queue = [];
 var totalTilesCached = 0;
 var tileCacheLimit = 4000;
+var dirtyTileKeys = new Set();
+var tileCacheLRU = new Set();
 
 // caller ids. this returns information to a request that uploaded the edits to the server
 // [response_callback, response_data, completion_callback, total_units, current_units]
@@ -41,6 +43,21 @@ var ratelimits = {};
 var tileIterationTempMem = {};
 
 var tileCacheTimeLimit = 1000 * 60 * 1;
+
+function getTileUID(worldID, tileX, tileY) {
+	return worldID + "," + tileY + "," + tileX;
+}
+
+function markTileDirty(worldID, tileX, tileY) {
+	dirtyTileKeys.add(getTileUID(worldID, tileX, tileY));
+}
+
+function touchCachedTile(worldID, tileX, tileY, tile) {
+	var tileUID = getTileUID(worldID, tileX, tileY);
+	tileCacheLRU.delete(tileUID);
+	tileCacheLRU.add(tileUID);
+	if(tile) tile.last_accessed = Date.now();
+}
 
 module.exports.main = function(server) {
 	db = server.db;
@@ -466,13 +483,34 @@ async function loadTileCacheData(world_id, tileX, tileY) {
 // free all in-memory tiles if they haven't been written to in a while
 function performCacheInvalidation(disregardAge) {
 	var date = Date.now();
-	for(var worldID in memTileCache) {
-		for(var tileY in memTileCache[worldID]) {
-			for(var tileX in memTileCache[worldID][tileY]) {
-				var tile = memTileCache[worldID][tileY][tileX];
-				if(tile.props_updated || tile.content_updated || tile.writability_updated || tile.inserting) continue;
-				if(date - tile.last_accessed > tileCacheTimeLimit || disregardAge)  {
+	for(var tileUID of tileCacheLRU) {
+		var tileVec = tileUID.split(",");
+		var worldID = tileVec[0];
+		var tileY = tileVec[1];
+		var tileX = tileVec[2];
+		var tile = memTileCache[worldID]?.[tileY]?.[tileX];
+		if(!tile) {
+			tileCacheLRU.delete(tileUID);
+			continue;
+		}
+		if(tile.props_updated || tile.content_updated || tile.writability_updated || tile.inserting) continue;
+		if(date - tile.last_accessed > tileCacheTimeLimit || disregardAge)  {
+			deleteCachedTile(worldID, tileX, tileY);
+			if(!disregardAge || totalTilesCached <= tileCacheLimit) break;
+		}
+		if(disregardAge && totalTilesCached <= tileCacheLimit) break;
+		if(!disregardAge && date - tile.last_accessed <= tileCacheTimeLimit) {
+			break;
+		}
+	}
+	if(disregardAge && totalTilesCached > tileCacheLimit) {
+		for(var worldID in memTileCache) {
+			for(var tileY in memTileCache[worldID]) {
+				for(var tileX in memTileCache[worldID][tileY]) {
+					var tile = memTileCache[worldID][tileY][tileX];
+					if(tile.props_updated || tile.content_updated || tile.writability_updated || tile.inserting) continue;
 					deleteCachedTile(worldID, tileX, tileY);
+					if(totalTilesCached <= tileCacheLimit) return;
 				}
 			}
 		}
@@ -708,6 +746,7 @@ function tileWriteEdits(callID, tile, options, editData) {
 			}
 			if(charUpdated) {
 				tile.last_accessed = Date.now();
+				markTileDirty(world.id, tileX, tileY);
 				sharedData.updatedTiles[tileY + "," + tileX] = tile;
 			}
 			if(!sharedData.updatedTilesDirect[tileY + "," + tileX]) {
@@ -819,6 +858,7 @@ function tileWriteLinks(callID, tile, options) {
 	}
 	tile.props_updated = true;
 	tile.last_accessed = Date.now();
+	markTileDirty(world.id, tileX, tileY);
 
 	respData[0] = false;
 	respData[1] = true;
@@ -990,6 +1030,7 @@ function tileWriteProtections(callID, tile, options) {
 	}
 
 	tile.last_accessed = Date.now();
+	markTileDirty(world.id, tileX, tileY);
 
 	// no permission to modify
 	if(!has_modified) {
@@ -1008,6 +1049,8 @@ function tileWriteProtections(callID, tile, options) {
 function tileWriteClear(callID, tile, options) {
 	var sharedData = cids[callID].sharedData;
 
+	var tileX = options.tileX;
+	var tileY = options.tileY;
 	var charX = options.charX;
 	var charY = options.charY;
 	var charWidth = options.charWidth;
@@ -1077,6 +1120,7 @@ function tileWriteClear(callID, tile, options) {
 	tile.props_updated = true;
 
 	tile.last_accessed = Date.now();
+	markTileDirty(world.id, tileX, tileY);
 
 	sharedData.updatedTile = tile;
 	IOProgress(callID);
@@ -1112,7 +1156,7 @@ function processPendingEdits(worldID, tileX, tileY, pendingEdits) {
 }
 
 function appendToUnloadedTileCache(worldID, tileX, tileY, editData) {
-	var tile_uid = worldID + "," + tileY + "," + tileX;
+	var tile_uid = getTileUID(worldID, tileX, tileY);
 	var qList = lookupTileQueue(tile_uid);
 	if(qList) {
 		qList[1].push(editData);
@@ -1160,7 +1204,7 @@ async function flushBulkWriteQueue() {
 	await db.run("BEGIN");
 	try {
 		var elm = bulkWriteQueue[0];
-		bulkWriteQueue.shift();
+		bulkWriteQueue.splice(0, 1);
 		var edits = elm[0];
 		var response = elm[1];
 		for(var i = 0; i < edits.length; i++) {
@@ -1203,11 +1247,16 @@ function bulkWriteEdits(edits) {
 async function iterateDatabaseChanges() {
 	let writeQueue = [];
 	let modTileCount = 0;
-	for(let worldID in memTileCache) {
-		for(let tileY in memTileCache[worldID]) {
-			for(let tileX in memTileCache[worldID][tileY]) {
-				let tile = memTileCache[worldID][tileY][tileX];
-				if(!tile.props_updated && !tile.content_updated && !tile.writability_updated) continue;
+	let dirtyKeys = Array.from(dirtyTileKeys);
+	dirtyTileKeys.clear();
+	for(let d = 0; d < dirtyKeys.length; d++) {
+		let tileVec = dirtyKeys[d].split(",");
+		let worldID = tileVec[0];
+		let tileY = tileVec[1];
+		let tileX = tileVec[2];
+		let tile = memTileCache[worldID]?.[tileY]?.[tileX];
+		if(!tile) continue;
+		if(!tile.props_updated && !tile.content_updated && !tile.writability_updated) continue;
 				modTileCount++;
 				let empty_content = false;
 				let empty_color = false;
@@ -1315,8 +1364,6 @@ async function iterateDatabaseChanges() {
 							tile.tile_id = newTile.lastID;
 						}]);
 				}
-			}
-		}
 	}
 	if(writeQueue.length) {
 		await bulkWriteEdits(writeQueue);
@@ -1332,8 +1379,7 @@ async function commitEditLog() {
 	if(eLogLen > 1) editTransaction = true;
 	if(editTransaction) await db_edits.run("BEGIN");
 	for(var i = 0; i < eLogLen; i++) {
-		var edit = editLogQueue[0];
-		editLogQueue.shift();
+		var edit = editLogQueue[i];
 		var tileX = edit[0];
 		var tileY = edit[1];
 		var user = edit[2];
@@ -1349,6 +1395,7 @@ async function commitEditLog() {
 			numRows++;
 		}
 	}
+	editLogQueue.splice(0, eLogLen);
 	if(editTransaction) await db_edits.run("COMMIT");
 	return numRows;
 }
@@ -1399,12 +1446,15 @@ function getCachedTile(worldID, tileX, tileY) {
 	// already exists in the iteration cache. add to main tile cache.
 	if(iteratedTileCache) {
 		setCachedTile(worldID, tileX, tileY, iteratedTileCache);
+		touchCachedTile(worldID, tileX, tileY, iteratedTileCache);
 		return iteratedTileCache;
 	}
 	if(!memTileCache[worldID]) return false;
 	if(!memTileCache[worldID][tileY]) return false;
 	if(!memTileCache[worldID][tileY][tileX]) return false;
-	return memTileCache[worldID][tileY][tileX];
+	var tile = memTileCache[worldID][tileY][tileX];
+	touchCachedTile(worldID, tileX, tileY, tile);
+	return tile;
 }
 function setCachedTile(worldID, tileX, tileY, cacheTileData) {
 	if(!memTileCache[worldID]) {
@@ -1417,9 +1467,11 @@ function setCachedTile(worldID, tileX, tileY, cacheTileData) {
 		memTileCache[worldID][tileY][tileX] = cacheTileData;
 		totalTilesCached++;
 	}
+	touchCachedTile(worldID, tileX, tileY, cacheTileData);
 }
 function deleteCachedTile(worldID, tileX, tileY) {
 	delete memTileCache[worldID][tileY][tileX];
+	tileCacheLRU.delete(getTileUID(worldID, tileX, tileY));
 	totalTilesCached--;
 	if(!Object.keys(memTileCache[worldID][tileY]).length) delete memTileCache[worldID][tileY];
 	if(!Object.keys(memTileCache[worldID]).length) delete memTileCache[worldID];
@@ -1643,6 +1695,9 @@ async function processNextPublicClearBatch(context) {
 		var dimTile = getCachedTile(context.world.id, tileX, tileY);
 		if(dimTile) {
 			clearTilePublicContent(context.world, dimTile);
+			if(dimTile.props_updated || dimTile.content_updated || dimTile.writability_updated) {
+				markTileDirty(context.world.id, tileX, tileY);
+			}
 		} else {
 			// do not handle tiles that are currently loading
 			if(lookupTileQueue(context.world.id + "," + tileX + "," + tileY)) {
@@ -1713,6 +1768,7 @@ async function processNextEraseWorldBatch(context) {
 		var ctile = getCachedTile(context.world.id, tileX, tileY);
 		if(ctile) {
 			clearTileContent(ctile);
+			markTileDirty(context.world.id, tileX, tileY);
 		} else {
 			writeQueue.push(["DELETE FROM tile WHERE world_id=? AND tileX=? and tileY=?", [context.world.id, tileX, tileY]]);
 		}
@@ -1942,3 +1998,4 @@ var types = {
 };
 
 module.exports.types = types;
+module.exports.touchCachedTile = touchCachedTile;

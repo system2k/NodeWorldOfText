@@ -158,6 +158,7 @@ var db,
 	db_chat,
 	db_img,
 	db_misc;
+var sqliteDbManagers = [];
 
 // Global
 CONST = {};
@@ -169,7 +170,7 @@ CONST.tileArea = CONST.tileCols * CONST.tileRows;
 // 3 levels: world_id -> tile_y -> tile_x
 var memTileCache = {};
 
-var clientVersion = "";
+var clientVersion = "20260723-v18";
 var ranks_cache = { users: {} };
 var restr_cache = "";
 var restr_cg1_cache = "";
@@ -756,12 +757,36 @@ function loadDbSystems() {
 	var chat_history = new sql.Database(chatDBPath);
 	var image_db = new sql.Database(imageDBPath);
 	var misc_db = new sql.Database(miscDBPath);
+	var sqliteDbs = [database, edits_db, chat_history, image_db, misc_db];
+	for(var i = 0; i < sqliteDbs.length; i++) {
+		sqliteDbs[i].exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000;");
+	}
 
 	db = new AsyncDBManager(database);
 	db_edits = new AsyncDBManager(edits_db);
 	db_chat = new AsyncDBManager(chat_history);
 	db_img = new AsyncDBManager(image_db);
 	db_misc = new AsyncDBManager(misc_db);
+	sqliteDbManagers = [db, db_edits, db_chat, db_img, db_misc];
+	startWalMaintenance();
+}
+
+var walCheckpointBusy = false;
+function startWalMaintenance() {
+	if(intv.wal_checkpoint) return;
+	intv.wal_checkpoint = setInterval(async function() {
+		if(walCheckpointBusy || !sqliteDbManagers.length) return;
+		walCheckpointBusy = true;
+		try {
+			for(var i = 0; i < sqliteDbManagers.length; i++) {
+				await sqliteDbManagers[i].exec("PRAGMA wal_checkpoint(PASSIVE);");
+			}
+		} catch(e) {
+			handle_error(e, true);
+		} finally {
+			walCheckpointBusy = false;
+		}
+	}, 1000 * 60);
 }
 
 async function loadEmail() {
@@ -1752,10 +1777,25 @@ async function uvias_init() {
 	});
 }
 
-function wsSend(socket, data) {
-	if(socket.readyState !== WebSocket.OPEN) return;
+function flushWsSendQueue(socket) {
+	if(!socket.sdata) return;
+	socket.sdata.wsFlushQueued = false;
+	var queue = socket.sdata.wsSendQueue;
+	if(!queue || !queue.length) return;
+	socket.sdata.wsSendQueue = [];
+	if(socket.readyState !== WebSocket.OPEN) {
+		socket.sdata.messageBackpressure -= queue.length;
+		return;
+	}
+	if(socket._socket && socket._socket.cork) socket._socket.cork();
+	for(var i = 0; i < queue.length; i++) {
+		wsSendNow(socket, queue[i]);
+	}
+	if(socket._socket && socket._socket.uncork) process.nextTick(socket._socket.uncork.bind(socket._socket));
+}
+
+function wsSendNow(socket, data) {
 	var error = false;
-	socket.sdata.messageBackpressure++;
 	try {
 		socket.send(data, function() {
 			if(!error && socket.sdata) {
@@ -1771,6 +1811,21 @@ function wsSend(socket, data) {
 			socket.sdata.messageBackpressure--;
 		}
 		error = true;
+	}
+}
+
+function wsSend(socket, data) {
+	if(socket.readyState !== WebSocket.OPEN) return;
+	if(!socket.sdata) return socket.send(data);
+	socket.sdata.messageBackpressure++;
+	if(!socket.sdata.wsSendQueue) {
+		socket.sdata.wsSendQueue = [data];
+	} else {
+		socket.sdata.wsSendQueue.push(data);
+	}
+	if(!socket.sdata.wsFlushQueued) {
+		socket.sdata.wsFlushQueued = true;
+		setImmediate(flushWsSendQueue, socket);
 	}
 }
 
@@ -1981,6 +2036,7 @@ async function manageWebsocketConnection(ws, req) {
 		hasBroadcastedCursorPosition: false,
 		cursorPositionHidden: false,
 		messageBackpressure: 0,
+		protocolVersion: 1,
 		receiveContentUpdates: true,
 		descriptiveCmd: false,
 		passiveCmd: false,
@@ -2273,10 +2329,9 @@ async function manageWebsocketConnection(ws, req) {
 		if(!(typeof msg == "string" || typeof msg == "object")) {
 			return;
 		}
-		if(msg.constructor == Buffer) { // TODO
-			/*msg = bin_packet.decode(msg);
-			if(!msg) return; // malformed packet*/
-			return;
+		if(msg.constructor == Buffer) {
+			msg = bin_packet.decodeV2(msg);
+			if(!msg) return; // malformed packet or unsupported binary type
 		}
 		// Parse JSON message
 		try {
@@ -2294,6 +2349,15 @@ async function manageWebsocketConnection(ws, req) {
 		if(typeof msg.request == "number") {
 			requestID = san_nbr(msg.request);
 		}
+		if(kind == "protocol") {
+			if(msg.protocolVersion == 2 && msg.binarySupport) {
+				ws.sdata.protocolVersion = 2;
+				return send_ws(bin_packet.encodeV2Response({
+					kind: "protocol"
+				}));
+			}
+			return;
+		}
 		if(kind == "ping") {
 			var res = {
 				kind: "ping",
@@ -2301,6 +2365,11 @@ async function manageWebsocketConnection(ws, req) {
 			};
 			if(msg.id != void 0) {
 				res.id = san_nbr(msg.id);
+			}
+			if(requestID !== null) res.request = requestID;
+			if(ws.sdata.protocolVersion == 2) {
+				var binRes = bin_packet.encodeV2Response(res);
+				if(binRes) return send_ws(binRes);
 			}
 			return send_ws(JSON.stringify(res)); 
 		}
@@ -2312,6 +2381,10 @@ async function manageWebsocketConnection(ws, req) {
 		function send(msg) {
 			msg.kind = kind;
 			if(requestID !== null) msg.request = requestID;
+			if(ws.sdata.protocolVersion == 2) {
+				var binRes = bin_packet.encodeV2Response(msg);
+				if(binRes) return send_ws(binRes);
+			}
 			send_ws(JSON.stringify(msg));
 		}
 		function broadcast(data, opts) {
@@ -2348,6 +2421,7 @@ async function manageWebsocketConnection(ws, req) {
 
 async function start_server() {
 	await loadServerSettings();
+	deployNewClientVersion();
 	loadRestrictionsList();
 	
 	if(accountSystem == "local") {
@@ -2402,7 +2476,12 @@ async function start_server() {
 
 	wss = new WebSocket.Server({
 		server: httpServer.server,
-		perMessageDeflate: true,
+		perMessageDeflate: {
+			threshold: 1024,
+			concurrencyLimit: 4,
+			zlibDeflateOptions: { level: 6, memLevel: 7 },
+			zlibInflateOptions: { chunkSize: 16 * 1024 }
+		},
 		maxPayload: 128000
 	});
 	global_data.wss = wss;

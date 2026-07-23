@@ -250,6 +250,34 @@ register_chat_command("warp", function(args) {
 	clientChatResponse("Switching to world: \"" + address + "\"");
 }, ["world"], "go to another world", "forexample");
 
+register_chat_command("warpserver", function(args) {
+	var address = args[0];
+	if(!address) {
+		ws_path = createWsPath();
+	} else if(address.substr(0, 5) == "ws://" || address.substr(0, 6) == "wss://") {
+		ws_path = address;
+	} else {
+		if(address.toLowerCase() == "owot") address = "https://ourworldoftext.com";
+		if(address.substr(0, 7) != "http://" && address.substr(0, 8) != "https://") {
+			address = "https://" + address;
+		}
+		try {
+			var url = new URL(address);
+		} catch(e) {
+			return clientChatResponse("Invalid server: " + address);
+		}
+		ws_path = (url.protocol == "https:" ? "wss://" : "ws://") + url.host + url.pathname.replace(/\/$/, "") + "/ws/" + url.search;
+	}
+	positionX = 0;
+	positionY = 0;
+	writeBuffer = [];
+	tellEdit = [];
+	resetUI();
+	stopPasting();
+	w.changeSocket(ws_path, true);
+	clientChatResponse("Switching to server: " + ws_path);
+}, ["server"], "go to another server", "https://ourworldoftext.com");
+
 register_chat_command("night", function() {
 	w.night();
 }, null, "enable night mode", null);

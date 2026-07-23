@@ -8,6 +8,7 @@ module.exports.main = function(server) {
 }
 
 var ipAddrQueue = [];
+var ipAddrQueued = new Set();
 var fetchesByIp = {};
 
 async function fetchTimer() {
@@ -34,11 +35,13 @@ async function fetchNext() {
 	var ipQueue = fetchesByIp[nextIp];
 	if(!ipQueue) {
 		ipAddrQueue.shift();
+		ipAddrQueued.delete(nextIp);
 		return true;
 	}
 	var queue = ipQueue.queue;
 
 	ipAddrQueue.shift();
+	ipAddrQueued.delete(nextIp);
 	if(!queue.length) {
 		// queue for this IP is empty - don't push it back to the end of line
 		delete fetchesByIp[nextIp];
@@ -58,6 +61,7 @@ async function fetchNext() {
 
 	if(ipQueue.tilesInPeriod + area > 100) {
 		ipAddrQueue.push(nextIp);
+		ipAddrQueued.add(nextIp);
 		return true;
 	}
 	ipQueue.tilesInPeriod += area;
@@ -65,6 +69,7 @@ async function fetchNext() {
 	// append it right back to the end of the line
 	if(queue.length) {
 		ipAddrQueue.push(nextIp);
+		ipAddrQueued.add(nextIp);
 	}
 
 	// ~~/~~/~~/~~/ !SECURITY ADVISORY! ~~/~~/~~/~~/
@@ -89,14 +94,15 @@ async function fetchNext() {
 }
 
 function queueFetch(ip, worldID, range, channel) { // TODO: what if client closes in the middle of fetching multiple ranges?
-	if(!ipAddrQueue.includes(ip)) {
+	if(!ipAddrQueued.has(ip)) {
 		ipAddrQueue.push(ip);
-		if(!fetchesByIp[ip]) {
-			fetchesByIp[ip] = {
-				tilesInPeriod: 0,
-				queue: []
-			};
-		}
+		ipAddrQueued.add(ip);
+	}
+	if(!fetchesByIp[ip]) {
+		fetchesByIp[ip] = {
+			tilesInPeriod: 0,
+			queue: []
+		};
 	}
 	var queue = fetchesByIp[ip].queue;
 	if(queue.length > 10000) throw "Queue overflow";

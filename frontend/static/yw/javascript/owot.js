@@ -76,7 +76,6 @@ var writeBuffer            = [];
 var highlightFlash         = {};
 var highlightCount         = 0;
 var coloredChars           = {}; // highlighted chars
-var shiftOptState          = { prevX: 0, prevY: 0, x1: 0, y1: 0, x2: 0, y2: 0, prevZoom: -1 };
 var backgroundImage        = null;
 var backgroundPattern      = null;
 var backgroundPatternSize  = [0, 0];
@@ -168,14 +167,34 @@ var pasteDirRight          = true; // move cursor right when writing
 var pasteDirDown           = true; // move cursor down after pressing enter
 var defaultCursor          = "text";
 var defaultDragCursor      = "move";
-var fetchClientMargin      = 200;
+var tileCacheLimit         = 10000;
+var panVelocityX           = 0;
+var panVelocityY           = 0;
+var kineticPanEnabled      = true;
+var kineticFriction        = 0.94;
+var kineticStartVelocity   = 20;
+var kineticMinVelocity     = 0.12;
+var kineticMaxVelocity     = 90;
+var panVelocitySamples     = [];
+var momentumFrame          = 0;
+var momentumVX             = 0;
+var momentumVY             = 0;
+var smoothZoomEnabled      = kineticPanEnabled;
+var smoothZoomFrame        = 0;
+var smoothZoomTarget       = null;
+var smoothZoomAnchorX      = 0;
+var smoothZoomAnchorY      = 0;
+var smoothPanFrame         = 0;
+var smoothPanTargetX       = 0;
+var smoothPanTargetY       = 0;
+var fetchFrameQueued       = false;
+var lastFetchFrameTime     = 0;
 var classicTileProcessing  = false; // directly process utf32 only
 var unloadedPatternPanning = false;
 var cursorRenderingEnabled = true;
 var guestCursorsEnabled    = true; // render guest cursors
 var showMyGuestCursor      = true; // show my cursor to everyone if the world allows it
 var unobstructCursor       = false; // render cursor on top of characters that may block it
-var shiftOptimization      = false;
 var transparentBackground  = true;
 var writeFlushRate         = state.worldModel.write_interval;
 var bufferLargeChars       = true; // prevents certain large characters from being cut off by the grid
@@ -246,9 +265,12 @@ var dragPosY = 0;
 var isDragging = false;
 var hasDragged = false;
 var draggingEnabled = true;
-var touchInitZoom = 0;
 var touchInitDistance = 0;
 var touchPrev = null;
+var touchWasZooming = false;
+var touchPinchStart = null;
+var touchPinchAnchor = null;
+var touchPanBlocked = false;
 
 var modules = {};
 var isModule = false;
@@ -932,14 +954,11 @@ function reloadRenderer() {
 
 // set absolute zoom - must not be called directly (use changeZoom)
 function updateRendererZoom(percentage) {
-	if(percentage < 3) percentage = 3;
-	if(percentage > 1000) percentage = 1000;
+	if(percentage < 1) percentage = 1;
+	if(percentage > 2500) percentage = 2500;
 	percentage = decimal(percentage);
 	zoom = percentage;
 
-	if(zoom < 0.20) {
-		shiftOptimization = true;
-	}
 	updateScaleConsts();
 
 	if(tileWidth * tileHeight > 100000000) {
@@ -971,8 +990,8 @@ function changeZoom(percentage, isPartial) {
 		positionY /= zoom;
 	}
 	userZoom = percentage / 100;
-	if(userZoom < 0.2) userZoom = 0.2;
-	if(userZoom > 10) userZoom = 10;
+	if(userZoom < 0.05) userZoom = 0.05;
+	if(userZoom > 25) userZoom = 25;
 	updateRendererZoom(userZoom * deviceRatio() * 100);
 	if(!isPartial) {
 		positionX *= zoom;
@@ -1472,9 +1491,6 @@ function adjust_scaling_DOM(ratio) {
 	// make the display size the size of the viewport
 	elm.owot.style.width = window_width + "px";
 	elm.owot.style.height = window_height + "px";
-	if(shiftOptimization) {
-		shiftOptState.zoom = -1;
-	}
 }
 
 function event_resize() {
@@ -1707,6 +1723,11 @@ Tile.set = function(tileX, tileY, data) {
 	if(!(str in tiles)) {
 		w.tile.count++;
 	}
+	if(data === null) {
+		removeTileFromPool(tileX, tileY);
+	} else if(tiles[str] && tiles[str] !== data) {
+		removeTileFromPool(tileX, tileY);
+	}
 	tiles[str] = data;
 	expandLocalBoundary(tileX, tileY);
 	return data;
@@ -1745,6 +1766,199 @@ Tile.visible = function(tileX, tileY) {
 		return false;
 	}
 	return true;
+}
+
+function noteViewportMove(oldX, oldY) {
+	panVelocityX = positionX - oldX;
+	panVelocityY = positionY - oldY;
+	recordPanSample();
+	scheduleFetchUnloadedTiles();
+}
+
+function scheduleFetchUnloadedTiles() {
+	if(fetchFrameQueued || !w.fetchUnloadedTiles) return;
+	fetchFrameQueued = true;
+	requestAnimationFrame(function() {
+		fetchFrameQueued = false;
+		var now = performance.now();
+		if(now - lastFetchFrameTime < 50) return;
+		lastFetchFrameTime = now;
+		w.fetchUnloadedTiles();
+	});
+}
+
+function recordPanSample() {
+	var now = performance.now();
+	panVelocitySamples.push([now, positionX, positionY]);
+	while(panVelocitySamples.length > 2 && now - panVelocitySamples[0][0] > 100) {
+		panVelocitySamples.shift();
+	}
+}
+
+function resetPanSamples() {
+	panVelocitySamples = [[performance.now(), positionX, positionY]];
+}
+
+function cancelMomentum() {
+	if(momentumFrame) {
+		cancelAnimationFrame(momentumFrame);
+		momentumFrame = 0;
+	}
+	momentumVX = 0;
+	momentumVY = 0;
+}
+
+function cancelSmoothPan() {
+	if(smoothPanFrame) {
+		cancelAnimationFrame(smoothPanFrame);
+		smoothPanFrame = 0;
+	}
+}
+
+function stopViewportMotion() {
+	cancelMomentum();
+	cancelSmoothPan();
+}
+
+function startMomentum() {
+	if(!kineticPanEnabled || regionSelectionsActive()) return;
+	var last = panVelocitySamples[panVelocitySamples.length - 1];
+	var first = panVelocitySamples[panVelocitySamples.length - 2];
+	if(!first || !last) {
+		first = [0, positionX - panVelocityX, positionY - panVelocityY];
+		last = [16.6667, positionX, positionY];
+	}
+	var dt = last[0] - first[0];
+	if(dt <= 0) dt = 16.6667;
+	var vx = (last[1] - first[1]) / dt * 16.6667;
+	var vy = (last[2] - first[2]) / dt * 16.6667;
+	if(Math.abs(vx) < Math.abs(panVelocityX)) vx = panVelocityX;
+	if(Math.abs(vy) < Math.abs(panVelocityY)) vy = panVelocityY;
+	var speed = Math.sqrt(vx * vx + vy * vy);
+	if(speed < kineticStartVelocity) return;
+	if(speed > kineticMaxVelocity) {
+		var scale = kineticMaxVelocity / speed;
+		vx *= scale;
+		vy *= scale;
+	}
+	momentumVX = vx;
+	momentumVY = vy;
+	if(!momentumFrame) momentumFrame = requestAnimationFrame(momentumStep);
+}
+
+function momentumStep() {
+	momentumFrame = 0;
+	if(!kineticPanEnabled || isDragging) return;
+	var oldX = positionX;
+	var oldY = positionY;
+	positionX += momentumVX;
+	positionY += momentumVY;
+	positionX = Math.round(positionX);
+	positionY = Math.round(positionY);
+	noteViewportMove(oldX, oldY);
+	w.render();
+	momentumVX *= kineticFriction;
+	momentumVY *= kineticFriction;
+	if(Math.abs(momentumVX) > kineticMinVelocity || Math.abs(momentumVY) > kineticMinVelocity) {
+		momentumFrame = requestAnimationFrame(momentumStep);
+	}
+}
+
+function changeZoomAt(percentage, pageX, pageY, isPartial) {
+	var oldX = positionX;
+	var oldY = positionY;
+	positionX += owotWidth / 2 - pageX;
+	positionY += owotHeight / 2 - pageY;
+	positionX /= zoom;
+	positionY /= zoom;
+	changeZoom(percentage, true);
+	positionX *= zoom;
+	positionY *= zoom;
+	positionX -= owotWidth / 2 - pageX;
+	positionY -= owotHeight / 2 - pageY;
+	noteViewportMove(oldX, oldY);
+	if(!isPartial) {
+		w.render();
+		zoomGarbageCollect();
+	}
+}
+
+function smoothZoomTo(percentage, pageX, pageY) {
+	if(!smoothZoomEnabled) return changeZoomAt(percentage, pageX, pageY);
+	smoothZoomTarget = percentage;
+	smoothZoomAnchorX = pageX;
+	smoothZoomAnchorY = pageY;
+	if(!smoothZoomFrame) smoothZoomFrame = requestAnimationFrame(smoothZoomStep);
+}
+
+function smoothZoomStep() {
+	smoothZoomFrame = 0;
+	if(smoothZoomTarget === null) return;
+	var current = userZoom * 100;
+	var next = current + (smoothZoomTarget - current) * 0.28;
+	if(Math.abs(smoothZoomTarget - next) < 0.15) {
+		next = smoothZoomTarget;
+		smoothZoomTarget = null;
+	}
+	changeZoomAt(next, smoothZoomAnchorX, smoothZoomAnchorY);
+	if(smoothZoomTarget !== null) smoothZoomFrame = requestAnimationFrame(smoothZoomStep);
+}
+
+function smoothPanTo(targetX, targetY) {
+	if(!kineticPanEnabled) {
+		var oldX = positionX;
+		var oldY = positionY;
+		positionX = targetX;
+		positionY = targetY;
+		noteViewportMove(oldX, oldY);
+		w.render();
+		return;
+	}
+	stopViewportMotion();
+	smoothPanTargetX = targetX;
+	smoothPanTargetY = targetY;
+	smoothPanFrame = requestAnimationFrame(smoothPanStep);
+}
+
+function smoothPanStep() {
+	smoothPanFrame = 0;
+	var oldX = positionX;
+	var oldY = positionY;
+	positionX += (smoothPanTargetX - positionX) * 0.18;
+	positionY += (smoothPanTargetY - positionY) * 0.18;
+	if(Math.abs(smoothPanTargetX - positionX) < 0.5) positionX = smoothPanTargetX;
+	if(Math.abs(smoothPanTargetY - positionY) < 0.5) positionY = smoothPanTargetY;
+	noteViewportMove(oldX, oldY);
+	w.render();
+	if(positionX != smoothPanTargetX || positionY != smoothPanTargetY) {
+		smoothPanFrame = requestAnimationFrame(smoothPanStep);
+	}
+}
+
+function pruneTileCache() {
+	if(w.tile.count <= tileCacheLimit) return;
+	var renderRange = getBufferedTileRange(3);
+	var keepX1 = renderRange[0][0];
+	var keepY1 = renderRange[0][1];
+	var keepX2 = renderRange[1][0];
+	var keepY2 = renderRange[1][1];
+	var evict = [];
+	for(var key in tiles) {
+		var pos = getPos(key);
+		var tileY = pos[0];
+		var tileX = pos[1];
+		if(tileX >= keepX1 && tileX <= keepX2 && tileY >= keepY1 && tileY <= keepY2) continue;
+		var dx = tileX < keepX1 ? keepX1 - tileX : tileX > keepX2 ? tileX - keepX2 : 0;
+		var dy = tileY < keepY1 ? keepY1 - tileY : tileY > keepY2 ? tileY - keepY2 : 0;
+		evict.push([Math.max(dx, dy), tileX, tileY]);
+	}
+	evict.sort(function(a, b) {
+		return b[0] - a[0];
+	});
+	var target = tileCacheLimit - 250;
+	for(var i = 0; i < evict.length && w.tile.count > target; i++) {
+		Tile.delete(evict[i][1], evict[i][2]);
+	}
 }
 
 // if a tile is marked as stale, then the content of the tile is outdated and pending a re-update
@@ -2237,6 +2451,7 @@ function triggerUIClick() {
 }
 
 function event_mousedown(e, arg_pageX, arg_pageY) {
+	stopViewportMotion();
 	currentMousePosition[0] = e.pageX;
 	currentMousePosition[1] = e.pageY;
 	var target = e.target;
@@ -2263,6 +2478,7 @@ function event_mousedown(e, arg_pageX, arg_pageY) {
 		dragPosX = positionX;
 		dragPosY = positionY;
 		isDragging = true;
+		resetPanSamples();
 	}
 	var isActive = triggerUIClick();
 	var pos = getTileCoordsFromMouseCoords(pageX, pageY);
@@ -2390,11 +2606,24 @@ function stopDragging() {
 }
 
 function event_mouseup(e, arg_pageX, arg_pageY) {
-	var pageX = Math.trunc(e.pageX * zoomRatio);
-	var pageY = Math.trunc(e.pageY * zoomRatio);
-	if(arg_pageX != void 0) pageX = arg_pageX;
-	if(arg_pageY != void 0) pageY = arg_pageY;
+	var pageX = arg_pageX != void 0 ? arg_pageX : Math.trunc(e.pageX * zoomRatio);
+	var pageY = arg_pageY != void 0 ? arg_pageY : Math.trunc(e.pageY * zoomRatio);
+	var wasDragging = isDragging;
+	if(wasDragging && !regionSelectionsActive()) {
+		var movedX = pageX - dragStartX;
+		var movedY = pageY - dragStartY;
+		if(Math.abs(movedX) > 2 || Math.abs(movedY) > 2) {
+			var oldX = positionX;
+			var oldY = positionY;
+			positionX = dragPosX + movedX;
+			positionY = dragPosY + movedY;
+			noteViewportMove(oldX, oldY);
+			hasDragged = true;
+			w.render();
+		}
+	}
 	var canShowMobileKeyboard = !hasDragged;
+	var didDrag = hasDragged;
 	var foundActiveSelection = false;
 	stopDragging();
 
@@ -2402,7 +2631,14 @@ function event_mouseup(e, arg_pageX, arg_pageY) {
 		draggable_element_mouseup[i](e, pageX, pageY);
 	}
 
-	if(e.target != elm.owot && e.target != linkDiv) return;
+	if(didDrag && !regionSelectionsActive()) {
+		startMomentum();
+		return;
+	}
+
+	if(e.target != elm.owot && e.target != linkDiv) {
+		return;
+	}
 
 	if(e.which == 3) { // right click
 		if(ignoreCanvasContext) {
@@ -3474,16 +3710,19 @@ function autoArrowKeyMoveStop(dir) {
 }
 
 function event_keydown(e) {
+	stopViewportMotion();
+	var centerPageX = owotWidth / 2;
+	var centerPageY = owotHeight / 2;
 	if(checkKeyPress(e, keyConfig.zoomIn)) {
-		changeZoom((userZoom * 100) * 1.5);
+		smoothZoomTo((userZoom * 100) * 1.5, centerPageX, centerPageY);
 		e.preventDefault();
 	}
 	if(checkKeyPress(e, keyConfig.zoomOut)) {
-		changeZoom((userZoom * 100) / 1.5);
+		smoothZoomTo((userZoom * 100) / 1.5, centerPageX, centerPageY);
 		e.preventDefault();
 	}
 	if(checkKeyPress(e, keyConfig.zoomReset)) {
-		changeZoom(100);
+		smoothZoomTo(100, centerPageX, centerPageY);
 		e.preventDefault();
 	}
 	
@@ -4028,6 +4267,24 @@ function updateHoveredLink(mouseX, mouseY, evt, safe) {
 	}
 }
 
+var pendingMousemoveEvent = null;
+var mousemoveFrameQueued = false;
+
+function event_mousemove_frame() {
+	mousemoveFrameQueued = false;
+	var e = pendingMousemoveEvent;
+	pendingMousemoveEvent = null;
+	if(e) event_mousemove(e);
+}
+
+function event_mousemove_coalesced(e) {
+	pendingMousemoveEvent = e;
+	if(!mousemoveFrameQueued) {
+		mousemoveFrameQueued = true;
+		requestAnimationFrame(event_mousemove_frame);
+	}
+}
+
 function event_mousemove(e, arg_pageX, arg_pageY) {
 	currentMousePosition[0] = e.pageX;
 	currentMousePosition[1] = e.pageY;
@@ -4171,8 +4428,11 @@ function event_mousemove(e, arg_pageX, arg_pageY) {
 
 	if(!isDragging || regionSelectionsActive()) return;
 
+	var oldX = positionX;
+	var oldY = positionY;
 	positionX = dragPosX + (pageX - dragStartX);
 	positionY = dragPosY + (pageY - dragStartY);
+	noteViewportMove(oldX, oldY);
 	hasDragged = true;
 	w.render();
 }
@@ -4192,10 +4452,28 @@ function getCenterTouchPosition(touches) {
 	return [x, y];
 }
 
+function copyTouchPoints(touches) {
+	var res = [];
+	for(var i = 0; i < touches.length; i++) {
+		res.push(touches[i].identifier, touches[i].clientX * zoomRatio, touches[i].clientY * zoomRatio);
+	}
+	return res;
+}
+
+function findTouchPoint(points, touch) {
+	if(!points) return -1;
+	var id = touch.identifier;
+	for(var i = 0; i < points.length; i += 3) {
+		if(points[i] == id) return i;
+	}
+	return -1;
+}
+
 function event_touchstart(e) {
+	stopViewportMotion();
 	var touches = e.touches;
 	var target = e.target;
-	touchPrev = touches;
+	touchPrev = copyTouchPoints(touches);
 	
 	if(closest(target, getChatfield()) || target == elm.chatbar || target == elm.confirm_js_code) {
 		worldFocused = false;
@@ -4208,6 +4486,8 @@ function event_touchstart(e) {
 
 	// if this is the beginning of a potential longpress, mark the start time
 	if(touches.length == 1) {
+		touchWasZooming = false;
+		touchPanBlocked = false;
 		longpressStartTime = Date.now();
 		longpressPosition = [
 			touches[0].clientX * zoomRatio,
@@ -4227,7 +4507,10 @@ function event_touchstart(e) {
 	var y = pos[1];
 	
 	if(touches.length >= 2) {
-		touchInitZoom = zoom / deviceRatio();
+		touchWasZooming = true;
+		touchPanBlocked = false;
+		touchPinchStart = copyTouchPoints(touches);
+		touchPinchAnchor = null;
 		touchInitDistance = getDistance(touches[0].clientX * zoomRatio,
 			touches[0].clientY * zoomRatio,
 			touches[1].clientX * zoomRatio,
@@ -4240,18 +4523,49 @@ function event_touchstart(e) {
 		dragPosX = positionX;
 		dragPosY = positionY;
 		isDragging = true;
+		resetPanSamples();
 	}
 }
 function event_touchend(e) {
 	var touches = e.touches;
 	longpressStartTime = 0;
 	if(touches.length == 0) {
-		if(touchPrev && touchPrev.length) {
-			event_mouseup(e, touchPrev[0].pageX * zoomRatio, touchPrev[0].pageY * zoomRatio);
+		if(touchWasZooming) {
+			touchWasZooming = false;
+			isDragging = false;
+			hasDragged = false;
+			touchPrev = null;
+			touchPinchStart = null;
+			touchPinchAnchor = null;
+			touchPanBlocked = false;
+			return;
+		}
+		if(hasDragged) {
+			stopDragging();
+			startMomentum();
+			touchPrev = null;
+			touchPinchStart = null;
+			touchPinchAnchor = null;
+			touchPanBlocked = false;
+			return;
+		}
+		var changed = e.changedTouches && e.changedTouches[0];
+		if(changed) {
+			event_mouseup(e, changed.pageX * zoomRatio, changed.pageY * zoomRatio);
 		}
 		isDragging = false;
 		hasDragged = false;
+		touchPanBlocked = false;
 	} else {
+		if(touchWasZooming && touches.length == 1) {
+			isDragging = false;
+			hasDragged = false;
+			touchPanBlocked = true;
+			touchPrev = copyTouchPoints(touches);
+			touchPinchStart = null;
+			touchPinchAnchor = null;
+			return;
+		}
 		var pos = getCenterTouchPosition(touches);
 		var x = pos[0];
 		var y = pos[1];
@@ -4259,13 +4573,22 @@ function event_touchend(e) {
 		dragStartY = y;
 		dragPosX = positionX;
 		dragPosY = positionY;
+		touchPrev = copyTouchPoints(touches);
+		touchPinchStart = touches.length >= 2 ? copyTouchPoints(touches) : null;
+		touchPinchAnchor = null;
 	}
 }
 function event_touchmove(e) {
 	var touches = e.touches;
-	touchPrev = touches;
 
 	longpressStartTime = 0;
+
+	if(touchPanBlocked && touches.length == 1) {
+		touchPrev = copyTouchPoints(touches);
+		e.preventDefault();
+		return;
+	}
+	if(touches.length >= 2) touchPanBlocked = false;
 
 	if(!isDragging || regionSelectionsActive()) {
 		var pos = touch_pagePos(e);
@@ -4276,9 +4599,6 @@ function event_touchmove(e) {
 		return;
 	}
 	
-	var halfX = Math.floor(owotWidth / 2);
-	var halfY = Math.floor(owotHeight / 2);
-	
 	var pos = getCenterTouchPosition(touches);
 	var x = pos[0];
 	var y = pos[1];
@@ -4287,26 +4607,45 @@ function event_touchmove(e) {
 	
 	if(touches.length == 2) {
 		isZooming = true;
-		var distance = getDistance(touches[0].clientX * zoomRatio,
-			touches[0].clientY * zoomRatio,
-			touches[1].clientX * zoomRatio,
-			touches[1].clientY * zoomRatio);
-
-		changeZoom((touchInitZoom * (distance / touchInitDistance)) * 100, true);
-		
-		var relClickX = dragStartX - halfX;
-		var relClickY = dragStartY - halfY;
-
-		var logicalZoom = zoom / deviceRatio();
-		
-		positionX = (dragPosX / touchInitZoom * logicalZoom) + (x - dragStartX) + relClickX - (relClickX / touchInitZoom * logicalZoom);
-		positionY = (dragPosY / touchInitZoom * logicalZoom) + (y - dragStartY) + relClickY - (relClickY / touchInitZoom * logicalZoom);
+		touchWasZooming = true;
+		var oldX = positionX;
+		var oldY = positionY;
+		var t0x = touches[0].clientX * zoomRatio;
+		var t0y = touches[0].clientY * zoomRatio;
+		var t1x = touches[1].clientX * zoomRatio;
+		var t1y = touches[1].clientY * zoomRatio;
+		var prev0 = findTouchPoint(touchPrev, touches[0]);
+		var prev1 = findTouchPoint(touchPrev, touches[1]);
+		var prevDistance = prev0 != -1 && prev1 != -1 ?
+			getDistance(touchPrev[prev0 + 1], touchPrev[prev0 + 2], touchPrev[prev1 + 1], touchPrev[prev1 + 2]) :
+			touchInitDistance;
+		var distance = getDistance(t0x, t0y, t1x, t1y);
+		if(prevDistance > 0 && distance > 0) {
+			var move0 = prev0 != -1 ? getDistance(t0x, t0y, touchPrev[prev0 + 1], touchPrev[prev0 + 2]) : Infinity;
+			var move1 = prev1 != -1 ? getDistance(t1x, t1y, touchPrev[prev1 + 1], touchPrev[prev1 + 2]) : Infinity;
+			if(touchPinchAnchor == null) {
+				var start0 = findTouchPoint(touchPinchStart, touches[0]);
+				var start1 = findTouchPoint(touchPinchStart, touches[1]);
+				if(start0 != -1 && start1 != -1) {
+					move0 = getDistance(t0x, t0y, touchPinchStart[start0 + 1], touchPinchStart[start0 + 2]);
+					move1 = getDistance(t1x, t1y, touchPinchStart[start1 + 1], touchPinchStart[start1 + 2]);
+				}
+				touchPinchAnchor = move0 <= move1 ? touches[0].identifier : touches[1].identifier;
+			}
+			var anchorFirst = touchPinchAnchor == touches[0].identifier;
+			var anchorX = anchorFirst ? t0x : t1x;
+			var anchorY = anchorFirst ? t0y : t1y;
+			changeZoomAt((zoom / deviceRatio()) * (distance / prevDistance) * 100, anchorX, anchorY, true);
+		}
 	} else {
+		var oldX = positionX;
+		var oldY = positionY;
 		positionX = dragPosX + (x - dragStartX);
 		positionY = dragPosY + (y - dragStartY);
 	}
 	positionX = Math.round(positionX);
 	positionY = Math.round(positionY);
+	noteViewportMove(oldX, oldY);
 	hasDragged = true;
 	
 	e.preventDefault();
@@ -4314,6 +4653,7 @@ function event_touchmove(e) {
 	if(isZooming) {
 		zoomGarbageCollect();
 	}
+	touchPrev = copyTouchPoints(touches);
 }
 
 // get position from touch event
@@ -4323,6 +4663,7 @@ function touch_pagePos(e) {
 }
 
 function event_wheel(e) {
+	stopViewportMotion();
 	if(Modal.isOpen) return;
 	if(!scrollingEnabled) return; // return if disabled
 	// if not focused on canvas, don't scroll world
@@ -4338,13 +4679,64 @@ function event_wheel(e) {
 		deltaX = deltaY;
 		deltaY = 0;
 	}
+	var oldX = positionX;
+	var oldY = positionY;
 	positionY -= deltaY;
 	positionX -= deltaX;
+	noteViewportMove(oldX, oldY);
 	w.emit("scroll", {
 		deltaX: -deltaX,
 		deltaY: -deltaY
 	});
 	w.render();
+	e.preventDefault();
+}
+
+var pendingWheelDeltaX = 0;
+var pendingWheelDeltaY = 0;
+var wheelFrameQueued = false;
+
+function event_wheel_frame() {
+	wheelFrameQueued = false;
+	var deltaX = pendingWheelDeltaX;
+	var deltaY = pendingWheelDeltaY;
+	pendingWheelDeltaX = 0;
+	pendingWheelDeltaY = 0;
+	if(!deltaX && !deltaY) return;
+	var oldX = positionX;
+	var oldY = positionY;
+	positionY -= deltaY;
+	positionX -= deltaX;
+	noteViewportMove(oldX, oldY);
+	w.emit("scroll", {
+		deltaX: -deltaX,
+		deltaY: -deltaY
+	});
+	w.render();
+}
+
+function event_wheel_coalesced(e) {
+	stopViewportMotion();
+	if(Modal.isOpen) return;
+	if(!scrollingEnabled) return;
+	if(!closest(e.target, elm.main_view) && !closest(e.target, elm.link_div)) return;
+	if(e.ctrlKey) return;
+	var deltaX = Math.trunc(e.deltaX);
+	var deltaY = Math.trunc(e.deltaY);
+	if(e.deltaMode && deltaY) {
+		deltaX = 0;
+		deltaY = (deltaY / Math.abs(deltaY)) * 100;
+	}
+	if(checkKeyPress(e, keyConfig.sidewaysScroll)) {
+		deltaX = deltaY;
+		deltaY = 0;
+	}
+	pendingWheelDeltaX += deltaX;
+	pendingWheelDeltaY += deltaY;
+	if(!wheelFrameQueued) {
+		wheelFrameQueued = true;
+		requestAnimationFrame(event_wheel_frame);
+	}
 	e.preventDefault();
 }
 
@@ -4376,22 +4768,16 @@ function event_wheel_zoom(e) {
 	}
 
 	if(e.ctrlKey) {
-		// start adjusting/normalizing the client position in order to zoom towards the mouse cursor's position
-		positionX += owotWidth / 2 - pageX;
-		positionY += owotHeight / 2 - pageY;
-		positionX /= zoom;
-		positionY /= zoom;
+		stopViewportMotion();
+		var targetZoom;
 		if(deltaY < 0) {
 			// zoom in
-			changeZoom((userZoom * 100) * (1.2 ** (-deltaY / 90)), true);
+			targetZoom = (userZoom * 100) * (1.2 ** (-deltaY / 90));
 		} else {
 			// zoom out
-			changeZoom((userZoom * 100) / (1.2 ** (deltaY / 90)), true);
+			targetZoom = (userZoom * 100) / (1.2 ** (deltaY / 90));
 		}
-		positionX *= zoom;
-		positionY *= zoom;
-		positionX -= owotWidth / 2 - pageX;
-		positionY -= owotHeight / 2 - pageY;
+		smoothZoomTo(targetZoom, pageX, pageY);
 		if(isDragging) {
 			// don't fling user to a far location when dragging and zooming
 			dragPosX = positionX;
@@ -4402,6 +4788,19 @@ function event_wheel_zoom(e) {
 		e.preventDefault();
 		zoomGarbageCollect();
 	}
+}
+
+function event_dblclick(e) {
+	if(!e.altKey) return;
+	if(e.target != elm.owot && e.target != linkDiv) return;
+	if(Modal.isOpen || regionSelectionsActive() || w.isLinking || w.isProtecting) return;
+	stopViewportMotion();
+	var pageX = e.pageX * zoomRatio;
+	var pageY = e.pageY * zoomRatio;
+	var dx = pageX - Math.floor(owotWidth / 2);
+	var dy = pageY - Math.floor(owotHeight / 2);
+	smoothPanTo(positionX - dx, positionY - dy);
+	e.preventDefault();
 }
 
 function convertKeyCode(key) {
@@ -4512,6 +4911,195 @@ function createWsPath() {
 	return "ws" + (window.location.protocol == "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/" + search;
 }
 
+var v2Protocol = {
+	enabled: false,
+	encoder: typeof TextEncoder != "undefined" ? new TextEncoder() : null,
+	decoder: typeof TextDecoder != "undefined" ? new TextDecoder("utf-8") : null,
+	magic0: 0x4F, // O
+	magic1: 0x57, // W
+	magic2: 0x32, // 2
+	version: 2,
+	hello: 1,
+	ping: 2,
+	write: 3,
+	fetch: 4,
+	writeResponse: 0x83
+};
+
+function v2IsPacket(data) {
+	if(!data || data.byteLength < 5) return false;
+	var view = new Uint8Array(data, 0, 5);
+	return view[0] == v2Protocol.magic0 &&
+		view[1] == v2Protocol.magic1 &&
+		view[2] == v2Protocol.magic2 &&
+		view[3] == v2Protocol.version;
+}
+
+function v2Packet(type, bodySize) {
+	var buf = new ArrayBuffer(5 + bodySize);
+	var bytes = new Uint8Array(buf);
+	bytes[0] = v2Protocol.magic0;
+	bytes[1] = v2Protocol.magic1;
+	bytes[2] = v2Protocol.magic2;
+	bytes[3] = v2Protocol.version;
+	bytes[4] = type;
+	return buf;
+}
+
+function v2ByteLength(str) {
+	if(!str) return 0;
+	if(v2Protocol.encoder) return v2Protocol.encoder.encode(str).length;
+	return unescape(encodeURIComponent(str)).length;
+}
+
+function v2WriteString(bytes, view, offset, str) {
+	if(!str) {
+		view.setUint16(offset, 0);
+		return offset + 2;
+	}
+	var encoded = v2Protocol.encoder ? v2Protocol.encoder.encode(str) : null;
+	var len = encoded ? encoded.length : v2ByteLength(str);
+	if(len > 65535) len = 65535;
+	view.setUint16(offset, len);
+	offset += 2;
+	if(encoded) {
+		bytes.set(encoded.subarray(0, len), offset);
+	} else {
+		var legacy = unescape(encodeURIComponent(str));
+		for(var i = 0; i < len; i++) bytes[offset + i] = legacy.charCodeAt(i);
+	}
+	return offset + len;
+}
+
+function v2ReadString(bytes, view, state) {
+	if(state.offset + 2 > bytes.length) return null;
+	var len = view.getUint16(state.offset);
+	state.offset += 2;
+	if(state.offset + len > bytes.length) return null;
+	var chunk = bytes.subarray(state.offset, state.offset + len);
+	state.offset += len;
+	if(v2Protocol.decoder) return v2Protocol.decoder.decode(chunk);
+	var str = "";
+	for(var i = 0; i < chunk.length; i++) str += String.fromCharCode(chunk[i]);
+	return decodeURIComponent(escape(str));
+}
+
+function v2Encode(data) {
+	if(!data || data.constructor != Object) return null;
+	if(data.kind == "protocol") {
+		var hello = v2Packet(v2Protocol.hello, 1);
+		new Uint8Array(hello)[5] = 1;
+		return hello;
+	}
+	if(data.kind == "ping") {
+		var ping = v2Packet(v2Protocol.ping, 8);
+		var pingView = new DataView(ping);
+		pingView.setUint32(5, data.request || 0);
+		pingView.setUint32(9, data.id || 0);
+		return ping;
+	}
+	if(data.kind == "fetch") {
+		var rects = data.fetchRectangles || [];
+		var fetch = v2Packet(v2Protocol.fetch, 7 + rects.length * 16);
+		var fetchView = new DataView(fetch);
+		var fetchBytes = new Uint8Array(fetch);
+		var offset = 5;
+		fetchView.setUint32(offset, data.request || 0); offset += 4;
+		fetchBytes[offset++] = (data.utf16 ? 1 : 0) | (data.array ? 2 : 0) | (data.content_only ? 4 : 0) | (data.concat ? 8 : 0);
+		fetchView.setUint16(offset, rects.length); offset += 2;
+		for(var i = 0; i < rects.length; i++) {
+			var rect = rects[i];
+			fetchView.setInt32(offset, rect.minX || 0); offset += 4;
+			fetchView.setInt32(offset, rect.minY || 0); offset += 4;
+			fetchView.setInt32(offset, rect.maxX || 0); offset += 4;
+			fetchView.setInt32(offset, rect.maxY || 0); offset += 4;
+		}
+		return fetch;
+	}
+	if(data.kind == "write") {
+		var edits = data.edits || [];
+		var bodySize = 7;
+		for(var i = 0; i < edits.length; i++) {
+			bodySize += 24 + v2ByteLength(edits[i][5]);
+		}
+		var write = v2Packet(v2Protocol.write, bodySize);
+		var writeView = new DataView(write);
+		var writeBytes = new Uint8Array(write);
+		var offset = 5;
+		writeView.setUint32(offset, data.request || 0); offset += 4;
+		writeBytes[offset++] = (data.public_only ? 1 : 0) | (data.preserve_links ? 2 : 0);
+		writeView.setUint16(offset, edits.length); offset += 2;
+		for(var i = 0; i < edits.length; i++) {
+			var edit = edits[i];
+			writeView.setInt32(offset, edit[0] || 0); offset += 4; // tileY
+			writeView.setInt32(offset, edit[1] || 0); offset += 4; // tileX
+			writeBytes[offset++] = edit[2] || 0; // charY
+			writeBytes[offset++] = edit[3] || 0; // charX
+			writeView.setUint32(offset, (edit[6] || 0) >>> 0); offset += 4; // edit id
+			writeView.setInt32(offset, edit[7] == null ? 0 : edit[7]); offset += 4; // fg color
+			writeView.setInt32(offset, edit[8] == null ? -1 : edit[8]); offset += 4; // bg color
+			offset = v2WriteString(writeBytes, writeView, offset, edit[5]); // UTF-8 grapheme payload
+		}
+		return write;
+	}
+	return null;
+}
+
+function v2Decode(data) {
+	var bytes = new Uint8Array(data);
+	if(!v2IsPacket(data)) return null;
+	var view = new DataView(data);
+	var state = { offset: 5 };
+	var type = bytes[4];
+	// V2 frame layout mirrors backend/utils/bin_packet.js:
+	// bytes 0..2: "OW2", byte 3: protocol version, byte 4: packet type.
+	// Server currently emits binary hello/ping/write responses; rich tile
+	// payloads, links, cursors, and admin metadata intentionally stay on JSON
+	// until matching binary response schemas exist server-side.
+	if(type == v2Protocol.hello) {
+		return {
+			kind: "protocol",
+			protocolVersion: 2,
+			binarySupport: true,
+			capabilities: bytes[state.offset]
+		};
+	}
+	if(type == v2Protocol.ping) {
+		if(state.offset + 8 > bytes.length) return null;
+		return {
+			kind: "ping",
+			request: view.getUint32(state.offset),
+			id: view.getUint32(state.offset + 4)
+		};
+	}
+	if(type == v2Protocol.writeResponse) {
+		if(state.offset + 8 > bytes.length) return null;
+		var request = view.getUint32(state.offset); state.offset += 4;
+		var acceptedLen = view.getUint16(state.offset); state.offset += 2;
+		var accepted = [];
+		for(var i = 0; i < acceptedLen; i++) {
+			if(state.offset + 4 > bytes.length) return null;
+			accepted.push(view.getUint32(state.offset));
+			state.offset += 4;
+		}
+		if(state.offset + 2 > bytes.length) return null;
+		var rejectedLen = view.getUint16(state.offset); state.offset += 2;
+		var rejected = {};
+		for(var i = 0; i < rejectedLen; i++) {
+			if(state.offset + 8 > bytes.length) return null;
+			rejected[view.getUint32(state.offset)] = view.getUint32(state.offset + 4);
+			state.offset += 8;
+		}
+		return {
+			kind: "write",
+			request: request,
+			accepted: accepted,
+			rejected: rejected
+		};
+	}
+	return null;
+}
+
 function createSocket(getChatHist) {
 	getChatHist = !!getChatHist;
 	socket = new ReconnectingWebSocket(ws_path);
@@ -4520,8 +5108,18 @@ function createSocket(getChatHist) {
 
 	socket.binaryType = "arraybuffer";
 	socket.onmessage = function(msg) {
-		var data = JSON.parse(msg.data);
+		var data = msg.data;
+		if(data && data.constructor == ArrayBuffer) {
+			data = v2Decode(data);
+			if(!data) return;
+		} else {
+			data = JSON.parse(data);
+		}
 		var kind = data.kind;
+		if(kind == "protocol" && data.protocolVersion == 2 && data.binarySupport) {
+			v2Protocol.enabled = true;
+			return;
+		}
 		if(ws_functions[kind]) {
 			ws_functions[kind](data);
 		}
@@ -4536,6 +5134,9 @@ function createSocket(getChatHist) {
 		};
 		w.emit("socketOpen", event);
 		if (event.cancel) return true;
+		v2Protocol.enabled = false;
+		var hello = v2Encode({ kind: "protocol" });
+		if(hello) socket.send(hello);
 		clearAllGuestCursors();
 		for(var tile in tiles) {
 			if(tiles[tile] == null) {
@@ -4591,97 +5192,6 @@ function createSocket(getChatHist) {
 	}
 }
 
-function cullRanges(map, width, height) {
-	var completelyFilled = true;
-	for(var i = 0; i < map.length; i++) {
-		if(!map[i]) {
-			completelyFilled = false;
-			break;
-		}
-	}
-	if(completelyFilled) return [];
-	var ranges = [];
-	var iterNum = 0;
-	var lastStartX = 0;
-	var lastStartY = 0;
-	while(true) {
-		var startX = lastStartX;
-		var startY = lastStartY;
-		var startFound = false;
-		var boundX = width - 1;
-		var boundY = height - 1;
-		var wLen = 0;
-		var hLen = 1;
-		for(var i = startY * width + startX; i < width * height; i++) {
-			if(!map[i]) {
-				startX = i % width;
-				startY = Math.floor(i / width);
-				startFound = true;
-				break;
-			}
-		}
-		if(!startFound) break;
-		for(var i = startX; i <= boundX; i++) {
-			if(map[startY * width + i]) break;
-			wLen++;
-		}
-		// first row is skipped
-		for(var y = startY + 1; y <= boundY; y++) {
-			var invRow = false;
-			for(var i = startX; i <= startX + wLen - 1; i++) {
-				if(map[y * width + i]) {
-					invRow = true;
-					break;
-				}
-			}
-			if(invRow) {
-				break;
-			} else {
-				hLen++;
-			}
-		}
-		var endX = startX + wLen - 1;
-		var endY = startY + hLen - 1;
-		for(var y = startY; y <= endY; y++) {
-			for(var x = startX; x <= endX; x++) {
-				map[y * width + x] = true;
-			}
-		}
-		lastStartX = startX;
-		lastStartY = startY;
-		ranges.push([startX, startY, endX, endY]);
-		iterNum++;
-		if(iterNum > width * height) break;
-	}
-	var totalArea = 0;
-	for(var i = 0; i < ranges.length; i++) {
-		var range = ranges[i];
-		var width = Math.abs(range[2] - range[0]) + 1;
-		var height = Math.abs(range[3] - range[1]) + 1;
-		if(width * height > 50 * 50) {
-			if(width > 50 && height > 50) {
-				range[2] -= width - 50; // reduce width
-				range[3] -= height - 50; // reduce height
-				width = 50;
-				height = 50;
-			} else if(width > 50) {
-				range[2] -= width - 50;
-				width = 50;
-			} else if(height > 50) {
-				range[3] -= height - 50;
-				height = 50;
-			}
-		}
-		totalArea += width * height;
-		if(totalArea > 5000) {
-			ranges = ranges.slice(0, i);
-			break;
-		}
-	}
-	if(ranges.length > 50) ranges = ranges.slice(0, 50);
-	return ranges;
-}
-
 function updateRemoteBoundary() {
 	var vis = w.getTileVisibility();
 	var centerX = Math.round(vis.centerX);
@@ -4715,8 +5225,7 @@ function updateRemoteBoundary() {
 			var tile = tiles[i];
 			if(!tile) continue;
 	
-			var dist = (centerX - tileX) ** 2 + (centerY - tileY) ** 2;
-			if(dist > 128 * 128) {
+			if(tileX < x1 || tileX > x2 || tileY < y1 || tileY > y2) {
 				tile.stale = true;
 			}
 		}
@@ -4741,49 +5250,52 @@ function expandLocalBoundary(x, y) {
 
 // fetches only unloaded tiles
 function getAndFetchTiles() {
-	var viewWidth = getWidth(fetchClientMargin);
-	var viewHeight = getHeight(fetchClientMargin);
-	var viewArea = viewWidth * viewHeight;
-	if(!viewArea) return;
-
-	var visibleRange = getVisibleTileRange(fetchClientMargin);
-	var startX = visibleRange[0][0];
-	var startY = visibleRange[0][1];
-	var endX = visibleRange[1][0];
-	var endY = visibleRange[1][1];
-	var map = [];
-	for(var y = startY; y <= endY; y++) {
-		for(var x = startX; x <= endX; x++) {
-			map.push(Tile.exists(x, y) && !isTileStale(x, y));
-		}
-	}
-	var ranges = cullRanges(map, viewWidth, viewHeight);
-
+	var maxFetchArea = 5000;
 	var toFetch = [];
-	for(var i = 0; i < ranges.length; i++) {
-		var range = ranges[i];
-		var bounds = {
-			minX: range[0] + startX + tileFetchOffsetX,
-			minY: range[1] + startY + tileFetchOffsetY,
-			maxX: range[2] + startX + tileFetchOffsetX,
-			maxY: range[3] + startY + tileFetchOffsetY
-		};
-		toFetch.push(bounds);
-		bounds.minX = clipIntMax(bounds.minX);
-		bounds.minY = clipIntMax(bounds.minY);
-		bounds.maxX = clipIntMax(bounds.maxX);
-		bounds.maxY = clipIntMax(bounds.maxY);
-		for(var y = bounds.minY; y <= bounds.maxY; y++) {
-			for(var x = bounds.minX; x <= bounds.maxX; x++) {
-				// reserve tile as 'null' to avoid re-fetching same area
-				if(!isTileStale(x, y)) {
-					Tile.set(x, y, null);
-				} else if(Tile.exists(x, y)) {
-					Tile.get(x, y).stale = false;
+	var usedFetchArea = 0;
+
+	function collectFetchRanges(fetchRange, maxArea) {
+		if(maxArea <= 0) return;
+		var startX = fetchRange[0][0];
+		var startY = fetchRange[0][1];
+		var endX = fetchRange[1][0];
+		var endY = fetchRange[1][1];
+		if(endX < startX || endY < startY) return;
+		for(var y = startY; y <= endY; y++) {
+			var x = startX;
+			while(x <= endX && usedFetchArea < maxArea && toFetch.length < 50) {
+				while(x <= endX && Tile.exists(x, y) && !isTileStale(x, y)) x++;
+				if(x > endX) break;
+				var runStart = x;
+				var runLen = 0;
+				while(x <= endX && runLen < 50 && usedFetchArea + runLen < maxArea &&
+					(!Tile.exists(x, y) || isTileStale(x, y))) {
+					x++;
+					runLen++;
+				}
+				if(!runLen) break;
+				var bounds = {
+					minX: clipIntMax(runStart + tileFetchOffsetX),
+					minY: clipIntMax(y + tileFetchOffsetY),
+					maxX: clipIntMax(runStart + runLen - 1 + tileFetchOffsetX),
+					maxY: clipIntMax(y + tileFetchOffsetY)
+				};
+				toFetch.push(bounds);
+				usedFetchArea += runLen;
+				for(var rx = bounds.minX; rx <= bounds.maxX; rx++) {
+					if(!isTileStale(rx, bounds.minY)) {
+						Tile.set(rx, bounds.minY, null);
+					} else if(Tile.exists(rx, bounds.minY)) {
+						Tile.get(rx, bounds.minY).stale = false;
+					}
 				}
 			}
+			if(usedFetchArea >= maxArea || toFetch.length >= 50) break;
 		}
 	}
+
+	collectFetchRanges(getBufferedTileRange(3), maxFetchArea);
+
 	if(initiallyFetched) {
 		updateRemoteBoundary();
 	}
@@ -4818,7 +5330,7 @@ function clearTiles(all) {
 		boundaryStatus.maxX = 0;
 		boundaryStatus.maxY = 0;
 	} else {
-		var visibleRange = getVisibleTileRange();
+		var visibleRange = getBufferedTileRange(3);
 		var x1 = visibleRange[0][0];
 		var y1 = visibleRange[0][1];
 		var x2 = visibleRange[1][0];
@@ -4839,10 +5351,11 @@ function clearTiles(all) {
 			Tile.delete(pos[1], pos[0]);
 		}
 	}
+	if(!all) pruneTileCache();
 }
 
 function clearVisibleTiles() {
-	var visibleRange = getVisibleTileRange(fetchClientMargin);
+	var visibleRange = getBufferedTileRange(3);
 	var startX = visibleRange[0][0];
 	var startY = visibleRange[0][1];
 	var endX = visibleRange[1][0];
@@ -6703,10 +7216,25 @@ var network = {
 	latestID: 1,
 	callbacks: {},
 	http: networkHTTP,
+	pendingV2Edits: [],
+	pendingV2WriteFrame: false,
+	flushV2Writes: function() {
+		network.pendingV2WriteFrame = false;
+		if(!network.pendingV2Edits.length) return;
+		var edits = network.pendingV2Edits;
+		network.pendingV2Edits = [];
+		network.transmit({
+			kind: "write",
+			edits: edits
+		});
+	},
 	transmit: function(data) {
-		data = JSON.stringify(data);
 		try {
-			w.socket.send(data);
+			if(v2Protocol.enabled) {
+				var bin = v2Encode(data);
+				if(bin) return w.socket.send(bin);
+			}
+			w.socket.send(JSON.stringify(data));
 		} catch(e) {
 			console.warn("Transmission error");
 		}
@@ -6786,6 +7314,17 @@ var network = {
 	},
 	write: function(edits, opts, callback) {
 		if(!opts) opts = {};
+		if(v2Protocol.enabled && !callback && !opts.public_only && !opts.preserve_links) {
+			for(var i = 0; i < edits.length; i++) {
+				network.pendingV2Edits.push(edits[i]);
+			}
+			if(!network.pendingV2WriteFrame) {
+				network.pendingV2WriteFrame = true;
+				var scheduleFrame = typeof requestAnimationFrame == "function" ? requestAnimationFrame : setTimeout;
+				scheduleFrame(network.flushV2Writes);
+			}
+			return;
+		}
 		var writeReq = {
 			kind: "write",
 			edits: edits,
@@ -6974,6 +7513,18 @@ Object.assign(w, {
 		exists: Tile.exists,
 		loaded: Tile.loaded,
 		visible: Tile.visible
+	},
+	motion: {
+		set: function(opts) {
+			if(!opts) return;
+			if(typeof opts.kinetic == "boolean") kineticPanEnabled = opts.kinetic;
+			if(typeof opts.smoothZoom == "boolean") smoothZoomEnabled = opts.smoothZoom;
+			if(typeof opts.friction == "number" && opts.friction > 0 && opts.friction < 1) kineticFriction = opts.friction;
+			if(typeof opts.startVelocity == "number" && opts.startVelocity >= 0) kineticStartVelocity = opts.startVelocity;
+			if(typeof opts.minVelocity == "number" && opts.minVelocity >= 0) kineticMinVelocity = opts.minVelocity;
+			if(typeof opts.maxVelocity == "number" && opts.maxVelocity > 0) kineticMaxVelocity = opts.maxVelocity;
+		},
+		stop: stopViewportMotion
 	},
 	doAnnounce: function(text, announceClass) {
 		if(!announceClass) {
@@ -7486,8 +8037,9 @@ function setupDOMEvents() {
 	document.addEventListener("touchend", event_touchend);
 	document.addEventListener("touchmove", event_touchmove, { passive: false });
 	document.addEventListener("wheel", event_wheel_zoom, { passive: false });
-	document.addEventListener("wheel", event_wheel, { passive: false });
-	document.addEventListener("mousemove", event_mousemove);
+	document.addEventListener("wheel", event_wheel_coalesced, { passive: false });
+	document.addEventListener("dblclick", event_dblclick);
+	document.addEventListener("mousemove", event_mousemove_coalesced);
 	document.addEventListener("keydown", event_keydown);
 	document.addEventListener("keyup", event_keyup);
 	document.addEventListener("mouseup", event_mouseup);
@@ -8109,10 +8661,7 @@ var ws_functions = {
 		w.emit("afterFetch", data);
 		updateHoveredLink(null, null, null, true);
 		// too many tiles, remove tiles outside of the viewport
-		var tileLim = Math.floor(getArea(fetchClientMargin) * 1.5 / zoom + 1000);
-		if(w.tile.count > tileLim && unloadTilesAuto) {
-			clearTiles();
-		}
+		if(unloadTilesAuto) pruneTileCache();
 	},
 	colors: function(data) {
 		// update all world colors
@@ -8241,10 +8790,7 @@ var ws_functions = {
 			}
 		}
 		if(highlights.length > 0 && useHighlight) highlight(highlights);
-		var tileLim = Math.floor(getArea(fetchClientMargin) * 1.5 / zoom + 1000);
-		if(w.tile.count > tileLim && unloadTilesAuto) {
-			clearTiles();
-		}
+		if(unloadTilesAuto) pruneTileCache();
 		w.emit("afterTileUpdate", data);
 	},
 	tileUpdateDirect: function(data) {

@@ -44,14 +44,29 @@ function partitionRectangle(rect) {
 	return res;
 }
 
+function getMemTile(memTileCache, worldID, tileY, tileX) {
+	return memTileCache[worldID] && memTileCache[worldID][tileY] && memTileCache[worldID][tileY][tileX];
+}
+
+function subRectFullyCached(memTileCache, worldID, x1, y1, x2, y2) {
+	for(var ty = y1; ty <= y2; ty++) {
+		for(var tx = x1; tx <= x2; tx++) {
+			if(!getMemTile(memTileCache, worldID, ty, tx)) return false;
+		}
+	}
+	return true;
+}
+
 module.exports = async function(data, server, params) {
 	var world = params.world;
 
 	var memTileCache = server.memTileCache;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
 	var tile_fetcher = server.tile_fetcher;
+	var tile_database = server.tile_database;
 
 	var tiles = {};
+	var tileKeys = [];
 	var fetchRectLimit = 50;
 	var totalAreaLimit = 5000;
 
@@ -127,36 +142,43 @@ module.exports = async function(data, server, params) {
 			var y2 = subRect[3];
 			for(var ty = y1; ty <= y2; ty++) {
 				for(var tx = x1; tx <= x2; tx++) {
-					tiles[ty + "," + tx] = null;
+					var key = ty + "," + tx;
+					if(!(key in tiles)) {
+						tiles[key] = null;
+						tileKeys.push(key, ty, tx);
+					}
 				}
 			}
 
-			var tileData = await tile_fetcher.fetch(ipAddress, world.id, subRect, params.channel);
-			if(params.ws && params.ws.readyState !== WebSocket.OPEN) {
-				tile_fetcher.cancel(params.channel);
-				return null;
-			}
-			// merge our fetched tiles together
-			for(var t = 0; t < tileData.length; t++) {
-				var tileX = tileData[t].tileX;
-				var tileY = tileData[t].tileY;
-				fetchedTiles[tileY + "," + tileX] = tileData[t];
+			if(!subRectFullyCached(memTileCache, world.id, x1, y1, x2, y2)) {
+				var tileData = await tile_fetcher.fetch(ipAddress, world.id, subRect, params.channel);
+				if(params.ws && params.ws.readyState !== WebSocket.OPEN) {
+					tile_fetcher.cancel(params.channel);
+					return null;
+				}
+				// merge our fetched tiles together
+				for(var t = 0; t < tileData.length; t++) {
+					var tileX = tileData[t].tileX;
+					var tileY = tileData[t].tileY;
+					fetchedTiles[tileY + "," + tileX] = tileData[t];
+				}
 			}
 		}
 	}
 
 	// normalize the retrieved tiles
 	// first - we must check the cache for more up-to-date tile data
-	for(var i in tiles) {
-		var pos = i.split(",");
-		var tileX = parseInt(pos[1]);
-		var tileY = parseInt(pos[0]);
+	for(var k = 0; k < tileKeys.length; k += 3) {
+		var i = tileKeys[k];
+		var tileY = tileKeys[k + 1];
+		var tileX = tileKeys[k + 2];
 		var dbTile = fetchedTiles[i];
 
 		var properties, content;
 
-		if(memTileCache[world.id] && memTileCache[world.id][tileY] && memTileCache[world.id][tileY][tileX]) {
-			var memTile = memTileCache[world.id][tileY][tileX];
+		var memTile = getMemTile(memTileCache, world.id, tileY, tileX);
+		if(memTile) {
+			tile_database.touchCachedTile(world.id, tileX, tileY, memTile);
 			var normTile = normalizeCacheTile(memTile);
 			properties = normTile.properties;
 			content = normTile.content;
@@ -186,6 +208,7 @@ module.exports = async function(data, server, params) {
 				alt_return_obj = "";
 			}
 			var joinedTiles = {};
+			var joinedContent = q_array ? null : [];
 			for(var i = 0; i < len; i++) {
 				var reg = data.fetchRectangles[i];
 				var x1 = reg.minX;
@@ -202,10 +225,13 @@ module.exports = async function(data, server, params) {
 						if(q_array) {
 							alt_return_obj.push(...tile.content);
 						} else {
-							alt_return_obj += tile.content;
+							joinedContent.push(tile.content);
 						}
 					}
 				}
+			}
+			if(!q_array) {
+				alt_return_obj = joinedContent.join("");
 			}
 		} else {
 			for(var i in tiles) {

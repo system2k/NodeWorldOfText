@@ -4,6 +4,12 @@ var renderQueue = [];
 var renderQueueMap = new Map();
 var canBypassRenderDefer = true;
 var renderSerial = 1;
+var rgbStringCache = Object.create(null);
+
+function getRGBString(color) {
+	color = color & 0xFFFFFF;
+	return rgbStringCache[color] || (rgbStringCache[color] = "rgb(" + (color >> 16 & 255) + "," + (color >> 8 & 255) + "," + (color & 255) + ")");
+}
 
 function isTileQueued(x, y) {
 	var pos = y + "," + x;
@@ -308,44 +314,59 @@ function getTileScreenPosition(tileX, tileY) {
 
 function getVisibleTileRange(margin) {
 	if(!margin) margin = 0;
-	var A = getTileCoordsFromMouseCoords(0 - margin, 0 - margin);
-	var B = getTileCoordsFromMouseCoords(owotWidth - 1 + margin, owotHeight - 1 + margin);
-	var startX = clipIntMax(A[0]);
-	var startY = clipIntMax(A[1]);
-	var endX = clipIntMax(B[0]);
-	var endY = clipIntMax(B[1]);
-	if(startX > endX || startY > endY || (B[0] - A[0] + 1) > 100000 || (B[1] - A[1] + 1) > 100000) {
+	var halfW = Math.trunc(owotWidth / 2);
+	var halfH = Math.trunc(owotHeight / 2);
+	var startXRaw = Math.floor(((0 - margin) - positionX - halfW) / tileW);
+	var startYRaw = Math.floor(((0 - margin) - positionY - halfH) / tileH);
+	var endXRaw = Math.floor(((owotWidth - 1 + margin) - positionX - halfW) / tileW);
+	var endYRaw = Math.floor(((owotHeight - 1 + margin) - positionY - halfH) / tileH);
+	var startX = clipIntMax(startXRaw);
+	var startY = clipIntMax(startYRaw);
+	var endX = clipIntMax(endXRaw);
+	var endY = clipIntMax(endYRaw);
+	if(startX > endX || startY > endY || (endXRaw - startXRaw + 1) > 100000 || (endYRaw - startYRaw + 1) > 100000) {
 		throw "Invalid ranges";
 	}
 	return [[startX, startY], [endX, endY]];
 }
 
+function getBufferedTileRange(buffer) {
+	if(!buffer) buffer = 0;
+	var range = getVisibleTileRange(0);
+	var startX = range[0][0] - buffer;
+	var startY = range[0][1] - buffer;
+	var endX = range[1][0] + buffer;
+	var endY = range[1][1] + buffer;
+	return [[clipIntMax(startX), clipIntMax(startY)], [clipIntMax(endX), clipIntMax(endY)]];
+}
+
+function tileInRange(tileX, tileY, range) {
+	return tileX >= range[0][0] && tileX <= range[1][0] && tileY >= range[0][1] && tileY <= range[1][1];
+}
+
 function getVisibleTiles(margin) {
 	if(!margin) margin = 0;
-	var A = getTileCoordsFromMouseCoords(0 - margin, 0 - margin);
-	var B = getTileCoordsFromMouseCoords(owotWidth - 1 + margin, owotHeight - 1 + margin);
-	return getRange(A[0], A[1], B[0], B[1]);
+	var range = getVisibleTileRange(margin);
+	return getRange(range[0][0], range[0][1], range[1][0], range[1][1]);
 }
 
 function getWidth(margin) {
 	if(!margin) margin = 0;
-	var A = getTileCoordsFromMouseCoords(0 - margin, 0);
-	var B = getTileCoordsFromMouseCoords(owotWidth - 1 + margin, 0);
-	return B[0] - A[0] + 1;
+	var halfW = Math.trunc(owotWidth / 2);
+	return Math.floor(((owotWidth - 1 + margin) - positionX - halfW) / tileW) -
+		Math.floor(((0 - margin) - positionX - halfW) / tileW) + 1;
 }
 
 function getHeight(margin) {
 	if(!margin) margin = 0;
-	var A = getTileCoordsFromMouseCoords(0, 0 - margin);
-	var B = getTileCoordsFromMouseCoords(0, owotHeight - 1 + margin);
-	return B[1] - A[1] + 1;
+	var halfH = Math.trunc(owotHeight / 2);
+	return Math.floor(((owotHeight - 1 + margin) - positionY - halfH) / tileH) -
+		Math.floor(((0 - margin) - positionY - halfH) / tileH) + 1;
 }
 
 function getArea(margin) {
 	if(!margin) margin = 0;
-	var A = getTileCoordsFromMouseCoords(0 - margin, 0 - margin);
-	var B = getTileCoordsFromMouseCoords(owotWidth - 1 + margin, owotHeight - 1 + margin);
-	return (B[0] - A[0] + 1) * (B[1] - A[1] + 1);
+	return getWidth(margin) * getHeight(margin);
 }
 
 function tileAndCharsToWindowCoords(tileX, tileY, charX, charY) {
@@ -847,7 +868,7 @@ function renderChar(textRender, offsetX, offsetY, char, color, cellW, cellH, pro
 	if(color == 0 || !colorsEnabled || (isLink && !colorizeLinks)) {
 		textRender.fillStyle = linkColor;
 	} else {
-		textRender.fillStyle = `rgb(${color >> 16 & 255},${color >> 8 & 255},${color & 255})`;
+		textRender.fillStyle = getRGBString(color);
 	}
 
 	// x padding of text if the char width is > 10
@@ -1168,6 +1189,8 @@ function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, off
 	}
 	var hasDrawn = false;
 	var tileBgCells = coloredChars[str];
+	var baseCellW = clampW / tileC;
+	var baseCellH = clampH / tileR;
 	for(var y = y1; y <= y2; y++) {
 		var tileRowBgCells = null;
 		var tileRowProps = null;
@@ -1194,14 +1217,12 @@ function renderContent(textRenderCtx, tileX, tileY, clampW, clampH, offsetX, off
 			var char = tileContent[y * tileC + x];
 			var color = tileColors ? tileColors[y * tileC + x] : 0;
 
-			var tmpCellW = clampW / tileC;
-			var tmpCellH = clampH / tileR;
-			var sx = Math.floor(x * tmpCellW);
-			var sy = Math.floor(y * tmpCellH);
-			var ex = Math.floor((x + 1) * tmpCellW);
-			var ey = Math.floor((y + 1) * tmpCellH);
-			tmpCellW = ex - sx;
-			tmpCellH = ey - sy;
+			var sx = Math.floor(x * baseCellW);
+			var sy = Math.floor(y * baseCellH);
+			var ex = Math.floor((x + 1) * baseCellW);
+			var ey = Math.floor((y + 1) * baseCellH);
+			var tmpCellW = ex - sx;
+			var tmpCellH = ey - sy;
 
 			var offX = sx + offsetX;
 			var offY = sy + offsetY;
@@ -1228,6 +1249,8 @@ function renderCellBgColors(textRenderCtx, tileX, tileY, clampW, clampH) {
 	var bgcolors = tile.properties.bgcolor;
 	var hasDrawn = false;
 	if(!bgcolors) return;
+	var tmpCellW = clampW / tileC;
+	var tmpCellH = clampH / tileR;
 	for(let y = 0; y < tileR; y++) {
 		for(let x = 0; x < tileC; x++) {
 			let bgColor = bgcolors[y * tileC + x];
@@ -1238,13 +1261,11 @@ function renderCellBgColors(textRenderCtx, tileX, tileY, clampW, clampH) {
 			}
 			if(bgColor == -1) continue;
 			if(containsCursor && cursorCoords && cursorCoords[2] == x && cursorCoords[3] == y) continue;
-			let tmpCellW = clampW / tileC;
-			let tmpCellH = clampH / tileR;
 			let sx = Math.floor(x * tmpCellW);
 			let sy = Math.floor(y * tmpCellH);
 			let ex = Math.floor((x + 1) * tmpCellW);
 			let ey = Math.floor((y + 1) * tmpCellH);
-			textRenderCtx.fillStyle = `rgb(${bgColor >> 16 & 255},${bgColor >> 8 & 255},${bgColor & 255})`;
+			textRenderCtx.fillStyle = getRGBString(bgColor);
 			textRenderCtx.fillRect(sx, sy, ex - sx, ey - sy);
 			hasDrawn = true;
 		}
@@ -1424,12 +1445,7 @@ function renderTile(tileX, tileY) {
 		} else {
 			// tile has no cached image, and rendering is in progress
 			if(transparentBackground) {
-				if(shiftOptimization) {
-					owotCtx.fillStyle = "#C0C0C0";
-					owotCtx.fillRect(offsetX, offsetY, clampW, clampH);
-				} else {
-					clearTile(tileX, tileY);
-				}
+				clearTile(tileX, tileY);
 			}
 		}
 	}
@@ -1454,15 +1470,18 @@ function renderNextTilesInQueue() {
 	var start = performance.now();
 	var size = renderQueue.length;
 	var fastQueue = true;
+	var bakeRange = getBufferedTileRange(3);
 	for(var i = 0; i < size; i++) {
-		var tileCoords = renderQueue.shift();
+		var tileCoords = renderQueue[i];
 		if(tileCoords) {
 			var tileX = tileCoords[0];
 			var tileY = tileCoords[1];
 			var tile = Tile.get(tileX, tileY);
 			renderQueueMap.delete(tileY + "," + tileX);
-			if(Tile.visible(tileX, tileY)) {
+			if(tile && tileInRange(tileX, tileY, bakeRange)) {
 				drawTile(tileX, tileY);
+			}
+			if(Tile.visible(tileX, tileY)) {
 				renderTile(tileX, tileY);
 			} else if(tile) {
 				tile.redraw = true;
@@ -1477,8 +1496,12 @@ function renderNextTilesInQueue() {
 		}
 		var end = performance.now();
 		var diff = end - start;
-		if(diff >= 16 && (!fastQueue || diff > 700)) break;
+		if(diff >= 16 && (!fastQueue || diff > 700)) {
+			i++;
+			break;
+		}
 	}
+	if(i > 0) renderQueue.splice(0, i);
 }
 
 // the 'redraw' parameter is deprecated
@@ -1488,56 +1511,25 @@ function renderTiles(redraw) {
 	if(unloadedPatternPanning) {
 		elm.owot.style.backgroundPosition = positionX + "px " + positionY + "px";
 	}
-	var optShifted = false;
-	var canOptimizeShift = shiftOptimization && zoom <= 0.5 && shiftOptState.zoom == zoom;
-	if(!canOptimizeShift) {
-		owotCtx.clearRect(0, 0, owotWidth, owotHeight);
-	} else {
-		owotCtx.drawImage(owot, Math.floor(positionX) - shiftOptState.prevX, Math.floor(positionY) - shiftOptState.prevY);
-		optShifted = true;
-	}
+	owotCtx.clearRect(0, 0, owotWidth, owotHeight);
 	if(redraw) w.redraw();
 	// render all visible tiles
-	var visibleRange = getVisibleTileRange(1.0);
+	var visibleRange = getBufferedTileRange(3);
 	var startX = visibleRange[0][0];
 	var startY = visibleRange[0][1];
 	var endX = visibleRange[1][0];
 	var endY = visibleRange[1][1];
 	for(var y = startY; y <= endY; y++) {
 		for(var x = startX; x <= endX; x++) {
-			var tile = Tile.get(x, y);
-			var shouldRender = false;
-			if(tile) {
-				shouldRender = tile.redraw || tile.rerender || (tile.serial && tile.serial != renderSerial);
-			}
-			if(optShifted && !shouldRender) {
-				// at really far zooms, we can just shift the whole screen and only blit the tiles beyond the edges
-				if(!(shiftOptState.x1 < x && x < shiftOptState.x2 && shiftOptState.y1 < y && y < shiftOptState.y2)) {
-					renderTile(x, y);
-				}
-			} else {
-				renderTile(x, y);
-			}
-			if(optShifted && !Tile.loaded(x, y)) {
-				clearTile(x, y);
-			}
+			renderTile(x, y);
 		}
-	}
-	if(shiftOptimization) {
-		shiftOptState.prevX = Math.floor(positionX);
-		shiftOptState.prevY = Math.floor(positionY);
-		shiftOptState.x1 = startX;
-		shiftOptState.y1 = startY;
-		shiftOptState.x2 = endX;
-		shiftOptState.y2 = endY;
-		shiftOptState.zoom = zoom;
 	}
 	w.emit("tilesRendered");
 }
 
 // re-render only tiles that have changed to the screen
 function renderTilesSelective() {
-	var visibleRange = getVisibleTileRange(1.0);
+	var visibleRange = getBufferedTileRange(3);
 	var startX = visibleRange[0][0];
 	var startY = visibleRange[0][1];
 	var endX = visibleRange[1][0];
@@ -1557,7 +1549,7 @@ function renderTilesSelective() {
 }
 
 function setRedrawPatterned(pattern) {
-	var visibleRange = getVisibleTileRange(1.0);
+	var visibleRange = getBufferedTileRange(3);
 	var startX = visibleRange[0][0];
 	var startY = visibleRange[0][1];
 	var endX = visibleRange[1][0];
@@ -1620,7 +1612,7 @@ function renderCursorOutline(renderCtx, offsetX, offsetY) {
 	var tileY = cursorCoords[1];
 	var charX = cursorCoords[2];
 	var charY = cursorCoords[3];
-	renderCtx.strokeStyle = "rgb(" + (color >> 16 & 255) + "," + (color >> 8 & 255) + "," + (color & 255) + ")";
+	renderCtx.strokeStyle = getRGBString(color);
 	renderCtx.lineWidth = 2;
 	renderCtx.beginPath();
 	renderCtx.rect(offsetX + charX * cellW + 1, offsetY + charY * cellH + 1, cellW - 2, cellH - 2);

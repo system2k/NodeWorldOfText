@@ -347,43 +347,257 @@ function encode(data) {
 	return JSON.stringify(bin);
 }
 
-/*encode({
-	"kind": "write",
-	"edits": [
-		[-1,0,2,2,1561251059010,"t",1,16711680],
-		[-1,0,2,3,1561251059054,"e",2,16711680],
-		[-1,0,2,4,1561251059114,"s",3,16711680],
-		[-1,0,2,5,1561251059144,"t",4,16711680, ["PWD03859136", 500, true, [
-			["abcdefg", [123, 123, 123, 123, 123, 123, 123]],
-			["fdsajkl", [321, 321, 321, 321, 321, 321, 321]]
-		]]]
-	],
-	public_only: true,
-	preserve_links: true,
-	bypass: "abc123"
-});*/
+var V2_MAGIC_0 = 0x4F; // O
+var V2_MAGIC_1 = 0x57; // W
+var V2_MAGIC_2 = 0x32; // 2
+var V2_VERSION = 2;
+var V2_HELLO = 1;
+var V2_PING = 2;
+var V2_WRITE = 3;
+var V2_FETCH = 4;
+var V2_WRITE_RESPONSE = 0x83;
+var V2_SCRATCH_SIZE = 1024 * 64;
+var v2Scratch = Buffer.allocUnsafe(V2_SCRATCH_SIZE);
 
-/*encode({
-	"kind":"fetch",
-	"fetchRectangles": [
-		{"minX":-12,"minY":-1,"maxX":-9,"maxY":6},
-		{"minX":-8,"minY":4,"maxX":2,"maxY":6}
-	],
-	utf16: true,
-	array: true,
-	content_only: true,
-	concat: true
-});*/
-
-function encode_response(data) {
-	var type = data.kind;
-	if(type == "fetch") {
-		
-	}
+function isV2Packet(data) {
+	return data && data.length >= 5 &&
+		data[0] == V2_MAGIC_0 && data[1] == V2_MAGIC_1 && data[2] == V2_MAGIC_2 &&
+		data[3] == V2_VERSION;
 }
 
-function decode(data) {
+function byteLengthString(str) {
+	if(!str) return 0;
+	return Buffer.byteLength(str);
+}
 
+function writeString(buf, offset, str) {
+	if(!str) {
+		buf.writeUInt16BE(0, offset);
+		return offset + 2;
+	}
+	var len = Buffer.byteLength(str);
+	if(len > 65535) len = 65535;
+	buf.writeUInt16BE(len, offset);
+	offset += 2;
+	buf.write(str, offset, len);
+	return offset + len;
+}
+
+function readString(buf, state) {
+	if(state.offset + 2 > buf.length) return null;
+	var len = buf.readUInt16BE(state.offset);
+	state.offset += 2;
+	if(state.offset + len > buf.length) return null;
+	var str = buf.toString("utf8", state.offset, state.offset + len);
+	state.offset += len;
+	return str;
+}
+
+function allocV2Packet(type, bodySize) {
+	var packetSize = 5 + bodySize;
+	var buf = packetSize <= V2_SCRATCH_SIZE ? v2Scratch : Buffer.allocUnsafe(packetSize);
+	buf[0] = V2_MAGIC_0;
+	buf[1] = V2_MAGIC_1;
+	buf[2] = V2_MAGIC_2;
+	buf[3] = V2_VERSION;
+	buf[4] = type;
+	return [buf, packetSize];
+}
+
+function finishV2Packet(packet) {
+	// Small packets are copied out of the reusable scratch buffer because ws.send is async.
+	// Larger packets already own their Buffer and can be passed through unchanged.
+	var buf = packet[0];
+	var len = packet[1];
+	if(buf === v2Scratch) return Buffer.from(buf.subarray(0, len));
+	return len == buf.length ? buf : buf.subarray(0, len);
+}
+
+function decodeV2(data) {
+	var buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+	if(!isV2Packet(buf)) return null;
+	var state = { offset: 5 };
+	var type = buf[4];
+	if(type == V2_HELLO) {
+		if(state.offset + 1 > buf.length) return null;
+		return {
+			kind: "protocol",
+			protocolVersion: 2,
+			binarySupport: true,
+			capabilities: buf[state.offset]
+		};
+	}
+	if(type == V2_PING) {
+		if(state.offset + 8 > buf.length) return null;
+		return {
+			kind: "ping",
+			request: buf.readUInt32BE(state.offset),
+			id: buf.readUInt32BE(state.offset + 4)
+		};
+	}
+	if(type == V2_FETCH) {
+		if(state.offset + 7 > buf.length) return null;
+		var request = buf.readUInt32BE(state.offset);
+		state.offset += 4;
+		var flags = buf[state.offset++];
+		var count = buf.readUInt16BE(state.offset);
+		state.offset += 2;
+		var fetchRectangles = [];
+		for(var i = 0; i < count; i++) {
+			if(state.offset + 16 > buf.length) return null;
+			fetchRectangles.push({
+				minX: buf.readInt32BE(state.offset),
+				minY: buf.readInt32BE(state.offset + 4),
+				maxX: buf.readInt32BE(state.offset + 8),
+				maxY: buf.readInt32BE(state.offset + 12)
+			});
+			state.offset += 16;
+		}
+		return {
+			kind: "fetch",
+			request,
+			fetchRectangles,
+			utf16: !!(flags & 1),
+			array: !!(flags & 2),
+			content_only: !!(flags & 4),
+			concat: !!(flags & 8)
+		};
+	}
+	if(type == V2_WRITE) {
+		if(state.offset + 7 > buf.length) return null;
+		var request = buf.readUInt32BE(state.offset);
+		state.offset += 4;
+		var flags = buf[state.offset++];
+		var count = buf.readUInt16BE(state.offset);
+		state.offset += 2;
+		var edits = [];
+		for(var i = 0; i < count; i++) {
+			if(state.offset + 22 > buf.length) return null;
+			var tileY = buf.readInt32BE(state.offset);
+			var tileX = buf.readInt32BE(state.offset + 4);
+			var charY = buf[state.offset + 8];
+			var charX = buf[state.offset + 9];
+			var editId = buf.readUInt32BE(state.offset + 10);
+			var color = buf.readInt32BE(state.offset + 14);
+			var bgColor = buf.readInt32BE(state.offset + 18);
+			state.offset += 22;
+			var char = readString(buf, state);
+			if(char === null) return null;
+			edits.push([tileY, tileX, charY, charX, 0, char, editId, color, bgColor]);
+		}
+		return {
+			kind: "write",
+			request,
+			edits,
+			public_only: !!(flags & 1),
+			preserve_links: !!(flags & 2)
+		};
+	}
+	return null;
+}
+
+function encodeV2Hello() {
+	var packet = allocV2Packet(V2_HELLO, 1);
+	var buf = packet[0];
+	buf[5] = 1;
+	return finishV2Packet(packet);
+}
+
+function encodeV2Ping(data) {
+	var packet = allocV2Packet(V2_PING, 8);
+	var buf = packet[0];
+	buf.writeUInt32BE(data.request || 0, 5);
+	buf.writeUInt32BE(data.id || 0, 9);
+	return finishV2Packet(packet);
+}
+
+function encodeV2WriteResponse(data) {
+	var accepted = Array.isArray(data.accepted) ? data.accepted : [];
+	var rejected = data.rejected || {};
+	var rejectedKeys = Object.keys(rejected);
+	var packet = allocV2Packet(V2_WRITE_RESPONSE, 4 + 2 + accepted.length * 4 + 2 + rejectedKeys.length * 8);
+	var buf = packet[0];
+	var offset = 5;
+	buf.writeUInt32BE(data.request || 0, offset);
+	offset += 4;
+	buf.writeUInt16BE(accepted.length, offset);
+	offset += 2;
+	for(var i = 0; i < accepted.length; i++) {
+		buf.writeUInt32BE(accepted[i] >>> 0, offset);
+		offset += 4;
+	}
+	buf.writeUInt16BE(rejectedKeys.length, offset);
+	offset += 2;
+	for(var i = 0; i < rejectedKeys.length; i++) {
+		var key = +rejectedKeys[i];
+		buf.writeUInt32BE(key >>> 0, offset);
+		buf.writeUInt32BE((rejected[rejectedKeys[i]] || 0) >>> 0, offset + 4);
+		offset += 8;
+	}
+	return finishV2Packet(packet);
+}
+
+function encodeV2Request(data) {
+	if(!data || data.constructor != Object) return null;
+	if(data.kind == "protocol") return encodeV2Hello();
+	if(data.kind == "ping") return encodeV2Ping(data);
+	if(data.kind == "fetch") {
+		var rects = data.fetchRectangles || [];
+		var packet = allocV2Packet(V2_FETCH, 7 + rects.length * 16);
+		var buf = packet[0];
+		var offset = 5;
+		buf.writeUInt32BE(data.request || 0, offset);
+		offset += 4;
+		buf[offset++] = (data.utf16 ? 1 : 0) | (data.array ? 2 : 0) | (data.content_only ? 4 : 0) | (data.concat ? 8 : 0);
+		buf.writeUInt16BE(rects.length, offset);
+		offset += 2;
+		for(var i = 0; i < rects.length; i++) {
+			var rect = rects[i];
+			buf.writeInt32BE(rect.minX || 0, offset);
+			buf.writeInt32BE(rect.minY || 0, offset + 4);
+			buf.writeInt32BE(rect.maxX || 0, offset + 8);
+			buf.writeInt32BE(rect.maxY || 0, offset + 12);
+			offset += 16;
+		}
+		return finishV2Packet(packet);
+	}
+	if(data.kind == "write") {
+		var edits = data.edits || [];
+		var bodySize = 7;
+		for(var i = 0; i < edits.length; i++) {
+			bodySize += 22 + 2 + byteLengthString(edits[i][5]);
+		}
+		var packet = allocV2Packet(V2_WRITE, bodySize);
+		var buf = packet[0];
+		var offset = 5;
+		buf.writeUInt32BE(data.request || 0, offset);
+		offset += 4;
+		buf[offset++] = (data.public_only ? 1 : 0) | (data.preserve_links ? 2 : 0);
+		buf.writeUInt16BE(edits.length, offset);
+		offset += 2;
+		for(var i = 0; i < edits.length; i++) {
+			var edit = edits[i];
+			buf.writeInt32BE(edit[0] || 0, offset);
+			buf.writeInt32BE(edit[1] || 0, offset + 4);
+			buf[offset + 8] = edit[2] || 0;
+			buf[offset + 9] = edit[3] || 0;
+			buf.writeUInt32BE((edit[6] || 0) >>> 0, offset + 10);
+			buf.writeInt32BE(edit[7] == null ? 0 : edit[7], offset + 14);
+			buf.writeInt32BE(edit[8] == null ? -1 : edit[8], offset + 18);
+			offset += 22;
+			offset = writeString(buf, offset, edit[5]);
+		}
+		return finishV2Packet(packet);
+	}
+	return null;
+}
+
+function encodeV2Response(data) {
+	if(!data || data.constructor != Object) return null;
+	if(data.kind == "ping") return encodeV2Ping(data);
+	if(data.kind == "write") return encodeV2WriteResponse(data);
+	if(data.kind == "protocol") return encodeV2Hello();
+	return null;
 }
 /*
 
@@ -432,5 +646,8 @@ announcement - 'a'
 
 module.exports = {
 	encode,
-	decode
+	decodeV2,
+	encodeV2Request,
+	encodeV2Response,
+	isV2Packet
 };
