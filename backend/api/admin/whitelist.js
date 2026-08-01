@@ -61,6 +61,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 
 	var db_misc = server.db_misc;
 	var siteWhitelistStatus = server.siteWhitelistStatus;
+	var siteWhitelistCache = server.siteWhitelistCache;
 
 	if(!user.superuser) {
 		return await callPage("404");

@@ -128,6 +128,9 @@
 			"no_captcha", "few_captcha",
 			"pchat_anon"
 		];
+		var uncheckedByDefaultWhitelistHeaders = [
+			"no_captcha"
+		];
 
 		var tempIdMax = 1;
 		var updatedWhitelistFeatures = {};
@@ -374,13 +377,6 @@
 				});
 			});
 
-			// add_by_uid / wl_add_user_id
-			// add_by_ip / wl_add_ip
-			// add_by_username / wl_add_username
-			// add_by_world_name / wl_add_world_name
-
-			// wl_sub_user / wl_sub_ip / wl_sub_world
-
 			wl_sub_user.addEventListener("click", function() {
 				let updates = updatedWhitelistOptions.user;
 				let additions = addedWhitelistOptions.user;
@@ -520,7 +516,8 @@
 					return;
 				}
 				let newId = "-" + tempIdMax++;
-				let optMap = Object.fromEntries(whitelistHeaders.map(h => [h, true]));
+				let checkedHeaders = Array.from(new Set(whitelistHeaders).difference(new Set(uncheckedByDefaultWhitelistHeaders)));
+				let optMap = Object.fromEntries(checkedHeaders.map(h => [h, true]));
 
 				let newRow = addDataToWhitelistTable(document.getElementById("wl_user").querySelector(".whitelist_table>tbody"), "user", {
 					id: newId,
@@ -544,7 +541,8 @@
 					return;
 				}
 				let newId = "-" + tempIdMax++;
-				let optMap = Object.fromEntries(whitelistHeaders.map(h => [h, true]));
+				let checkedHeaders = Array.from(new Set(whitelistHeaders).difference(new Set(uncheckedByDefaultWhitelistHeaders)));
+				let optMap = Object.fromEntries(checkedHeaders.map(h => [h, true]));
 
 				let newRow = addDataToWhitelistTable(document.getElementById("wl_user").querySelector(".whitelist_table>tbody"), "user", {
 					id: newId,
@@ -565,7 +563,8 @@
 				let ip = wl_add_ip.value;
 
 				let newId = "-" + tempIdMax++;
-				let optMap = Object.fromEntries(whitelistHeaders.map(h => [h, true]));
+				let checkedHeaders = Array.from(new Set(whitelistHeaders).difference(new Set(uncheckedByDefaultWhitelistHeaders)));
+				let optMap = Object.fromEntries(checkedHeaders.map(h => [h, true]));
 
 				let newRow = addDataToWhitelistTable(document.getElementById("wl_ip").querySelector(".whitelist_table>tbody"), "ip", {
 					id: newId,
@@ -585,7 +584,8 @@
 				let world_name = wl_add_world_name.value;
 
 				let newId = "-" + tempIdMax++;
-				let optMap = Object.fromEntries(whitelistHeaders.map(h => [h, true]));
+				let checkedHeaders = Array.from(new Set(whitelistHeaders).difference(new Set(uncheckedByDefaultWhitelistHeaders)));
+				let optMap = Object.fromEntries(checkedHeaders.map(h => [h, true]));
 
 				let newRow = addDataToWhitelistTable(document.getElementById("wl_world").querySelector(".whitelist_table>tbody"), "world", {
 					id: newId,
@@ -614,7 +614,6 @@
 			wl_lda_ip.addEventListener("click", async function() {
 				for(let i = 0; i < 999; i++) {
 					let ld = await wlLoadIp();
-					console.log({ld})
 					if(!ld) break;
 					await { then: (res) => setTimeout(res, 1000 / 4) };
 				}
