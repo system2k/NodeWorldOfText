@@ -87,7 +87,8 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		client_version: getClientVersion(),
 		csrftoken,
 		global_chat_enabled: getServerSetting("chatGlobalEnabled") == "1",
-		global_chat_no_anon: getServerSetting("chatGlobalNoAnon") == "1"
+		global_chat_no_anon: getServerSetting("chatGlobalNoAnon") == "1",
+		sockets_per_ip: getServerSetting("socketsPerIp")
 	};
 
 	write(render("administrator.html", data));
@@ -142,6 +143,9 @@ module.exports.POST = async function(req, write, server, ctx) {
 			}
 		} else {
 			updateServerSetting("chatGlobalNoAnon", "0");
+		}
+		if("sockets_per_ip" in post_data) {
+			updateServerSetting("socketsPerIp", post_data.sockets_per_ip.toString());
 		}
 	}
 	if("announcement" in post_data) {

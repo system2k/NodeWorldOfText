@@ -116,7 +116,8 @@ var sql_edits_init = "./backend/edits.sql";
 var serverSettings = {
 	announcement: "",
 	chatGlobalEnabled: "1",
-	chatGlobalNoAnon: "0"
+	chatGlobalNoAnon: "0",
+	socketsPerIp: "50"
 };
 var serverSettingsStatus = {};
 
@@ -137,7 +138,6 @@ var isStopping = false;
 var closed_client_limit = 1000 * 60 * 20; // 20 min
 var ws_req_per_second = 1000;
 var pw_encryption = "sha512WithRSAEncryption";
-var connections_per_ip = 50;
 var static_path = "./frontend/static/";
 var static_path_web = "static/";
 var templates_path = "./frontend/templates/";
@@ -1467,6 +1467,7 @@ async function updateServerSetting(option, value) {
 	if(serverSettingsStatus[option].updating) return false;
 	serverSettingsStatus[option].updating = true;
 	serverSettings[option] = value;
+	if(option == "socketsPerIp"){connections_per_ip = parseInt(value)};
 	var element = await db.get("SELECT value FROM server_info WHERE name=?", option);
 	if(!element) {
 		await db.run("INSERT INTO server_info values(?, ?)", [option, value]);
@@ -1482,7 +1483,7 @@ function getServerSetting(option) {
 	}
 	return serverSettings[option];
 }
-
+var connections_per_ip = parseInt(getServerSetting("socketsPerIp"));
 async function modifyAnnouncement(text) {
 	if(typeof text != "string") return false;
 	updateServerSetting("announcement", text);

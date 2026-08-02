@@ -306,6 +306,10 @@
 					Global chat: prevent anonymous users:
 					<input type="checkbox" name="set_chat_global_no_anon" id="set_chat_global_no_anon"{%if global_chat_no_anon%} checked{%endif%}>
 				</div>
+				<div>
+					Connections per IP:
+					<input type="text" name="sockets_per_ip" id="sockets_per_ip" value="{{ sockets_per_ip }}" style="width: 100%;">
+				</div>
 				<input type="submit" value="Set">
 			</form>
 		</div>
