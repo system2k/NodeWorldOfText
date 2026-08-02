@@ -6,6 +6,8 @@ var create_date = utils.create_date;
 var getTimeFlagValue = utils.getTimeFlagValue;
 var sanitize_username = utils.sanitize_username;
 
+var { checkWhitelistFeature } = require("../utils/whitelist.js");
+
 function sanitizeColor(col) {
 	var masks = ["#XXXXXX", "#XXX"];
 
@@ -87,6 +89,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var is_member = !!world.members.map[user.id] || is_owner;
 
 	var isGlobalEnabled = getServerSetting("chatGlobalEnabled") == "1";
+	var wl_can_chat = checkWhitelistFeature(user.id, user.authenticated, ipHeaderAddr, world.name, "chat", server);
+	var wl_can_chat_dm = checkWhitelistFeature(user.id, user.authenticated, ipHeaderAddr, world.name, "chat_dm", server);
+	var wl_can_pchat_anon = checkWhitelistFeature(user.id, user.authenticated, ipHeaderAddr, world.name, "pchat_anon", server);
 
 	var clientIpObj = null;
 	if(client_ips[world.id]) {
@@ -124,6 +129,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	if(!chat_perm) can_chat = true;
 	if(chat_perm === 1 && (is_member || is_owner)) can_chat = true;
 	if(chat_perm === 2 && is_owner) can_chat = true;
+	if(!wl_can_chat) can_chat = false;
 
 	var location = "";
 	if(!(data.location == "global" || data.location == "page")) data.location = "page";
@@ -151,17 +157,17 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var has_chat_username = typeof username_to_display == "string" && !!username_to_display.trim();
 
 	if(location == "global") {
-		var chatGlobalNoAnon = getServerSetting("chatGlobalNoAnon") == "1";
-		if(chatGlobalNoAnon && !user.authenticated) {
+		let chatGlobalNoAnon = getServerSetting("chatGlobalNoAnon") == "1";
+		if(chatGlobalNoAnon && !user.authenticated && !wl_can_pchat_anon) {
 			serverChatResponse("Sign in to send messages in global chat.", location);
 			return;
 		}
-		if(user.authenticated && !has_chat_username) {
+		if(user.authenticated && !has_chat_username && !wl_can_pchat_anon) {
 			serverChatResponse("Your account needs a username to send messages in global chat.", location);
 			return;
 		}
 	} else if(location == "page") {
-		if(world.opts.noAnonChat && !user.authenticated) {
+		if(world.opts.noAnonChat && !user.authenticated && !(wl_can_pchat_anon && world.name == "")) {
 			serverChatResponse("Sign in to send messages in this world.", location);
 			return;
 		}
@@ -455,6 +461,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			message += "";
 			message = message.trim();
 			var noClient = false;
+			if(!wl_can_chat_dm) {
+				return serverChatResponse("Direct messages are disabled", location);
+			}
 			if(!id) {
 				return serverChatResponse("No id given", location);
 			}

@@ -5,6 +5,8 @@ var fetchOwnedWorldsByUserId = world_mgr.fetchOwnedWorldsByUserId;
 var claimWorldByName = world_mgr.claimWorldByName;
 var revokeMembershipByWorldName = world_mgr.revokeMembershipByWorldName;
 
+var { checkWhitelistFeatureWithOwner } = require("../../utils/whitelist.js");
+
 function sendWorldStatusUpdate(server, worldId, userId) {
 	var wss = server.wss;
 	var wsSend = server.wsSend;
@@ -48,6 +50,11 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		return write(null, null, {
 			redirect: "/accounts/login/?next=/accounts/profile/"
 		});
+	}
+
+	var wl_can_profile = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
+	if(!wl_can_profile) {
+		return write("Not whitelisted - the website may temporarily be under lockdown", 403);
 	}
 
 	var world_list = [];
@@ -142,6 +149,11 @@ module.exports.POST = async function(req, write, server, ctx) {
 
 	if(!user.authenticated) {
 		return write(null, 403);
+	}
+
+	var wl_can_profile = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
+	if(!wl_can_profile) {
+		return write("Not whitelisted - the website may temporarily be under lockdown", 403);
 	}
 
 	var csrftoken = post_data.csrfmiddlewaretoken;

@@ -1,3 +1,5 @@
+var { checkWhitelistFeatureWithOwner } = require("../../utils/whitelist.js");
+
 function escape_control(str) {
 	str += "";
 	str = str.replace(/\\/g, "\\\\");
@@ -15,6 +17,11 @@ module.exports.GET = async function(req, write, server, ctx) {
 	var accountSystem = server.accountSystem;
 
 	if(!user.authenticated) return write(null, 403);
+
+	var wl_can_profile = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
+	if(!wl_can_profile) {
+		return write("Not whitelisted - the website may temporarily be under lockdown", 403);
+	}
 
 	var input = query_data.q;
 

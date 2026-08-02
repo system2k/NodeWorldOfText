@@ -4,6 +4,8 @@ var normalizeCacheTile = utils.normalizeCacheTile;
 var advancedSplit = utils.advancedSplit;
 var san_nbr = utils.san_nbr;
 
+var { checkWhitelistFeature } = require("../utils/whitelist.js");
+
 function partitionRectangle(rect) {
 	var minY = rect.minY;
 	var minX = rect.minX;
@@ -46,6 +48,7 @@ function partitionRectangle(rect) {
 
 module.exports = async function(data, server, params) {
 	var world = params.world;
+	var user = params.user;
 
 	var memTileCache = server.memTileCache;
 	var broadcastMonitorEvent = server.broadcastMonitorEvent;
@@ -60,6 +63,11 @@ module.exports = async function(data, server, params) {
 		ipAddress = params.ws.sdata.ipAddress;
 	} else {
 		ipAddress = params.ipAddress;
+	}
+
+	var wl_can_fetch = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "load_tile", server);
+	if(!wl_can_fetch) {
+		return {};
 	}
 
 	if(!Array.isArray(data.fetchRectangles)) return "Invalid parameters";

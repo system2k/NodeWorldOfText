@@ -11,6 +11,8 @@ var promoteMembershipByWorldName = world_mgr.promoteMembershipByWorldName;
 var revokeMembershipByWorldName = world_mgr.revokeMembershipByWorldName;
 var renameWorld = world_mgr.renameWorld;
 
+var { checkWhitelistFeatureWithOwner } = require("../../utils/whitelist.js");
+
 function validateCSS(c) {
 	if(c == "default") return "";
 	if(typeof c !== "string") return "";
@@ -129,6 +131,11 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		return write(null, null, {
 			redirect: "/accounts/login/?next=" + url.parse(req.url).pathname
 		});
+	}
+
+	var wl_can_profile = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
+	if(!wl_can_profile) {
+		return write("Not whitelisted - the website may temporarily be under lockdown", 403);
 	}
 
 	// gets world name from /accounts/configure/{world...}/
@@ -330,6 +337,11 @@ module.exports.POST = async function(req, write, server, ctx) {
 
 	if(!user.authenticated) {
 		return write();
+	}
+
+	var wl_can_profile = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
+	if(!wl_can_profile) {
+		return write("Not whitelisted - the website may temporarily be under lockdown", 403);
 	}
 
 	var world_name = checkURLParam("/accounts/configure/*world", path).world;
