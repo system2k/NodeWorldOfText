@@ -1483,7 +1483,7 @@ function getServerSetting(option) {
 	}
 	return serverSettings[option];
 }
-var connections_per_ip = parseInt(getServerSetting("socketsPerIp"));
+
 async function modifyAnnouncement(text) {
 	if(typeof text != "string") return false;
 	updateServerSetting("announcement", text);
@@ -2288,7 +2288,7 @@ async function manageWebsocketConnection(ws, req) {
 		}
 	}
 }
-
+var connections_per_ip;
 async function start_server() {
 	await loadServerSettings();
 	loadRestrictionsList();
@@ -2349,7 +2349,7 @@ async function start_server() {
 		maxPayload: 128000
 	});
 	global_data.wss = wss;
-
+	connections_per_ip = parseInt(getServerSetting("socketsPerIp"));
 	wss.on("connection", async function(ws, req) {
 		try {
 			manageWebsocketConnection(ws, req);
