@@ -422,7 +422,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			
 			var unblocked_ip = getClientIPByChatID(id, location == "global");
 			if(unblocked_ip) {
-				chat_mgr.unsetTellBlockByIP(ipHeaderAddr, blocked_ip);
+				chat_mgr.unsetTellBlockByIP(ipHeaderAddr, unblocked_ip);
 			}
 
 			serverChatResponse("Unblocked chats from ID: " + id, location);

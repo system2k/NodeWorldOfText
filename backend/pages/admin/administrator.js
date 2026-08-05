@@ -57,7 +57,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 			var uid = adr.id.substr(1);
 			var level = adr.level;
 	
-			var username = "deleted~" + uid;
+			var username = "uid~" + uid;
 	
 			var usr_data = await uvias.get("SELECT * FROM accounts.users WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", uid);
 			if(usr_data) {

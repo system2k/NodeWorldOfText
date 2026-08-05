@@ -1,7 +1,7 @@
 var utils = require("../../utils/utils.js");
 var san_nbr = utils.san_nbr;
 
-var validCategories = [
+const validFeatures = [
 	"write", "load_tile",
 	"color", "own_color",
 	"chat", "chat_dm", "load_chat",
@@ -11,7 +11,9 @@ var validCategories = [
 	"pchat_anon"
 ];
 
-var validStatuses = ["public", "authenticated", "whitelisted", "disabled"];
+const validStatuses = ["public", "authenticated", "whitelisted", "disabled"];
+
+const validCategories = ["user", "ip", "world"];
 
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var user = ctx.user;
@@ -72,7 +74,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 	if(post_data.type == "features") {
 		let changes = post_data.changes;
 		for(let type in changes) {
-			if(!validCategories.includes(type)) {
+			if(!validFeatures.includes(type)) {
 				continue;
 			}
 			let change = changes[type];
@@ -93,15 +95,25 @@ module.exports.POST = async function(req, write, server, ctx) {
 		let changes = post_data.changes;
 		let additions = post_data.additions;
 		let removals = post_data.removals;
+
+		// user, ip, world
+		if(!validCategories.includes(category)) {
+			return;
+		}
 		
 		for(let id in changes) {
 			let updateSet = [];
+			let ptrs = siteWhitelistCache.idCategoryFeatureMap.get(Number(id));
+			let category = ptrs[0];
+			let identifier = ptrs[1];
+			let featuresObj = siteWhitelistCache[category].get(identifier);
 			for(let type in changes[id]) {
-				if(!validCategories.includes(type)) {
+				if(!validFeatures.includes(type)) {
 					continue;
 				}
 				let flag = Boolean(changes[id][type]) ? 1 : 0;
 				updateSet.push(`${type}=${flag}`);
+				featuresObj[type] = flag;
 			}
 			if(updateSet.length) {
 				let query = updateSet.join(",");
@@ -116,35 +128,41 @@ module.exports.POST = async function(req, write, server, ctx) {
 			let additionsObj = additions[tid];
 			let options = additionsObj.options;
 
-			for(let type in options) {
-				if(!validCategories.includes(type)) {
-					continue;
-				}
-				let flag = Boolean(options[type]) ? 1 : 0;
-				colSet.push(type);
-				valSet.push(flag);
-			}
+			let identifier = null;
+
 			if(category == "user") {
 				colSet.push("id_type");
 				valSet.push("user");
 
 				colSet.push("user_id");
 				valSet.push(additionsObj.user_id);
+				identifier = additionsObj.user_id;
 			} else if(category == "world") {
 				colSet.push("id_type");
 				valSet.push("world");
 
 				colSet.push("world_name");
 				valSet.push(additionsObj.world_name);
+				identifier = additionsObj.world_name;
 			} else if(category == "ip") {
 				colSet.push("id_type");
 				valSet.push("ip");
 
 				colSet.push("ip");
 				valSet.push(additionsObj.ip);
+				identifier = additionsObj.ip;
 			} else {
 				write(`Unknown category ${category}`, 400);
 				return;
+			}
+
+			for(let type in options) {
+				if(!validFeatures.includes(type)) {
+					continue;
+				}
+				let flag = Boolean(options[type]) ? 1 : 0;
+				colSet.push(type);
+				valSet.push(flag);
 			}
 
 			if(colSet.length) {
@@ -153,11 +171,22 @@ module.exports.POST = async function(req, write, server, ctx) {
 				if(resp.lastID) {
 					optionAdditionIdMapping[tid] = resp.lastID;
 				}
+
+				siteWhitelistCache[category].set(identifier, {
+					id: resp.lastID,
+					...Object.fromEntries(colSet.map((v, idx) => [colSet[idx], valSet[idx]]))
+				});
+				siteWhitelistCache.idCategoryFeatureMap.set(resp.lastID, [category, identifier]);
 			}
 		}
 
 		for(let id in removals) {
 			await db_misc.run("DELETE FROM site_whitelist WHERE id=?", id);
+			let ptrs = siteWhitelistCache.idCategoryFeatureMap.get(Number(id));
+			let category = ptrs[0];
+			let identifier = ptrs[1];
+			siteWhitelistCache[category].delete(identifier);
+			siteWhitelistCache.idCategoryFeatureMap.delete(Number(id));
 		}
 
 		write(JSON.stringify({

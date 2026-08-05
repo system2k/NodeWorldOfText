@@ -1,11 +1,6 @@
 var utils = require("../../utils/utils.js");
 var san_nbr = utils.san_nbr;
 
-// var restrictions = require("../../../utils/restrictions.js");
-// var ipaddress = require("../../../framework/ipaddress.js");
-
-// var reconIP = ipaddress.reconIP;
-
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var user = ctx.user;
 	var query_data = ctx.query_data;

@@ -173,7 +173,8 @@ var memTileCache = {};
 var siteWhitelistCache = {
 	ip: new Map(),
 	user: new Map(),
-	world: new Map()
+	world: new Map(),
+	idCategoryFeatureMap: new Map() // map from id => [category, feature]
 };
 var siteWhitelistStatus = new Map();
 
@@ -1039,21 +1040,21 @@ async function initialize_site_whitelist_db() {
 				ip TEXT,
 				id_type TEXT,
 				
-				write INTEGER,
-				load_tile INTEGER,
-				color INTEGER,
-				own_color INTEGER,
-				chat INTEGER,
-				chat_dm INTEGER,
-				load_chat INTEGER,
-				profile INTEGER,
-				uc_picto INTEGER,
-				uc_dot INTEGER,
-				uc_nonletter INTEGER,
-				own_uc_special INTEGER,
-				no_captcha INTEGER,
-				few_captcha INTEGER,
-				pchat_anon INTEGER
+				write INTEGER NOT NULL DEFAULT 0,
+				load_tile INTEGER NOT NULL DEFAULT 0,
+				color INTEGER NOT NULL DEFAULT 0,
+				own_color INTEGER NOT NULL DEFAULT 0,
+				chat INTEGER NOT NULL DEFAULT 0,
+				chat_dm INTEGER NOT NULL DEFAULT 0,
+				load_chat INTEGER NOT NULL DEFAULT 0,
+				profile INTEGER NOT NULL DEFAULT 0,
+				uc_picto INTEGER NOT NULL DEFAULT 0,
+				uc_dot INTEGER NOT NULL DEFAULT 0,
+				uc_nonletter INTEGER NOT NULL DEFAULT 0,
+				own_uc_special INTEGER NOT NULL DEFAULT 0,
+				no_captcha INTEGER NOT NULL DEFAULT 0,
+				few_captcha INTEGER NOT NULL DEFAULT 0,
+				pchat_anon INTEGER NOT NULL DEFAULT 0
 			)
 		`);
 	}
@@ -1095,6 +1096,7 @@ async function initialize_site_whitelist_db() {
 	siteWhitelistCache.user.clear();
 	siteWhitelistCache.ip.clear();
 	siteWhitelistCache.world.clear();
+	siteWhitelistCache.idCategoryFeatureMap.clear();
 
 	wl_status.forEach(function(row) {
 		siteWhitelistStatus.set(row.code, row.status);
@@ -1103,6 +1105,7 @@ async function initialize_site_whitelist_db() {
 	for(let i = 0; i < wl_list.length; i++) {
 		let entry = wl_list[i];
 		if(!entry) continue;
+		let id = entry.id;
 		let id_type = entry.id_type;
 
 		let user_id = entry.user_id;
@@ -1111,10 +1114,13 @@ async function initialize_site_whitelist_db() {
 
 		if(id_type == "user") {
 			siteWhitelistCache.user.set(user_id, entry);
+			siteWhitelistCache.idCategoryFeatureMap.set(id, [id_type, user_id]);
 		} else if(id_type == "ip") {
 			siteWhitelistCache.ip.set(ip, entry);
+			siteWhitelistCache.idCategoryFeatureMap.set(id, [id_type, ip]);
 		} else if(id_type == "world") {
 			siteWhitelistCache.world.set(world_name, entry);
+			siteWhitelistCache.idCategoryFeatureMap.set(id, [id_type, world_name]);
 		}
 	}
 }
@@ -1359,6 +1365,11 @@ function parseToken(token) {
 }
 
 async function getUserIdFromUsername(username) {
+	const uidPrefix = "uid~";
+	if(username.startsWith(uidPrefix)) {
+		let uid = username.slice(uidPrefix.length);
+		return getUsernameFromUserId(uid);
+	}
 	if(accountSystem == "uvias") {
 		var db_user = await uvias.get("SELECT to_hex(uid) AS uid FROM accounts.users WHERE lower(username)=lower($1::text)", username);
 		if(!db_user) return null;
@@ -1385,6 +1396,9 @@ async function getUsernameFromUserId(uid) {
 		}
 
 		let d_inf = await uvias.get("SELECT username FROM accounts.users WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", uid);
+		if(!d_inf) {
+			return "uid~" + uid;
+		}
 
 		return d_inf.username;
 	} else if(accountSystem == "local") {
