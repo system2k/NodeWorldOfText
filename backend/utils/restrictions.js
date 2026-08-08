@@ -427,10 +427,10 @@ function procRest(list) {
 	sortRestrictionListIPv6(parsed.color.ipv6);
 
 	sortRestrictionListIPv4(parsed.daccess.site.ipv4);
-	sortRestrictionListIPv4(parsed.daccess.site.ipv6);
+	sortRestrictionListIPv6(parsed.daccess.site.ipv6);
 
 	sortRestrictionListIPv4(parsed.daccess.httpwrite.ipv4);
-	sortRestrictionListIPv4(parsed.daccess.httpwrite.ipv6);
+	sortRestrictionListIPv6(parsed.daccess.httpwrite.ipv6);
 	
 	// we don't need to sort the cg1 lists nor build a restrictions tree for them
 	
