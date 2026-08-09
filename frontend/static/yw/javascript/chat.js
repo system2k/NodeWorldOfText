@@ -284,7 +284,7 @@ register_chat_command("stats", function() {
 }, null, "view stats of a world", null);
 
 function sendChat() {
-	var chatText = elm.chatbar.value;
+	var chatText = elm.chatbar.value.replace(/\u00A0/g, "\u0020");
 	elm.chatbar.value = "";
 	var opts = {};
 	if(defaultChatColor != null) {

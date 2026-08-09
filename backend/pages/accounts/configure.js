@@ -164,7 +164,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 			var uidt = members[i].slice(1);
 			username = await uvias.get("SELECT * FROM accounts.users WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", uidt);
 			if(!username) {
-				username = "deleted~" + uidt;
+				username = "uid~" + uidt;
 			} else {
 				username = username.username;
 			}
@@ -191,7 +191,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 			if(owner_name) {
 				owner_name = owner_name.username;
 			} else {
-				owner_name = "deleted~" + debug1;
+				owner_name = "uid~" + debug1;
 			}
 		} else if(accountSystem == "local") {
 			owner_name = (await db.get("SELECT username FROM auth_user WHERE id=?", [world.ownerId])).username;
@@ -461,8 +461,8 @@ module.exports.POST = async function(req, write, server, ctx) {
 		var revocationStatus = false;
 		var revokedId = "";
 		if(accountSystem == "uvias") {
-			if(username_to_remove.startsWith("deleted~")) {
-				id_to_remove = username_to_remove.substr("deleted~".length);
+			if(username_to_remove.startsWith("uid~")) {
+				id_to_remove = username_to_remove.substr("uid~".length);
 				if(id_to_remove.length < 1 || id_to_remove.length > 16) validId = false;
 				var validSet = "0123456789abcdef";
 				for(var c = 0; c < id_to_remove.length; c++) {
