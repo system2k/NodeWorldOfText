@@ -31,6 +31,7 @@ const restrictions = require("./backend/utils/restrictions.js");
 const frameUtils   = require("./backend/framework/utils.js");
 const serverUtil   = require("./backend/framework/server.js");
 const templates    = require("./backend/framework/templates.js");
+const captcha_manager = require("./backend/utils/captcha_manager.js");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -553,6 +554,9 @@ var pages = {
 			restrictions: require("./backend/api/admin/restrictions.js"),
 			whitelist: require("./backend/api/admin/whitelist.js"),
 			user: require("./backend/api/admin/user.js")
+		},
+		captcha: {
+			altcha: require("./backend/api/captcha/altcha.js")
 		}
 	},
 	accounts: {
@@ -1255,6 +1259,7 @@ function createEndpoints(server) {
 	server.registerEndpoint("api/admin/restrictions", pages.api.admin.restrictions);
 	server.registerEndpoint("api/admin/whitelist", pages.api.admin.whitelist);
 	server.registerEndpoint("api/admin/user", pages.api.admin.user);
+	server.registerEndpoint("api/captcha/altcha", pages.api.captcha.altcha);
 
 	server.registerEndpoint("accounts/login", pages.accounts.login);
 	server.registerEndpoint("accounts/logout", pages.accounts.logout);
@@ -1878,23 +1883,23 @@ async function uvias_init() {
 
 function wsSend(socket, data) {
 	if(socket.readyState !== WebSocket.OPEN) return;
-	var error = false;
+	var handled = false;
 	socket.sdata.messageBackpressure++;
 	try {
 		socket.send(data, function() {
-			if(!error && socket.sdata) {
+			if(!handled && socket.sdata) {
 				socket.sdata.messageBackpressure--;
 			}
-			error = true;
+			handled = true;
 			if(socket.sdata.methods.updateNetworkStats) {
 				socket.sdata.methods.updateNetworkStats();
 			}
 		});
 	} catch(e) {
-		if(!error && socket.sdata) {
+		if(!handled && socket.sdata) {
 			socket.sdata.messageBackpressure--;
 		}
-		error = true;
+		handled = true;
 	}
 }
 
@@ -2115,7 +2120,8 @@ async function manageWebsocketConnection(ws, req) {
 		chat_blocks: null,
 		center: [0, 0],
 		boundary: null,
-		localFilter: true
+		localFilter: true,
+		captchaRequired: true
 	};
 
 	var parsedURL = new URL(req.url, "ws://example.com/ws");
@@ -2363,6 +2369,15 @@ async function manageWebsocketConnection(ws, req) {
 		initial_user_count
 	}));
 
+	if(captcha_manager.hasPendingChallenge(ws.sdata.ipAddress)) {
+		ws.sdata.captchaRequired = true;
+		var challenge = await captcha_manager.requireCaptcha(ws.sdata.ipAddress);
+		send_ws(JSON.stringify({
+			kind: "captcha_required",
+			challenge: challenge
+		}));
+	}
+
 	if(client_cursor_pos[world.id]) {
 		var world_cursors = client_cursor_pos[world.id];
 		for(var csr_channel in world_cursors) {
@@ -2428,6 +2443,17 @@ async function manageWebsocketConnection(ws, req) {
 			}
 			return send_ws(JSON.stringify(res)); 
 		}
+
+		if(ws.sdata.captchaRequired) {
+			send_ws(JSON.stringify({
+				kind: "error",
+				code: "CAPTCHA",
+				message: "Captcha must be solved",
+				id: msg.id != void 0 ? san_nbr(msg.id) : null
+			}));
+			return;
+		}
+
 		// Begin calling a websocket function for the necessary request
 		if(!websockets.hasOwnProperty(kind)) {
 			return;
@@ -2530,7 +2556,6 @@ async function start_server() {
 
 	wss = new WebSocket.Server({
 		server: httpServer.server,
-		perMessageDeflate: true,
 		maxPayload: 128000
 	});
 	global_data.wss = wss;
@@ -2614,6 +2639,7 @@ var global_data = {
 	getUsernameFromUserId,
 	siteWhitelistCache,
 	siteWhitelistStatus,
+	captcha_manager,
 };
 
 async function sysLoad() {
@@ -2685,6 +2711,10 @@ function stopServer(restart, maintenance) {
 			}
 
 			await loopCommitRestrictions(true);
+
+			if(captcha_manager) {
+				captcha_manager.stopCleanup();
+			}
 		} catch(e) {
 			handle_error(e);
 			if(!isTestServer) console.log(e);
