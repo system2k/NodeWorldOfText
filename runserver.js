@@ -627,7 +627,8 @@ var websockets = {
 	write: require("./backend/websockets/write.js"),
 	config: require("./backend/websockets/config.js"),
 	boundary: require("./backend/websockets/boundary.js"),
-	stats: require("./backend/websockets/stats.js")
+	stats: require("./backend/websockets/stats.js"),
+	captcha_solve: require("./backend/websockets/captcha_solve.js")
 };
 
 var modules = {
@@ -2023,7 +2024,8 @@ var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	link:			[400, 1000, 0], // TODO: fix link limits
 	protect:		[400, 1000, 0],
 	write:			[256, 1000, 0], // rate-limiting handled separately
-	cursor:			[70, 1000, 0]
+	cursor:			[70, 1000, 0],
+	captcha_solve:  [6, 2000, 0]
 };
 
 function can_process_req_kind(lims, kind) {
@@ -2121,7 +2123,7 @@ async function manageWebsocketConnection(ws, req) {
 		center: [0, 0],
 		boundary: null,
 		localFilter: true,
-		captchaRequired: true
+		captchaRequired: false
 	};
 
 	var parsedURL = new URL(req.url, "ws://example.com/ws");
@@ -2369,7 +2371,7 @@ async function manageWebsocketConnection(ws, req) {
 		initial_user_count
 	}));
 
-	if(captcha_manager.hasPendingChallenge(ws.sdata.ipAddress)) {
+	if(/*captcha_manager.hasPendingChallenge(ws.sdata.ipAddress)*/1) {
 		ws.sdata.captchaRequired = true;
 		var challenge = await captcha_manager.requireCaptcha(ws.sdata.ipAddress);
 		send_ws(JSON.stringify({
@@ -2444,7 +2446,7 @@ async function manageWebsocketConnection(ws, req) {
 			return send_ws(JSON.stringify(res)); 
 		}
 
-		if(ws.sdata.captchaRequired) {
+		if(ws.sdata.captchaRequired && kind != "captcha_solve") {
 			send_ws(JSON.stringify({
 				kind: "error",
 				code: "CAPTCHA",
@@ -2460,7 +2462,10 @@ async function manageWebsocketConnection(ws, req) {
 		}
 		if(!can_process_req_kind(kindLimits, kind)) return;
 		function send(msg) {
-			msg.kind = kind;
+			// if the ws handler already defines 'kind', don't override it
+			if(!msg.kind) {
+				msg.kind = kind;
+			}
 			if(requestID !== null) msg.request = requestID;
 			send_ws(JSON.stringify(msg));
 		}
