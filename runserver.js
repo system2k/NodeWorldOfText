@@ -32,6 +32,7 @@ const frameUtils   = require("./backend/framework/utils.js");
 const serverUtil   = require("./backend/framework/server.js");
 const templates    = require("./backend/framework/templates.js");
 const captcha_manager = require("./backend/utils/captcha_manager.js");
+var { checkWhitelistFeature } = require("./backend/utils/whitelist.js");
 
 var trimHTML             = utils.trimHTML;
 var create_date          = utils.create_date;
@@ -910,6 +911,7 @@ async function initializeServer() {
 	await initialize_image_db();
 	await initialize_mutes_db();
 	await initialize_site_whitelist_db();
+	await initialize_captcha_exempt_db();
 
 	global_data.db = db;
 	global_data.db_img = db_img;
@@ -1040,6 +1042,7 @@ async function initialize_site_whitelist_db() {
 		await db_misc.run(`
 			CREATE TABLE 'site_whitelist' (
 				id INTEGER PRIMARY KEY NOT NULL,
+				date_created INTEGER,
 				
 				user_id TEXT,
 				world_name TEXT,
@@ -1128,6 +1131,23 @@ async function initialize_site_whitelist_db() {
 			siteWhitelistCache.world.set(world_name, entry);
 			siteWhitelistCache.idCategoryFeatureMap.set(id, [id_type, world_name]);
 		}
+	}
+}
+
+async function initialize_captcha_exempt_db() {
+	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='captcha_exempt'")) {
+		await db_misc.run(`
+			CREATE TABLE 'captcha_exempt' (
+				id INTEGER PRIMARY KEY NOT NULL,
+				ip TEXT UNIQUE,
+				date_created INTEGER,
+				captcha_type TEXT,
+				user_id TEXT
+			)
+		`);
+		await db_misc.run(`
+			CREATE INDEX ce_ip ON captcha_exempt (ip)
+		`);
 	}
 }
 
@@ -2371,13 +2391,40 @@ async function manageWebsocketConnection(ws, req) {
 		initial_user_count
 	}));
 
-	if(/*captcha_manager.hasPendingChallenge(ws.sdata.ipAddress)*/1) {
+	var captchaExemptWhitelist = checkWhitelistFeature(user.id, user.authenticated, ws.sdata.ipAddress, world.name, "no_captcha", global_data);
+	var captchaDoAutoExempt = checkWhitelistFeature(user.id, user.authenticated, ws.sdata.ipAddress, world.name, "few_captcha", global_data);
+	var captchaExemptDatabase = await db_misc.get("SELECT * FROM captcha_exempt WHERE ip=?", ws.sdata.ipAddress);
+	if(!captchaExemptWhitelist && !captchaExemptDatabase) {
 		ws.sdata.captchaRequired = true;
-		var challenge = await captcha_manager.requireCaptcha(ws.sdata.ipAddress);
+		let challenge = await captcha_manager.requireCaptcha(ws.sdata.ipAddress);
 		send_ws(JSON.stringify({
 			kind: "captcha_required",
 			challenge: challenge
 		}));
+
+		if(captchaDoAutoExempt) {
+			try {
+				await db_misc.run(`
+					INSERT INTO captcha_exempt (id, ip, date_created, captcha_type, user_id)
+					VALUES (null, $ip, $date_created, $captcha_type, $user_id)
+				`, {
+					$ip: ws.sdata.ipAddress,
+					$date_created: Date.now(),
+					$captcha_type: "ALTCHA",
+					$user_id: user.id || null
+				});
+			} catch(e) {
+				handle_error(e);
+			}
+		}
+
+/*			CREATE TABLE 'captcha_exempt' (
+				id INTEGER PRIMARY KEY NOT NULL,
+				ip TEXT,
+				date_created INTEGER,
+				captcha_type TEXT,
+				user_id TEXT
+			)*/
 	}
 
 	if(client_cursor_pos[world.id]) {
