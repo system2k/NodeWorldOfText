@@ -88,7 +88,8 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		csrftoken,
 		global_chat_enabled: getServerSetting("chatGlobalEnabled") == "1",
 		global_chat_no_anon: getServerSetting("chatGlobalNoAnon") == "1",
-		chat_age_restriction: getServerSetting("chatAgeRestriction")
+		chat_age_restriction: getServerSetting("chatAgeRestriction"),
+		captcha_enabled: getServerSetting("captchaEnabled") == "1"
 	};
 
 	write(render("administrator.html", data));
@@ -148,6 +149,14 @@ module.exports.POST = async function(req, write, server, ctx) {
 			var ageRestrictionHours = parseInt(post_data.set_chat_age_restriction);
 			if(isNaN(ageRestrictionHours) || ageRestrictionHours < 0) ageRestrictionHours = 0;
 			updateServerSetting("chatAgeRestriction", ageRestrictionHours.toString());
+		}
+		if("set_captcha_enabled" in post_data) {
+			var isEnabled = post_data.set_captcha_enabled;
+			if(isEnabled == "on") {
+				updateServerSetting("captchaEnabled", "1");
+			}
+		} else {
+			updateServerSetting("captchaEnabled", "0");
 		}
 	}
 	if("announcement" in post_data) {

@@ -119,7 +119,8 @@ var serverSettings = {
 	announcement: "",
 	chatGlobalEnabled: "1",
 	chatGlobalNoAnon: "0",
-	chatAgeRestriction: "0"
+	chatAgeRestriction: "0",
+	captchaEnabled: "0"
 };
 var serverSettingsStatus = {};
 
@@ -2394,7 +2395,8 @@ async function manageWebsocketConnection(ws, req) {
 	var captchaExemptWhitelist = checkWhitelistFeature(user.id, user.authenticated, ws.sdata.ipAddress, world.name, "no_captcha", global_data);
 	var captchaDoAutoExempt = checkWhitelistFeature(user.id, user.authenticated, ws.sdata.ipAddress, world.name, "few_captcha", global_data);
 	var captchaExemptDatabase = await db_misc.get("SELECT * FROM captcha_exempt WHERE ip=?", ws.sdata.ipAddress);
-	if(!captchaExemptWhitelist && !captchaExemptDatabase) {
+	var captchaEnabledGlobally = getServerSetting("captchaEnabled") == "1";
+	if(!captchaExemptWhitelist && !captchaExemptDatabase && captchaEnabledGlobally) {
 		ws.sdata.captchaRequired = true;
 		let challenge = await captcha_manager.requireCaptcha(ws.sdata.ipAddress);
 		send_ws(JSON.stringify({
@@ -2417,14 +2419,6 @@ async function manageWebsocketConnection(ws, req) {
 				handle_error(e);
 			}
 		}
-
-/*			CREATE TABLE 'captcha_exempt' (
-				id INTEGER PRIMARY KEY NOT NULL,
-				ip TEXT,
-				date_created INTEGER,
-				captcha_type TEXT,
-				user_id TEXT
-			)*/
 	}
 
 	if(client_cursor_pos[world.id]) {

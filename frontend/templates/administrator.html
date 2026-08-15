@@ -310,6 +310,10 @@
 					Required account age for chat (hours):
 					<input type="number" name="set_chat_age_restriction" id="set_chat_age_restriction" value="{{ chat_age_restriction }}" min="0" style="width: 60px;">
 				</div>
+				<div>
+					Captcha enabled:
+					<input type="checkbox" name="set_captcha_enabled" id="set_captcha_enabled"{%if captcha_enabled%} checked{%endif%}>
+				</div>
 				<input type="submit" value="Set">
 			</form>
 		</div>
