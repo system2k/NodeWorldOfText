@@ -2418,12 +2418,12 @@ async function start_server() {
 
 	await sysLoad(); // initialize the subsystems (tile database; chat manager)
 
-	serverLoaded = true;
-
 	var plugin = loadPlugin(true);
 	if(plugin && plugin.main) {
 		plugin.main(global_data);
 	}
+
+	serverLoaded = true;
 }
 
 // the server context
