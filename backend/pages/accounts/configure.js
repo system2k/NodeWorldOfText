@@ -11,7 +11,7 @@ var promoteMembershipByWorldName = world_mgr.promoteMembershipByWorldName;
 var revokeMembershipByWorldName = world_mgr.revokeMembershipByWorldName;
 var renameWorld = world_mgr.renameWorld;
 
-var { checkWhitelistFeatureWithOwner } = require("../../utils/whitelist.js");
+var { checkWhitelistFeature } = require("../../utils/whitelist.js");
 
 function validateCSS(c) {
 	if(c == "default") return "";
@@ -133,7 +133,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		});
 	}
 
-	var wl_can_profile = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
+	var wl_can_profile = checkWhitelistFeature(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
 	if(!wl_can_profile) {
 		return write("Not whitelisted - the website may temporarily be under lockdown", 403);
 	}
@@ -339,7 +339,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 		return write();
 	}
 
-	var wl_can_profile = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
+	var wl_can_profile = checkWhitelistFeature(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
 	if(!wl_can_profile) {
 		return write("Not whitelisted - the website may temporarily be under lockdown", 403);
 	}

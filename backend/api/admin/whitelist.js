@@ -3,10 +3,10 @@ var san_nbr = utils.san_nbr;
 
 const validFeatures = [
 	"write", "load_tile",
-	"color", "own_color",
+	"color",
 	"chat", "chat_dm", "load_chat",
 	"profile",
-	"uc_picto", "uc_dot", "uc_nonletter", "own_uc_special",
+	"uc_picto", "uc_dot", "uc_nonletter",
 	"no_captcha", "few_captcha",
 	"pchat_anon"
 ];

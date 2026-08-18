@@ -1,7 +1,7 @@
 var world_mgr = require("../../subsystems/world_mgr.js");
 var fetchOwnedWorldsByUserId = world_mgr.fetchOwnedWorldsByUserId;
 
-var { checkWhitelistFeatureWithOwner } = require("../../utils/whitelist.js");
+var { checkWhitelistFeature } = require("../../utils/whitelist.js");
 
 module.exports.GET = async function(req, write, server, ctx, params) {
 	var cookies = ctx.cookies;
@@ -15,7 +15,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		});
 	}
 
-	var wl_can_profile = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
+	var wl_can_profile = checkWhitelistFeature(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
 	if(!wl_can_profile) {
 		return write("Not whitelisted - the website may temporarily be under lockdown", 403);
 	}

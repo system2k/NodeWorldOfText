@@ -1,7 +1,7 @@
 var utils = require("../utils/utils.js");
 var san_nbr = utils.san_nbr;
 
-var { checkWhitelistFeatureWithOwner } = require("../utils/whitelist.js");
+var { checkWhitelistFeature } = require("../utils/whitelist.js");
 
 function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
@@ -47,7 +47,7 @@ module.exports = async function(data, server, params) {
 		ipAddressFam = params.ipAddressFam;
 	}
 
-	var wl_can_write = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ipAddress, world.name, "write", server, is_owner, "own_write");
+	var wl_can_write = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "write", server);
 	if(!wl_can_write) {
 		return [true, "PERM"];
 	}

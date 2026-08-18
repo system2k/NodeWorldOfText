@@ -1053,7 +1053,6 @@ async function initialize_site_whitelist_db() {
 				write INTEGER NOT NULL DEFAULT 0,
 				load_tile INTEGER NOT NULL DEFAULT 0,
 				color INTEGER NOT NULL DEFAULT 0,
-				own_color INTEGER NOT NULL DEFAULT 0,
 				chat INTEGER NOT NULL DEFAULT 0,
 				chat_dm INTEGER NOT NULL DEFAULT 0,
 				load_chat INTEGER NOT NULL DEFAULT 0,
@@ -1061,7 +1060,6 @@ async function initialize_site_whitelist_db() {
 				uc_picto INTEGER NOT NULL DEFAULT 0,
 				uc_dot INTEGER NOT NULL DEFAULT 0,
 				uc_nonletter INTEGER NOT NULL DEFAULT 0,
-				own_uc_special INTEGER NOT NULL DEFAULT 0,
 				no_captcha INTEGER NOT NULL DEFAULT 0,
 				few_captcha INTEGER NOT NULL DEFAULT 0,
 				pchat_anon INTEGER NOT NULL DEFAULT 0
@@ -1081,7 +1079,6 @@ async function initialize_site_whitelist_db() {
 			('write', 'public'),
 			('load_tile', 'public'),
 			('color', 'public'),
-			('own_color', 'public'),
 			('chat', 'public'),
 			('chat_dm', 'public'),
 			('load_chat', 'public'),
@@ -1089,8 +1086,7 @@ async function initialize_site_whitelist_db() {
 			('uc_picto', 'public'),
 			('uc_dot', 'public'),
 			('uc_nonletter', 'public'),
-			('own_uc_special', 'public'),
-			('no_captcha', 'public'),
+			('no_captcha', 'whitelisted'),
 			('few_captcha', 'public'),
 			('pchat_anon', 'public')
 		`);
@@ -2393,7 +2389,6 @@ async function manageWebsocketConnection(ws, req) {
 	}));
 
 	var captchaExemptWhitelist = checkWhitelistFeature(user.id, user.authenticated, ws.sdata.ipAddress, world.name, "no_captcha", global_data);
-	var captchaDoAutoExempt = checkWhitelistFeature(user.id, user.authenticated, ws.sdata.ipAddress, world.name, "few_captcha", global_data);
 	var captchaExemptDatabase = await db_misc.get("SELECT * FROM captcha_exempt WHERE ip=?", ws.sdata.ipAddress);
 	var captchaEnabledGlobally = getServerSetting("captchaEnabled") == "1";
 	if(!captchaExemptWhitelist && !captchaExemptDatabase && captchaEnabledGlobally) {
@@ -2403,22 +2398,6 @@ async function manageWebsocketConnection(ws, req) {
 			kind: "captcha_required",
 			challenge: challenge
 		}));
-
-		if(captchaDoAutoExempt) {
-			try {
-				await db_misc.run(`
-					INSERT INTO captcha_exempt (id, ip, date_created, captcha_type, user_id)
-					VALUES (null, $ip, $date_created, $captcha_type, $user_id)
-				`, {
-					$ip: ws.sdata.ipAddress,
-					$date_created: Date.now(),
-					$captcha_type: "ALTCHA",
-					$user_id: user.id || null
-				});
-			} catch(e) {
-				handle_error(e);
-			}
-		}
 	}
 
 	if(client_cursor_pos[world.id]) {

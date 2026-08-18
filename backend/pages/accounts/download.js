@@ -5,7 +5,7 @@ var world_mgr = require("../../subsystems/world_mgr.js");
 var releaseWorld = world_mgr.releaseWorld;
 var getOrCreateWorld = world_mgr.getOrCreateWorld;
 
-var { checkWhitelistFeatureWithOwner } = require("../../utils/whitelist.js");
+var { checkWhitelistFeature } = require("../../utils/whitelist.js");
 
 async function iterateWorld(db, worldId, onTile) {
 	var groupSize = 16;
@@ -50,7 +50,7 @@ module.exports.GET = async function(req, write, server, ctx) {
 		return await callPage("404");
 	}
 
-	var wl_can_profile = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ctx.ipAddress, world.name, "profile", server);
+	var wl_can_profile = checkWhitelistFeature(user.id, user.authenticated, ctx.ipAddress, world.name, "profile", server);
 	if(!wl_can_profile) {
 		return write("Not whitelisted - the website may temporarily be under lockdown", 403);
 	}

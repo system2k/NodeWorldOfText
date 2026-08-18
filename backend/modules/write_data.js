@@ -9,7 +9,7 @@ var restrictions = require("../utils/restrictions.js");
 var checkCoalition = restrictions.checkCoalition;
 var getRestrictions = restrictions.getRestrictions;
 
-var { checkWhitelistFeatureWithOwner } = require("../utils/whitelist.js");
+var { checkWhitelistFeature } = require("../utils/whitelist.js");
 
 var enums = require("../utils/enums.js");
 
@@ -135,12 +135,12 @@ module.exports = async function(data, server, params) {
 	if(color_cell == enums.perm.member && !is_member) can_color_cell = false;
 	if(color_cell == enums.perm.owner && !is_owner) can_color_cell = false;
 
-	var wl_can_write = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ipAddress, world.name, "write", server, is_owner, "own_write");
-	var wl_can_color = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ipAddress, world.name, "color", server, is_owner, "own_color");
+	var wl_can_write = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "write", server);
+	var wl_can_color = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "color", server);
 
-	var wl_can_use_picto = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ipAddress, world.name, "uc_picto", server, is_owner, "own_uc_special");
-	var wl_can_use_dots = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ipAddress, world.name, "uc_dot", server, is_owner, "own_uc_special");
-	var wl_can_use_nonletters = checkWhitelistFeatureWithOwner(user.id, user.authenticated, ipAddress, world.name, "uc_nonletter", server, is_owner, "own_uc_special");
+	var wl_can_use_picto = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "uc_picto", server);
+	var wl_can_use_dots = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "uc_dot", server);
+	var wl_can_use_nonletters = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "uc_nonletter", server);
 
 	var edits = data.edits;
 	if(!edits) return emptyWriteResponse;
