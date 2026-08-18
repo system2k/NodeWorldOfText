@@ -81,6 +81,7 @@ function maintenanceMode() {
 					<span>Our World Of Text is currently down for maintenance.</span><br>
 					<span>Maintenance began on ${timeStr}</span>
 				</html>`;
+			res.writeHead(503);
 			res.write(text);
 			res.end();
 		} catch (e) {
