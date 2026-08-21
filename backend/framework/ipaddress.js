@@ -1,22 +1,35 @@
 var fs = require("fs");
 
 function normalize_ipv6(ip) {
-	ip = ip.replace(/^:|:$/g, "");
-	ip = ip.split(":");
-	
-	for(var i = 0; i < ip.length; i++) {
-		var seg = ip[i];
-		if(seg) {
-			ip[i] = seg.padStart(4, "0");
-		} else {
-			seg = [];
-			for(var a = ip.length; a <= 8; a++) {
-				seg.push("0000");
-			}
-			ip[i] = seg.join(":");
-		}
+	if(typeof ip != "string") return null;
+
+	let div = ip.split("::");
+	if(div.length == 2) {
+		let ls = (div[0].trim() || "0").split(":");
+		let rs = (div[1].trim() || "0").split(":");
+		ip = [...ls, new Array(8 - (ls.length + rs.length)).fill("0000").join(":"), ...rs].join(":");
+	} else if(div.length != 1) {
+		return null;
 	}
+
+	ip = ip.split(":");
+
+	if(ip.length != 8) return null;
+	ip = ip.map(x => x.trim().toUpperCase().padStart(4, "0"));
+	if(ip.findIndex(x => x.length != 4 || x.match(/[^A-F0-9]/)) > -1) return null;
+
 	return ip.join(":");
+}
+
+function normalize_ipv4(ip) {
+	if(typeof ip != "string") return null;
+
+	ip = ip.split(".").map(x => parseInt(x.trim()));
+	if(ip.length != 4) return null;
+	if(ip.findIndex(x => isNaN(x)) > -1) return null;
+	if(ip.findIndex(x => x < 0 || x > 255) > -1) return null;
+
+	return ip.join(".");
 }
 
 // TODO: move this elsewhere
@@ -156,6 +169,20 @@ function is_cf_ipv6_int(num) {
 ipv4_txt_to_int();
 ipv6_txt_to_int();
 
+function parseAnyIp(ip) {
+	if(!ip) return ["0.0.0.0", 4, 0];
+	if(ip.indexOf(".") > -1) {
+		let norm = normalize_ipv4(ip);
+		if(!norm) return ["0.0.0.0", 4, 0];
+		let val = ipv4_to_int(norm);
+		return [norm, 4, val];
+	} else {
+		let norm = normalize_ipv6(ip);
+		if(!norm) return ["0.0.0.0", 4, 0];
+		let val = ipv6_to_int(norm);
+		return [norm, 6, val];
+	}
+}
 
 function evaluateIpAddress(remIp, realIp, cfIp) {
 	var ipAddress = remIp;
@@ -172,18 +199,6 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 			ipAddressFam = 6;
 			ipAddress = normalize_ipv6(ipAddress);
 			ipAddressVal = ipv6_to_int(ipAddress);
-		}
-	}
-
-	function parseAnyIp(ip) {
-		if(!ip) return ["0.0.0.0", 4, 0];
-		if(ip.indexOf(".") > -1) {
-			var val = ipv4_to_int(ip);
-			return [ip, 4, val];
-		} else {
-			var norm = normalize_ipv6(ip);
-			var val = ipv6_to_int(norm);
-			return [norm, 6, val];
 		}
 	}
 
@@ -267,4 +282,5 @@ module.exports = {
 	reconIPv4,
 	reconIPv6,
 	reconIP,
+	parseAnyIp,
 };

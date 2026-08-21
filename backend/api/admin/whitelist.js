@@ -1,6 +1,10 @@
 var utils = require("../../utils/utils.js");
 var san_nbr = utils.san_nbr;
 
+var {
+	parseAnyIp
+} = require("../../framework/ipaddress.js");
+
 const validFeatures = [
 	"write", "load_tile",
 	"color",
@@ -145,12 +149,19 @@ module.exports.POST = async function(req, write, server, ctx) {
 				valSet.push(additionsObj.world_name);
 				identifier = additionsObj.world_name;
 			} else if(category == "ip") {
+				let pendingIpData = parseAnyIp(additionsObj.ip);
+				let normIp = pendingIpData?.[0];
+				if(!normIp) {
+					write(`Invalid IP: ${additionsObj.ip}`, 400);
+					return;
+				}
+
 				colSet.push("id_type");
 				valSet.push("ip");
 
 				colSet.push("ip");
-				valSet.push(additionsObj.ip);
-				identifier = additionsObj.ip;
+				valSet.push(normIp);
+				identifier = normIp;
 			} else {
 				write(`Unknown category ${category}`, 400);
 				return;

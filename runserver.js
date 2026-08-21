@@ -2390,6 +2390,15 @@ async function manageWebsocketConnection(ws, req) {
 
 	var captchaExemptWhitelist = checkWhitelistFeature(user.id, user.authenticated, ws.sdata.ipAddress, world.name, "no_captcha", global_data);
 	var captchaExemptDatabase = await db_misc.get("SELECT * FROM captcha_exempt WHERE ip=?", ws.sdata.ipAddress);
+
+	if(captchaExemptDatabase) {
+		let date_created = captchaExemptDatabase.date_created;
+		if(Date.now() - date_created >= 1000 * 60 * 60) { // expired after 1 hour
+			await db_misc.run("DELETE FROM captcha_exempt WHERE ip=?", ws.sdata.ipAddress);
+			captchaExemptDatabase = null;
+		}
+	}
+
 	var captchaEnabledGlobally = getServerSetting("captchaEnabled") == "1";
 	if(!captchaExemptWhitelist && !captchaExemptDatabase && captchaEnabledGlobally) {
 		ws.sdata.captchaRequired = true;
