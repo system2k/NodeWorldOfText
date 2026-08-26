@@ -1278,6 +1278,9 @@ async function getUsernameFromUserId(uid) {
 		}
 
 		let d_inf = await uvias.get("SELECT username FROM accounts.users WHERE uid=('x'||lpad($1::text,16,'0'))::bit(64)::bigint", uid);
+		if(!d_inf) {
+			return "uid~" + uid;
+		}
 
 		return d_inf.username;
 	} else if(accountSystem == "local") {
