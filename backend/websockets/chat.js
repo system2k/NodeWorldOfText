@@ -628,7 +628,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 			if(muted_ip) {
 				var muteDate = time != -1 ? Date.now() + (time * 1000) : -1;
-				chat_mgr.muteByIP(effectiveWorldID, ipHeaderAddr, muteDate, user.id);
+				chat_mgr.muteByIP(effectiveWorldID, muted_ip, muteDate, user.id);
 				if(muteDate == -1) {
 					serverChatResponse("Muted client indefinitely", location);
 				} else {
