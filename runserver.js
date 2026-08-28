@@ -27,6 +27,7 @@ const utils        = require("./backend/utils/utils.js");
 const rate_limiter = require("./backend/utils/rate_limiter.js");
 const ipaddress    = require("./backend/framework/ipaddress.js");
 const prompt       = require("./backend/utils/prompt.js");
+const Antibot      = require("./backend/utils/antibot.js");
 const restrictions = require("./backend/utils/restrictions.js");
 const frameUtils   = require("./backend/framework/utils.js");
 const serverUtil   = require("./backend/framework/server.js");
@@ -899,6 +900,14 @@ async function initializeServer() {
 
 	global_data.checkCSRF = httpServer.checkCSRF;
 	global_data.createCSRF = httpServer.createCSRF;
+
+	var antibot = new Antibot();
+	if(antibot.enabled) {
+		console.log("Antibot enabled (" + antibot.clientChecks.length + " checks, " + antibot.botGlobals.length + " bot globals)");
+	} else {
+		console.log("Antibot disabled");
+	}
+	global_data.antibot = antibot;
 
 	if(accountSystem == "local") {
 		await loadEmail();
@@ -2242,6 +2251,8 @@ async function manageWebsocketConnection(ws, req) {
 		initial_user_count
 	}));
 
+	global_data.antibot.sendChallenge(ws);
+
 	if(client_cursor_pos[world.id]) {
 		var world_cursors = client_cursor_pos[world.id];
 		for(var csr_channel in world_cursors) {
@@ -2307,6 +2318,7 @@ async function manageWebsocketConnection(ws, req) {
 			}
 			return send_ws(JSON.stringify(res)); 
 		}
+		if(global_data.antibot.verifyMessage(ws, msg)) return;
 		// Begin calling a websocket function for the necessary request
 		if(!websockets.hasOwnProperty(kind)) {
 			return;
