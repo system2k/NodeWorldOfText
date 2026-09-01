@@ -7,9 +7,10 @@ var {
 
 const validFeatures = [
 	"write", "load_tile",
-	"color",
+	"color", "link",
 	"chat", "chat_dm", "load_chat",
-	"profile",
+	"cmd",
+	"profile", "claim", "promote",
 	"uc_picto", "uc_dot", "uc_nonletter",
 	"no_captcha", "few_captcha",
 	"pchat_anon"
@@ -23,9 +24,6 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	var user = ctx.user;
 	var query_data = ctx.query_data;
 	var db_misc = server.db_misc;
-	var uvias = server.uvias;
-	var accountSystem = server.accountSystem;
-	var getUserIdFromUsername = server.getUserIdFromUsername;
 	var getUsernameFromUserId = server.getUsernameFromUserId;
 	var siteWhitelistStatus = server.siteWhitelistStatus;
 
@@ -142,15 +140,22 @@ module.exports.POST = async function(req, write, server, ctx) {
 				valSet.push(additionsObj.user_id);
 				identifier = additionsObj.user_id;
 			} else if(category == "world") {
+				let pendingWorldName = additionsObj.world_name;
+				if(typeof pendingWorldName != "string") {
+					write(`Invalid world name type: ${typeof pendingWorldName}`, 400);
+					return;
+				}
+				pendingWorldName = pendingWorldName.trim().toUpperCase().slice(0, 10000);
+
 				colSet.push("id_type");
 				valSet.push("world");
 
 				colSet.push("world_name");
-				valSet.push(additionsObj.world_name);
-				identifier = additionsObj.world_name;
+				valSet.push(pendingWorldName);
+				identifier = pendingWorldName;
 			} else if(category == "ip") {
-				let pendingIpData = parseAnyIp(additionsObj.ip);
-				let normIp = pendingIpData?.[0];
+				let pendingIp = parseAnyIp(additionsObj.ip);
+				let normIp = pendingIp?.[0];
 				if(!normIp) {
 					write(`Invalid IP: ${additionsObj.ip}`, 400);
 					return;

@@ -105,10 +105,14 @@
 			write: "Canvas write, link, protect, clea",
 			load_tile: "Fetch tile regions",
 			color: "Write text with colors",
+			link: "Set a link to a cell",
 			chat: "Send chat message",
 			chat_dm: "Send direct private chat message",
 			load_chat: "Fetch chat history",
+			cmd: "Send custom cmd WebSocket messages",
 			profile: "Profile management (claiming worlds, configuring worlds)",
+			claim: "World claiming via user profile",
+			promote: "Adding members to a world via world configuration",
 			uc_picto: "Unicode pictographs/emojis",
 			uc_dot: "Unicode 2x3/2x4 dot characters",
 			uc_nonletter: "Unicode non-letter characters",
@@ -119,15 +123,19 @@
 
 		var whitelistHeaders = [
 			"write", "load_tile",
-			"color",
+			"color", "link",
 			"chat", "chat_dm", "load_chat",
-			"profile",
+			"cmd",
+			"profile", "claim", "promote",
 			"uc_picto", "uc_dot", "uc_nonletter",
 			"no_captcha", "few_captcha",
 			"pchat_anon"
 		];
 		var uncheckedByDefaultWhitelistHeaders = [
 			"no_captcha", "pchat_anon"
+		];
+		var notWorldSpecificWhitelistHeaders = [
+			"profile", "claim"
 		];
 
 		var tempIdMax = 1;
@@ -199,12 +207,19 @@
 		}
 
 		function getEffectiveHeaders(type) {
+			let wlHeaders = whitelistHeaders;
+			if(type == "world") {
+				// remove profile-specific headers
+				wlHeaders = Array.from(
+					new Set(whitelistHeaders).difference(new Set(notWorldSpecificWhitelistHeaders))
+				);
+			}
 			return [
 				"id",
 				...(type == "user" ? ["username", "user_id"]: []),
 				...(type == "ip" ? ["ip"]: []),
 				...(type == "world" ? ["world_name"]: []),
-				...whitelistHeaders,
+				...wlHeaders,
 				"Delete"
 			];
 		}
@@ -380,6 +395,8 @@
 				let additions = addedWhitelistOptions.user;
 				let removals = removedWhitelistOptions.user;
 
+				let setAnimation = animateButton(wl_sub_user);
+
 				submittingStatus.whitelistUser = true;
 				wl_sub_user.disabled = true;
 
@@ -412,8 +429,10 @@
 					updatedWhitelistOptions.user = {};
 					addedWhitelistOptions.user = {};
 					removedWhitelistOptions.user = {};
+					setAnimation(false);
 				}).catch(function() {
 					alert("Failed to update options for 'user'");
+					setAnimation(true);
 				}).finally(function() {
 					wl_sub_user.disabled = false;
 				});
@@ -423,6 +442,8 @@
 				let updates = updatedWhitelistOptions.ip;
 				let additions = addedWhitelistOptions.ip;
 				let removals = removedWhitelistOptions.ip;
+
+				let setAnimation = animateButton(wl_sub_ip);
 
 				submittingStatus.whitelistIp = true;
 				wl_sub_ip.disabled = true;
@@ -456,8 +477,10 @@
 					updatedWhitelistOptions.ip = {};
 					addedWhitelistOptions.ip = {};
 					removedWhitelistOptions.ip = {};
+					setAnimation(false);
 				}).catch(function() {
 					alert("Failed to update options for 'ip'");
+					setAnimation(true);
 				}).finally(function() {
 					wl_sub_ip.disabled = false;
 				});
@@ -467,6 +490,8 @@
 				let updates = updatedWhitelistOptions.world;
 				let additions = addedWhitelistOptions.world;
 				let removals = removedWhitelistOptions.world;
+
+				let setAnimation = animateButton(wl_sub_world);
 
 				submittingStatus.whitelistWorld = true;
 				wl_sub_world.disabled = true;
@@ -500,8 +525,10 @@
 					updatedWhitelistOptions.world = {};
 					addedWhitelistOptions.world = {};
 					removedWhitelistOptions.world = {};
+					setAnimation(false);
 				}).catch(function() {
 					alert("Failed to update options for 'world'");
+					setAnimation(true);
 				}).finally(function() {
 					wl_sub_world.disabled = false;
 				});
@@ -711,6 +738,40 @@
 			populateWhitelistTable(document.getElementById("wl_user"), "user", userRules);
 			populateWhitelistTable(document.getElementById("wl_ip"), "ip", ipRules);
 			populateWhitelistTable(document.getElementById("wl_world"), "world", worldRules);
+		}
+
+		function animateButton(buttonElm) {
+			buttonElm.style.border = "solid 2px blue";
+			return (isErr) => {
+				if(!isErr) {
+					buttonElm.style.border = "solid 2px #008000";
+				}
+				if(isErr) {
+					let state = 0;
+					let render = () => {
+						buttonElm.style.border = "solid 2px #FF0000";
+						setTimeout(() => {
+							buttonElm.style.border = "";
+							state++;
+							if(state >= 5) return;
+							setTimeout(render, 180);
+						}, 200);
+					};
+					render();
+				} else {
+					let alpha = 255;
+					let render = () => {
+						buttonElm.style.borderColor = "#008000" + (alpha).toString(16).padStart(2,0);
+						alpha -= 10;
+						if(alpha <= 0) {
+							buttonElm.style.border = "";
+							return;
+						}
+						requestAnimationFrame(render);
+					};
+					requestAnimationFrame(render);
+				}
+			};
 		}
 
 		preload();

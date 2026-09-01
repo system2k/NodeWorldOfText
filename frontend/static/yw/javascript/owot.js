@@ -4568,22 +4568,29 @@ function createSocket(getChatHist) {
 		w.emit("socketOpen", event);
 	}
 
-	socket.onclose = function() {
-		console.log("Socket has closed. Reconnecting...");
+	socket.onclose = function(evt) {
+		let doReconnect = true;
+		if(evt?.code == 1003) {
+			doReconnect = false;
+		}
+		console.log(`Socket has closed.${doReconnect ? " Reconnecting..." : ""}`);
 		w.emit("socketClose", true); // bool: before default behavior?
-		for(var i in network.callbacks) {
-			var cb = network.callbacks[i];
+		for(let i in network.callbacks) {
+			let cb = network.callbacks[i];
 			if(typeof cb == "function") {
 				cb(null, true);
 			}
 			delete network.callbacks[i];
 		}
-		if(!disconnectTimeout) {
+		if(!disconnectTimeout && doReconnect) {
 			disconnectTimeout = setTimeout(function() {
 				w.doAnnounce("Connection lost. Please wait until the client reconnects.", "err_connect");
 			}, 1000 * 2);
 		}
 		w.emit("socketClose", false);
+		if(!doReconnect) {
+			socket.pause();
+		}
 	}
 
 	socket.onerror = function(err) {
@@ -6696,6 +6703,55 @@ var networkHTTP = {
 				if(callback) callback(null);
 			}
 		});
+	},
+	captchaGetAltchaChallenge: function(callback) {
+		ajaxRequest({
+			type: "GET",
+			url: "/api/captcha/altcha",
+			done: function(data) {
+				if(callback) callback(JSON.parse(data));
+			},
+			error: function() {
+				if(callback) callback(null);
+			}
+		});
+	},
+	captchaSendAltchaSolution: function(payload, callback) {
+		var query = getQuerystring(window.location.search);
+		var key = null;
+		if(query.key) {
+			key = query.key;
+		}
+		ajaxRequest({
+			type: "POST",
+			url: "/api/captcha/altcha",
+			data: {
+				world: state.worldModel.name,
+				key: key,
+				payload
+			},
+			done: function(data) {
+				if(callback) callback(JSON.parse(data));
+			},
+			error: function() {
+				if(callback) callback(null);
+			}
+		});
+	},
+	captchaGetStatus: function(callback) {
+		ajaxRequest({
+			type: "GET",
+			url: "/api/captcha/status",
+			data: {
+				world: state.worldModel.name
+			},
+			done: function(data) {
+				if(callback) callback(JSON.parse(data));
+			},
+			error: function() {
+				if(callback) callback(null);
+			}
+		});
 	}
 };
 
@@ -8571,25 +8627,22 @@ var ws_functions = {
 	captcha_required: function(data) {
 		if(window._captchaOverlay) {
 			window._captchaSolveCallback = function(payload) {
-				network.transmit({
-					kind: "captcha_solve",
-					payload: payload
+				networkHTTP.captchaSendAltchaSolution(payload, function(response) {
+					var isVerified = response.verified;
+					if(window._captchaOverlay) {
+						if(isVerified) {
+							window._captchaOverlay.hide();
+							w.socket.resume();
+						} else {
+							var errorEl = document.getElementById("captcha_error");
+							var widget = document.getElementById("altcha-widget");
+							if(errorEl) errorEl.style.display = "";
+							if(widget) widget.reset();
+						}
+					}
 				});
 			};
 			window._captchaOverlay.show();
-		}
-	},
-	captcha_solved: function(data) {
-		window._captchaSolveCallback = null;
-		if(window._captchaOverlay) {
-			if(data.verified) {
-				window._captchaOverlay.hide();
-			} else {
-				var errorEl = document.getElementById("captcha_error");
-				var widget = document.getElementById("altcha-widget");
-				if(errorEl) errorEl.style.display = "";
-				if(widget) widget.reset();
-			}
 		}
 	}
 };

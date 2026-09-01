@@ -11,6 +11,10 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var accountSystem = server.accountSystem;
 	var wsSend = server.wsSend;
 
+	if(!ws.sdata.canUseCmd) {
+		return;
+	}
+
 	// rate limit commands
 	var msNow = Date.now();
 

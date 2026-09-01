@@ -31,36 +31,12 @@ const restrictions = require("./backend/utils/restrictions.js");
 const frameUtils   = require("./backend/framework/utils.js");
 const serverUtil   = require("./backend/framework/server.js");
 const templates    = require("./backend/framework/templates.js");
-const captcha_manager = require("./backend/utils/captcha_manager.js");
+const captcha      = require("./backend/subsystems/captcha.js");
 var { checkWhitelistFeature } = require("./backend/utils/whitelist.js");
 
-var trimHTML             = utils.trimHTML;
-var create_date          = utils.create_date;
 var san_nbr              = utils.san_nbr;
-var san_dp               = utils.san_dp;
-var checkURLParam        = utils.checkURLParam;
-var removeLastSlash      = utils.removeLastSlash;
-var ar_str_trim          = utils.ar_str_trim;
-var ar_str_decodeURI     = utils.ar_str_decodeURI;
-var http_time            = utils.http_time;
-var encode_base64        = utils.encode_base64;
-var decode_base64        = utils.decode_base64;
 var process_error_arg    = utils.process_error_arg;
-var tile_coord           = utils.tile_coord;
-var calculateTimeDiff    = utils.calculateTimeDiff;
-var compareNoCase        = utils.compareNoCase;
-var resembles_int_number = utils.resembles_int_number;
-var TerminalMessage      = utils.TerminalMessage;
-var encodeCharProt       = utils.encodeCharProt;
-var decodeCharProt       = utils.decodeCharProt;
-var change_char_in_array = utils.change_char_in_array;
-var html_tag_esc         = utils.html_tag_esc;
 var dump_dir             = utils.dump_dir;
-var arrayIsEntirely      = utils.arrayIsEntirely;
-var normalizeCacheTile   = utils.normalizeCacheTile;
-var checkDuplicateCookie = utils.checkDuplicateCookie;
-var advancedSplit        = utils.advancedSplit;
-var filterEdit           = utils.filterEdit;
 var toHex64              = utils.toHex64;
 var toInt64              = utils.toInt64;
 
@@ -137,6 +113,7 @@ var debugLogging = false;
 var testUviasIds = false;
 var serverLoaded = false;
 var isStopping = false;
+var networkStatsActive = true;
 
 var closed_client_limit = 1000 * 60 * 20; // 20 min
 var ws_req_per_second = 1000;
@@ -558,7 +535,8 @@ var pages = {
 			user: require("./backend/api/admin/user.js")
 		},
 		captcha: {
-			altcha: require("./backend/api/captcha/altcha.js")
+			altcha: require("./backend/api/captcha/altcha.js"),
+			status: require("./backend/api/captcha/status.js")
 		}
 	},
 	accounts: {
@@ -629,8 +607,7 @@ var websockets = {
 	write: require("./backend/websockets/write.js"),
 	config: require("./backend/websockets/config.js"),
 	boundary: require("./backend/websockets/boundary.js"),
-	stats: require("./backend/websockets/stats.js"),
-	captcha_solve: require("./backend/websockets/captcha_solve.js")
+	stats: require("./backend/websockets/stats.js")
 };
 
 var modules = {
@@ -648,17 +625,8 @@ var subsystems = {
 	world_mgr: require("./backend/subsystems/world_mgr.js")
 };
 
-var sanitizeWorldname = subsystems.world_mgr.sanitizeWorldname;
-var modifyWorldProp = subsystems.world_mgr.modifyWorldProp;
-var commitAllWorlds = subsystems.world_mgr.commitAllWorlds;
 var releaseWorld = subsystems.world_mgr.releaseWorld;
 var getOrCreateWorld = subsystems.world_mgr.getOrCreateWorld;
-var fetchWorldMembershipsByUserId = subsystems.world_mgr.fetchWorldMembershipsByUserId;
-var fetchOwnedWorldsByUserId = subsystems.world_mgr.fetchOwnedWorldsByUserId;
-var revokeMembershipByWorldName = subsystems.world_mgr.revokeMembershipByWorldName;
-var promoteMembershipByWorldName = subsystems.world_mgr.promoteMembershipByWorldName;
-var claimWorldByName = subsystems.world_mgr.claimWorldByName;
-var renameWorld = subsystems.world_mgr.renameWorld;
 var canViewWorld = subsystems.world_mgr.canViewWorld;
 var getWorldNameFromCacheById = subsystems.world_mgr.getWorldNameFromCacheById;
 
@@ -1053,10 +1021,14 @@ async function initialize_site_whitelist_db() {
 				write INTEGER NOT NULL DEFAULT 0,
 				load_tile INTEGER NOT NULL DEFAULT 0,
 				color INTEGER NOT NULL DEFAULT 0,
+				link INTEGER NOT NULL DEFAULT 0,
 				chat INTEGER NOT NULL DEFAULT 0,
 				chat_dm INTEGER NOT NULL DEFAULT 0,
 				load_chat INTEGER NOT NULL DEFAULT 0,
+				cmd INTEGER NOT NULL DEFAULT 0,
 				profile INTEGER NOT NULL DEFAULT 0,
+				claim INTEGER NOT NULL DEFAULT 0,
+				promote INTEGER NOT NULL DEFAULT 0,
 				uc_picto INTEGER NOT NULL DEFAULT 0,
 				uc_dot INTEGER NOT NULL DEFAULT 0,
 				uc_nonletter INTEGER NOT NULL DEFAULT 0,
@@ -1079,16 +1051,20 @@ async function initialize_site_whitelist_db() {
 			('write', 'public'),
 			('load_tile', 'public'),
 			('color', 'public'),
+			('link', 'public'),
 			('chat', 'public'),
 			('chat_dm', 'public'),
 			('load_chat', 'public'),
+			('cmd', 'public'),
 			('profile', 'public'),
+			('claim', 'public'),
+			('promote', 'public'),
 			('uc_picto', 'public'),
 			('uc_dot', 'public'),
 			('uc_nonletter', 'public'),
 			('no_captcha', 'whitelisted'),
 			('few_captcha', 'public'),
-			('pchat_anon', 'public')
+			('pchat_anon', 'whitelisted')
 		`);
 	}
 
@@ -1278,6 +1254,7 @@ function createEndpoints(server) {
 	server.registerEndpoint("api/admin/whitelist", pages.api.admin.whitelist);
 	server.registerEndpoint("api/admin/user", pages.api.admin.user);
 	server.registerEndpoint("api/captcha/altcha", pages.api.captcha.altcha);
+	server.registerEndpoint("api/captcha/status", pages.api.captcha.status);
 
 	server.registerEndpoint("accounts/login", pages.accounts.login);
 	server.registerEndpoint("accounts/logout", pages.accounts.logout);
@@ -1546,7 +1523,6 @@ async function getUserInfo(cookies, is_websocket, dispatch) {
 						user.staff = level == 1 || level == 2 || level == 3;
 					}
 
-					// TODO: might want to add a public script repository for OWOT and remove/change this
 					if(user.staff && !is_websocket) {
 						user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id);
 					} else {
@@ -2041,8 +2017,7 @@ var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
 	link:			[400, 1000, 0], // TODO: fix link limits
 	protect:		[400, 1000, 0],
 	write:			[256, 1000, 0], // rate-limiting handled separately
-	cursor:			[70, 1000, 0],
-	captcha_solve:  [6, 2000, 0]
+	cursor:			[70, 1000, 0]
 };
 
 function can_process_req_kind(lims, kind) {
@@ -2140,7 +2115,8 @@ async function manageWebsocketConnection(ws, req) {
 		center: [0, 0],
 		boundary: null,
 		localFilter: true,
-		captchaRequired: false
+		canUseCmd: true,
+		requireCaptcha: false
 	};
 
 	var parsedURL = new URL(req.url, "ws://example.com/ws");
@@ -2153,7 +2129,7 @@ async function manageWebsocketConnection(ws, req) {
 	var bytesWritten = 0;
 	var bytesRead = 0;
 
-	var pre_queue = [];
+	var preQueue = [];
 	var world = null;
 	var clientId = void 0;
 	var worldObj = null;
@@ -2233,10 +2209,28 @@ async function manageWebsocketConnection(ws, req) {
 		evictClient();
 	});
 
-	// TODO: may not fire in all cases
 	function updateNetworkStats() {
-		var b_out = req.socket.bytesWritten;
-		var b_in = req.socket.bytesRead;
+		let b_out = 0;
+		let b_in = 0;
+
+		if(networkStatsActive) {
+			let a = performance.now();
+			b_out = req.socket.bytesWritten;
+			b_in = req.socket.bytesRead;
+			let b = performance.now();
+			let diff = b - a;
+			if(diff > 5) {
+				console.warn("Disabled network stats due to performance");
+				networkStatsActive = false;
+			}
+		}
+
+		if(req.socket.writableLength > 50000000) {
+			console.log(`Evicting client due to excessive outbound buffer size: ${ws.sdata.ipAddress}`);
+			evictClient();
+			ws.close();
+		}
+
 		periodWSOutboundBytes += b_out - bytesWritten;
 		periodWSInboundBytes += b_in - bytesRead;
 		bytesWritten = b_out;
@@ -2246,7 +2240,6 @@ async function manageWebsocketConnection(ws, req) {
 
 	function send_ws(data) {
 		wsSend(ws, data);
-		updateNetworkStats();
 	}
 	function error_ws(errorCode, errorMsg) {
 		send_ws(JSON.stringify({
@@ -2302,7 +2295,11 @@ async function manageWebsocketConnection(ws, req) {
 	// adds data to a queue. this must be before any async calls and the message event
 	function pre_message(msg) {
 		if(!can_process_req()) return;
-		pre_queue.push(msg);
+		preQueue.push(msg);
+		if(preQueue.length > 30) {
+			evictClient();
+			ws.close();
+		}
 	}
 	ws.on("message", pre_message);
 
@@ -2311,6 +2308,7 @@ async function manageWebsocketConnection(ws, req) {
 	var cookies = parseCookie(req.headers.cookie);
 	var user = await getUserInfo(cookies, true);
 	if(ws.sdata.terminated) return;
+
 	var channel = new_token(7);
 	ws.sdata.channel = channel;
 
@@ -2326,6 +2324,7 @@ async function manageWebsocketConnection(ws, req) {
 
 	world = await getOrCreateWorld(location);
 	if(ws.sdata.terminated) return;
+
 	if(!world) {
 		return error_ws("NO_EXIST", "World does not exist");
 	}
@@ -2334,118 +2333,130 @@ async function manageWebsocketConnection(ws, req) {
 		memKey: search.get("key")
 	});
 	if(ws.sdata.terminated) return;
+
 	if(!permission) {
 		return error_ws("NO_PERM", "No permission");
 	}
 
-	ws.sdata.userClient = true; // client connection is now initialized
-	ws.sdata.keyQuery = search.get("key");
-	
-	ctx.world = world;
-
-	ws.sdata.world = world;
-	ws.sdata.user = user;
-
-	var chat_permission = world.feature.chat;
-	var can_chat = chat_permission == 0 || (chat_permission == 1 && permission.member) || (chat_permission == 2 && permission.owner);
-
-	worldObj = getWorldData(world.id);
-	if(!ws.sdata.terminated && !ws.sdata.hide_user_count) {
-		worldObj.user_count++;
+	var wl_can_cmd = checkWhitelistFeature(user.id, user.authenticated, ws.sdata.ipAddress, world.name, "cmd", global_data);
+	if(!wl_can_cmd) {
+		ws.sdata.canUseCmd = false;
 	}
 
-	var initial_user_count;
-	if(can_chat) {
-		initial_user_count = worldObj.user_count;
-	}
+	var captchaToken = search.get("captcha");
+	var captchaTest = captchaToken && !captcha.reserveClientCaptchaToken(captchaToken, ws.sdata.ipAddress);
 
-	clientId = generateClientId(world.id);
-
-	if(!client_ips[world.id]) {
-		client_ips[world.id] = {};
-	}
-	client_ips[world.id][clientId] = [ws.sdata.ipAddress, -1, false, -1];
-	// [Ip, Disconnect time, Is disconnected, Last chat time (on global)]
-
-	ws.sdata.clientId = clientId;
-	ws.sdata.chat_blocks = {
-		id: [],
-		user: [],
-		no_tell: false,
-		no_anon: false,
-		no_reg: false,
-		block_all: false
-	};
-
-	broadcastMonitorEvent("Connect", ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + world.name + "', " + world.id + "]");
-
-	var sentClientId = clientId;
-	if(!can_chat) sentClientId = -1;
-	send_ws(JSON.stringify({
-		kind: "channel",
-		sender: channel,
-		id: sentClientId,
-		initial_user_count
-	}));
-
-	var captchaExemptWhitelist = checkWhitelistFeature(user.id, user.authenticated, ws.sdata.ipAddress, world.name, "no_captcha", global_data);
-	var captchaExemptDatabase = await db_misc.get("SELECT * FROM captcha_exempt WHERE ip=?", ws.sdata.ipAddress);
-
-	if(captchaExemptDatabase) {
-		let date_created = captchaExemptDatabase.date_created;
-		if(Date.now() - date_created >= 1000 * 60 * 60) { // expired after 1 hour
-			await db_misc.run("DELETE FROM captcha_exempt WHERE ip=?", ws.sdata.ipAddress);
-			captchaExemptDatabase = null;
-		}
-	}
-
-	var captchaEnabledGlobally = getServerSetting("captchaEnabled") == "1";
-	if(!captchaExemptWhitelist && !captchaExemptDatabase && captchaEnabledGlobally) {
-		ws.sdata.captchaRequired = true;
-		let challenge = await captcha_manager.requireCaptcha(ws.sdata.ipAddress);
+	if(!captchaTest && await captcha.isRequired(global_data, user, ws.sdata.ipAddress, world.name)) {
 		send_ws(JSON.stringify({
-			kind: "captcha_required",
-			challenge: challenge
+			kind: "captcha_required"
 		}));
+		evictClient();
+		ws.close(1003);
+	} else {
+		postInitClient();
 	}
 
-	if(client_cursor_pos[world.id]) {
-		var world_cursors = client_cursor_pos[world.id];
-		for(var csr_channel in world_cursors) {
-			var csr = world_cursors[csr_channel];
-			if(csr.hidden) continue;
-			var tileX = csr.tileX;
-			var tileY = csr.tileY;
-			var isCenter = -24 <= tileX && tileX <= 24 && -24 <= tileY && tileY <= 24;
-			if(!isCenter) continue;
-			send_ws(JSON.stringify({
-				kind: "cursor",
-				position: {
-					tileX: csr.tileX,
-					tileY: csr.tileY,
-					charX: csr.charX,
-					charY: csr.charY
-				},
-				channel: csr_channel
-			}));
+	function postInitClient() {
+		if(ws.sdata.userClient) {
+			// already initialized
+			return;
+		}
+		ws.sdata.userClient = true; // client connection is now initialized
+		ws.sdata.keyQuery = search.get("key");
+		
+		ctx.world = world;
+
+		ws.sdata.world = world;
+		ws.sdata.user = user;
+
+		var chat_permission = world.feature.chat;
+		var can_chat = chat_permission == 0 || (chat_permission == 1 && permission.member) || (chat_permission == 2 && permission.owner);
+
+		worldObj = getWorldData(world.id);
+		if(!ws.sdata.terminated && !ws.sdata.hide_user_count) {
+			worldObj.user_count++;
+		}
+
+		var initial_user_count;
+		if(can_chat) {
+			initial_user_count = worldObj.user_count;
+		}
+
+		clientId = generateClientId(world.id);
+
+		if(!client_ips[world.id]) {
+			client_ips[world.id] = {};
+		}
+		client_ips[world.id][clientId] = [ws.sdata.ipAddress, -1, false, -1];
+		// [Ip, Disconnect time, Is disconnected, Last chat time (on global)]
+
+		ws.sdata.clientId = clientId;
+		ws.sdata.chat_blocks = {
+			id: [],
+			user: [],
+			no_tell: false,
+			no_anon: false,
+			no_reg: false,
+			block_all: false
+		};
+
+		broadcastMonitorEvent("Connect", ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + world.name + "', " + world.id + "]");
+
+		var sentClientId = clientId;
+		if(!can_chat) sentClientId = -1;
+		send_ws(JSON.stringify({
+			kind: "channel",
+			sender: channel,
+			id: sentClientId,
+			initial_user_count
+		}));
+
+		if(client_cursor_pos[world.id]) {
+			var world_cursors = client_cursor_pos[world.id];
+			for(var csr_channel in world_cursors) {
+				var csr = world_cursors[csr_channel];
+				if(csr.hidden) continue;
+				var tileX = csr.tileX;
+				var tileY = csr.tileY;
+				var isCenter = -24 <= tileX && tileX <= 24 && -24 <= tileY && tileY <= 24;
+				if(!isCenter) continue;
+				send_ws(JSON.stringify({
+					kind: "cursor",
+					position: {
+						tileX: csr.tileX,
+						tileY: csr.tileY,
+						charX: csr.charX,
+						charY: csr.charY
+					},
+					channel: csr_channel
+				}));
+			}
+		}
+
+		ws.off("message", pre_message);
+		ws.on("message", handle_message);
+
+		// Some messages might have been received before the socket finished opening
+		if(preQueue.length > 0) {
+			for(var p = 0; p < preQueue.length; p++) {
+				handle_message(preQueue[p]);
+				preQueue.splice(p, 1);
+				p--;
+			}
 		}
 	}
 
-	ws.off("message", pre_message);
-	ws.on("message", handle_message);
 	async function handle_message(msg, isBinary) {
 		if(ws.sdata.terminated) return;
+		updateNetworkStats();
+		if(!can_process_req()) return;
 		if(!isBinary) {
 			msg = msg.toString("utf8");
 		}
-		updateNetworkStats();
-		if(!can_process_req()) return;
 		if(!(typeof msg == "string" || typeof msg == "object")) {
 			return;
 		}
-		if(msg.constructor == Buffer) { // TODO
-			/*msg = bin_packet.decode(msg);
-			if(!msg) return; // malformed packet*/
+		if(msg.constructor == Buffer) {
 			return;
 		}
 		// Parse JSON message
@@ -2473,16 +2484,6 @@ async function manageWebsocketConnection(ws, req) {
 				res.id = san_nbr(msg.id);
 			}
 			return send_ws(JSON.stringify(res)); 
-		}
-
-		if(ws.sdata.captchaRequired && kind != "captcha_solve") {
-			send_ws(JSON.stringify({
-				kind: "error",
-				code: "CAPTCHA",
-				message: "Captcha must be solved",
-				id: msg.id != void 0 ? san_nbr(msg.id) : null
-			}));
-			return;
 		}
 
 		// Begin calling a websocket function for the necessary request
@@ -2520,14 +2521,6 @@ async function manageWebsocketConnection(ws, req) {
 			}));
 		}
 	}
-	// Some messages might have been received before the socket finished opening
-	if(pre_queue.length > 0) {
-		for(var p = 0; p < pre_queue.length; p++) {
-			handle_message(pre_queue[p]);
-			pre_queue.splice(p, 1);
-			p--;
-		}
-	}
 }
 
 async function start_server() {
@@ -2543,6 +2536,10 @@ async function start_server() {
 	intv.userCount = setInterval(function() {
 		broadcastUserCount();
 	}, 2000);
+
+	intv.resetNetworkCounter = setInterval(function() {
+		networkStatsActive = true;
+	}, 1000 * 60 * 10);
 
 	intv.traff_mon_net_interval = setInterval(function() {
 		var httpByteStat = httpServer.consumeByteTransferStats();
@@ -2596,7 +2593,7 @@ async function start_server() {
 
 	wss.on("connection", async function(ws, req) {
 		try {
-			manageWebsocketConnection(ws, req);
+			await manageWebsocketConnection(ws, req);
 		} catch(e) {
 			// failed to initialize
 			handle_error(e);
@@ -2673,7 +2670,6 @@ var global_data = {
 	getUsernameFromUserId,
 	siteWhitelistCache,
 	siteWhitelistStatus,
-	captcha_manager,
 };
 
 async function sysLoad() {
@@ -2745,10 +2741,6 @@ function stopServer(restart, maintenance) {
 			}
 
 			await loopCommitRestrictions(true);
-
-			if(captcha_manager) {
-				captcha_manager.stopCleanup();
-			}
 		} catch(e) {
 			handle_error(e);
 			if(!isTestServer) console.log(e);

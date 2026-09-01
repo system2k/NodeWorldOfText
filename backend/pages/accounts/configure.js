@@ -368,7 +368,12 @@ module.exports.POST = async function(req, write, server, ctx) {
 		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
 	}
 
+	var wl_can_promote = checkWhitelistFeature(user.id, user.authenticated, ctx.ipAddress, world.name, "promote", server);
+
 	if(post_data.form == "add_member") {
+		if(!wl_can_promote) {
+			return await callPage("accounts/configure", { message: "Member promotion is disabled for your group" });
+		}
 		var username = post_data.add_member;
 
 		var adduser;

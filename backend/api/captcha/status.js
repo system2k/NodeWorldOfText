@@ -1,34 +1,51 @@
-var { checkWhitelistFeature } = require("../../utils/whitelist.js")
+var captcha = require("../../subsystems/captcha.js");
+
+var world_mgr = require("../../subsystems/world_mgr.js");
+var releaseWorld = world_mgr.releaseWorld;
+var getWorld = world_mgr.getWorld;
+var canViewWorld = world_mgr.canViewWorld;
 
 module.exports.GET = async function(req, write, server, ctx) {
 	var user = ctx.user;
 	var ipAddress = ctx.ipAddress;
+	var query_data = ctx.query_data;
+	var setCallback = ctx.setCallback;
 
 	var getServerSetting = server.getServerSetting;
-	var db_misc = server.db_misc;
-	var captcha_manager = server.captcha_manager;
-
-	var captchaExemptWhitelist = checkWhitelistFeature(user.id, user.authenticated, ipAddress, server, "no_captcha", server);
-	var captchaExemptDatabase = await db_misc.get("SELECT * FROM captcha_exempt WHERE ip=?", ipAddress);
-
-	if(captchaExemptDatabase) {
-		let date_created = captchaExemptDatabase.date_created;
-		if(Date.now() - date_created >= 1000 * 60 * 60) { // expired after 1 hour
-			await db_misc.run("DELETE FROM captcha_exempt WHERE ip=?", ipAddress);
-			captchaExemptDatabase = null;
-		}
-	}
 
 	var captchaEnabledGlobally = getServerSetting("captchaEnabled") == "1";
-	if(!captchaExemptWhitelist && !captchaExemptDatabase && captchaEnabledGlobally) {
-		ws.sdata.captchaRequired = true;
-		let challenge = await captcha_manager.requireCaptcha(ipAddress);
+	if(!captchaEnabledGlobally) {
 		return write(JSON.stringify({
-			status: "REQUIRED"
+			required: false
 		}));
 	}
 
+	var worldIncluded = query_data.world != void 0;
+	var worldName = null;
+
+	if(worldIncluded) {
+		if(typeof query_data.world != "string") return write(null, 400);
+		let world = await getWorld(query_data.world);
+		if(!world) {
+			return write(null, 404);
+		}
+		
+		setCallback(function() {
+			releaseWorld(world);
+		});
+
+		let perm = await canViewWorld(world, user, {
+			memKey: query_data.key
+		});
+		if(!perm) {
+			return write(null, 403);
+		}
+		worldName = world.name.toUpperCase();
+	}
+
+	let isRequired = await captcha.isRequired(server, user, ipAddress, worldName);
+
 	return write(JSON.stringify({
-		status: "PASS"
+		required: isRequired
 	}));
 }

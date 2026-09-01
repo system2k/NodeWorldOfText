@@ -57,7 +57,8 @@ module.exports = async function(data, server, params) {
 	}
 
 	var wl_can_write = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "write", server);
-	if(!wl_can_write) {
+	var wl_can_link = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "link", server);
+	if(!wl_can_write || !wl_can_link) {
 		return [true, "PERM"];
 	}
 
