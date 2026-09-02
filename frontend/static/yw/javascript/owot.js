@@ -4507,9 +4507,18 @@ function checkKeyPatterns(combination) {
 }
 
 function createWsPath() {
-	var search = window.location.search;
-	if(!search) search = "";
-	return "ws" + (window.location.protocol == "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/" + search;
+	var searchString = "";
+	var params = {};
+	if(window.location.search) {
+		params = getQuerystring(window.location.search);
+	}
+	if(w.captcha?.token) {
+		params.captcha = w.captcha.token;
+	}
+	if(Object.keys(params).length > 0) {
+		searchString = "?" + Object.entries(params).map(e => encodeURIComponent(e[0]) + "=" + encodeURIComponent(e[1])).join("&");
+	}
+	return "ws" + (window.location.protocol == "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/" + searchString;
 }
 
 function createSocket(getChatHist) {
@@ -6573,7 +6582,8 @@ var networkHTTP = {
 			min_tileX: x1,
 			min_tileY: y1,
 			max_tileX: x2,
-			max_tileY: y2
+			max_tileY: y2,
+			captcha: w.captcha?.token || undefined
 		};
 		var query = getQuerystring(window.location.search);
 		if(query.key) {
@@ -6602,7 +6612,8 @@ var networkHTTP = {
 			opts = {};
 		}
 		var data = {
-			edits: JSON.stringify(edits)
+			edits: JSON.stringify(edits),
+			captcha: w.captcha?.token || undefined
 		};
 		if(opts.public_only) data.public_only = true;
 		if(opts.preserve_links) data.preserve_links = true;
@@ -6625,7 +6636,8 @@ var networkHTTP = {
 			data: {
 				world: state.worldModel.name,
 				tileX, tileY, charX, charY,
-				url
+				url,
+				captcha: w.captcha?.token || undefined
 			},
 			done: function(data) {
 				if(callback) callback(data);
@@ -6642,7 +6654,8 @@ var networkHTTP = {
 			data: {
 				world: state.worldModel.name,
 				tileX, tileY, charX, charY,
-				link_tileX, link_tileY, relative
+				link_tileX, link_tileY, relative,
+				captcha: w.captcha?.token || undefined
 			},
 			done: function(data) {
 				if(callback) callback(data);
@@ -6657,7 +6670,8 @@ var networkHTTP = {
 		var data = {
 			world: state.worldModel.name,
 			tileX: tileX,
-			tileY: tileY
+			tileY: tileY,
+			captcha: w.captcha?.token || undefined
 		};
 		var url = "/ajax/protect/";
 		if(type == "unprotect") {
@@ -6684,7 +6698,8 @@ var networkHTTP = {
 			tileX: tileX,
 			tileY: tileY,
 			charX: charX,
-			charY: charY
+			charY: charY,
+			captcha: w.captcha?.token || undefined
 		};
 		var url = "/ajax/protect/char/";
 		if(type == "unprotect") {
@@ -7030,6 +7045,9 @@ Object.assign(w, {
 		exists: Tile.exists,
 		loaded: Tile.loaded,
 		visible: Tile.visible
+	},
+	captcha: {
+		token: null
 	},
 	doAnnounce: function(text, announceClass) {
 		if(!announceClass) {
@@ -8624,14 +8642,18 @@ var ws_functions = {
 			}
 		}
 	},
-	captcha_required: function(data) {
+	captcha_required: function() {
 		if(window._captchaOverlay) {
 			window._captchaSolveCallback = function(payload) {
 				networkHTTP.captchaSendAltchaSolution(payload, function(response) {
 					var isVerified = response.verified;
+					var token = response.token;
 					if(window._captchaOverlay) {
 						if(isVerified) {
 							window._captchaOverlay.hide();
+							w.captcha.token = token;
+							// create new socket instance with token parameter
+							w.changeSocket(createWsPath());
 							w.socket.resume();
 						} else {
 							var errorEl = document.getElementById("captcha_error");

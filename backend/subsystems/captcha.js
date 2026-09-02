@@ -18,7 +18,7 @@ function getHmacKey() {
 }
 
 function generateCaptchaToken() {
-	return crypto.randomBytes(16).toString("hex");
+	return crypto.randomBytes(8).toString("hex");
 }
 
 function setClientCaptchaToken(ipAddress) {
@@ -27,6 +27,7 @@ function setClientCaptchaToken(ipAddress) {
 		ips: new Set([ipAddress]),
 		date: Date.now()
 	});
+	return tok;
 }
 
 // returns: successfully reserved
@@ -107,19 +108,24 @@ async function isRequired(server, user, ipAddress, worldName) {
 	}
 
 	var isRequired = false;
+	var isTempExempt = false;
 
 	var captchaExemptWhitelist = checkWhitelistFeature(user.id, user.authenticated, ipAddress, worldName, "no_captcha", server);
-	var captchaExemptDatabase = await db_misc.get("SELECT * FROM captcha_exempt WHERE ip=?", ipAddress);
+	var captchaFewWhitelist = checkWhitelistFeature(user.id, user.authenticated, ipAddress, worldName, "few_captcha", server);
 
-	if(captchaExemptDatabase) {
-		let date_created = captchaExemptDatabase.date_created;
-		if(Date.now() - date_created >= 1000 * 60 * 60) { // expired after 1 hour
-			await db_misc.run("DELETE FROM captcha_exempt WHERE ip=?", ipAddress);
-			captchaExemptDatabase = null;
+	if(captchaFewWhitelist) {
+		let captchaExemptDatabase = await db_misc.get("SELECT * FROM captcha_exempt WHERE ip=?", ipAddress);
+		if(captchaExemptDatabase) {
+			isTempExempt = true;
+			let date_created = captchaExemptDatabase.date_created;
+			if(Date.now() - date_created >= 1000 * 60 * 60) { // expired after 1 hour
+				isTempExempt = false;
+				await db_misc.run("DELETE FROM captcha_exempt WHERE ip=?", ipAddress);
+			}
 		}
 	}
 
-	if(!captchaExemptWhitelist && !captchaExemptDatabase) {
+	if(!captchaExemptWhitelist && !isTempExempt) {
 		isRequired = true;
 	}
 

@@ -64,12 +64,17 @@ module.exports.POST = async function(req, write, server, ctx) {
 	}
 
 	var verifiedStatus = await captcha.verifyChallenge(payload, ipAddress);
+	var token = null;
 
 	if(verifiedStatus) {
 		await captcha.persistVerification(server, user, ipAddress, worldName);
+		token = captcha.setClientCaptchaToken(ipAddress);
 	}
 
-	write(JSON.stringify({ verified: verifiedStatus }), 200, {
+	write(JSON.stringify({
+		verified: verifiedStatus,
+		token
+	}), 200, {
 		mime: "application/json"
 	});
 }

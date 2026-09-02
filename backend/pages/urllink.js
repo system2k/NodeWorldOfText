@@ -3,6 +3,8 @@ var releaseWorld = world_mgr.releaseWorld;
 var getOrCreateWorld = world_mgr.getOrCreateWorld;
 var canViewWorld = world_mgr.canViewWorld;
 
+var captcha = require("../subsystems/captcha.js");
+
 // both url links and coordinate links
 module.exports.POST = async function(req, write, server, ctx, params) {
 	var post_data = ctx.post_data;
@@ -23,6 +25,12 @@ module.exports.POST = async function(req, write, server, ctx, params) {
 	var can_read = await canViewWorld(world, user);
 	if(!can_read) {
 		return write(null, 403);
+	}
+
+	var captchaToken = post_data.captcha;
+	var captchaTest = captchaToken && captcha.reserveClientCaptchaToken(captchaToken, ctx.ipAddress);
+	if(!captchaTest && await captcha.isRequired(server, user, ctx.ipAddress, world.name)) {
+		return write("Captcha required", 429);
 	}
 
 	var type = "url";
