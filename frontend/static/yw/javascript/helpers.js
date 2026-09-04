@@ -148,6 +148,7 @@ function ajaxRequest(settings) {
 	var ampAppend = false;
 	if(settings.data) {
 		for(var i in settings.data) {
+			if(settings.data[i] == null) continue;
 			if(ampAppend) formData += "&";
 			ampAppend = true;
 			formData += encodeURIComponent(i) + "=" + encodeURIComponent(settings.data[i]);

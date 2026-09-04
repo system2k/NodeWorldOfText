@@ -511,8 +511,8 @@ function resizable_chat() {
 		downY = e.pageY;
 		if(state) {
 			// subtract 2 for the borders
-			chatWidth = chat_window.offsetWidth - 2;
-			chatHeight = chat_window.offsetHeight - 2;
+			chatWidth = chat_window.offsetWidth;
+			chatHeight = chat_window.offsetHeight;
 			elmX = chat_window.offsetLeft;
 			elmY = chat_window.offsetTop;
 			isDown = true;

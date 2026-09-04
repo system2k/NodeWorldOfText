@@ -29,6 +29,7 @@ register_chat_command("search", function(args) {
 class InteractiveTable {
 	headers = [];
 	rowsById = {};
+	scheduledChanges = new Map();
 
 	tbody = null;
 	selectedRows = new Set();
@@ -200,7 +201,7 @@ class InteractiveTable {
 		let column = row.columns[name];
 		if(!column) return;
 
-		this._normalizeAndSetValue(column.cellElement, value);
+		this.scheduledChanges.set(column.cellElement, value);
 	}
 
 	removeRow(id) {
@@ -209,6 +210,14 @@ class InteractiveTable {
 		let elm = row.rowElement;
 		elm.remove();
 		delete this.rowsById[id];
+	}
+
+	iterateScheduledChanges() {
+		let changes = this.scheduledChanges;
+		changes.forEach((value, elm) => {
+			this._normalizeAndSetValue(elm, value);
+			changes.delete(elm);
+		});
 	}
 }
 
@@ -274,6 +283,8 @@ class WTWTracker {
 				this.dataTable.selectRow(ipAddr);
 			}
 		});
+
+		this._updateTableLoop();
 	}
 
 	show() {
@@ -288,6 +299,13 @@ class WTWTracker {
 		if(this.frame) {
 			this.frame.style.display = "none";
 		}
+	}
+
+	_updateTableLoop() {
+		if(this.dataTable && this.isVisible) {
+			this.dataTable.iterateScheduledChanges();
+		}
+		window.requestAnimationFrame(this._updateTableLoop.bind(this));
 	}
 
 	setCoordRadius(value) {
@@ -777,6 +795,7 @@ class WTWTracker {
 		frame.style.display = "flex";
 		frame.style.flexDirection = "column";
 		frame.style.gap = "2px";
+		frame.style.boxSizing = "border-box";
 
 		let titleBar = document.createElement("div");
 		titleBar.style.display = "flex";
@@ -1173,7 +1192,7 @@ class WTWTracker {
 		frame.appendChild(controlButtonArea);
 		frame.appendChild(rateLimitControls);
 
-		let resizeStatus = makeElementResizable(frame);
+		let resizeStatus = makeElementResizable(frame, 515, 265);
 		makeElementDraggable(titleBar, frame, [ closeButton ], function() {
 			if(resizeStatus.elementIsResizing) {
 				return -1;

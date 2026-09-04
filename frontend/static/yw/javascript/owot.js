@@ -511,7 +511,7 @@ function resizeElement(element, width, height, minWidth, minHeight) {
 	return [width, height];
 }
 
-function makeElementResizable(element) {
+function makeElementResizable(element, minWidth, minHeight) {
 	let resizeStatus = {
 		elementIsResizing: false
 	};
@@ -545,8 +545,8 @@ function makeElementResizable(element) {
 		downY = e.pageY;
 		if(state) {
 			// subtract 2 for the borders
-			elementWidth = element.offsetWidth - 2;
-			elementHeight = element.offsetHeight - 2;
+			elementWidth = element.offsetWidth;
+			elementHeight = element.offsetHeight;
 			elmX = element.offsetLeft;
 			elmY = element.offsetTop;
 			isDown = true;
@@ -583,7 +583,7 @@ function makeElementResizable(element) {
 		} else if(resize_right) {
 			width_delta = offX;
 		}
-		var res = resizeElement(element, elementWidth + width_delta, elementHeight + height_delta);
+		var res = resizeElement(element, elementWidth + width_delta, elementHeight + height_delta, minWidth, minHeight);
 		if(resize_top && !snap_bottom) {
 			element.style.top = (elmY + (elementHeight - res[1])) + "px";
 		}
@@ -4516,7 +4516,9 @@ function createWsPath() {
 		params.captcha = w.captcha.token;
 	}
 	if(Object.keys(params).length > 0) {
-		searchString = "?" + Object.entries(params).map(e => encodeURIComponent(e[0]) + "=" + encodeURIComponent(e[1])).join("&");
+		searchString = "?" + Object.entries(params)
+			.map(e => encodeURIComponent(e[0]) + "=" + encodeURIComponent(e[1]))
+			.join("&");
 	}
 	return "ws" + (window.location.protocol == "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/" + searchString;
 }
