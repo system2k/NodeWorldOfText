@@ -800,7 +800,7 @@ function beginMessagePurge(recId, recUsername, recDate) {
 	}, 1000 / 60);
 }
 
-function toggleChatDeletionToolState(dryRun) {
+function toggleChatDeletionToolState(dryRun, altKeyHeld) {
 	if(!chatDeleteToolStyle) {
 		chatDeleteToolStyle = document.createElement("style");
 		document.head.appendChild(chatDeleteToolStyle);
@@ -808,8 +808,13 @@ function toggleChatDeletionToolState(dryRun) {
 	var cio_d_tgl = document.getElementById("cio_d_tgl");
 	if(!dryRun) {
 		if(chatDeleteToolState == 0) {
-			chatDeleteToolState = 1;
-			cio_d_tgl.innerText = "[Toggle purge opt.]";
+			if(altKeyHeld) {
+				chatDeleteToolState = 1;
+				cio_d_tgl.innerText = "[Toggle purge opt.]";
+			} else {
+				chatDeleteToolState = 2;
+				cio_d_tgl.innerText = "[Toggle no opt.]";
+			}
 		} else if(chatDeleteToolState == 1) {
 			chatDeleteToolState = 2;
 			cio_d_tgl.innerText = "[Toggle no opt.]";
@@ -1063,8 +1068,8 @@ function handleChatMessageManage(context) {
 		close();
 	};
 
-	elms.cio_d_tgl.onclick = () => {
-		toggleChatDeletionToolState();
+	elms.cio_d_tgl.onclick = (evt) => {
+		toggleChatDeletionToolState(false, evt.ctrlKey || evt.shiftKey);
 	};
 }
 
