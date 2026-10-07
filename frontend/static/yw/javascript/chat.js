@@ -8,6 +8,7 @@ var initChatOpen         = false;
 var chatWriteHistory     = []; // history of user's chats
 var chatRecordsPage      = [];
 var chatRecordsGlobal    = [];
+var chatRecordsSerial    = {};
 var chatAdditionsPage    = [];
 var chatAdditionsGlobal  = [];
 var chatCommandRegistry  = {};
@@ -21,66 +22,314 @@ var chatPageUnreadBar    = null;
 var chatGlobalUnreadBar  = null;
 var chatGreentext        = true;
 var chatEmotes           = true;
+var chatExpandDuplicates = false;
+var chatLocalSerial      = 1;
 var acceptChatDeletions  = true;
+var chatDeleteToolState  = 0; // 0 = disabled, 1 = delete message, 2 = purge all from user
+var chatDeleteToolStyle  = null;
 var client_commands      = {}; // deprecated
 
-if(isNaN(defaultChatColor)) {
-	defaultChatColor = null;
-} else {
-	if(defaultChatColor < 0) defaultChatColor = 0;
-	if(defaultChatColor > 16777215) defaultChatColor = 16777215;
-}
-
-defineElements({ // elm[<name>]
-	chat_window: byId("chat_window"),
-	chat_open: byId("chat_open"),
-	chatsend: byId("chatsend"),
-	chatbar: byId("chatbar"),
-	chat_close: byId("chat_close"),
-	page_chatfield: byId("page_chatfield"),
-	global_chatfield: byId("global_chatfield"),
-	chat_page_tab: byId("chat_page_tab"),
-	chat_global_tab: byId("chat_global_tab"),
-	usr_online: byId("usr_online"),
-	total_unread: byId("total_unread"),
-	page_unread: byId("page_unread"),
-	global_unread: byId("global_unread"),
-	chat_upper: byId("chat_upper")
-});
-
-if(Permissions.can_chat(state.userModel, state.worldModel)) {
-	OWOT.on("chat", function(e) {
-		w.emit("chatMod", e);
-		if(e.hide) return;
-		event_on_chat(e);
-	});
-}
-
-if(state.userModel.is_staff) {
-	elm.chatbar.maxLength = 3030;
-} else {
-	elm.chatbar.maxLength = 400;
-}
-
-chatbar.addEventListener("input", function(evt) {
-	if(evt.target.value.includes("\n") || evt.target.value.includes("\r")) {
-		evt.target.value = evt.target.value.replace(/[\r\n]/g, "");
+function initChat() {
+	if(isNaN(defaultChatColor)) {
+		defaultChatColor = null;
+	} else {
+		if(defaultChatColor < 0) defaultChatColor = 0;
+		if(defaultChatColor > 16777215) defaultChatColor = 16777215;
 	}
-});
 
-var canChat = Permissions.can_chat(state.userModel, state.worldModel);
-if(!canChat) {
-	selectedChatTab = 1;
-	elm.chat_window.style.display = "none";
-} else {
-	elm.chat_open.style.display = "";
-}
+	defineElements({ // elm[<name>]
+		chat_window: byId("chat_window"),
+		chat_open: byId("chat_open"),
+		chatsend: byId("chatsend"),
+		chatbar: byId("chatbar"),
+		chat_close: byId("chat_close"),
+		page_chatfield: byId("page_chatfield"),
+		global_chatfield: byId("global_chatfield"),
+		chat_page_tab: byId("chat_page_tab"),
+		chat_global_tab: byId("chat_global_tab"),
+		usr_online: byId("usr_online"),
+		total_unread: byId("total_unread"),
+		page_unread: byId("page_unread"),
+		global_unread: byId("global_unread"),
+		chat_upper: byId("chat_upper")
+	});
 
-if(state.worldModel.no_chat_global) {
-	elm.chat_page_tab.style.display = "none";
-	elm.chat_global_tab.style.display = "none";
-	elm.usr_online.style.paddingLeft = "0px";
-	elm.chat_upper.style.textAlign = "center";
+	if(Permissions.can_chat(state.userModel, state.worldModel)) {
+		OWOT.on("chat", function(e) {
+			w.emit("chatMod", e);
+			if(e.hide) return;
+			event_on_chat(e);
+		});
+	}
+
+	if(state.userModel.is_staff) {
+		elm.chatbar.maxLength = 3030;
+	} else {
+		elm.chatbar.maxLength = 400;
+	}
+
+	elm.chatbar.addEventListener("input", function(evt) {
+		if(evt.target.value.includes("\n") || evt.target.value.includes("\r")) {
+			evt.target.value = evt.target.value.replace(/[\r\n]/g, "");
+		}
+	});
+
+	var canChat = Permissions.can_chat(state.userModel, state.worldModel);
+	if(!canChat) {
+		selectedChatTab = 1;
+		elm.chat_window.style.display = "none";
+	} else {
+		elm.chat_open.style.display = "";
+	}
+
+	if(state.worldModel.no_chat_global) {
+		elm.chat_page_tab.style.display = "none";
+		elm.chat_global_tab.style.display = "none";
+		elm.usr_online.style.paddingLeft = "0px";
+		elm.chat_upper.style.textAlign = "center";
+	}
+
+	elm.chatsend.addEventListener("click", function() {
+		sendChat();
+	});
+
+	elm.chatbar.addEventListener("keypress", function(e) {
+		if(e.key == "Enter" || e.keyCode == 13) { // Enter
+			e.preventDefault();
+			sendChat();
+		}
+	});
+
+	elm.chatbar.addEventListener("keydown", function(e) {
+		var keyCode = e.keyCode;
+		// scroll through chat history that the client sent
+		if(keyCode == 38) { // up
+			// history modified
+			if(chatWriteHistoryIdx > -1 && elm.chatbar.value != chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1]) {
+				chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1] = elm.chatbar.value;
+			}
+			if(chatWriteHistoryIdx == -1 && elm.chatbar.value) {
+				chatWriteTmpBuffer = elm.chatbar.value;
+			}
+			chatWriteHistoryIdx++;
+			if(chatWriteHistoryIdx >= chatWriteHistory.length) chatWriteHistoryIdx = chatWriteHistory.length - 1;
+			var upVal = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
+			if(!upVal) return;
+			elm.chatbar.value = upVal;
+			// pressing up will move the cursor all the way to the left by default
+			e.preventDefault();
+			moveCaretEnd(elm.chatbar);
+		} else if(keyCode == 40) { // down
+			// history modified
+			if(chatWriteHistoryIdx > -1 && elm.chatbar.value != chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1]) {
+				chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1] = elm.chatbar.value;
+			}
+			chatWriteHistoryIdx--;
+			if(chatWriteHistoryIdx < -1) {
+				chatWriteHistoryIdx = -1;
+				return;
+			}
+			var str = "";
+			if(chatWriteHistoryIdx != -1) {
+				str = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
+			} else {
+				if(chatWriteTmpBuffer) {
+					str = chatWriteTmpBuffer;
+					e.preventDefault();
+					moveCaretEnd(elm.chatbar);
+				}
+			}
+			elm.chatbar.value = str;
+			e.preventDefault();
+			moveCaretEnd(elm.chatbar);
+		}
+	});
+
+	elm.chat_close.addEventListener("click", function() {
+		w.emit("chatClose");
+		elm.chat_window.style.display = "none";
+		elm.chat_open.style.display = "";
+		chatOpen = false;
+	});
+
+	elm.chat_open.addEventListener("click", function() {
+		w.emit("chatOpen");
+		elm.chat_window.style.display = "";
+		elm.chat_open.style.display = "none";
+		chatOpen = true;
+		if(selectedChatTab == 0) {
+			insertNewChatElements();
+			chatPageUnread = 0;
+			if(!initPageTabOpen) {
+				initPageTabOpen = true;
+				elm.page_chatfield.scrollTop = elm.page_chatfield.scrollHeight;
+			}
+		} else {
+			insertNewChatElements();
+			chatGlobalUnread = 0;
+			if(!initGlobalTabOpen) {
+				initGlobalTabOpen = true;
+				elm.global_chatfield.scrollTop = elm.global_chatfield.scrollHeight;
+			}
+		}
+		var chatWidth = chat_window.offsetWidth - 2;
+		var chatHeight = chat_window.offsetHeight - 2;
+		var screenRatio = window.devicePixelRatio;
+		if(!screenRatio) screenRatio = 1;
+		var virtWidth = owotWidth / screenRatio;
+		if(chatWidth > virtWidth) {
+			resizeElement(elm.chat_window, virtWidth - 2, chatHeight);
+		}
+		if(!initChatOpen) {
+			initChatOpen = true;
+			setChatTabPadding(elm.chat_page_tab);
+			setChatTabPadding(elm.chat_global_tab);
+		}
+		updateUnread();
+
+		if(!chatDeleteToolStyle) {
+			toggleChatDeletionToolState(true);
+		}
+	});
+
+	elm.chat_page_tab.addEventListener("click", function() {
+		elm.chat_page_tab.classList.add("chat_tab_selected");
+		elm.chat_global_tab.classList.remove("chat_tab_selected");
+
+		elm.global_chatfield.style.display = "none";
+		elm.page_chatfield.style.display = "";
+		selectedChatTab = 0;
+		chatPageUnread = 0;
+
+		insertNewChatElements();
+		updateUnread();
+		if(!initPageTabOpen) {
+			initPageTabOpen = true;
+			elm.page_chatfield.scrollTop = elm.page_chatfield.scrollHeight;
+		}
+	});
+
+	elm.chat_global_tab.addEventListener("click", function() {
+		elm.chat_global_tab.classList.add("chat_tab_selected");
+		elm.chat_page_tab.classList.remove("chat_tab_selected");
+
+		elm.global_chatfield.style.display = "";
+		elm.page_chatfield.style.display = "none";
+		selectedChatTab = 1;
+		chatGlobalUnread = 0;
+
+		insertNewChatElements();
+		updateUnread();
+		if(!initGlobalTabOpen) {
+			initGlobalTabOpen = true;
+			elm.global_chatfield.scrollTop = elm.global_chatfield.scrollHeight;
+		}
+	});
+
+	w.on("chatMod", function(e) {
+		if(e.id !== 0) return;
+		if(e.realUsername != "[ Server ]") return;
+		if(e.message.startsWith("Command")) {
+			var cmdList = [];
+			var htmlResp = "";
+			var remoteCmdList = e.message.split("\n");
+			var head = remoteCmdList[0];
+
+			htmlResp += head + "<br>";
+			htmlResp += "<div style=\"background-color: #DADADA; font-family: monospace; font-size: 13px;\">";
+
+			var cmdIdx = 0;
+			for(var i = 1; i < remoteCmdList.length; i++) {
+				var line = remoteCmdList[i];
+				if(!line.startsWith("/")) continue;
+				line = line.split(" -> ");
+				var cmdRaw = line[0].split(" ");
+				var params = cmdRaw[1];
+				var command = cmdRaw[0].slice(1);
+				if(params) {
+					params = params.slice(1, -1).split(",");
+				}
+				var descRaw = line[1];
+				var exampleStartIdx = descRaw.indexOf("(");
+				var example = "";
+				if(exampleStartIdx > -1) {
+					example = descRaw.slice(exampleStartIdx + 1, -1); // remove parentheses
+					descRaw = descRaw.slice(0, exampleStartIdx - 1);
+					example = example.split(" ").slice(1).join(" ");
+				}
+
+				cmdList.push({
+					command: command,
+					params: params,
+					desc: descRaw,
+					example: example
+				});
+			}
+
+			for(var cmd in chatCommandRegistry) {
+				var cliCmd = chatCommandRegistry[cmd];
+				cmdList.push({
+					command: cmd,
+					params: cliCmd.params,
+					desc: cliCmd.desc,
+					example: cliCmd.example
+				});
+			}
+
+			cmdList.sort(function(a, b) {
+				return a.command.localeCompare(b.command);
+			});
+
+			for(var i = 0; i < cmdList.length; i++) {
+				var info = cmdList[i];
+				var command = info.command;
+				var params = info.params;
+				var example = info.example;
+				var desc = info.desc;
+
+				// display command parameters
+				var param_desc = "";
+				if(params) {
+					param_desc += html_tag_esc("<");
+					for(var v = 0; v < params.length; v++) {
+						var arg = params[v];
+						param_desc += "<span style=\"font-style: italic\">" + html_tag_esc(arg) + "</span>";
+						if(v != params.length - 1) {
+							param_desc += ", ";
+						}
+					}
+					param_desc += html_tag_esc(">");
+				}
+
+				var exampleElm = "";
+				if(example && params) {
+					example = "/" + command + " " + example;
+					exampleElm = "title=\"" + html_tag_esc("Example: " + example) +"\"";
+				}
+
+				command = "<span " + exampleElm + "style=\"color: #00006F\">" + html_tag_esc(command) + "</span>";
+
+				var help_row = html_tag_esc("-> /") + command + " " + param_desc + " :: " + html_tag_esc(desc);
+
+				// alternating stripes
+				if(cmdIdx % 2 == 1) {
+					help_row = "<div style=\"background-color: #C3C3C3\">" + help_row + "</div>";
+				}
+
+				htmlResp += help_row;
+				cmdIdx++;
+			}
+			htmlResp += "</div>";
+
+			e.message = htmlResp;
+			// upgrade permissions to allow display of HTML
+			e.op = true;
+			e.admin = true;
+			e.staff = true;
+		}
+	});
+
+	initChatCommands();
 }
 
 function api_chat_send(message, opts) {
@@ -156,132 +405,134 @@ function register_chat_command(command, callback, params, desc, example) {
 	client_commands[command.toLowerCase()] = callback;
 }
 
-register_chat_command("nick", function (args) {
-	var newDisplayName = args.join(" ");
-	if(!newDisplayName) {
-		newDisplayName = "";
-	}
-	var nickLim = state.userModel.is_staff ? Infinity : 40;
-	newDisplayName = newDisplayName.slice(0, nickLim);
-	YourWorld.Nickname = newDisplayName;
-	storeNickname();
-	var nickChangeMsg;
-	if(newDisplayName) {
-		nickChangeMsg = "Set nickname to `" + newDisplayName + "`";
-	} else {
-		nickChangeMsg = "Nickname reset";
-	}
-	clientChatResponse(nickChangeMsg);
-}, ["nickname"], "change your nickname", "JohnDoe");
-
-register_chat_command("ping", function() {
-	var pingTime = getDate();
-	network.ping(function(resp, err) {
-		if(err) {
-			return clientChatResponse("Ping failed");
+function initChatCommands() {
+	register_chat_command("nick", function (args) {
+		var newDisplayName = args.join(" ");
+		if(!newDisplayName) {
+			newDisplayName = "";
 		}
-		var pongTime = getDate();
-		var pingMs = pongTime - pingTime;
-		clientChatResponse("Ping: " + pingMs + " MS");
-	});
-}, null, "check the latency", null);
-
-register_chat_command("gridsize", function (args) {
-	var size = args[0];
-	if(!size) size = "10x18";
-	size = size.split("x");
-	var width = parseInt(size[0]);
-	var height = parseInt(size[1]);
-	if(!width || isNaN(width) || !isFinite(width)) width = 10;
-	if(!height || isNaN(height) || !isFinite(height)) height = 18;
-	if(width < 4) width = 4;
-	if(width > 160) width = 160;
-	if(height < 4) height = 4;
-	if(height > 144) height = 144;
-	var originalW = defaultSizes.cellW;
-	var originalH = defaultSizes.cellH;
-	defaultSizes.cellW = width;
-	defaultSizes.cellH = height;
-	positionX *= width / originalW;
-	positionY *= height / originalH;
-	updateScaleConsts();
-	w.reloadRenderer();
-	clientChatResponse("Changed grid size to " + width + "x" + height);
-}, ["WxH"], "change the size of cells", "10x20");
-
-register_chat_command("color",  function(args) {
-	var color = args.join(" ");
-	color = resolveColorValue(color);
-	YourWorld.Color = color;
-	clientChatResponse("Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase());
-}, ["color code"], "change your text color", "#FF00FF");
-
-register_chat_command("chatcolor", function(args) {
-	var color = args.join(" ");
-	if(!color) {
-		localStorage.removeItem("chatcolor");
-		defaultChatColor = null;
-		clientChatResponse("Chat color reset");
-	} else {
-		defaultChatColor = resolveColorValue(color);
-		localStorage.setItem("chatcolor", defaultChatColor);
-		clientChatResponse("Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase());
-	}
-}, ["color code"], "change your chat color", "#FF00FF");
-
-register_chat_command("warp", function(args) {
-	var address = args[0];
-	if(!address) address = "";
-	positionX = 0;
-	positionY = 0;
-	writeBuffer = [];
-	tellEdit = [];
-	resetUI();
-	stopPasting();
-	if(address.charAt(0) == "/") address = address.substr(1);
-	state.worldModel.pathname = address ? "/" + address : "";
-	ws_path = createWsPath();
-	w.changeSocket(ws_path, true);
-	getWorldProps(address, "props", function(props, error) {
-		if(!error) {
-			reapplyProperties(props);
+		var nickLim = state.userModel.is_staff ? Infinity : 40;
+		newDisplayName = newDisplayName.slice(0, nickLim);
+		YourWorld.Nickname = newDisplayName;
+		storeNickname();
+		var nickChangeMsg;
+		if(newDisplayName) {
+			nickChangeMsg = "Set nickname to `" + newDisplayName + "`";
+		} else {
+			nickChangeMsg = "Nickname reset";
 		}
-	});
-	clientChatResponse("Switching to world: \"" + address + "\"");
-}, ["world"], "go to another world", "forexample");
+		clientChatResponse(nickChangeMsg);
+	}, ["nickname"], "change your nickname", "JohnDoe");
 
-register_chat_command("night", function() {
-	w.night();
-}, null, "enable night mode", null);
+	register_chat_command("ping", function() {
+		var pingTime = getDate();
+		network.ping(function(resp, err) {
+			if(err) {
+				return clientChatResponse("Ping failed");
+			}
+			var pongTime = getDate();
+			var pingMs = pongTime - pingTime;
+			clientChatResponse("Ping: " + pingMs + " MS");
+		});
+	}, null, "check the latency", null);
 
-register_chat_command("day", function() {
-	w.day(true);
-}, null, "disable night mode", null);
+	register_chat_command("gridsize", function (args) {
+		var size = args[0];
+		if(!size) size = "10x18";
+		size = size.split("x");
+		var width = parseInt(size[0]);
+		var height = parseInt(size[1]);
+		if(!width || isNaN(width) || !isFinite(width)) width = 10;
+		if(!height || isNaN(height) || !isFinite(height)) height = 18;
+		if(width < 4) width = 4;
+		if(width > 160) width = 160;
+		if(height < 4) height = 4;
+		if(height > 144) height = 144;
+		var originalW = defaultSizes.cellW;
+		var originalH = defaultSizes.cellH;
+		defaultSizes.cellW = width;
+		defaultSizes.cellH = height;
+		positionX *= width / originalW;
+		positionY *= height / originalH;
+		updateScaleConsts();
+		w.reloadRenderer();
+		clientChatResponse("Changed grid size to " + width + "x" + height);
+	}, ["WxH"], "change the size of cells", "10x20");
 
-register_chat_command("clear", function() {
-	if(selectedChatTab == 0) {
-		for(var i = 0; i < chatRecordsPage.length; i++) {
-			var rec = chatRecordsPage[i];
-			rec.element.remove();
+	register_chat_command("color",  function(args) {
+		var color = args.join(" ");
+		color = resolveColorValue(color);
+		YourWorld.Color = color;
+		clientChatResponse("Changed text color to #" + ("00000" + YourWorld.Color.toString(16)).slice(-6).toUpperCase());
+	}, ["color code"], "change your text color", "#FF00FF");
+
+	register_chat_command("chatcolor", function(args) {
+		var color = args.join(" ");
+		if(!color) {
+			localStorage.removeItem("chatcolor");
+			defaultChatColor = null;
+			clientChatResponse("Chat color reset");
+		} else {
+			defaultChatColor = resolveColorValue(color);
+			localStorage.setItem("chatcolor", defaultChatColor);
+			clientChatResponse("Changed chat color to #" + ("00000" + defaultChatColor.toString(16)).slice(-6).toUpperCase());
 		}
-		chatRecordsPage.splice(0);
-	} else if(selectedChatTab == 1) {
-		for(var i = 0; i < chatRecordsGlobal.length; i++) {
-			var rec = chatRecordsGlobal[i];
-			rec.element.remove();
-		}
-		chatRecordsGlobal.splice(0);
-	}
-}, null, "clear all chat messages locally", null);
+	}, ["color code"], "change your chat color", "#FF00FF");
 
-register_chat_command("stats", function() {
-	network.stats(function(data) {
-		var stat = "Stats for world:\n";
-		stat += "Creation date: " + convertToDate(data.creationDate) + "\n";
-		stat += "View count: " + data.views;
-		clientChatResponse(stat);
-	});
-}, null, "view stats of a world", null);
+	register_chat_command("warp", function(args) {
+		var address = args[0];
+		if(!address) address = "";
+		positionX = 0;
+		positionY = 0;
+		writeBuffer = [];
+		tellEdit = [];
+		resetUI();
+		stopPasting();
+		if(address.charAt(0) == "/") address = address.substr(1);
+		state.worldModel.pathname = address ? "/" + address : "";
+		ws_path = createWsPath();
+		w.changeSocket(ws_path, true);
+		getWorldProps(address, "props", function(props, error) {
+			if(!error) {
+				reapplyProperties(props);
+			}
+		});
+		clientChatResponse("Switching to world: \"" + address + "\"");
+	}, ["world"], "go to another world", "forexample");
+
+	register_chat_command("night", function() {
+		w.night();
+	}, null, "enable night mode", null);
+
+	register_chat_command("day", function() {
+		w.day(true);
+	}, null, "disable night mode", null);
+
+	register_chat_command("clear", function() {
+		if(selectedChatTab == 0) {
+			for(var i = 0; i < chatRecordsPage.length; i++) {
+				var rec = chatRecordsPage[i];
+				rec.element.remove();
+			}
+			chatRecordsPage.splice(0);
+		} else if(selectedChatTab == 1) {
+			for(var i = 0; i < chatRecordsGlobal.length; i++) {
+				var rec = chatRecordsGlobal[i];
+				rec.element.remove();
+			}
+			chatRecordsGlobal.splice(0);
+		}
+	}, null, "clear all chat messages locally", null);
+
+	register_chat_command("stats", function() {
+		network.stats(function(data) {
+			var stat = "Stats for world:\n";
+			stat += "Creation date: " + convertToDate(data.creationDate) + "\n";
+			stat += "View count: " + data.views;
+			clientChatResponse(stat);
+		});
+	}, null, "view stats of a world", null);
+}
 
 function sendChat() {
 	var chatText = elm.chatbar.value.replace(/\u00A0/g, "\u0020");
@@ -329,17 +580,6 @@ function event_on_chat(data) {
 		data.nickname, data.message, data.realUsername, data.op, data.admin, data.staff, data.color, data.date || Date.now(), data.dataObj);
 }
 
-elm.chatsend.addEventListener("click", function() {
-	sendChat();
-});
-
-elm.chatbar.addEventListener("keypress", function(e) {
-	if(e.key == "Enter" || e.keyCode == 13) { // Enter
-		e.preventDefault();
-		sendChat();
-	}
-});
-
 function moveCaretEnd(elm) {
 	if(elm.selectionStart != void 0) {
 		elm.selectionStart = elm.value.length;
@@ -358,128 +598,6 @@ function setChatTabPadding(elm) {
 	width += 16 * 2;
 	elm.style.minWidth = width + "px";
 }
-
-elm.chatbar.addEventListener("keydown", function(e) {
-	var keyCode = e.keyCode;
-	// scroll through chat history that the client sent
-	if(keyCode == 38) { // up
-		// history modified
-		if(chatWriteHistoryIdx > -1 && elm.chatbar.value != chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1]) {
-			chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1] = elm.chatbar.value;
-		}
-		if(chatWriteHistoryIdx == -1 && elm.chatbar.value) {
-			chatWriteTmpBuffer = elm.chatbar.value;
-		}
-		chatWriteHistoryIdx++;
-		if(chatWriteHistoryIdx >= chatWriteHistory.length) chatWriteHistoryIdx = chatWriteHistory.length - 1;
-		var upVal = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
-		if(!upVal) return;
-		elm.chatbar.value = upVal;
-		// pressing up will move the cursor all the way to the left by default
-		e.preventDefault();
-		moveCaretEnd(elm.chatbar);
-	} else if(keyCode == 40) { // down
-		// history modified
-		if(chatWriteHistoryIdx > -1 && elm.chatbar.value != chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1]) {
-			chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1] = elm.chatbar.value;
-		}
-		chatWriteHistoryIdx--;
-		if(chatWriteHistoryIdx < -1) {
-			chatWriteHistoryIdx = -1;
-			return;
-		}
-		var str = "";
-		if(chatWriteHistoryIdx != -1) {
-			str = chatWriteHistory[chatWriteHistory.length - chatWriteHistoryIdx - 1];
-		} else {
-			if(chatWriteTmpBuffer) {
-				str = chatWriteTmpBuffer;
-				e.preventDefault();
-				moveCaretEnd(elm.chatbar);
-			}
-		}
-		elm.chatbar.value = str;
-		e.preventDefault();
-		moveCaretEnd(elm.chatbar);
-	}
-});
-
-elm.chat_close.addEventListener("click", function() {
-	w.emit("chatClose");
-	elm.chat_window.style.display = "none";
-	elm.chat_open.style.display = "";
-	chatOpen = false;
-});
-
-elm.chat_open.addEventListener("click", function() {
-	w.emit("chatOpen");
-	elm.chat_window.style.display = "";
-	elm.chat_open.style.display = "none";
-	chatOpen = true;
-	if(selectedChatTab == 0) {
-		insertNewChatElements();
-		chatPageUnread = 0;
-		if(!initPageTabOpen) {
-			initPageTabOpen = true;
-			elm.page_chatfield.scrollTop = elm.page_chatfield.scrollHeight;
-		}
-	} else {
-		insertNewChatElements();
-		chatGlobalUnread = 0;
-		if(!initGlobalTabOpen) {
-			initGlobalTabOpen = true;
-			elm.global_chatfield.scrollTop = elm.global_chatfield.scrollHeight;
-		}
-	}
-	var chatWidth = chat_window.offsetWidth - 2;
-	var chatHeight = chat_window.offsetHeight - 2;
-	var screenRatio = window.devicePixelRatio;
-	if(!screenRatio) screenRatio = 1;
-	var virtWidth = owotWidth / screenRatio;
-	if(chatWidth > virtWidth) {
-		resizeElement(elm.chat_window, virtWidth - 2, chatHeight);
-	}
-	if(!initChatOpen) {
-		initChatOpen = true;
-		setChatTabPadding(elm.chat_page_tab);
-		setChatTabPadding(elm.chat_global_tab);
-	}
-	updateUnread();
-});
-
-elm.chat_page_tab.addEventListener("click", function() {
-	elm.chat_page_tab.classList.add("chat_tab_selected");
-	elm.chat_global_tab.classList.remove("chat_tab_selected");
-
-	elm.global_chatfield.style.display = "none";
-	elm.page_chatfield.style.display = "";
-	selectedChatTab = 0;
-	chatPageUnread = 0;
-
-	insertNewChatElements();
-	updateUnread();
-	if(!initPageTabOpen) {
-		initPageTabOpen = true;
-		elm.page_chatfield.scrollTop = elm.page_chatfield.scrollHeight;
-	}
-});
-
-elm.chat_global_tab.addEventListener("click", function() {
-	elm.chat_global_tab.classList.add("chat_tab_selected");
-	elm.chat_page_tab.classList.remove("chat_tab_selected");
-
-	elm.global_chatfield.style.display = "";
-	elm.page_chatfield.style.display = "none";
-	selectedChatTab = 1;
-	chatGlobalUnread = 0;
-
-	insertNewChatElements();
-	updateUnread();
-	if(!initGlobalTabOpen) {
-		initGlobalTabOpen = true;
-		elm.global_chatfield.scrollTop = elm.global_chatfield.scrollHeight;
-	}
-});
 
 function resizable_chat() {
 	var state = 0;
@@ -654,108 +772,273 @@ var emoteList = {
 	"fppinchaaa": [128, 96]
 };
 
-w.on("chatMod", function(e) {
-	if(e.id !== 0) return;
-	if(e.realUsername != "[ Server ]") return;
-	if(e.message.startsWith("Command")) {
-		var cmdList = [];
-		var htmlResp = "";
-		var remoteCmdList = e.message.split("\n");
-		var head = remoteCmdList[0];
-
-		htmlResp += head + "<br>";
-		htmlResp += "<div style=\"background-color: #DADADA; font-family: monospace; font-size: 13px;\">";
-
-		var cmdIdx = 0;
-		for(var i = 1; i < remoteCmdList.length; i++) {
-			var line = remoteCmdList[i];
-			if(!line.startsWith("/")) continue;
-			line = line.split(" -> ");
-			var cmdRaw = line[0].split(" ");
-			var params = cmdRaw[1];
-			var command = cmdRaw[0].slice(1);
-			if(params) {
-				params = params.slice(1, -1).split(",");
-			}
-			var descRaw = line[1];
-			var exampleStartIdx = descRaw.indexOf("(");
-			var example = "";
-			if(exampleStartIdx > -1) {
-				example = descRaw.slice(exampleStartIdx + 1, -1); // remove parentheses
-				descRaw = descRaw.slice(0, exampleStartIdx - 1);
-				example = example.split(" ").slice(1).join(" ");
-			}
-
-			cmdList.push({
-				command: command,
-				params: params,
-				desc: descRaw,
-				example: example
-			});
+function beginMessagePurge(recId, recUsername, recDate) {
+	var matches = [];
+	var matchSpoolIdx = 0;
+	var records = selectedChatTab == 0 ? chatRecordsPage : chatRecordsGlobal;
+	for(let idx in records) {
+		let irec = records[idx];
+		let id = irec.id;
+		let date = irec.date;
+		let name = irec.realUsername;
+		if(
+			(name && name.toUpperCase() == recUsername.toUpperCase()) ||
+			(id == recId && (Math.abs(recDate - date) < 1000 * 60 * 20 || !recDate))
+		) {
+			matches.push([id, date]);
 		}
-
-		for(var cmd in chatCommandRegistry) {
-			var cliCmd = chatCommandRegistry[cmd];
-			cmdList.push({
-				command: cmd,
-				params: cliCmd.params,
-				desc: cliCmd.desc,
-				example: cliCmd.example
-			});
-		}
-
-		cmdList.sort(function(a, b) {
-			return a.command.localeCompare(b.command);
-		});
-
-		for(var i = 0; i < cmdList.length; i++) {
-			var info = cmdList[i];
-			var command = info.command;
-			var params = info.params;
-			var example = info.example;
-			var desc = info.desc;
-
-			// display command parameters
-			var param_desc = "";
-			if(params) {
-				param_desc += html_tag_esc("<");
-				for(var v = 0; v < params.length; v++) {
-					var arg = params[v];
-					param_desc += "<span style=\"font-style: italic\">" + html_tag_esc(arg) + "</span>";
-					if(v != params.length - 1) {
-						param_desc += ", ";
-					}
-				}
-				param_desc += html_tag_esc(">");
-			}
-
-			var exampleElm = "";
-			if(example && params) {
-				example = "/" + command + " " + example;
-				exampleElm = "title=\"" + html_tag_esc("Example: " + example) +"\"";
-			}
-
-			command = "<span " + exampleElm + "style=\"color: #00006F\">" + html_tag_esc(command) + "</span>";
-
-			var help_row = html_tag_esc("-> /") + command + " " + param_desc + " :: " + html_tag_esc(desc);
-
-			// alternating stripes
-			if(cmdIdx % 2 == 1) {
-				help_row = "<div style=\"background-color: #C3C3C3\">" + help_row + "</div>";
-			}
-
-			htmlResp += help_row;
-			cmdIdx++;
-		}
-		htmlResp += "</div>";
-
-		e.message = htmlResp;
-		// upgrade permissions to allow display of HTML
-		e.op = true;
-		e.admin = true;
-		e.staff = true;
 	}
-});
+	var spooler = setInterval(() => {
+		var match = matches[matchSpoolIdx++];
+		if(!match) {
+			clearInterval(spooler);
+			return;
+		}
+		network.chat(`/delete ${match[0]} ${match[1]}`, selectedChatTab == 0 ? "page" : "global", null, null, null, {
+			hideResponse: true
+		}, () => {});
+	}, 1000 / 60);
+}
+
+function toggleChatDeletionToolState(dryRun) {
+	if(!chatDeleteToolStyle) {
+		chatDeleteToolStyle = document.createElement("style");
+		document.head.appendChild(chatDeleteToolStyle);
+	}
+	var cio_d_tgl = document.getElementById("cio_d_tgl");
+	if(!dryRun) {
+		if(chatDeleteToolState == 0) {
+			chatDeleteToolState = 1;
+			cio_d_tgl.innerText = "[Toggle purge opt.]";
+		} else if(chatDeleteToolState == 1) {
+			chatDeleteToolState = 2;
+			cio_d_tgl.innerText = "[Toggle no opt.]";
+		} else if(chatDeleteToolState == 2) {
+			chatDeleteToolState = 0;
+			cio_d_tgl.innerText = "[Toggle delete opt.]";
+		}
+	}
+	switch(chatDeleteToolState) {
+		case 0: chatDeleteToolStyle.innerHTML = ".chat-mgr.chat-del {display: none !important}"; break;
+		case 1: chatDeleteToolStyle.innerHTML = ".chat-mgr.chat-del::before {content: \"X\"}"; break;
+		case 2: chatDeleteToolStyle.innerHTML = ".chat-mgr.chat-del::before {content: \"\uD83D\uDCA3\"; font-size: 0.8em}"; break;
+	}
+}
+
+function handleChatMessageDelete(context) {
+	var target = context.target;
+	var row = target?.closest?.("[data-serial]");
+	if(!row) return;
+	var serial = row.dataset.serial;
+	var rec = chatRecordsSerial[serial];
+	if(!rec) return;
+
+	if(chatDeleteToolState == 1) {
+		w.chat.send(`/delete ${rec.id} ${rec.date}`);
+	} else if(chatDeleteToolState == 2) {
+		beginMessagePurge(rec.id, rec.realUsername, rec.date);
+	}
+}
+
+function handleChatMessageManage(context) {
+	var target = context.target;
+	var row = target?.closest?.("[data-serial]");
+	if(!row) return;
+	var serial = row.dataset.serial;
+	var rec = chatRecordsSerial[serial];
+	if(!rec) return;
+	
+	var infoCont = document.getElementById("chat_info");
+	infoCont.style.display = "";
+	var aborted = false;
+
+	var close = () => {
+		infoCont.style.display = "none";
+		aborted = true;
+		document.removeEventListener("click", clickEvt);
+	};
+
+	var clickEvt = (evt) => {
+		var target = evt.target;
+		if(!target?.closest?.("#chat_info") && !target?.closest?.(".chat-mgr")) {
+			close();
+		}
+	};
+	document.addEventListener("click", clickEvt);
+
+	var elms = {
+		ci_ip: document.getElementById("ci_ip"),
+		ci_id: document.getElementById("ci_id"),
+		ci_user: document.getElementById("ci_user"),
+		ci_unix: document.getElementById("ci_unix"),
+		cio_bc: document.getElementById("cio_bc"),
+		cio_bc_id: document.getElementById("cio_bc_id"),
+		cio_bc_name: document.getElementById("cio_bc_name"),
+		cio_bc_both: document.getElementById("cio_bc_both"),
+		cio_mc: document.getElementById("cio_mc"),
+		cio_mc_id: document.getElementById("cio_mc_id"),
+		cio_mc_name: document.getElementById("cio_mc_name"),
+		cio_mc_both: document.getElementById("cio_mc_both"),
+		cio_ml: document.getElementById("cio_ml"),
+		cio_ml_1h: document.getElementById("cio_ml_1h"),
+		cio_ml_1d: document.getElementById("cio_ml_1d"),
+		cio_ml_inf: document.getElementById("cio_ml_inf"),
+		cio_d: document.getElementById("cio_d"),
+		cio_d_this: document.getElementById("cio_d_this"),
+		cio_d_purge: document.getElementById("cio_d_purge"),
+		cio_d_tgl: document.getElementById("cio_d_tgl"),
+	};
+
+	elms.ci_ip.innerText = "Loading...";
+	elms.ci_id.innerText = String(rec.id);
+	elms.ci_user.innerText = String(rec.realUsername);
+	elms.ci_unix.innerText = String(rec.date);
+
+	network.chat(`/whois ${rec.id}`, selectedChatTab == 0 ? "page" : "global", null, null, null, {
+		hideResponse: true
+	}, function(resp) {
+		if(aborted) return;
+		if(resp.id != 0 || resp.message == "Client not found") {
+			elms.ci_ip.innerText = "error";
+			return;
+		}
+		let rawMsg = Object.fromEntries(
+			resp.message
+				.replace(/\r\n/g, "\n")
+				.split("\n")
+				.map(x => /(.+)\s*:\s*(.+)/.exec(x))
+				.map(x => [(x[1] || "").toLowerCase().trim(), (x[2] || "").trim()])
+		);
+		let ip = rawMsg.ip;
+		if(ip) {
+			elms.ci_ip.innerText = String(ip);
+		}
+	});
+
+	elms.cio_bc_id.onclick = () => {
+		w.chat.send(`/block ${rec.id}`);
+		close();
+	};
+	elms.cio_bc_name.onclick = () => {
+		w.chat.send(`/blockuser ${rec.realUsername}`);
+		close();
+	};
+	elms.cio_bc_both.onclick = () => {
+		w.chat.send(`/block ${rec.id}`);
+		w.chat.send(`/blockuser ${rec.realUsername}`);
+		close();
+	};
+
+	var cioMuteCheckGroup = () => {
+		[
+			elms.cio_mc_id, elms.cio_mc_name, elms.cio_mc_both,
+			elms.cio_ml_1h, elms.cio_ml_1d, elms.cio_ml_inf
+		].forEach(elm => elm.classList.remove("chat-info-opt-sel"));
+		// mute classification
+		if(muteStatusC) {
+			elms.cio_mc.classList.remove("chat-info-opt-group-req");
+			if(!muteStatusL) {
+				elms.cio_ml.classList.add("chat-info-opt-group-req");
+			}
+			({
+				id: elms.cio_mc_id,
+				name: elms.cio_mc_name,
+				both: elms.cio_mc_both
+			})[muteStatusC].classList.add("chat-info-opt-sel");
+		}
+		// mute duration
+		if(muteStatusL) {
+			elms.cio_ml.classList.remove("chat-info-opt-group-req");
+			if(!muteStatusC) {
+				elms.cio_mc.classList.add("chat-info-opt-group-req");
+			}
+			({
+				"1h": elms.cio_ml_1h,
+				"1d": elms.cio_ml_1d,
+				inf: elms.cio_ml_inf
+			})[muteStatusL].classList.add("chat-info-opt-sel");
+		}
+		// both params defined
+		if(muteStatusC && muteStatusL) {
+			let timeSpecifier = ({
+				"1h": "1 h",
+				"1d": "1 d",
+				inf: "-1"
+			})[muteStatusL];
+			if(muteStatusC == "id" || muteStatusC == "both") {
+				w.chat.send(`/mute ${rec.id} ${timeSpecifier}`);
+			}
+			if(muteStatusC == "name" || muteStatusC == "both") {
+				w.chat.send(`/muteuser ${rec.realUsername} ${timeSpecifier}`);
+			}
+			close();
+		}
+	};
+
+	var muteStatusC = null;
+	var muteStatusL = null;
+	elms.cio_mc_id.onclick = () => {
+		if(muteStatusC == "id") {
+			muteStatusC = null;
+		} else {
+			muteStatusC = "id";
+		}
+		cioMuteCheckGroup();
+	};
+	elms.cio_mc_name.onclick = () => {
+		if(muteStatusC == "name") {
+			muteStatusC = null;
+		} else {
+			muteStatusC = "name";
+		}
+		cioMuteCheckGroup();
+	};
+	elms.cio_mc_both.onclick = () => {
+		if(muteStatusC == "both") {
+			muteStatusC = null;
+		} else {
+			muteStatusC = "both";
+		}
+		cioMuteCheckGroup();
+	};
+	elms.cio_ml_1h.onclick = () => {
+		if(muteStatusL == "1h") {
+			muteStatusL = null;
+		} else {
+			muteStatusL = "1h";
+		}
+		cioMuteCheckGroup();
+	};
+	elms.cio_ml_1d.onclick = () => {
+		if(muteStatusL == "1d") {
+			muteStatusL = null;
+		} else {
+			muteStatusL = "1d";
+		}
+		cioMuteCheckGroup();
+	};
+	elms.cio_ml_inf.onclick = () => {
+		if(muteStatusL == "inf") {
+			muteStatusL = null;
+		} else {
+			muteStatusL = "inf";
+		}
+		cioMuteCheckGroup();
+	};
+
+	elms.cio_d_this.onclick = () => {
+		w.chat.send(`/delete ${rec.id} ${rec.date}`);
+		close();
+	};
+	elms.cio_d_purge.onclick = () => {
+		beginMessagePurge(rec.id, rec.realUsername, rec.date);
+		close();
+	};
+
+	elms.cio_d_tgl.onclick = () => {
+		toggleChatDeletionToolState();
+	};
+}
 
 /*
 	[type]:
@@ -969,6 +1252,8 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 		message = emoteMessage;
 	}
 
+	var serial = chatLocalSerial++;
+
 	var msgDom = document.createElement("span");
 	msgDom.innerHTML = "&nbsp;" + message;
 
@@ -980,6 +1265,20 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 	}
 
 	var chatGroup = document.createElement("div");
+	chatGroup.className = "chat-msg";
+	chatGroup.dataset.serial = serial;
+
+	var chatManage = document.createElement("div");
+	chatManage.className = "chat-mgr";
+	chatManage.innerText = ">";
+	chatGroup.appendChild(chatManage);
+	chatManage.onclick = handleChatMessageManage;
+
+	var chatDelete = document.createElement("div");
+	chatDelete.className = "chat-mgr chat-del";
+	chatGroup.appendChild(chatDelete);
+	chatDelete.onclick = handleChatMessageDelete;
+
 	if(!pm && hasTagDom) chatGroup.appendChild(tagDom);
 	if(pmDom) {
 		if(pm == "to_me") {
@@ -1010,6 +1309,7 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 		msgDom: msgDom
 	};
 	chatGroup.addEventListener("click", function() {
+		if(!chatExpandDuplicates) return;
 		var data = this._duplicateData;
 		if(data && data.count > 1) {
 			data.expanded = !data.expanded;
@@ -1019,6 +1319,7 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 
 	var chatRec = {
 		id: id, date: date,
+		serial: serial,
 		field: field,
 		element: chatGroup,
 		type: type,
@@ -1033,6 +1334,7 @@ function buildChatElement(field, id, type, nickname, message, realUsername, op, 
 	} else if(field == elm.global_chatfield) {
 		chatRecordsGlobal.push(chatRec);
 	}
+	chatRecordsSerial[serial] = chatRec;
 	if(chatRecordsPage.length > chatHistoryLimit) { // overflow on current page
 		var rec = chatRecordsPage.shift();
 		rec.element.remove();
@@ -1053,8 +1355,10 @@ function updateDuplicateChatGroup(chatGroup) {
 		data.msgDom.innerHTML = data.singleMessageHtml;
 		return;
 	}
-	chatGroup.style.cursor = "pointer";
-	chatGroup.title = "Click to expand repeated messages";
+	if(chatExpandDuplicates) {
+		chatGroup.style.cursor = "pointer";
+		chatGroup.title = "Click to expand repeated messages";
+	}
 	if(data.expanded) {
 		var repeated = [];
 		for(var i = 0; i < data.count; i++) {
@@ -1062,7 +1366,6 @@ function updateDuplicateChatGroup(chatGroup) {
 		}
 		data.msgDom.innerHTML = repeated.join("<br>");
 	} else {
-		//data.msgDom.innerHTML = data.singleMessageHtml + " [x" + data.count + "]";
 		data.msgDom.innerHTML = data.singleMessageHtml + ' <div class="multiplier">[x' + data.count + ']</div>';
 	}
 }
@@ -1234,3 +1537,5 @@ function chatType(registered, nickname, realUsername) {
 	if(!registered && nickname) return "anon_nick";
 	return type;
 }
+
+initChat();

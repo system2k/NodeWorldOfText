@@ -6775,6 +6775,7 @@ var networkHTTP = {
 var network = {
 	latestID: 1,
 	callbacks: {},
+	callbackOpts: {},
 	http: networkHTTP,
 	transmit: function(data) {
 		data = JSON.stringify(data);
@@ -6893,21 +6894,30 @@ var network = {
 			fetchReq.request = opts.id;
 		}
 		if(callback) {
-			var id = network.latestID++;
+			let id = network.latestID++;
 			fetchReq.request = id;
 			network.callbacks[id] = callback;
 		}
 		network.transmit(fetchReq);
 	},
-	chat: function(message, location, nickname, color, customMeta) {
-		network.transmit({
+	chat: function(message, location, nickname, color, customMeta, opts, callback) {
+		// opts: {hideResponse: true/false (requires callback)}
+		if(!opts) opts = {};
+		var req = {
 			kind: "chat",
 			nickname: nickname,
 			message: message,
 			location: location,
 			color: color,
 			customMeta: customMeta
-		});
+		};
+		if(callback) {
+			let id = network.latestID++;
+			req.request = id;
+			network.callbacks[id] = callback;
+			network.callbackOpts[id] = opts;
+		}
+		network.transmit(req);
 	},
 	ping: function(callback) {
 		var cb_id = void 0;
@@ -8330,8 +8340,8 @@ var ws_functions = {
 	},
 	write: function(data) {
 		if("request" in data) {
-			var id = data.request;
-			var cb = network.callbacks[id];
+			let id = data.request;
+			let cb = network.callbacks[id];
 			if(typeof cb == "function") {
 				cb(data, null);
 			}
@@ -8517,22 +8527,40 @@ var ws_functions = {
 		}
 	},
 	chat: function(data) {
-		var type = chatType(data.registered, data.nickname, data.realUsername);
-		w.emit("chat", {
-			location: data.location,
-			id: data.id,
-			type: type,
-			nickname: data.nickname,
-			message: data.message,
-			realUsername: data.realUsername,
-			op: data.op,
-			admin: data.admin,
-			staff: data.staff,
-			color: data.color,
-			date: data.date,
-			dataObj: data,
-			hide: false
-		});
+		let hideResponse = false;
+		if("request" in data) {
+			let id = data.request;
+			let cb = network.callbacks[id];
+			let opts = network.callbackOpts[id];
+			if(typeof cb == "function") {
+				cb(data, null);
+			}
+			if(typeof opts == "object") {
+				if(opts.hideResponse) {
+					hideResponse = true;
+				}
+			}
+			delete network.callbacks[id];
+			delete network.callbackOpts[id];
+		}
+		if(!hideResponse) {
+			let type = chatType(data.registered, data.nickname, data.realUsername);
+			w.emit("chat", {
+				location: data.location,
+				id: data.id,
+				type: type,
+				nickname: data.nickname,
+				message: data.message,
+				realUsername: data.realUsername,
+				op: data.op,
+				admin: data.admin,
+				staff: data.staff,
+				color: data.color,
+				date: data.date,
+				dataObj: data,
+				hide: false
+			});
+		}
 	},
 	user_count: function(data) {
 		var count = data.count;

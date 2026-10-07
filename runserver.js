@@ -2007,7 +2007,7 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 }
 
 var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
-	chat:			[16, 1000, 0], // rate-limiting handled separately
+	chat:			[150, 1000, 0], // rate-limiting handled separately
 	chathistory:	[4, 500, 0],
 	clear_tile:		[512, 1000, 0],
 	cmd_opt:		[10, 1000, 0],

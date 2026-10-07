@@ -242,6 +242,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 		// superuser
 		[2, "worlds", null, "list all worlds", null],
+		[2, "whois", null, "list details about client", null],
 
 		// staff
 		[1, "channel", null, "get info about a chat channel"],
@@ -342,6 +343,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 	var com = {
 		worlds: function() {
+			if(!user.superuser) return;
 			var topCount = 1000;
 			var lst = topActiveWorlds(topCount);
 			var worldList = "";
@@ -805,6 +807,17 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		},
 		test: function() {
 			isTestMessage = true;
+		},
+		whois: function(id) {
+			if(!user.authenticated) return;
+			if(!user.superuser) return;
+			id = san_nbr(id);
+			var ip = getClientIPByChatID(id, location == "global");
+			if(ip) {
+				serverChatResponse(`IP: ${ip}`, location);
+			} else {
+				serverChatResponse("Client not found", location);
+			}
 		}
 	}
 
@@ -815,10 +828,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		commandType = commandArgs[0].toLowerCase();
 	}
 
-	// chat limiter
-	var msNow = Date.now();
-	var second = Math.floor(msNow / 1000);
-
 	var messageRate = 2;
 	if(location == "page") {
 		if(is_member) messageRate = 8;
@@ -827,6 +836,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	if(isCommand && commandType != "tell") messageRate = 32;
 	if(user.staff) {
 		messageRate = 32;
+		if(isCommand && commandType != "tell") messageRate = 128;
 	}
 
 	var canSend = chat_mgr.canSendMessage(ipHeaderAddr, messageRate);
@@ -837,13 +847,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	}
 
 	if(isCommand) {
-		var operator = user.operator;
-		var superuser = user.superuser;
-		var staff = user.staff;
-
 		switch(commandType) {
 			case "worlds":
-				if(superuser) com.worlds();
+				com.worlds();
 				return;
 			case "help":
 				com.help();
@@ -901,7 +907,10 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				return;
 			case "test":
 				com.test();
-				break;
+				break; // continue sending message
+			case "whois":
+				com.whois(commandArgs[1]);
+				return;
 			default:
 				serverChatResponse("Invalid command: " + msg);
 		}

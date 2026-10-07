@@ -129,6 +129,41 @@
 				 <textarea id="chatbar" rows="1" autocomplete="off" aria-autocomplete="none"></textarea>
 				<button id="chatsend" style="margin: 3px;">Send</button>
 			</div>
+			<div id="chat_info" style="display: none;">
+				<div style="display: grid; grid-template-columns: auto 1fr;">
+					<div><b>IP</b></div><div id="ci_ip"></div>
+					<div><b>ID</b></div><div id="ci_id"></div>
+					<div><b>Username</b></div><div id="ci_user"></div>
+					<div><b>Unix</b></div><div id="ci_unix"></div>
+
+					<div><b>Block</b></div>
+					<div id="cio_bc" class="chat-info-opt-group">
+						<div class="chat-info-opt" id="cio_bc_id">[ID]</div>
+						<div class="chat-info-opt" id="cio_bc_name">[Name]</div>
+						<div class="chat-info-opt" id="cio_bc_both">Both</div>
+					</div>
+					<div><b>Mute</b></div>
+					<div>
+						<div id="cio_mc" class="chat-info-opt-group">
+							<div class="chat-info-opt" id="cio_mc_id">[ID]</div>
+							<div class="chat-info-opt" id="cio_mc_name">[Name]</div>
+							<div class="chat-info-opt" id="cio_mc_both">Both</div>
+						</div>
+						|
+						<div id="cio_ml" class="chat-info-opt-group">
+							<div class="chat-info-opt" id="cio_ml_1h">[1h]</div>
+							<div class="chat-info-opt" id="cio_ml_1d">[1d]</div>
+							<div class="chat-info-opt" id="cio_ml_inf">[∞]</div>
+						</div>
+					</div>
+					
+					<div><b>Delete</b></div><div id="cio_d" class="chat-info-opt-group">
+						<div class="chat-info-opt" id="cio_d_this">[This message]</div>
+						<div class="chat-info-opt" id="cio_d_tgl">[Toggle delete opt.]</div>
+						<div class="chat-info-opt" id="cio_d_purge">[Purge all]</div>
+					</div>
+				</div>
+			</div>
 		</div>
 		<div id="confirm_js" style="display: none; top: 50px; left: 100px;">
 			<a href="javascript:void 0;" id="run_js_confirm">run</a>

@@ -348,6 +348,59 @@ a:visited {
 	font-size: 16px;
 	cursor: default;
 }
+.chat-msg:hover>.chat-mgr {
+	display: inline;
+}
+.chat-mgr {
+	display: none;
+	background-color: #E5E5FF;
+    position: absolute;
+    padding-left: 3px;
+    padding-right: 3px;
+	font-family: 'Courier New', Courier, monospace;
+	cursor: pointer;
+	user-select: none;
+}
+.chat-mgr.chat-del {
+	background-color: red;
+	left: 20px;
+	color: white;
+}
+.chat-mgr:hover {
+	background-color: #CCCCFF;
+	cursor: default;
+}
+.chat-mgr:active {
+	color: white;
+	background-color: #B2B2FF;
+}
+#chat_info {
+	background-color: #E5E5FF;
+	position: absolute;
+	font-family: Verdana;
+	border: 1px solid #ccc;
+	font-size: 13px;
+}
+.chat-info-opt {
+	display: inline;
+}
+.chat-info-opt-group {
+	display: inline;
+}
+.chat-info-opt-group-req {
+	background-color: yellow;
+}
+.chat-info-opt:hover {
+	background-color: red;
+	cursor: pointer;
+}
+.chat-info-opt-sel {
+	background-color: blue;
+}
+#chat_info_ctl {
+	display: flex;
+	justify-content: space-between;
+}
 #confirm_js {
 	width: 441px;
 	height: 256px;
