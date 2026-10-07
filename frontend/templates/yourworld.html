@@ -130,11 +130,17 @@
 				<button id="chatsend" style="margin: 3px;">Send</button>
 			</div>
 			<div id="chat_info" style="display: none;">
-				<div style="display: grid; grid-template-columns: auto 1fr;">
-					<div><b>IP</b></div><div id="ci_ip"></div>
+				<div class="chat-info-field">
+					<div id="hci_ip"><b>IP</b></div><div id="ci_ip"></div>
 					<div><b>ID</b></div><div id="ci_id"></div>
-					<div><b>Username</b></div><div id="ci_user"></div>
-					<div><b>Unix</b></div><div id="ci_unix"></div>
+					<div><b>Username</b></div>
+					<div class="chat-info-opt-group">
+						<div id="ci_user"></div>
+					</div>
+					<div><b>Unix</b></div>
+					<div class="chat-info-opt-group">
+						<div id="ci_unix"></div>
+					</div>
 
 					<div><b>Block</b></div>
 					<div id="cio_bc" class="chat-info-opt-group">
@@ -142,8 +148,8 @@
 						<div class="chat-info-opt" id="cio_bc_name">[Name]</div>
 						<div class="chat-info-opt" id="cio_bc_both">Both</div>
 					</div>
-					<div><b>Mute</b></div>
-					<div>
+					<div id="hci_mute"><b>Mute</b></div>
+					<div id="cio_m">
 						<div id="cio_mc" class="chat-info-opt-group">
 							<div class="chat-info-opt" id="cio_mc_id">[ID]</div>
 							<div class="chat-info-opt" id="cio_mc_name">[Name]</div>
@@ -157,7 +163,7 @@
 						</div>
 					</div>
 					
-					<div><b>Delete</b></div><div id="cio_d" class="chat-info-opt-group">
+					<div id="hci_delete"><b>Delete</b></div><div id="cio_d" class="chat-info-opt-group">
 						<div class="chat-info-opt" id="cio_d_this">[This message]</div>
 						<div class="chat-info-opt" id="cio_d_tgl">[Toggle delete opt.]</div>
 						<div class="chat-info-opt" id="cio_d_purge">[Purge all]</div>

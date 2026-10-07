@@ -852,10 +852,15 @@ function handleChatMessageManage(context) {
 	infoCont.style.display = "";
 	var aborted = false;
 
+	var isSuperuser = state.userModel.is_superuser;
+	var isStaff = state.userModel.is_staff;
+	var isMember = state.userModel.is_member;
+
 	var close = () => {
 		infoCont.style.display = "none";
 		aborted = true;
 		document.removeEventListener("click", clickEvt);
+		cioResetUI();
 	};
 
 	var clickEvt = (evt) => {
@@ -875,6 +880,7 @@ function handleChatMessageManage(context) {
 		cio_bc_id: document.getElementById("cio_bc_id"),
 		cio_bc_name: document.getElementById("cio_bc_name"),
 		cio_bc_both: document.getElementById("cio_bc_both"),
+		cio_m: document.getElementById("cio_m"),
 		cio_mc: document.getElementById("cio_mc"),
 		cio_mc_id: document.getElementById("cio_mc_id"),
 		cio_mc_name: document.getElementById("cio_mc_name"),
@@ -887,6 +893,9 @@ function handleChatMessageManage(context) {
 		cio_d_this: document.getElementById("cio_d_this"),
 		cio_d_purge: document.getElementById("cio_d_purge"),
 		cio_d_tgl: document.getElementById("cio_d_tgl"),
+		hci_ip: document.getElementById("hci_ip"),
+		hci_mute: document.getElementById("hci_mute"),
+		hci_delete: document.getElementById("hci_delete"),
 	};
 
 	elms.ci_ip.innerText = "Loading...";
@@ -894,26 +903,39 @@ function handleChatMessageManage(context) {
 	elms.ci_user.innerText = String(rec.realUsername);
 	elms.ci_unix.innerText = String(rec.date);
 
-	network.chat(`/whois ${rec.id}`, selectedChatTab == 0 ? "page" : "global", null, null, null, {
-		hideResponse: true
-	}, function(resp) {
-		if(aborted) return;
-		if(resp.id != 0 || resp.message == "Client not found") {
-			elms.ci_ip.innerText = "error";
-			return;
-		}
-		let rawMsg = Object.fromEntries(
-			resp.message
-				.replace(/\r\n/g, "\n")
-				.split("\n")
-				.map(x => /(.+)\s*:\s*(.+)/.exec(x))
-				.map(x => [(x[1] || "").toLowerCase().trim(), (x[2] || "").trim()])
-		);
-		let ip = rawMsg.ip;
-		if(ip) {
-			elms.ci_ip.innerText = String(ip);
-		}
-	});
+	if(!isSuperuser) {
+		elms.hci_ip.style.display = "none";
+		elms.ci_ip.style.display = "none";
+	}
+	if(!isStaff && !isMember) {
+		elms.hci_mute.style.display = "none";
+		elms.cio_m.style.display = "none";
+		elms.hci_delete.style.display = "none";
+		elms.cio_d.style.display = "none";
+	}
+
+	if(isSuperuser) {
+		network.chat(`/whois ${rec.id}`, selectedChatTab == 0 ? "page" : "global", null, null, null, {
+			hideResponse: true
+		}, function(resp) {
+			if(aborted) return;
+			if(resp.id != 0 || resp.message == "Client not found") {
+				elms.ci_ip.innerText = "error";
+				return;
+			}
+			let rawMsg = Object.fromEntries(
+				resp.message
+					.replace(/\r\n/g, "\n")
+					.split("\n")
+					.map(x => /(.+)\s*:\s*(.+)/.exec(x))
+					.map(x => [(x[1] || "").toLowerCase().trim(), (x[2] || "").trim()])
+			);
+			let ip = rawMsg.ip;
+			if(ip) {
+				elms.ci_ip.innerText = String(ip);
+			}
+		});
+	}
 
 	elms.cio_bc_id.onclick = () => {
 		w.chat.send(`/block ${rec.id}`);
@@ -929,11 +951,17 @@ function handleChatMessageManage(context) {
 		close();
 	};
 
-	var cioMuteCheckGroup = () => {
+	var cioResetUI = () => {
 		[
 			elms.cio_mc_id, elms.cio_mc_name, elms.cio_mc_both,
 			elms.cio_ml_1h, elms.cio_ml_1d, elms.cio_ml_inf
 		].forEach(elm => elm.classList.remove("chat-info-opt-sel"));
+		elms.cio_mc.classList.remove("chat-info-opt-group-req");
+		elms.cio_ml.classList.remove("chat-info-opt-group-req");
+	};
+
+	var cioMuteCheckGroup = () => {
+		cioResetUI();
 		// mute classification
 		if(muteStatusC) {
 			elms.cio_mc.classList.remove("chat-info-opt-group-req");

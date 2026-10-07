@@ -351,6 +351,11 @@ a:visited {
 .chat-msg:hover>.chat-mgr {
 	display: inline;
 }
+.chat-info-field {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 5px;
+}
 .chat-mgr {
 	display: none;
 	background-color: #E5E5FF;
