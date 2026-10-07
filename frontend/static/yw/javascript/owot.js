@@ -118,6 +118,7 @@ var longpressPosition      = [0, 0];
 var tellEdit               = [];
 var autoTotal              = 0;
 var timesConnected         = 0;
+var receivedChatHistory    = false;
 var homeX                  = 0;
 var homeY                  = 0;
 
@@ -4561,7 +4562,7 @@ function createSocket(getChatHist) {
 		fetchInterval = setInterval(function() {
 			w.fetchUnloadedTiles();
 		}, checkTileFetchInterval);
-		if ((timesConnected == 1 || getChatHist) &&
+		if ((!receivedChatHistory || getChatHist) &&
 		    Permissions.can_chat(state.userModel, state.worldModel))
 		{
 			network.chathistory();
@@ -8586,6 +8587,7 @@ var ws_functions = {
 			addChat(chat.location, chat.id, type, chat.nickname,
 				chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color, chat.date, chat);
 		}
+		receivedChatHistory = true;
 	},
 	chatdelete: function(data) {
 		// subject to change
