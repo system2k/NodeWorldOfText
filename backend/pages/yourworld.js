@@ -47,7 +47,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 	if(query_data.fetch == 1) { // fetch request
 		let captchaToken = query_data.captcha;
 		let captchaTest = captchaToken && captcha.reserveClientCaptchaToken(captchaToken, ctx.ipAddress);
-		if(!captchaTest && await captcha.isRequired(server, user, ctx.ipAddress, world.name)) {
+		if(!captchaTest && captcha.isReady() && await captcha.isRequired(server, user, ctx.ipAddress, world.name)) {
 			return write("Captcha required", 429);
 		}
 
@@ -228,7 +228,7 @@ module.exports.POST = async function(req, write, server, ctx) {
 
 	var captchaToken = post_data.captcha;
 	var captchaTest = captchaToken && captcha.reserveClientCaptchaToken(captchaToken, ctx.ipAddress);
-	if(!captchaTest && await captcha.isRequired(server, user, ctx.ipAddress, world.name)) {
+	if(!captchaTest && captcha.isReady() && await captcha.isRequired(server, user, ctx.ipAddress, world.name)) {
 		return write("Captcha required", 429);
 	}
 

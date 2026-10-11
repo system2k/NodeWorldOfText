@@ -18,6 +18,13 @@ module.exports.GET = async function(req, write, server, ctx) {
 		return write(JSON.stringify({
 			required: false
 		}));
+	} else {
+		if(!captcha.isReady()) {
+			console.warn("Warning: Captcha is enabled but the libraries are not installed. Please run \"npm install --include=optional\" to install the required libraries.");
+			return write(JSON.stringify({
+				required: false
+			}));
+		}
 	}
 
 	var worldIncluded = query_data.world != void 0;

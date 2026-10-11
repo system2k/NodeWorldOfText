@@ -10,6 +10,10 @@ try {
 var hmacKey = null;
 var captchaTokens = new Map();
 
+function isReady() {
+	return altchaLib != null;
+}
+
 function getHmacKey() {
 	if(!hmacKey) {
 		hmacKey = crypto.randomBytes(32).toString("hex");
@@ -133,6 +137,7 @@ async function isRequired(server, user, ipAddress, worldName) {
 }
 
 module.exports = {
+	isReady,
 	createChallenge,
 	verifyChallenge,
 	persistVerification,

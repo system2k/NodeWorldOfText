@@ -2346,7 +2346,7 @@ async function manageWebsocketConnection(ws, req) {
 	var captchaToken = search.get("captcha");
 	var captchaTest = captchaToken && captcha.reserveClientCaptchaToken(captchaToken, ws.sdata.ipAddress);
 
-	if(!captchaTest && await captcha.isRequired(global_data, user, ws.sdata.ipAddress, world.name)) {
+	if(!captchaTest && captcha.isReady() && await captcha.isRequired(global_data, user, ws.sdata.ipAddress, world.name)) {
 		send_ws(JSON.stringify({
 			kind: "captcha_required"
 		}));

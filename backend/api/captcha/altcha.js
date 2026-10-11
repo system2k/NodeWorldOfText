@@ -1,5 +1,3 @@
-var { checkWhitelistFeature } = require("../../utils/whitelist.js");
-const { createChallenge, verifySolution, sha } = require("altcha/lib");
 var captcha = require("../../subsystems/captcha.js");
 
 var world_mgr = require("../../subsystems/world_mgr.js");
@@ -19,6 +17,10 @@ function getHmacKey() {
 module.exports.GET = async function(req, write, server, ctx) {
 	var ipAddress = ctx.ipAddress;
 
+	if(!captcha.isReady()) {
+		return write(null, 404);
+	}
+
 	var challenge = await captcha.createChallenge(ipAddress);
 
 	write(JSON.stringify(challenge), 200, {
@@ -34,6 +36,10 @@ module.exports.POST = async function(req, write, server, ctx) {
 
 	var db_misc = server.db_misc;
 	var handle_error = server.handle_error;
+	
+	if(!captcha.isReady()) {
+		return write(null, 404);
+	}
 
 	var worldIncluded = post_data.world != void 0;
 	var worldName = null;

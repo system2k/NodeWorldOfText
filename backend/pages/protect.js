@@ -28,7 +28,7 @@ module.exports.POST = async function(req, write, server, ctx, params) {
 
 	var captchaToken = post_data.captcha;
 	var captchaTest = captchaToken && captcha.reserveClientCaptchaToken(captchaToken, ctx.ipAddress);
-	if(!captchaTest && await captcha.isRequired(server, user, ctx.ipAddress, world.name)) {
+	if(!captchaTest && captcha.isReady() && await captcha.isRequired(server, user, ctx.ipAddress, world.name)) {
 		return write("Captcha required", 429);
 	}
 

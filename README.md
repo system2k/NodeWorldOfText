@@ -13,6 +13,7 @@
     * `cd nwot`
 * Install the dependencies
     * `npm install`
+    * Or run `npm install --include=optional` to install additional dependencies such as Altcha.
 * When running the server for the first time, you'll be asked to configure the settings. After doing so, run the command again. NOTE: This will create a 'nwotdata' directory on the same level as your repository.
     * `node main.js`
 * You'll then be prompted to create a superuser account. You may see this message:
