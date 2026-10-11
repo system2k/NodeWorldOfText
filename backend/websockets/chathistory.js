@@ -1,3 +1,5 @@
+var { checkWhitelistFeature } = require("../utils/whitelist.js");
+
 module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var user = ctx.user;
 	var world = ctx.world;
@@ -11,6 +13,12 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var chat_perm = world.feature.chat;
 	var is_member = !!world.members.map[user.id];
 	var is_owner = user.id == world.ownerId;
+
+	var ipHeaderAddr = ws.sdata.ipAddress;
+	var wl_can_load_chat = checkWhitelistFeature(user.id, user.authenticated, ipHeaderAddr, world.name, "load_chat", server);
+	if(!wl_can_load_chat) {
+		return;
+	}
 
 	var can_chat = false;
 	if(!chat_perm) can_chat = true;

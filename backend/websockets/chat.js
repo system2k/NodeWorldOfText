@@ -6,6 +6,8 @@ var create_date = utils.create_date;
 var getTimeFlagValue = utils.getTimeFlagValue;
 var sanitize_username = utils.sanitize_username;
 
+var { checkWhitelistFeature } = require("../utils/whitelist.js");
+
 function sanitizeColor(col) {
 	var masks = ["#XXXXXX", "#XXX"];
 
@@ -87,6 +89,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var is_member = !!world.members.map[user.id] || is_owner;
 
 	var isGlobalEnabled = getServerSetting("chatGlobalEnabled") == "1";
+	var wl_can_chat = checkWhitelistFeature(user.id, user.authenticated, ipHeaderAddr, world.name, "chat", server);
+	var wl_can_chat_dm = checkWhitelistFeature(user.id, user.authenticated, ipHeaderAddr, world.name, "chat_dm", server);
+	var wl_can_pchat_anon = checkWhitelistFeature(user.id, user.authenticated, ipHeaderAddr, world.name, "pchat_anon", server);
 
 	var clientIpObj = null;
 	if(client_ips[world.id]) {
@@ -124,6 +129,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	if(!chat_perm) can_chat = true;
 	if(chat_perm === 1 && (is_member || is_owner)) can_chat = true;
 	if(chat_perm === 2 && is_owner) can_chat = true;
+	if(!wl_can_chat) can_chat = false;
 
 	var location = "";
 	if(!(data.location == "global" || data.location == "page")) data.location = "page";
@@ -151,23 +157,36 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var has_chat_username = typeof username_to_display == "string" && !!username_to_display.trim();
 
 	if(location == "global") {
-		var chatGlobalNoAnon = getServerSetting("chatGlobalNoAnon") == "1";
-		if(chatGlobalNoAnon && !user.authenticated) {
+		let chatGlobalNoAnon = getServerSetting("chatGlobalNoAnon") == "1";
+		if(chatGlobalNoAnon && !user.authenticated && !wl_can_pchat_anon) {
 			serverChatResponse("Sign in to send messages in global chat.", location);
 			return;
 		}
-		if(user.authenticated && !has_chat_username) {
+		if(user.authenticated && !has_chat_username && !wl_can_pchat_anon) {
 			serverChatResponse("Your account needs a username to send messages in global chat.", location);
 			return;
 		}
 	} else if(location == "page") {
-		if(world.opts.noAnonChat && !user.authenticated) {
+		if(world.opts.noAnonChat && !user.authenticated && !(wl_can_pchat_anon && world.name == "")) {
 			serverChatResponse("Sign in to send messages in this world.", location);
 			return;
 		}
 	} else {
 		serverChatResponse("Unrecognized location", location);
 		return;
+	}
+
+	if(user.authenticated && user.date_joined) {
+		var ageRestrictionHours = parseInt(getServerSetting("chatAgeRestriction"));
+		if(ageRestrictionHours > 0) {
+			var accountAge = Date.now() - user.date_joined;
+			var minimumAge = ageRestrictionHours * 60 * 60 * 1000;
+			if(accountAge < minimumAge) {
+				var timeRemaining = calculateTimeDiff(minimumAge - accountAge);
+				serverChatResponse("Your account is too new. You must wait " + timeRemaining + " before chatting.", location);
+				return;
+			}
+		}
 	}
 
 	var isTestMessage = false;
@@ -223,6 +242,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 		// superuser
 		[2, "worlds", null, "list all worlds", null],
+		[2, "whois", null, "list details about client", null],
 
 		// staff
 		[1, "channel", null, "get info about a chat channel"],
@@ -323,6 +343,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 
 	var com = {
 		worlds: function() {
+			if(!user.superuser) return;
 			var topCount = 1000;
 			var lst = topActiveWorlds(topCount);
 			var worldList = "";
@@ -457,6 +478,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 			message += "";
 			message = message.trim();
 			var noClient = false;
+			if(!wl_can_chat_dm) {
+				return serverChatResponse("Direct messages are disabled", location);
+			}
 			if(!id) {
 				return serverChatResponse("No id given", location);
 			}
@@ -783,6 +807,17 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		},
 		test: function() {
 			isTestMessage = true;
+		},
+		whois: function(id) {
+			if(!user.authenticated) return;
+			if(!user.superuser) return;
+			id = san_nbr(id);
+			var ip = getClientIPByChatID(id, location == "global");
+			if(ip) {
+				serverChatResponse(`IP: ${ip}`, location);
+			} else {
+				serverChatResponse("Client not found", location);
+			}
 		}
 	}
 
@@ -793,10 +828,6 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 		commandType = commandArgs[0].toLowerCase();
 	}
 
-	// chat limiter
-	var msNow = Date.now();
-	var second = Math.floor(msNow / 1000);
-
 	var messageRate = 2;
 	if(location == "page") {
 		if(is_member) messageRate = 8;
@@ -805,6 +836,7 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	if(isCommand && commandType != "tell") messageRate = 32;
 	if(user.staff) {
 		messageRate = 32;
+		if(isCommand && commandType != "tell") messageRate = 128;
 	}
 
 	var canSend = chat_mgr.canSendMessage(ipHeaderAddr, messageRate);
@@ -815,13 +847,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	}
 
 	if(isCommand) {
-		var operator = user.operator;
-		var superuser = user.superuser;
-		var staff = user.staff;
-
 		switch(commandType) {
 			case "worlds":
-				if(superuser) com.worlds();
+				com.worlds();
 				return;
 			case "help":
 				com.help();
@@ -879,7 +907,10 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 				return;
 			case "test":
 				com.test();
-				break;
+				break; // continue sending message
+			case "whois":
+				com.whois(commandArgs[1]);
+				return;
 			default:
 				serverChatResponse("Invalid command: " + msg);
 		}

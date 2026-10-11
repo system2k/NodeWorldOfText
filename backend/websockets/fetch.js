@@ -1,5 +1,6 @@
 module.exports = async function(ws, data, send, broadcast, server, ctx) {
 	var tiles = await server.modules.fetch_tiles(data, server, {
+		user: ctx.user,
 		world: ctx.world,
 		ws: ws,
 		channel: ctx.channel

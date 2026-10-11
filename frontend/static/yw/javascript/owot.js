@@ -118,6 +118,7 @@ var longpressPosition      = [0, 0];
 var tellEdit               = [];
 var autoTotal              = 0;
 var timesConnected         = 0;
+var receivedChatHistory    = false;
 var homeX                  = 0;
 var homeY                  = 0;
 
@@ -511,7 +512,7 @@ function resizeElement(element, width, height, minWidth, minHeight) {
 	return [width, height];
 }
 
-function makeElementResizable(element) {
+function makeElementResizable(element, minWidth, minHeight) {
 	let resizeStatus = {
 		elementIsResizing: false
 	};
@@ -545,8 +546,8 @@ function makeElementResizable(element) {
 		downY = e.pageY;
 		if(state) {
 			// subtract 2 for the borders
-			elementWidth = element.offsetWidth - 2;
-			elementHeight = element.offsetHeight - 2;
+			elementWidth = element.offsetWidth;
+			elementHeight = element.offsetHeight;
 			elmX = element.offsetLeft;
 			elmY = element.offsetTop;
 			isDown = true;
@@ -583,7 +584,7 @@ function makeElementResizable(element) {
 		} else if(resize_right) {
 			width_delta = offX;
 		}
-		var res = resizeElement(element, elementWidth + width_delta, elementHeight + height_delta);
+		var res = resizeElement(element, elementWidth + width_delta, elementHeight + height_delta, minWidth, minHeight);
 		if(resize_top && !snap_bottom) {
 			element.style.top = (elmY + (elementHeight - res[1])) + "px";
 		}
@@ -4507,9 +4508,20 @@ function checkKeyPatterns(combination) {
 }
 
 function createWsPath() {
-	var search = window.location.search;
-	if(!search) search = "";
-	return "ws" + (window.location.protocol == "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/" + search;
+	var searchString = "";
+	var params = {};
+	if(window.location.search) {
+		params = getQuerystring(window.location.search);
+	}
+	if(w.captcha?.token) {
+		params.captcha = w.captcha.token;
+	}
+	if(Object.keys(params).length > 0) {
+		searchString = "?" + Object.entries(params)
+			.map(e => encodeURIComponent(e[0]) + "=" + encodeURIComponent(e[1]))
+			.join("&");
+	}
+	return "ws" + (window.location.protocol == "https:" ? "s" : "") + "://" + window.location.host + state.worldModel.pathname + "/ws/" + searchString;
 }
 
 function createSocket(getChatHist) {
@@ -4550,7 +4562,7 @@ function createSocket(getChatHist) {
 		fetchInterval = setInterval(function() {
 			w.fetchUnloadedTiles();
 		}, checkTileFetchInterval);
-		if ((timesConnected == 1 || getChatHist) &&
+		if ((!receivedChatHistory || getChatHist) &&
 		    Permissions.can_chat(state.userModel, state.worldModel))
 		{
 			network.chathistory();
@@ -4568,22 +4580,29 @@ function createSocket(getChatHist) {
 		w.emit("socketOpen", event);
 	}
 
-	socket.onclose = function() {
-		console.log("Socket has closed. Reconnecting...");
+	socket.onclose = function(evt) {
+		let doReconnect = true;
+		if(evt?.code == 1003) {
+			doReconnect = false;
+		}
+		console.log(`Socket has closed.${doReconnect ? " Reconnecting..." : ""}`);
 		w.emit("socketClose", true); // bool: before default behavior?
-		for(var i in network.callbacks) {
-			var cb = network.callbacks[i];
+		for(let i in network.callbacks) {
+			let cb = network.callbacks[i];
 			if(typeof cb == "function") {
 				cb(null, true);
 			}
 			delete network.callbacks[i];
 		}
-		if(!disconnectTimeout) {
+		if(!disconnectTimeout && doReconnect) {
 			disconnectTimeout = setTimeout(function() {
 				w.doAnnounce("Connection lost. Please wait until the client reconnects.", "err_connect");
 			}, 1000 * 2);
 		}
 		w.emit("socketClose", false);
+		if(!doReconnect) {
+			socket.pause();
+		}
 	}
 
 	socket.onerror = function(err) {
@@ -5585,7 +5604,7 @@ function buildMenu() {
 		w.disableColors();
 		setRedrawPatterned("square");
 	}, true);
-	menuOptions.colorsEnabled = menu.addCheckboxOption("Suppress images", function() {
+	menuOptions.suppressImages = menu.addCheckboxOption("Suppress images", function() {
 		w.enableImageSuppression();
 		setRedrawPatterned("square");
 	}, function() {
@@ -6566,7 +6585,8 @@ var networkHTTP = {
 			min_tileX: x1,
 			min_tileY: y1,
 			max_tileX: x2,
-			max_tileY: y2
+			max_tileY: y2,
+			captcha: w.captcha?.token || undefined
 		};
 		var query = getQuerystring(window.location.search);
 		if(query.key) {
@@ -6595,7 +6615,8 @@ var networkHTTP = {
 			opts = {};
 		}
 		var data = {
-			edits: JSON.stringify(edits)
+			edits: JSON.stringify(edits),
+			captcha: w.captcha?.token || undefined
 		};
 		if(opts.public_only) data.public_only = true;
 		if(opts.preserve_links) data.preserve_links = true;
@@ -6618,7 +6639,8 @@ var networkHTTP = {
 			data: {
 				world: state.worldModel.name,
 				tileX, tileY, charX, charY,
-				url
+				url,
+				captcha: w.captcha?.token || undefined
 			},
 			done: function(data) {
 				if(callback) callback(data);
@@ -6635,7 +6657,8 @@ var networkHTTP = {
 			data: {
 				world: state.worldModel.name,
 				tileX, tileY, charX, charY,
-				link_tileX, link_tileY, relative
+				link_tileX, link_tileY, relative,
+				captcha: w.captcha?.token || undefined
 			},
 			done: function(data) {
 				if(callback) callback(data);
@@ -6650,7 +6673,8 @@ var networkHTTP = {
 		var data = {
 			world: state.worldModel.name,
 			tileX: tileX,
-			tileY: tileY
+			tileY: tileY,
+			captcha: w.captcha?.token || undefined
 		};
 		var url = "/ajax/protect/";
 		if(type == "unprotect") {
@@ -6677,7 +6701,8 @@ var networkHTTP = {
 			tileX: tileX,
 			tileY: tileY,
 			charX: charX,
-			charY: charY
+			charY: charY,
+			captcha: w.captcha?.token || undefined
 		};
 		var url = "/ajax/protect/char/";
 		if(type == "unprotect") {
@@ -6696,12 +6721,62 @@ var networkHTTP = {
 				if(callback) callback(null);
 			}
 		});
+	},
+	captchaGetAltchaChallenge: function(callback) {
+		ajaxRequest({
+			type: "GET",
+			url: "/api/captcha/altcha",
+			done: function(data) {
+				if(callback) callback(JSON.parse(data));
+			},
+			error: function() {
+				if(callback) callback(null);
+			}
+		});
+	},
+	captchaSendAltchaSolution: function(payload, callback) {
+		var query = getQuerystring(window.location.search);
+		var key = null;
+		if(query.key) {
+			key = query.key;
+		}
+		ajaxRequest({
+			type: "POST",
+			url: "/api/captcha/altcha",
+			data: {
+				world: state.worldModel.name,
+				key: key,
+				payload
+			},
+			done: function(data) {
+				if(callback) callback(JSON.parse(data));
+			},
+			error: function() {
+				if(callback) callback(null);
+			}
+		});
+	},
+	captchaGetStatus: function(callback) {
+		ajaxRequest({
+			type: "GET",
+			url: "/api/captcha/status",
+			data: {
+				world: state.worldModel.name
+			},
+			done: function(data) {
+				if(callback) callback(JSON.parse(data));
+			},
+			error: function() {
+				if(callback) callback(null);
+			}
+		});
 	}
 };
 
 var network = {
 	latestID: 1,
 	callbacks: {},
+	callbackOpts: {},
 	http: networkHTTP,
 	transmit: function(data) {
 		data = JSON.stringify(data);
@@ -6820,21 +6895,30 @@ var network = {
 			fetchReq.request = opts.id;
 		}
 		if(callback) {
-			var id = network.latestID++;
+			let id = network.latestID++;
 			fetchReq.request = id;
 			network.callbacks[id] = callback;
 		}
 		network.transmit(fetchReq);
 	},
-	chat: function(message, location, nickname, color, customMeta) {
-		network.transmit({
+	chat: function(message, location, nickname, color, customMeta, opts, callback) {
+		// opts: {hideResponse: true/false (requires callback)}
+		if(!opts) opts = {};
+		var req = {
 			kind: "chat",
 			nickname: nickname,
 			message: message,
 			location: location,
 			color: color,
 			customMeta: customMeta
-		});
+		};
+		if(callback) {
+			let id = network.latestID++;
+			req.request = id;
+			network.callbacks[id] = callback;
+			network.callbackOpts[id] = opts;
+		}
+		network.transmit(req);
 	},
 	ping: function(callback) {
 		var cb_id = void 0;
@@ -6848,7 +6932,7 @@ var network = {
 		});
 	},
 	clear_tile: function(position) {
-		// position: {tileX, tileY, [charX, charY, [width, height]]]}
+		// position: {tileX, tileY, [charX, charY, [charWidth, charHeight]]]}
 		var data = {
 			tileX: position.tileX,
 			tileY: position.tileY
@@ -6974,6 +7058,9 @@ Object.assign(w, {
 		exists: Tile.exists,
 		loaded: Tile.loaded,
 		visible: Tile.visible
+	},
+	captcha: {
+		token: null
 	},
 	doAnnounce: function(text, announceClass) {
 		if(!announceClass) {
@@ -8254,8 +8341,8 @@ var ws_functions = {
 	},
 	write: function(data) {
 		if("request" in data) {
-			var id = data.request;
-			var cb = network.callbacks[id];
+			let id = data.request;
+			let cb = network.callbacks[id];
 			if(typeof cb == "function") {
 				cb(data, null);
 			}
@@ -8441,22 +8528,40 @@ var ws_functions = {
 		}
 	},
 	chat: function(data) {
-		var type = chatType(data.registered, data.nickname, data.realUsername);
-		w.emit("chat", {
-			location: data.location,
-			id: data.id,
-			type: type,
-			nickname: data.nickname,
-			message: data.message,
-			realUsername: data.realUsername,
-			op: data.op,
-			admin: data.admin,
-			staff: data.staff,
-			color: data.color,
-			date: data.date,
-			dataObj: data,
-			hide: false
-		});
+		let hideResponse = false;
+		if("request" in data) {
+			let id = data.request;
+			let cb = network.callbacks[id];
+			let opts = network.callbackOpts[id];
+			if(typeof cb == "function") {
+				cb(data, null);
+			}
+			if(typeof opts == "object") {
+				if(opts.hideResponse) {
+					hideResponse = true;
+				}
+			}
+			delete network.callbacks[id];
+			delete network.callbackOpts[id];
+		}
+		if(!hideResponse) {
+			let type = chatType(data.registered, data.nickname, data.realUsername);
+			w.emit("chat", {
+				location: data.location,
+				id: data.id,
+				type: type,
+				nickname: data.nickname,
+				message: data.message,
+				realUsername: data.realUsername,
+				op: data.op,
+				admin: data.admin,
+				staff: data.staff,
+				color: data.color,
+				date: data.date,
+				dataObj: data,
+				hide: false
+			});
+		}
 	},
 	user_count: function(data) {
 		var count = data.count;
@@ -8482,6 +8587,7 @@ var ws_functions = {
 			addChat(chat.location, chat.id, type, chat.nickname,
 				chat.message, chat.realUsername, chat.op, chat.admin, chat.staff, chat.color, chat.date, chat);
 		}
+		receivedChatHistory = true;
 	},
 	chatdelete: function(data) {
 		// subject to change
@@ -8566,6 +8672,31 @@ var ws_functions = {
 				delete network.callbacks[data.id];
 				cb(data);
 			}
+		}
+	},
+	captcha_required: function() {
+		if(window._captchaOverlay) {
+			window._captchaSolveCallback = function(payload) {
+				networkHTTP.captchaSendAltchaSolution(payload, function(response) {
+					var isVerified = response.verified;
+					var token = response.token;
+					if(window._captchaOverlay) {
+						if(isVerified) {
+							window._captchaOverlay.hide();
+							w.captcha.token = token;
+							// create new socket instance with token parameter
+							w.changeSocket(createWsPath());
+							w.socket.resume();
+						} else {
+							var errorEl = document.getElementById("captcha_error");
+							var widget = document.getElementById("altcha-widget");
+							if(errorEl) errorEl.style.display = "";
+							if(widget) widget.reset();
+						}
+					}
+				});
+			};
+			window._captchaOverlay.show();
 		}
 	}
 };

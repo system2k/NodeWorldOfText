@@ -306,6 +306,14 @@
 					Global chat: prevent anonymous users:
 					<input type="checkbox" name="set_chat_global_no_anon" id="set_chat_global_no_anon"{%if global_chat_no_anon%} checked{%endif%}>
 				</div>
+				<div>
+					Required account age for chat (hours):
+					<input type="number" name="set_chat_age_restriction" id="set_chat_age_restriction" value="{{ chat_age_restriction }}" min="0" style="width: 60px;">
+				</div>
+				<div>
+					Captcha enabled:
+					<input type="checkbox" name="set_captcha_enabled" id="set_captcha_enabled"{%if captcha_enabled%} checked{%endif%}>
+				</div>
 				<input type="submit" value="Set">
 			</form>
 		</div>
@@ -314,11 +322,12 @@
 	<div class="content_set">
 		<div class="content_set_title">Page Links</div>
 		<div class="content_set_content">
-			<a href="/administrator/backgrounds/" class="page_link_opt">Upload Page Backgrounds</a>
+			<a href="/administrator/backgrounds/" class="page_link_opt">Upload page backgrounds</a>
 			<a href="/administrator/restrictions/" class="page_link_opt">Manage restrictions</a>
 			{% if user.operator %}
 			<a href="/administrator/user_list/" class="page_link_opt">User list</a>{% endif %}
 			<a href="/administrator/shell/" class="page_link_opt">Execute shell script</a>
+			<a href="/administrator/whitelist/" class="page_link_opt">Manage whitelist</a>
 		</div>
 	</div>
 

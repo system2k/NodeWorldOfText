@@ -764,6 +764,37 @@ function sanitize_color(col) {
 	return col;
 }
 
+function wl_filter_char(char, wl_can_use_picto, wl_can_use_dots, wl_can_use_nonletters) {
+	if(!char) return char;
+	if(wl_can_use_picto && wl_can_use_dots && wl_can_use_nonletters) {
+		return char;
+	}
+	let code = char.codePointAt();
+	if(!wl_can_use_picto && (
+		(code >= 0x1F300 && code < 0x1F540) ||
+		(code >= 0x1F680 && code < 0x1F6E0) ||
+		(code >= 0x1F7E0 && code < 0x1F800) ||
+		(code >= 0x1F900 && code < 0x1FB00)
+	)) {
+		return "?";
+	}
+	if(!wl_can_use_dots && (
+		(code >= 0x1FB00 && code <= 0x1FB3B) || // slc 2x3
+		(code >= 0x1CD00 && code <= 0x1CDE5) || // slc 2x4
+		(code >= 0x1CE47 && code <= 0x1CEAF) || // slc spaced 2x3
+		(code >= 0x2801 && code <= 0x28FF) || // 2x4 braille
+		(code >= 0x2580 && code <= 0x259F) // box/shades
+	)) {
+		return "?";
+	}
+	if(!wl_can_use_nonletters && !(
+		(code >= 0x0000 && code < 0x058F) // exclude ascii/common symbols
+	)) {
+		return "?";
+	}
+	return char;
+}
+
 function arrayIsEntirely(arr, elm) {
 	for(var i = 0; i < arr.length; i++) {
 		if(arr[i] != elm) return false;
@@ -873,5 +904,6 @@ module.exports = {
 	toHex64,
 	toInt64,
 	getTimeFlagValue,
-	sanitize_username
+	sanitize_username,
+	wl_filter_char,
 };

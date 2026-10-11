@@ -9,6 +9,8 @@ var restrictions = require("../utils/restrictions.js");
 var checkCoalition = restrictions.checkCoalition;
 var getRestrictions = restrictions.getRestrictions;
 
+var { checkWhitelistFeature } = require("../utils/whitelist.js");
+
 function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
@@ -54,6 +56,11 @@ module.exports = async function(data, server, params) {
 		ipAddressFam = params.ipAddressFam;
 	}
 
+	var wl_can_write = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "write", server);
+	var wl_can_link = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "link", server);
+	if(!wl_can_write || !wl_can_link) {
+		return [true, "PERM"];
+	}
 
 	var restr = getRestrictions();
 	var isGrouped = checkCoalition(ipAddressVal, ipAddressFam);

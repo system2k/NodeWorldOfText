@@ -148,6 +148,7 @@ function ajaxRequest(settings) {
 	var ampAppend = false;
 	if(settings.data) {
 		for(var i in settings.data) {
+			if(settings.data[i] == null) continue;
 			if(ampAppend) formData += "&";
 			ampAppend = true;
 			formData += encodeURIComponent(i) + "=" + encodeURIComponent(settings.data[i]);
@@ -654,12 +655,18 @@ function ReconnectingWebSocket(url) {
 	this.onerror = null;
 	this.reconnectTimeout = 1000;
 	var closed = false;
+	var reconnectPaused = false;
+	var pendingReconnect = false;
 	var self = this;
 	function connect() {
 		self.socket = new WebSocket(url);
 		self.socket.onclose = function(r) {
 			if(self.onclose) self.onclose(r);
 			if(closed) return;
+			if(reconnectPaused) {
+				pendingReconnect = true;
+				return;
+			}
 			setTimeout(connect, self.reconnectTimeout);
 		}
 		self.socket.onopen = function(e) {
@@ -679,10 +686,20 @@ function ReconnectingWebSocket(url) {
 	}
 	this.close = function() {
 		closed = true;
+		pendingReconnect = false;
 		this.socket.close();
 	}
 	this.refresh = function() {
 		this.socket.close();
+	}
+	this.pause = function() {
+		reconnectPaused = true;
+	}
+	this.resume = function() {
+		reconnectPaused = false;
+		if(pendingReconnect) {
+			setTimeout(connect, self.reconnectTimeout);
+		}
 	}
 	return this;
 }

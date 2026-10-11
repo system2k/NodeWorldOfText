@@ -1,0 +1,780 @@
+{% extends "base.html" %}
+
+{% block title %}
+	Manage Whitelist | Our World of Text
+{% endblock %}
+
+{% block header %}
+	<h1>Manage Whitelist</h1>
+	<span><a href="/administrator/">« Back to Admin Panel</a></span>
+	<style>
+		.wl_more {
+			display: flex;
+			justify-content: space-between;
+		}
+	</style>
+{% endblock %}
+
+{% block content %}
+	<div class="content_set">
+		<div class="content_set_title">Whitelist Features</div>
+		<div class="content_set_content">
+			<div id="whitelist_features"></div>
+			<div style="margin-top:1rem;">
+				<button id="save_status">Save Status</button>
+			</div>
+		</div>
+	</div>
+	<div class="content_set" style="width: auto; display: table;" id="wl_user">
+		<div class="content_set_title">Whitelisted Users</div>
+		<div class="content_set_content">
+			<div style="margin-bottom:0.5rem;">
+				<div>
+					<input id="wl_add_user_id">
+					<button id="add_by_uid">Add by User ID</button>
+				</div>
+				<div>
+					<input id="wl_add_username">
+					<button id="add_by_username">Add by Username</button>
+				</div>
+			</div>
+			<table class="whitelist_table">
+				<thead>
+					<tr class="whitelist_header"></tr>
+				</thead>
+				<tbody>
+				</tbody>
+			</table>
+			<div style="margin-top:1rem;" class="wl_more">
+				<button class="submit_changes" id="wl_sub_user">Submit Changes</button>
+				<div><a id="wl_lda_user">Load all...</a> | <a id="wl_ld_user">Load more...</a></div>
+			</div>
+		</div>
+	</div>
+	<div class="content_set" style="width: auto; display: table;" id="wl_ip">
+		<div class="content_set_title">Whitelisted IP Addresses</div>
+		<div class="content_set_content">
+			<div style="margin-bottom:0.5rem;">
+				<div>
+					<input id="wl_add_ip">
+					<button id="add_by_ip">Add by IP</button>
+				</div>
+			</div>
+			<table class="whitelist_table">
+				<thead>
+					<tr class="whitelist_header"></tr>
+				</thead>
+				<tbody>
+				</tbody>
+			</table>
+			<div style="margin-top:1rem;" class="wl_more">
+				<button class="submit_changes" id="wl_sub_ip">Submit Changes</button>
+				<div><a id="wl_lda_ip">Load all...</a> | <a id="wl_ld_ip">Load more...</a></div>
+			</div>
+		</div>
+	</div>
+	<div class="content_set" style="width: auto; display: table;" id="wl_world">
+		<div class="content_set_title">Whitelisted Worlds</div>
+		<div class="content_set_content">
+			<div style="margin-bottom:0.5rem;">
+				<div>
+					<input id="wl_add_world_name">
+					<button id="add_by_world_name">Add by World Name</button>
+				</div>
+			</div>
+			<table class="whitelist_table">
+				<thead>
+					<tr class="whitelist_header"></tr>
+				</thead>
+				<tbody>
+				</tbody>
+			</table>
+			<div style="margin-top:1rem;" class="wl_more">
+				<button class="submit_changes" id="wl_sub_world">Submit Changes</button>
+				<div><a id="wl_lda_world">Load all...</a> | <a id="wl_ld_world">Load more...</a></div>
+			</div>
+		</div>
+	</div>
+	<style>
+
+	</style>
+	<script>
+		var csrftoken = "{{csrftoken}}";
+
+		var statusLookup = {
+			write: "Canvas write, link, protect, clea",
+			load_tile: "Fetch tile regions",
+			color: "Write text with colors",
+			link: "Set a link to a cell",
+			chat: "Send chat message",
+			chat_dm: "Send direct private chat message",
+			load_chat: "Fetch chat history",
+			cmd: "Send custom cmd WebSocket messages",
+			profile: "Profile management (claiming worlds, configuring worlds)",
+			claim: "World claiming via user profile",
+			promote: "Adding members to a world via world configuration",
+			uc_picto: "Unicode pictographs/emojis",
+			uc_dot: "Unicode 2x3/2x4 dot characters",
+			uc_nonletter: "Unicode non-letter characters",
+			no_captcha: "Exemption from captcha",
+			few_captcha: "Provide captcha once",
+			pchat_anon: "Allow usage of front page and global chats as an anon"
+		};
+
+		var whitelistHeaders = [
+			"write", "load_tile",
+			"color", "link",
+			"chat", "chat_dm", "load_chat",
+			"cmd",
+			"profile", "claim", "promote",
+			"uc_picto", "uc_dot", "uc_nonletter",
+			"no_captcha", "few_captcha",
+			"pchat_anon"
+		];
+		var uncheckedByDefaultWhitelistHeaders = [
+			"no_captcha", "pchat_anon"
+		];
+		var notWorldSpecificWhitelistHeaders = [
+			"profile", "claim"
+		];
+
+		var tempIdMax = 1;
+		var updatedWhitelistFeatures = {};
+		var updatedWhitelistOptions = { // category => id => type:status
+			user: {},
+			ip: {},
+			world: {}
+		};
+		var addedWhitelistOptions = { // category => temp-id => {options: {type:status}, user_id: int}
+			user: {},
+			ip: {},
+			world: {}
+		};
+		var removedWhitelistOptions = { // category => id => type
+			user: {},
+			ip: {},
+			world: {}
+		};
+		var pendingAddedRows = {}; // temp-id => Element
+
+		var submittingStatus = {
+			features: false,
+			whitelistUser: false,
+			whitelistIp: false,
+			whitelistWorld: false
+		};
+
+		var maxCategoryId = {
+			user: 0,
+			ip: 0,
+			world: 0
+		};
+
+		function checkInputCallback(evt) {
+			let target = evt.target;
+			if(!target || target.type != "checkbox") {
+				console.error("Element is not checkbox");
+				return;
+			}
+			let parCb = target.closest("[data-wl-head]");
+			if(!parCb) {
+				console.error("Cannot find parent container");
+				return;
+			}
+			let headName = parCb.dataset.wlHead;
+			let parRow = target.closest("[data-wl-entry-id]");
+			if(!parRow) {
+				console.error("Cannot find parent row");
+				return;
+			}
+			let parTable = target.closest("[data-wl-type]");
+			if(!parTable) {
+				console.error("Cannot find parent table");
+				return;
+			}
+			let ruleId = String(parRow.dataset.wlEntryId);
+			let checked = target.checked;
+			let type = parTable.dataset.wlType;
+
+			let isNew = ruleId.startsWith("-");
+
+			if(isNew) {
+				let opt = addedWhitelistOptions[type][ruleId];
+				opt.options[headName] = checked;
+			} else {
+				(updatedWhitelistOptions[type][ruleId] ??= {})[headName] = checked;
+			}
+		}
+
+		function getEffectiveHeaders(type) {
+			let wlHeaders = whitelistHeaders;
+			if(type == "world") {
+				// remove profile-specific headers
+				wlHeaders = Array.from(
+					new Set(whitelistHeaders).difference(new Set(notWorldSpecificWhitelistHeaders))
+				);
+			}
+			return [
+				"id",
+				...(type == "user" ? ["username", "user_id"]: []),
+				...(type == "ip" ? ["ip"]: []),
+				...(type == "world" ? ["world_name"]: []),
+				...wlHeaders,
+				"Delete"
+			];
+		}
+
+		function getMaxIdInArray(arr, key) {
+			let maxVal = 0;
+			for(let i = 0; i < arr.length; i++) {
+				if(arr[i][key] > maxVal) {
+					maxVal = arr[i][key];
+				}
+			}
+			return maxVal;
+		}
+
+		function addDataToWhitelistTable(table, type, entry, prepend) {
+			let effectiveHeaders = getEffectiveHeaders(type);
+
+			let id = entry.id;
+			let id_type = entry.id_type;
+			let user_id = entry.user_id;
+			let username = entry.username;
+			let ip = entry.ip;
+			let world_name = entry.world_name;
+
+			let columns = {};
+
+			let eRow = document.createElement("tr");
+			eRow.dataset.wlEntryId = id;
+			for(let h = 0; h < effectiveHeaders.length; h++) {
+				let head = effectiveHeaders[h];
+				let eCell = document.createElement("td");
+				eCell.dataset.wlHead = head;
+				if(whitelistHeaders.includes(head)) {
+					let eCheck = document.createElement("input");
+					eCheck.type = "checkbox";
+					eCheck.checked = Boolean(Number(entry[head]));
+					eCheck.oninput = checkInputCallback;
+					eCell.appendChild(eCheck);
+				} else if(head == "Delete") {
+					let btn = document.createElement("button");
+					btn.innerText = "X";
+					btn.onclick = () => {
+						eRow.remove();
+						delete addedWhitelistOptions[type][id];
+						if(!String(id).startsWith("-")) {
+							removedWhitelistOptions[type][id] = true;
+						}
+					};
+					eCell.appendChild(btn);
+				} else {
+					eCell.innerText = entry[head];
+				}
+				columns[head] = eCell;
+				eRow.appendChild(eCell);
+			}
+
+			if(prepend) {
+				table.prepend(eRow);
+			} else {
+				table.appendChild(eRow);
+			}
+
+			return {
+				row: eRow,
+				columns
+			};
+		}
+
+		function populateWhitelistTable(panel, type, data) {
+			var table = panel.querySelector(".whitelist_table>tbody");
+			var whitelist_header = panel.querySelector(".whitelist_header");
+
+			table.dataset.wlType = type;
+
+			let effectiveHeaders = getEffectiveHeaders(type);
+
+			for(let i = 0; i < effectiveHeaders.length; i++) {
+				let text = effectiveHeaders[i];
+				let head = document.createElement("th");
+				head.innerText = text;
+				whitelist_header.appendChild(head);
+			}
+
+			for(let i = 0; i < data.length; i++) {
+				addDataToWhitelistTable(table, type, data[i]);
+			}
+		}
+
+		function buildDropdown(keyValueList) {
+			let eInput = document.createElement("select");
+			for(let i = 0; i < keyValueList.length; i++) {
+				let kv = keyValueList[i];
+				let eOpt = document.createElement("option");
+				eOpt.value = kv[0];
+				eOpt.innerText = kv[1];
+				eInput.appendChild(eOpt);
+			}
+			return eInput;
+		}
+
+		async function wlLoadUser() {
+			let data = await fetchWhitelistData(maxCategoryId.user, 250, "user", false);
+			let rules = data.rules;
+			maxCategoryId.user = Math.max(maxCategoryId.user, getMaxIdInArray(rules, "id"));
+			for(let i = 0; i < rules.length; i++) {
+				addDataToWhitelistTable(document.getElementById("wl_user").querySelector(".whitelist_table>tbody"), "user", rules[i]);
+			}
+			return rules.length > 0;
+		};
+
+		async function wlLoadIp() {
+			let data = await fetchWhitelistData(maxCategoryId.ip, 250, "ip", false);
+			let rules = data.rules;
+			maxCategoryId.ip = Math.max(maxCategoryId.ip, getMaxIdInArray(rules, "id"));
+			for(let i = 0; i < rules.length; i++) {
+				addDataToWhitelistTable(document.getElementById("wl_ip").querySelector(".whitelist_table>tbody"), "ip", rules[i]);
+			}
+			return rules.length > 0;
+		};
+
+		async function wlLoadWorld() {
+			let data = await fetchWhitelistData(maxCategoryId.world, 250, "world", false);
+			let rules = data.rules;
+			maxCategoryId.world = Math.max(maxCategoryId.world, getMaxIdInArray(rules, "id"));
+			for(let i = 0; i < rules.length; i++) {
+				addDataToWhitelistTable(document.getElementById("wl_world").querySelector(".whitelist_table>tbody"), "world", rules[i]);
+			}
+			return rules.length > 0;
+		};
+
+		function initializeEvents() {
+			let save_status = document.getElementById("save_status");
+
+			let add_by_uid = document.getElementById("add_by_uid");
+			let wl_add_user_id = document.getElementById("wl_add_user_id");
+
+			let add_by_ip = document.getElementById("add_by_ip");
+			let wl_add_ip = document.getElementById("wl_add_ip");
+
+			let add_by_username = document.getElementById("add_by_username");
+			let wl_add_username = document.getElementById("wl_add_username");
+
+			let add_by_world_name = document.getElementById("add_by_world_name");
+			let wl_add_world_name = document.getElementById("wl_add_world_name");
+
+			let wl_sub_user = document.getElementById("wl_sub_user");
+			let wl_sub_ip = document.getElementById("wl_sub_ip");
+			let wl_sub_world = document.getElementById("wl_sub_world");
+
+			save_status.addEventListener("click", async function() {
+				submittingStatus.features = true;
+				save_status.disabled = true;
+				fetch("/api/admin/whitelist", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						type: "features",
+						changes: updatedWhitelistFeatures
+					})
+				}).then(function() {
+					updatedWhitelistFeatures = {};
+				}).catch(function() {
+					alert("Failed to update whitelist features");
+				}).finally(function() {
+					save_status.disabled = false;
+				});
+			});
+
+			wl_sub_user.addEventListener("click", function() {
+				let updates = updatedWhitelistOptions.user;
+				let additions = addedWhitelistOptions.user;
+				let removals = removedWhitelistOptions.user;
+
+				let setAnimation = animateButton(wl_sub_user);
+
+				submittingStatus.whitelistUser = true;
+				wl_sub_user.disabled = true;
+
+				fetch("/api/admin/whitelist", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						type: "options",
+						category: "user",
+						changes: updates,
+						additions: additions,
+						removals: removals
+					})
+				}).then(async function(resp) {
+					let status = await resp.json();
+					let additions = status.additions;
+					if(additions) {
+						for(let id in additions) {
+							let row = pendingAddedRows[id];
+							let newId = additions[id];
+							if(row) {
+								row.row.dataset.wlEntryId = newId;
+								row.columns["id"].innerText = newId;
+							}
+							delete pendingAddedRows[id];
+						}
+					}
+					updatedWhitelistOptions.user = {};
+					addedWhitelistOptions.user = {};
+					removedWhitelistOptions.user = {};
+					setAnimation(false);
+				}).catch(function() {
+					alert("Failed to update options for 'user'");
+					setAnimation(true);
+				}).finally(function() {
+					wl_sub_user.disabled = false;
+				});
+			});
+
+			wl_sub_ip.addEventListener("click", function() {
+				let updates = updatedWhitelistOptions.ip;
+				let additions = addedWhitelistOptions.ip;
+				let removals = removedWhitelistOptions.ip;
+
+				let setAnimation = animateButton(wl_sub_ip);
+
+				submittingStatus.whitelistIp = true;
+				wl_sub_ip.disabled = true;
+
+				fetch("/api/admin/whitelist", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						type: "options",
+						category: "ip",
+						changes: updates,
+						additions: additions,
+						removals: removals
+					})
+				}).then(async function(resp) {
+					let status = await resp.json();
+					let additions = status.additions;
+					if(additions) {
+						for(let id in additions) {
+							let row = pendingAddedRows[id];
+							let newId = additions[id];
+							if(row) {
+								row.row.dataset.wlEntryId = newId;
+								row.columns["id"].innerText = newId;
+							}
+							delete pendingAddedRows[id];
+						}
+					}
+					updatedWhitelistOptions.ip = {};
+					addedWhitelistOptions.ip = {};
+					removedWhitelistOptions.ip = {};
+					setAnimation(false);
+				}).catch(function() {
+					alert("Failed to update options for 'ip'");
+					setAnimation(true);
+				}).finally(function() {
+					wl_sub_ip.disabled = false;
+				});
+			});
+
+			wl_sub_world.addEventListener("click", function() {
+				let updates = updatedWhitelistOptions.world;
+				let additions = addedWhitelistOptions.world;
+				let removals = removedWhitelistOptions.world;
+
+				let setAnimation = animateButton(wl_sub_world);
+
+				submittingStatus.whitelistWorld = true;
+				wl_sub_world.disabled = true;
+
+				fetch("/api/admin/whitelist", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						type: "options",
+						category: "world",
+						changes: updates,
+						additions: additions,
+						removals: removals
+					})
+				}).then(async function(resp) {
+					let status = await resp.json();
+					let additions = status.additions;
+					if(additions) {
+						for(let id in additions) {
+							let row = pendingAddedRows[id];
+							let newId = additions[id];
+							if(row) {
+								row.row.dataset.wlEntryId = newId;
+								row.columns["id"].innerText = newId;
+							}
+							delete pendingAddedRows[id];
+						}
+					}
+					updatedWhitelistOptions.world = {};
+					addedWhitelistOptions.world = {};
+					removedWhitelistOptions.world = {};
+					setAnimation(false);
+				}).catch(function() {
+					alert("Failed to update options for 'world'");
+					setAnimation(true);
+				}).finally(function() {
+					wl_sub_world.disabled = false;
+				});
+			});
+
+			add_by_uid.addEventListener("click", async function() {
+				let username = await getUsernameFromId(wl_add_user_id.value);
+				if(!username) {
+					alert("Could not resolve uid");
+					return;
+				}
+				let newId = "-" + tempIdMax++;
+				let checkedHeaders = Array.from(new Set(whitelistHeaders).difference(new Set(uncheckedByDefaultWhitelistHeaders)));
+				let optMap = Object.fromEntries(checkedHeaders.map(h => [h, true]));
+
+				let newRow = addDataToWhitelistTable(document.getElementById("wl_user").querySelector(".whitelist_table>tbody"), "user", {
+					id: newId,
+					user_id: wl_add_user_id.value,
+					username: username,
+					id_type: "user",
+					...optMap
+				}, true);
+				pendingAddedRows[newId] = newRow;
+
+				addedWhitelistOptions["user"][newId] ??= {
+					options: optMap,
+					user_id: wl_add_user_id.value
+				};
+			});
+
+			add_by_username.addEventListener("click", async function() {
+				let user_id = await getIdFromUsername(wl_add_username.value);
+				if(!user_id) {
+					alert("Could not resolve username");
+					return;
+				}
+				let newId = "-" + tempIdMax++;
+				let checkedHeaders = Array.from(new Set(whitelistHeaders).difference(new Set(uncheckedByDefaultWhitelistHeaders)));
+				let optMap = Object.fromEntries(checkedHeaders.map(h => [h, true]));
+
+				let newRow = addDataToWhitelistTable(document.getElementById("wl_user").querySelector(".whitelist_table>tbody"), "user", {
+					id: newId,
+					user_id: String(user_id),
+					username: wl_add_username.value,
+					id_type: "user",
+					...optMap
+				}, true);
+				pendingAddedRows[newId] = newRow;
+
+				addedWhitelistOptions["user"][newId] ??= {
+					options: optMap,
+					user_id: user_id
+				};
+			});
+
+			add_by_ip.addEventListener("click", async function() {
+				let ip = wl_add_ip.value;
+
+				let newId = "-" + tempIdMax++;
+				let checkedHeaders = Array.from(new Set(whitelistHeaders).difference(new Set(uncheckedByDefaultWhitelistHeaders)));
+				let optMap = Object.fromEntries(checkedHeaders.map(h => [h, true]));
+
+				let newRow = addDataToWhitelistTable(document.getElementById("wl_ip").querySelector(".whitelist_table>tbody"), "ip", {
+					id: newId,
+					ip: ip,
+					id_type: "ip",
+					...optMap
+				}, true);
+				pendingAddedRows[newId] = newRow;
+
+				addedWhitelistOptions["ip"][newId] ??= {
+					options: optMap,
+					ip: ip
+				};
+			});
+
+			add_by_world_name.addEventListener("click", async function() {
+				let world_name = wl_add_world_name.value;
+
+				let newId = "-" + tempIdMax++;
+				let checkedHeaders = Array.from(new Set(whitelistHeaders).difference(new Set(uncheckedByDefaultWhitelistHeaders)));
+				let optMap = Object.fromEntries(checkedHeaders.map(h => [h, true]));
+
+				let newRow = addDataToWhitelistTable(document.getElementById("wl_world").querySelector(".whitelist_table>tbody"), "world", {
+					id: newId,
+					world_name: world_name,
+					id_type: "world",
+					...optMap
+				}, true);
+				pendingAddedRows[newId] = newRow;
+
+				addedWhitelistOptions["world"][newId] ??= {
+					options: optMap,
+					world_name: world_name
+				};
+			});
+
+			wl_ld_user.addEventListener("click", wlLoadUser);
+			wl_lda_user.addEventListener("click", async function() {
+				for(let i = 0; i < 999; i++) {
+					let ld = await wlLoadUser();
+					if(!ld) break;
+					await { then: (res) => setTimeout(res, 1000 / 4) };
+				}
+			});
+
+			wl_ld_ip.addEventListener("click", wlLoadIp);
+			wl_lda_ip.addEventListener("click", async function() {
+				for(let i = 0; i < 999; i++) {
+					let ld = await wlLoadIp();
+					if(!ld) break;
+					await { then: (res) => setTimeout(res, 1000 / 4) };
+				}
+			});
+
+			wl_ld_world.addEventListener("click", wlLoadWorld);
+			wl_lda_world.addEventListener("click", async function() {
+				for(let i = 0; i < 999; i++) {
+					let ld = await wlLoadWorld();
+					if(!ld) break;
+					await { then: (res) => setTimeout(res, 1000 / 4) };
+				}
+			});
+		}
+
+		async function fetchWhitelistData(after, limit, id_type, withStatus) {
+			let params = new URLSearchParams({ after, limit, id_type });
+			if(withStatus) {
+				params.append("include_status", "1");
+			}
+			let endpoint = "/api/admin/whitelist?" + params;
+			let data = await fetch(endpoint, {
+				method: "GET"
+			});
+			return await data.json();
+		}
+
+		async function getIdFromUsername(username) {
+			let params = new URLSearchParams({ username });
+			let endpoint = "/api/admin/user?" + params;
+			let data = await fetch(endpoint, {
+				method: "GET"
+			});
+			if(data.status >= 400 && data.status < 500) {
+				return null;
+			}
+			let response = await data.text();
+			return response;
+		}
+
+		async function getUsernameFromId(uid) {
+			let params = new URLSearchParams({ uid });
+			let endpoint = "/api/admin/user?" + params;
+			let data = await fetch(endpoint, {
+				method: "GET"
+			});
+			if(data.status >= 400 && data.status < 500) {
+				return null;
+			}
+			let response = await data.text();
+			return response;
+		}
+
+		async function preload() {
+			let featureData = await fetchWhitelistData(0, 0, null, true);
+			let userData = await fetchWhitelistData(0, 50, "user", false);
+			let ipData = await fetchWhitelistData(0, 50, "ip", false);
+			let worldData = await fetchWhitelistData(0, 50, "world", false);
+
+			let wlFeatures = document.getElementById("whitelist_features");
+
+			let userRules = userData.rules;
+			let ipRules = ipData.rules;
+			let worldRules = worldData.rules;
+
+			maxCategoryId.user = getMaxIdInArray(userRules, "id");
+			maxCategoryId.ip = getMaxIdInArray(ipRules, "id");
+			maxCategoryId.world = getMaxIdInArray(worldRules, "id");
+
+			for(let statusCode in featureData.status) {
+				let status = featureData.status[statusCode];
+				let desc = statusLookup[status] || "";
+
+				let eLabel = document.createElement("label");
+				eLabel.innerText = `${statusCode}: `;
+
+				let dropdownOpts = [
+					["public", "Public"],
+					["authenticated", "Authenticated"],
+					["whitelisted", "Whitelisted"],
+					["disabled", "Disabled"]
+				];
+				let optIdx = dropdownOpts.findIndex(e => e[0] == status) ?? -1;
+				let eList = buildDropdown(dropdownOpts);
+				eList.selectedIndex = optIdx;
+				eList.addEventListener("input", function(evt) {
+					updatedWhitelistFeatures[statusCode] = evt.target.value;
+				});
+
+				let eRow = document.createElement("div");
+				eRow.appendChild(eLabel);
+				eRow.appendChild(eList);
+
+				wlFeatures.appendChild(eRow);
+			}
+
+			populateWhitelistTable(document.getElementById("wl_user"), "user", userRules);
+			populateWhitelistTable(document.getElementById("wl_ip"), "ip", ipRules);
+			populateWhitelistTable(document.getElementById("wl_world"), "world", worldRules);
+		}
+
+		function animateButton(buttonElm) {
+			buttonElm.style.border = "solid 2px blue";
+			return (isErr) => {
+				if(!isErr) {
+					buttonElm.style.border = "solid 2px #008000";
+				}
+				if(isErr) {
+					let state = 0;
+					let render = () => {
+						buttonElm.style.border = "solid 2px #FF0000";
+						setTimeout(() => {
+							buttonElm.style.border = "";
+							state++;
+							if(state >= 5) return;
+							setTimeout(render, 180);
+						}, 200);
+					};
+					render();
+				} else {
+					let alpha = 255;
+					let render = () => {
+						buttonElm.style.borderColor = "#008000" + (alpha).toString(16).padStart(2,0);
+						alpha -= 10;
+						if(alpha <= 0) {
+							buttonElm.style.border = "";
+							return;
+						}
+						requestAnimationFrame(render);
+					};
+					requestAnimationFrame(render);
+				}
+			};
+		}
+
+		preload();
+		initializeEvents();
+	</script>
+{% endblock %}

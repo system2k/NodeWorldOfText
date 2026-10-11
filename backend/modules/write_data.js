@@ -1,11 +1,15 @@
-var utils = require("../utils/utils.js");
-var sanitize_color = utils.sanitize_color;
-var advancedSplit = utils.advancedSplit;
-var san_nbr = utils.san_nbr;
+var {
+	sanitize_color,
+	advancedSplit,
+	san_nbr,
+	wl_filter_char,
+} = require("../utils/utils.js");
 
 var restrictions = require("../utils/restrictions.js");
 var checkCoalition = restrictions.checkCoalition;
 var getRestrictions = restrictions.getRestrictions;
+
+var { checkWhitelistFeature } = require("../utils/whitelist.js");
 
 var enums = require("../utils/enums.js");
 
@@ -15,7 +19,7 @@ function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
 
-function partitionMultiEdit(editOffset, tileX, tileY, char, color, bgColor, editId) {
+function partitionMultiEdit(editOffset, tileX, tileY, char, color, bgColor, editId, wl_can_use_picto, wl_can_use_dots, wl_can_use_nonletters) {
 	var res = [];
 	for(var i = 0; i < char.length; i++) {
 		var subChar = char[i];
@@ -23,6 +27,8 @@ function partitionMultiEdit(editOffset, tileX, tileY, char, color, bgColor, edit
 		var subBgColor = bgColor;
 		if(Array.isArray(color)) subColor = color[i];
 		if(Array.isArray(bgColor)) subBgColor = bgColor[i];
+
+		subChar = wl_filter_char(char, wl_can_use_picto, wl_can_use_dots, wl_can_use_nonletters)
 		
 		var offset = editOffset + i;
 		if(offset < 0 || offset >= CONST.tileArea) continue;
@@ -129,6 +135,13 @@ module.exports = async function(data, server, params) {
 	if(color_cell == enums.perm.member && !is_member) can_color_cell = false;
 	if(color_cell == enums.perm.owner && !is_owner) can_color_cell = false;
 
+	var wl_can_write = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "write", server);
+	var wl_can_color = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "color", server);
+
+	var wl_can_use_picto = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "uc_picto", server);
+	var wl_can_use_dots = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "uc_dot", server);
+	var wl_can_use_nonletters = checkWhitelistFeature(user.id, user.authenticated, ipAddress, world.name, "uc_nonletter", server);
+
 	var edits = data.edits;
 	if(!edits) return emptyWriteResponse;
 	if(!Array.isArray(edits)) return emptyWriteResponse;
@@ -160,28 +173,33 @@ module.exports = async function(data, server, params) {
 
 	var validEdits = [];
 
-	for(var i = 0; i < edits.length; i++) {
-		var edit = edits[i];
+	for(let i = 0; i < edits.length; i++) {
+		let edit = edits[i];
 		if(!edit || !Array.isArray(edit)) continue;
 		
-		var tileY = san_nbr(edit[0]);
-		var tileX = san_nbr(edit[1]);
-		var charY = san_nbr(edit[2]);
-		var charX = san_nbr(edit[3]);
-		var date = edit[4];
-		var char = edit[5];
-		var editId = san_nbr(edit[6]);
-		var color = edit[7];
-		var bgColor = edit[8];
+		let tileY = san_nbr(edit[0]);
+		let tileX = san_nbr(edit[1]);
+		let charY = san_nbr(edit[2]);
+		let charX = san_nbr(edit[3]);
+		let date = edit[4];
+		let char = edit[5];
+		let editId = san_nbr(edit[6]);
+		let color = edit[7];
+		let bgColor = edit[8];
 
 		if(typeof char != "string") continue;
 
-		var editOffset = charY * CONST.tileCols + charX;
+		if(!wl_can_write) {
+			rejected[editId] = enums.write.zeroRateLimit;
+			continue;
+		}
+
+		let editOffset = charY * CONST.tileCols + charX;
 		if(editOffset < 0 || editOffset >= CONST.tileArea) continue;
 
-		var charRatePerSecond = defaultCharRatePerSecond;
+		let charRatePerSecond = defaultCharRatePerSecond;
 
-		var rrate = rate_limiter.checkCharrateRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name, tileX, tileY);
+		let rrate = rate_limiter.checkCharrateRestr(restr, ipAddressVal, ipAddressFam, isGrouped, world.name, tileX, tileY);
 		if(rrate != null) {
 			charRatePerSecond = rrate;
 		}
@@ -208,7 +226,7 @@ module.exports = async function(data, server, params) {
 			break;
 		}
 
-		var tileStr = world.id + "," + tileY + "," + tileX;
+		let tileStr = world.id + "," + tileY + "," + tileX;
 		if(!tiles[tileStr]) {
 			if(!rate_limiter.checkTileRateLimit(tileLimiter, tileRatePerSecond, tileX, tileY, world.id)) {
 				rejected[editId] = enums.write.tileRateLimit;
@@ -227,6 +245,11 @@ module.exports = async function(data, server, params) {
 			bgColor = -1;
 		}
 
+		if(!wl_can_color) {
+			color = 0;
+			bgColor = -1;
+		}
+
 		if(colorPaletteEnabled && colorPalette && !is_member) {
 			if(!isInListBinaryLookup(colorPalette, color)) {
 				color = colorPalette[0];
@@ -239,13 +262,15 @@ module.exports = async function(data, server, params) {
 			}
 		}
 
-		var testChar = advancedSplit(char);
+		let testChar = advancedSplit(char);
 		if(testChar.length == 0) { // empty edit
 			char = "\0";
-		} else if(char.length > 1 && (user.superuser || is_member || is_owner)) { // multi-char edit
-			validEdits.push(...partitionMultiEdit(editOffset, tileX, tileY, testChar, color, bgColor, editId));
+		} else if(testChar.length > 1 && (user.superuser || is_member || is_owner)) { // multi-char edit
+			validEdits.push(...partitionMultiEdit(editOffset, tileX, tileY, testChar, color, bgColor, editId, wl_can_use_picto, wl_can_use_dots, wl_can_use_nonletters));
 			continue;
 		}
+
+		char = wl_filter_char(char, wl_can_use_picto, wl_can_use_dots, wl_can_use_nonletters);
 
 		charY = Math.floor(editOffset / CONST.tileCols);
 		charX = editOffset % CONST.tileCols;

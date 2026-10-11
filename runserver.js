@@ -31,34 +31,12 @@ const restrictions = require("./backend/utils/restrictions.js");
 const frameUtils   = require("./backend/framework/utils.js");
 const serverUtil   = require("./backend/framework/server.js");
 const templates    = require("./backend/framework/templates.js");
+const captcha      = require("./backend/subsystems/captcha.js");
+var { checkWhitelistFeature } = require("./backend/utils/whitelist.js");
 
-var trimHTML             = utils.trimHTML;
-var create_date          = utils.create_date;
 var san_nbr              = utils.san_nbr;
-var san_dp               = utils.san_dp;
-var checkURLParam        = utils.checkURLParam;
-var removeLastSlash      = utils.removeLastSlash;
-var ar_str_trim          = utils.ar_str_trim;
-var ar_str_decodeURI     = utils.ar_str_decodeURI;
-var http_time            = utils.http_time;
-var encode_base64        = utils.encode_base64;
-var decode_base64        = utils.decode_base64;
 var process_error_arg    = utils.process_error_arg;
-var tile_coord           = utils.tile_coord;
-var calculateTimeDiff    = utils.calculateTimeDiff;
-var compareNoCase        = utils.compareNoCase;
-var resembles_int_number = utils.resembles_int_number;
-var TerminalMessage      = utils.TerminalMessage;
-var encodeCharProt       = utils.encodeCharProt;
-var decodeCharProt       = utils.decodeCharProt;
-var change_char_in_array = utils.change_char_in_array;
-var html_tag_esc         = utils.html_tag_esc;
 var dump_dir             = utils.dump_dir;
-var arrayIsEntirely      = utils.arrayIsEntirely;
-var normalizeCacheTile   = utils.normalizeCacheTile;
-var checkDuplicateCookie = utils.checkDuplicateCookie;
-var advancedSplit        = utils.advancedSplit;
-var filterEdit           = utils.filterEdit;
 var toHex64              = utils.toHex64;
 var toInt64              = utils.toInt64;
 
@@ -116,7 +94,9 @@ var sql_edits_init = "./backend/edits.sql";
 var serverSettings = {
 	announcement: "",
 	chatGlobalEnabled: "1",
-	chatGlobalNoAnon: "0"
+	chatGlobalNoAnon: "0",
+	chatAgeRestriction: "0",
+	captchaEnabled: "0"
 };
 var serverSettingsStatus = {};
 
@@ -133,6 +113,7 @@ var debugLogging = false;
 var testUviasIds = false;
 var serverLoaded = false;
 var isStopping = false;
+var networkStatsActive = true;
 
 var closed_client_limit = 1000 * 60 * 20; // 20 min
 var ws_req_per_second = 1000;
@@ -168,6 +149,15 @@ CONST.tileArea = CONST.tileCols * CONST.tileRows;
 // tile cache for fetching and updating
 // 3 levels: world_id -> tile_y -> tile_x
 var memTileCache = {};
+
+// whitelist cache (Map); gets overwritten after being loaded from the db
+var siteWhitelistCache = {
+	ip: new Map(),
+	user: new Map(),
+	world: new Map(),
+	idCategoryFeatureMap: new Map() // map from id => [category, feature]
+};
+var siteWhitelistStatus = new Map();
 
 var clientVersion = "";
 var ranks_cache = { users: {} };
@@ -538,6 +528,17 @@ function setupZipLog() {
 console.log("Loading page files");
 
 var pages = {
+	api: {
+		admin: {
+			restrictions: require("./backend/api/admin/restrictions.js"),
+			whitelist: require("./backend/api/admin/whitelist.js"),
+			user: require("./backend/api/admin/user.js")
+		},
+		captcha: {
+			altcha: require("./backend/api/captcha/altcha.js"),
+			status: require("./backend/api/captcha/status.js")
+		}
+	},
 	accounts: {
 		configure: require("./backend/pages/accounts/configure.js"),
 		download: require("./backend/pages/accounts/download.js"),
@@ -557,9 +558,6 @@ var pages = {
 		verify_email: require("./backend/pages/accounts/verify_email.js")
 	},
 	admin: {
-		api: {
-			restrictions: require("./backend/pages/admin/api/restrictions.js")
-		},
 		administrator: require("./backend/pages/admin/administrator.js"),
 		backgrounds: require("./backend/pages/admin/backgrounds.js"),
 		manage_ranks: require("./backend/pages/admin/manage_ranks.js"),
@@ -569,13 +567,13 @@ var pages = {
 		users_by_id: require("./backend/pages/admin/users_by_id.js"),
 		users_by_username: require("./backend/pages/admin/users_by_username.js"),
 		restrictions: require("./backend/pages/admin/restrictions.js"),
+		whitelist: require("./backend/pages/admin/whitelist.js"),
 		shell: require("./backend/pages/admin/shell.js")
 	},
 	other: {
 		ipaddress: require("./backend/pages/other/ipaddress.js"),
 		load_backgrounds: require("./backend/pages/other/load_backgrounds.js"),
-		random_color: require("./backend/pages/other/random_color.js"),
-		test: require("./backend/pages/other/test.js")
+		random_color: require("./backend/pages/other/random_color.js")
 	},
 	"404": require("./backend/pages/404.js"),
 	activate_complete: require("./backend/pages/activate_complete.js"),
@@ -627,17 +625,8 @@ var subsystems = {
 	world_mgr: require("./backend/subsystems/world_mgr.js")
 };
 
-var sanitizeWorldname = subsystems.world_mgr.sanitizeWorldname;
-var modifyWorldProp = subsystems.world_mgr.modifyWorldProp;
-var commitAllWorlds = subsystems.world_mgr.commitAllWorlds;
 var releaseWorld = subsystems.world_mgr.releaseWorld;
 var getOrCreateWorld = subsystems.world_mgr.getOrCreateWorld;
-var fetchWorldMembershipsByUserId = subsystems.world_mgr.fetchWorldMembershipsByUserId;
-var fetchOwnedWorldsByUserId = subsystems.world_mgr.fetchOwnedWorldsByUserId;
-var revokeMembershipByWorldName = subsystems.world_mgr.revokeMembershipByWorldName;
-var promoteMembershipByWorldName = subsystems.world_mgr.promoteMembershipByWorldName;
-var claimWorldByName = subsystems.world_mgr.claimWorldByName;
-var renameWorld = subsystems.world_mgr.renameWorld;
 var canViewWorld = subsystems.world_mgr.canViewWorld;
 var getWorldNameFromCacheById = subsystems.world_mgr.getWorldNameFromCacheById;
 
@@ -890,6 +879,8 @@ async function initializeServer() {
 	await initialize_edits_db();
 	await initialize_image_db();
 	await initialize_mutes_db();
+	await initialize_site_whitelist_db();
+	await initialize_captcha_exempt_db();
 
 	global_data.db = db;
 	global_data.db_img = db_img;
@@ -1012,6 +1003,124 @@ async function initialize_ranks_db() {
 	for(var i = 0; i < user_ranks.length; i++) {
 		var ur = user_ranks[i];
 		ranks_cache.users[ur.userid] = ur.rank;
+	}
+}
+
+async function initialize_site_whitelist_db() {
+	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='site_whitelist'")) {
+		await db_misc.run(`
+			CREATE TABLE 'site_whitelist' (
+				id INTEGER PRIMARY KEY NOT NULL,
+				date_created INTEGER,
+				
+				user_id TEXT,
+				world_name TEXT,
+				ip TEXT,
+				id_type TEXT,
+				
+				write INTEGER NOT NULL DEFAULT 0,
+				load_tile INTEGER NOT NULL DEFAULT 0,
+				color INTEGER NOT NULL DEFAULT 0,
+				link INTEGER NOT NULL DEFAULT 0,
+				chat INTEGER NOT NULL DEFAULT 0,
+				chat_dm INTEGER NOT NULL DEFAULT 0,
+				load_chat INTEGER NOT NULL DEFAULT 0,
+				cmd INTEGER NOT NULL DEFAULT 0,
+				profile INTEGER NOT NULL DEFAULT 0,
+				claim INTEGER NOT NULL DEFAULT 0,
+				promote INTEGER NOT NULL DEFAULT 0,
+				uc_picto INTEGER NOT NULL DEFAULT 0,
+				uc_dot INTEGER NOT NULL DEFAULT 0,
+				uc_nonletter INTEGER NOT NULL DEFAULT 0,
+				no_captcha INTEGER NOT NULL DEFAULT 0,
+				few_captcha INTEGER NOT NULL DEFAULT 0,
+				pchat_anon INTEGER NOT NULL DEFAULT 0
+			)
+		`);
+	}
+	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='site_whitelist_status'")) {
+		await db_misc.run(`
+			CREATE TABLE 'site_whitelist_status' (
+				code TEXT,
+				status TEXT
+			)
+		`);
+		await db_misc.run(`
+			INSERT INTO site_whitelist_status (code, status)
+			VALUES
+			('write', 'public'),
+			('load_tile', 'public'),
+			('color', 'public'),
+			('link', 'public'),
+			('chat', 'public'),
+			('chat_dm', 'public'),
+			('load_chat', 'public'),
+			('cmd', 'public'),
+			('profile', 'public'),
+			('claim', 'public'),
+			('promote', 'public'),
+			('uc_picto', 'public'),
+			('uc_dot', 'public'),
+			('uc_nonletter', 'public'),
+			('no_captcha', 'whitelisted'),
+			('few_captcha', 'public'),
+			('pchat_anon', 'whitelisted')
+		`);
+	}
+
+	// fetch all whitelist rows including rowid for identification
+	let wl_list = await db_misc.all("SELECT rowid AS id, * FROM site_whitelist");
+
+	// fetch status settings
+	let wl_status = await db_misc.all("SELECT code, status FROM site_whitelist_status");
+
+	siteWhitelistStatus.clear();
+	siteWhitelistCache.user.clear();
+	siteWhitelistCache.ip.clear();
+	siteWhitelistCache.world.clear();
+	siteWhitelistCache.idCategoryFeatureMap.clear();
+
+	wl_status.forEach(function(row) {
+		siteWhitelistStatus.set(row.code, row.status);
+	});
+
+	for(let i = 0; i < wl_list.length; i++) {
+		let entry = wl_list[i];
+		if(!entry) continue;
+		let id = entry.id;
+		let id_type = entry.id_type;
+
+		let user_id = entry.user_id;
+		let world_name = entry.world_name;
+		let ip = entry.ip;
+
+		if(id_type == "user") {
+			siteWhitelistCache.user.set(user_id, entry);
+			siteWhitelistCache.idCategoryFeatureMap.set(id, [id_type, user_id]);
+		} else if(id_type == "ip") {
+			siteWhitelistCache.ip.set(ip, entry);
+			siteWhitelistCache.idCategoryFeatureMap.set(id, [id_type, ip]);
+		} else if(id_type == "world") {
+			siteWhitelistCache.world.set(world_name, entry);
+			siteWhitelistCache.idCategoryFeatureMap.set(id, [id_type, world_name]);
+		}
+	}
+}
+
+async function initialize_captcha_exempt_db() {
+	if(!await db_misc.get("SELECT name FROM sqlite_master WHERE type='table' AND name='captcha_exempt'")) {
+		await db_misc.run(`
+			CREATE TABLE 'captcha_exempt' (
+				id INTEGER PRIMARY KEY NOT NULL,
+				ip TEXT UNIQUE,
+				date_created INTEGER,
+				captcha_type TEXT,
+				user_id TEXT
+			)
+		`);
+		await db_misc.run(`
+			CREATE INDEX ce_ip ON captcha_exempt (ip)
+		`);
 	}
 }
 
@@ -1141,6 +1250,12 @@ function createEndpoints(server) {
 	server.registerEndpoint("home", pages.home);
 	server.registerEndpoint(".well-known/*", null);
 
+	server.registerEndpoint("api/admin/restrictions", pages.api.admin.restrictions);
+	server.registerEndpoint("api/admin/whitelist", pages.api.admin.whitelist);
+	server.registerEndpoint("api/admin/user", pages.api.admin.user);
+	server.registerEndpoint("api/captcha/altcha", pages.api.captcha.altcha);
+	server.registerEndpoint("api/captcha/status", pages.api.captcha.status);
+
 	server.registerEndpoint("accounts/login", pages.accounts.login);
 	server.registerEndpoint("accounts/logout", pages.accounts.logout);
 	server.registerEndpoint("accounts/register", pages.accounts.register);
@@ -1177,7 +1292,7 @@ function createEndpoints(server) {
 	server.registerEndpoint("administrator/monitor/", (settings && settings.monitor && settings.monitor.redirect) ? settings.monitor.redirect : null);
 	server.registerEndpoint("administrator/shell", pages.admin.shell);
 	server.registerEndpoint("administrator/restrictions", pages.admin.restrictions, { binary_post_data: true });
-	server.registerEndpoint("administrator/api/restrictions", pages.admin.api.restrictions);
+	server.registerEndpoint("administrator/whitelist", pages.admin.whitelist, { binary_post_data: true });
 
 	server.registerEndpoint("script_manager/", pages.script_manager);
 	server.registerEndpoint("script_manager/edit/*", pages.script_edit);
@@ -1188,7 +1303,6 @@ function createEndpoints(server) {
 
 	server.registerEndpoint("other/random_color", pages.other.random_color, { no_login: true });
 	server.registerEndpoint("other/backgrounds/*", pages.other.load_backgrounds, { no_login: true });
-	server.registerEndpoint("other/test/*", pages.other.test, { no_login: true });
 	server.registerEndpoint("other/ipaddress", pages.other.ipaddress);
 
 	server.registerEndpoint("static/*", pages.static, { no_login: true });
@@ -1252,6 +1366,11 @@ function parseToken(token) {
 }
 
 async function getUserIdFromUsername(username) {
+	const uidPrefix = "uid~";
+	if(username.startsWith(uidPrefix)) {
+		let uid = username.slice(uidPrefix.length);
+		return getUsernameFromUserId(uid);
+	}
 	if(accountSystem == "uvias") {
 		var db_user = await uvias.get("SELECT to_hex(uid) AS uid FROM accounts.users WHERE lower(username)=lower($1::text)", username);
 		if(!db_user) return null;
@@ -1325,10 +1444,11 @@ async function getUserInfo(cookies, is_websocket, dispatch) {
 			user = JSON.parse(s_data.session_data);
 			if(cookies.csrftoken == user.csrftoken) { // verify csrftoken
 				user.authenticated = true;
-				var userauth = (await db.get("SELECT level, is_active, email FROM auth_user WHERE id=?", user.id));
+				var userauth = (await db.get("SELECT level, is_active, email, date_joined FROM auth_user WHERE id=?", user.id));
 				var level = userauth.level;
 				user.is_active = !!userauth.is_active;
 				user.email = userauth.email;
+				user.date_joined = userauth.date_joined;
 
 				user.operator = level == 3;
 				user.superuser = level == 2 || level == 3;
@@ -1360,7 +1480,7 @@ async function getUserInfo(cookies, is_websocket, dispatch) {
 			var session = await uvias.get("SELECT * FROM accounts.get_session($1::bigint, $2::bytea)", [uid, session_id]);
 			if(session) {
 				// both guests and users are included
-				var user_account = await uvias.get("SELECT to_hex(uid) as uid, username, rank_id FROM accounts.users WHERE uid=$1::bigint", uid);
+				var user_account = await uvias.get("SELECT to_hex(uid) as uid, username, rank_id, created FROM accounts.users WHERE uid=$1::bigint", uid);
 				if(user_account) {
 					success = true;
 					var session_expire = session.expires.getTime();
@@ -1378,6 +1498,7 @@ async function getUserInfo(cookies, is_websocket, dispatch) {
 					user.authenticated = true;
 					user.display_username = user_account.username;
 					user.uv_rank = user_account.rank_id;
+					user.date_joined = user_account.created.getTime();
 					if(links_local) {
 						user.is_active = links_local.email_verified;
 						user.email = links_local.email;
@@ -1402,7 +1523,6 @@ async function getUserInfo(cookies, is_websocket, dispatch) {
 						user.staff = level == 1 || level == 2 || level == 3;
 					}
 
-					// TODO: might want to add a public script repository for OWOT and remove/change this
 					if(user.staff && !is_websocket) {
 						user.scripts = await db.all("SELECT * FROM scripts WHERE owner_id=? AND enabled=1", user.id);
 					} else {
@@ -1757,23 +1877,23 @@ async function uvias_init() {
 
 function wsSend(socket, data) {
 	if(socket.readyState !== WebSocket.OPEN) return;
-	var error = false;
+	var handled = false;
 	socket.sdata.messageBackpressure++;
 	try {
 		socket.send(data, function() {
-			if(!error && socket.sdata) {
+			if(!handled && socket.sdata) {
 				socket.sdata.messageBackpressure--;
 			}
-			error = true;
+			handled = true;
 			if(socket.sdata.methods.updateNetworkStats) {
 				socket.sdata.methods.updateNetworkStats();
 			}
 		});
 	} catch(e) {
-		if(!error && socket.sdata) {
+		if(!handled && socket.sdata) {
 			socket.sdata.messageBackpressure--;
 		}
-		error = true;
+		handled = true;
 	}
 }
 
@@ -1887,7 +2007,7 @@ function evaluateIpAddress(remIp, realIp, cfIp) {
 }
 
 var ws_limits = { // [amount per ip, per ms, minimum ms cooldown]
-	chat:			[256, 1000, 0], // rate-limiting handled separately
+	chat:			[150, 1000, 0], // rate-limiting handled separately
 	chathistory:	[4, 500, 0],
 	clear_tile:		[512, 1000, 0],
 	cmd_opt:		[10, 1000, 0],
@@ -1994,7 +2114,9 @@ async function manageWebsocketConnection(ws, req) {
 		chat_blocks: null,
 		center: [0, 0],
 		boundary: null,
-		localFilter: true
+		localFilter: true,
+		canUseCmd: true,
+		requireCaptcha: false
 	};
 
 	var parsedURL = new URL(req.url, "ws://example.com/ws");
@@ -2007,7 +2129,7 @@ async function manageWebsocketConnection(ws, req) {
 	var bytesWritten = 0;
 	var bytesRead = 0;
 
-	var pre_queue = [];
+	var preQueue = [];
 	var world = null;
 	var clientId = void 0;
 	var worldObj = null;
@@ -2087,10 +2209,28 @@ async function manageWebsocketConnection(ws, req) {
 		evictClient();
 	});
 
-	// TODO: may not fire in all cases
 	function updateNetworkStats() {
-		var b_out = req.socket.bytesWritten;
-		var b_in = req.socket.bytesRead;
+		let b_out = 0;
+		let b_in = 0;
+
+		if(networkStatsActive) {
+			let a = performance.now();
+			b_out = req.socket.bytesWritten;
+			b_in = req.socket.bytesRead;
+			let b = performance.now();
+			let diff = b - a;
+			if(diff > 5) {
+				console.warn("Disabled network stats due to performance");
+				networkStatsActive = false;
+			}
+		}
+
+		if(req.socket.writableLength > 50000000) {
+			console.log(`Evicting client due to excessive outbound buffer size: ${ws.sdata.ipAddress}`);
+			evictClient();
+			ws.close();
+		}
+
 		periodWSOutboundBytes += b_out - bytesWritten;
 		periodWSInboundBytes += b_in - bytesRead;
 		bytesWritten = b_out;
@@ -2100,7 +2240,6 @@ async function manageWebsocketConnection(ws, req) {
 
 	function send_ws(data) {
 		wsSend(ws, data);
-		updateNetworkStats();
 	}
 	function error_ws(errorCode, errorMsg) {
 		send_ws(JSON.stringify({
@@ -2156,7 +2295,11 @@ async function manageWebsocketConnection(ws, req) {
 	// adds data to a queue. this must be before any async calls and the message event
 	function pre_message(msg) {
 		if(!can_process_req()) return;
-		pre_queue.push(msg);
+		preQueue.push(msg);
+		if(preQueue.length > 30) {
+			evictClient();
+			ws.close();
+		}
 	}
 	ws.on("message", pre_message);
 
@@ -2165,6 +2308,7 @@ async function manageWebsocketConnection(ws, req) {
 	var cookies = parseCookie(req.headers.cookie);
 	var user = await getUserInfo(cookies, true);
 	if(ws.sdata.terminated) return;
+
 	var channel = new_token(7);
 	ws.sdata.channel = channel;
 
@@ -2180,6 +2324,7 @@ async function manageWebsocketConnection(ws, req) {
 
 	world = await getOrCreateWorld(location);
 	if(ws.sdata.terminated) return;
+
 	if(!world) {
 		return error_ws("NO_EXIST", "World does not exist");
 	}
@@ -2188,97 +2333,130 @@ async function manageWebsocketConnection(ws, req) {
 		memKey: search.get("key")
 	});
 	if(ws.sdata.terminated) return;
+
 	if(!permission) {
 		return error_ws("NO_PERM", "No permission");
 	}
 
-	ws.sdata.userClient = true; // client connection is now initialized
-	ws.sdata.keyQuery = search.get("key");
-	
-	ctx.world = world;
-
-	ws.sdata.world = world;
-	ws.sdata.user = user;
-
-	var chat_permission = world.feature.chat;
-	var can_chat = chat_permission == 0 || (chat_permission == 1 && permission.member) || (chat_permission == 2 && permission.owner);
-
-	worldObj = getWorldData(world.id);
-	if(!ws.sdata.terminated && !ws.sdata.hide_user_count) {
-		worldObj.user_count++;
+	var wl_can_cmd = checkWhitelistFeature(user.id, user.authenticated, ws.sdata.ipAddress, world.name, "cmd", global_data);
+	if(!wl_can_cmd) {
+		ws.sdata.canUseCmd = false;
 	}
 
-	var initial_user_count;
-	if(can_chat) {
-		initial_user_count = worldObj.user_count;
+	var captchaToken = search.get("captcha");
+	var captchaTest = captchaToken && captcha.reserveClientCaptchaToken(captchaToken, ws.sdata.ipAddress);
+
+	if(!captchaTest && await captcha.isRequired(global_data, user, ws.sdata.ipAddress, world.name)) {
+		send_ws(JSON.stringify({
+			kind: "captcha_required"
+		}));
+		evictClient();
+		ws.close(1003);
+	} else {
+		postInitClient();
 	}
 
-	clientId = generateClientId(world.id);
+	function postInitClient() {
+		if(ws.sdata.userClient) {
+			// already initialized
+			return;
+		}
+		ws.sdata.userClient = true; // client connection is now initialized
+		ws.sdata.keyQuery = search.get("key");
+		
+		ctx.world = world;
 
-	if(!client_ips[world.id]) {
-		client_ips[world.id] = {};
-	}
-	client_ips[world.id][clientId] = [ws.sdata.ipAddress, -1, false, -1];
-	// [Ip, Disconnect time, Is disconnected, Last chat time (on global)]
+		ws.sdata.world = world;
+		ws.sdata.user = user;
 
-	ws.sdata.clientId = clientId;
-	ws.sdata.chat_blocks = {
-		id: [],
-		user: [],
-		no_tell: false,
-		no_anon: false,
-		no_reg: false,
-		block_all: false
-	};
+		var chat_permission = world.feature.chat;
+		var can_chat = chat_permission == 0 || (chat_permission == 1 && permission.member) || (chat_permission == 2 && permission.owner);
 
-	broadcastMonitorEvent("Connect", ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + world.name + "', " + world.id + "]");
+		worldObj = getWorldData(world.id);
+		if(!ws.sdata.terminated && !ws.sdata.hide_user_count) {
+			worldObj.user_count++;
+		}
 
-	var sentClientId = clientId;
-	if(!can_chat) sentClientId = -1;
-	send_ws(JSON.stringify({
-		kind: "channel",
-		sender: channel,
-		id: sentClientId,
-		initial_user_count
-	}));
+		var initial_user_count;
+		if(can_chat) {
+			initial_user_count = worldObj.user_count;
+		}
 
-	if(client_cursor_pos[world.id]) {
-		var world_cursors = client_cursor_pos[world.id];
-		for(var csr_channel in world_cursors) {
-			var csr = world_cursors[csr_channel];
-			if(csr.hidden) continue;
-			var tileX = csr.tileX;
-			var tileY = csr.tileY;
-			var isCenter = -24 <= tileX && tileX <= 24 && -24 <= tileY && tileY <= 24;
-			if(!isCenter) continue;
-			send_ws(JSON.stringify({
-				kind: "cursor",
-				position: {
-					tileX: csr.tileX,
-					tileY: csr.tileY,
-					charX: csr.charX,
-					charY: csr.charY
-				},
-				channel: csr_channel
-			}));
+		clientId = generateClientId(world.id);
+
+		if(!client_ips[world.id]) {
+			client_ips[world.id] = {};
+		}
+		client_ips[world.id][clientId] = [ws.sdata.ipAddress, -1, false, -1];
+		// [Ip, Disconnect time, Is disconnected, Last chat time (on global)]
+
+		ws.sdata.clientId = clientId;
+		ws.sdata.chat_blocks = {
+			id: [],
+			user: [],
+			no_tell: false,
+			no_anon: false,
+			no_reg: false,
+			block_all: false
+		};
+
+		broadcastMonitorEvent("Connect", ws.sdata.ipAddress + ", [" + clientId + ", '" + channel + "'] connected to world ['" + world.name + "', " + world.id + "]");
+
+		var sentClientId = clientId;
+		if(!can_chat) sentClientId = -1;
+		send_ws(JSON.stringify({
+			kind: "channel",
+			sender: channel,
+			id: sentClientId,
+			initial_user_count
+		}));
+
+		if(client_cursor_pos[world.id]) {
+			var world_cursors = client_cursor_pos[world.id];
+			for(var csr_channel in world_cursors) {
+				var csr = world_cursors[csr_channel];
+				if(csr.hidden) continue;
+				var tileX = csr.tileX;
+				var tileY = csr.tileY;
+				var isCenter = -24 <= tileX && tileX <= 24 && -24 <= tileY && tileY <= 24;
+				if(!isCenter) continue;
+				send_ws(JSON.stringify({
+					kind: "cursor",
+					position: {
+						tileX: csr.tileX,
+						tileY: csr.tileY,
+						charX: csr.charX,
+						charY: csr.charY
+					},
+					channel: csr_channel
+				}));
+			}
+		}
+
+		ws.off("message", pre_message);
+		ws.on("message", handle_message);
+
+		// Some messages might have been received before the socket finished opening
+		if(preQueue.length > 0) {
+			for(var p = 0; p < preQueue.length; p++) {
+				handle_message(preQueue[p]);
+				preQueue.splice(p, 1);
+				p--;
+			}
 		}
 	}
 
-	ws.off("message", pre_message);
-	ws.on("message", handle_message);
 	async function handle_message(msg, isBinary) {
 		if(ws.sdata.terminated) return;
+		updateNetworkStats();
+		if(!can_process_req()) return;
 		if(!isBinary) {
 			msg = msg.toString("utf8");
 		}
-		updateNetworkStats();
-		if(!can_process_req()) return;
 		if(!(typeof msg == "string" || typeof msg == "object")) {
 			return;
 		}
-		if(msg.constructor == Buffer) { // TODO
-			/*msg = bin_packet.decode(msg);
-			if(!msg) return; // malformed packet*/
+		if(msg.constructor == Buffer) {
 			return;
 		}
 		// Parse JSON message
@@ -2307,13 +2485,17 @@ async function manageWebsocketConnection(ws, req) {
 			}
 			return send_ws(JSON.stringify(res)); 
 		}
+
 		// Begin calling a websocket function for the necessary request
 		if(!websockets.hasOwnProperty(kind)) {
 			return;
 		}
 		if(!can_process_req_kind(kindLimits, kind)) return;
 		function send(msg) {
-			msg.kind = kind;
+			// if the ws handler already defines 'kind', don't override it
+			if(!msg.kind) {
+				msg.kind = kind;
+			}
 			if(requestID !== null) msg.request = requestID;
 			send_ws(JSON.stringify(msg));
 		}
@@ -2339,14 +2521,6 @@ async function manageWebsocketConnection(ws, req) {
 			}));
 		}
 	}
-	// Some messages might have been received before the socket finished opening
-	if(pre_queue.length > 0) {
-		for(var p = 0; p < pre_queue.length; p++) {
-			handle_message(pre_queue[p]);
-			pre_queue.splice(p, 1);
-			p--;
-		}
-	}
 }
 
 async function start_server() {
@@ -2363,6 +2537,10 @@ async function start_server() {
 		broadcastUserCount();
 	}, 2000);
 
+	intv.resetNetworkCounter = setInterval(function() {
+		networkStatsActive = true;
+	}, 1000 * 60 * 10);
+
 	intv.traff_mon_net_interval = setInterval(function() {
 		var httpByteStat = httpServer.consumeByteTransferStats();
 		if(httpByteStat.out || httpByteStat.in) {
@@ -2376,6 +2554,10 @@ async function start_server() {
 				if(!ws.sdata) return;
 				if(ws.sdata.messageBackpressure > 1) {
 					broadcastMonitorEvent("Backpressure", "Warning - backpressure of " + ws.sdata.messageBackpressure + " (" + ws.sdata.ipAddress + ")");
+				}
+				if(ws.sdata.messageBackpressure > 250) {
+					ws.sdata.terminated = true;
+					ws.close();
 				}
 			});
 		}
@@ -2405,14 +2587,13 @@ async function start_server() {
 
 	wss = new WebSocket.Server({
 		server: httpServer.server,
-		perMessageDeflate: true,
 		maxPayload: 128000
 	});
 	global_data.wss = wss;
 
 	wss.on("connection", async function(ws, req) {
 		try {
-			manageWebsocketConnection(ws, req);
+			await manageWebsocketConnection(ws, req);
 		} catch(e) {
 			// failed to initialize
 			handle_error(e);
@@ -2487,6 +2668,8 @@ var global_data = {
 	getServerUptime,
 	getUserIdFromUsername,
 	getUsernameFromUserId,
+	siteWhitelistCache,
+	siteWhitelistStatus,
 };
 
 async function sysLoad() {

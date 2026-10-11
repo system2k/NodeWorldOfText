@@ -5,6 +5,8 @@ var fetchOwnedWorldsByUserId = world_mgr.fetchOwnedWorldsByUserId;
 var claimWorldByName = world_mgr.claimWorldByName;
 var revokeMembershipByWorldName = world_mgr.revokeMembershipByWorldName;
 
+var { checkWhitelistFeature } = require("../../utils/whitelist.js");
+
 function sendWorldStatusUpdate(server, worldId, userId) {
 	var wss = server.wss;
 	var wsSend = server.wsSend;
@@ -48,6 +50,11 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		return write(null, null, {
 			redirect: "/accounts/login/?next=/accounts/profile/"
 		});
+	}
+
+	var wl_can_profile = checkWhitelistFeature(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
+	if(!wl_can_profile) {
+		return write("Not whitelisted - the website may temporarily be under lockdown", 403);
 	}
 
 	var world_list = [];
@@ -144,6 +151,13 @@ module.exports.POST = async function(req, write, server, ctx) {
 		return write(null, 403);
 	}
 
+	var wl_can_profile = checkWhitelistFeature(user.id, user.authenticated, ctx.ipAddress, null, "profile", server);
+	if(!wl_can_profile) {
+		return write("Not whitelisted - the website may temporarily be under lockdown", 403);
+	}
+
+	var wl_can_claim = checkWhitelistFeature(user.id, user.authenticated, ctx.ipAddress, null, "claim", server);
+
 	var csrftoken = post_data.csrfmiddlewaretoken;
 	if(!checkCSRF(csrftoken, user.id.toString(), 0)) {
 		return write("CSRF verification failed - please try again. This could be the result of leaving your tab open for too long.");
@@ -151,6 +165,11 @@ module.exports.POST = async function(req, write, server, ctx) {
 
 	var message = null;
 	if(post_data.form == "claim") {
+		if(!wl_can_claim) {
+			return await callPage("accounts/profile", {
+				message: "World claiming is currently disabled for your group"
+			});
+		}
 		if(accountSystem == "uvias" && user.uv_rank == uvias.getRankIdByName("guests")) {
 			// if this is a Uvias guest account, prevent it from claiming worlds
 			return await callPage("accounts/profile", {

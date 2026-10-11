@@ -5,6 +5,8 @@ var modifyWorldProp = world_mgr.modifyWorldProp;
 var releaseWorld = world_mgr.releaseWorld;
 var canViewWorld = world_mgr.canViewWorld;
 
+var captcha = require("../subsystems/captcha.js");
+
 function isMainPage(name) {
 	return name == "" || name.toLowerCase() == "main" || name.toLowerCase() == "owot";
 }
@@ -36,15 +38,21 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		memKey: query_data.key
 	});
 	if(!read_permission) {
-		var privNote = world.opts.privNote;
+		let privNote = world.opts.privNote;
 		return await callPage("accounts/private", {
 			privateWorldMsg: privNote
 		});
 	}
 
 	if(query_data.fetch == 1) { // fetch request
+		let captchaToken = query_data.captcha;
+		let captchaTest = captchaToken && captcha.reserveClientCaptchaToken(captchaToken, ctx.ipAddress);
+		if(!captchaTest && await captcha.isRequired(server, user, ctx.ipAddress, world.name)) {
+			return write("Captcha required", 429);
+		}
+
 		ctx.world = world;
-		var tiles = await modules.fetch_tiles({
+		let tiles = await modules.fetch_tiles({
 			fetchRectangles: [{
 				minY: query_data.min_tileY,
 				minX: query_data.min_tileX,
@@ -60,7 +68,7 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 			return write(tiles);
 		}
 		if("data" in tiles) tiles = tiles.data;
-		var tData;
+		let tData;
 		if(typeof tiles == "string") {
 			tData = tiles;
 		} else {
@@ -76,27 +84,27 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 		if(!query_data.hide) {
 			modifyWorldProp(world, "views", world.views + 1);
 		}
-		var pathname = world.name;
+		let pathname = world.name;
 		if(pathname != "") {
 			pathname = "/" + pathname;
 		}
-		var username = user.username;
+		let username = user.username;
 		if(accountSystem == "uvias") {
 			username = user.display_username;
 		}
-		var char_rate = world.opts.charRate;
+		let char_rate = world.opts.charRate;
 		if(char_rate) {
 			char_rate = char_rate.split("/").map(Number);
 		} else {
 			char_rate = [20480, 1000];
 		}
-		var write_int = world.opts.writeInt;
+		let write_int = world.opts.writeInt;
 		if(write_int == -1) write_int = 1000;
 
-		var announcement = getServerSetting("announcement");
-		var isGlobalEnabled = getServerSetting("chatGlobalEnabled") == "1";
+		let announcement = getServerSetting("announcement");
+		let isGlobalEnabled = getServerSetting("chatGlobalEnabled") == "1";
 
-		var state = {
+		let state = {
 			userModel: {
 				username: username,
 				is_superuser: user.superuser,
@@ -174,16 +182,16 @@ module.exports.GET = async function(req, write, server, ctx, params) {
 				state.background.alpha = world.background.alpha;
 			}
 		}
-		var page_title = "Our World of Text";
+		let page_title = "Our World of Text";
 		if(!isMainPage(world.name)) {
 			page_title = "/" + world.name;
 		}
-		var meta_desc = world.opts.desc;
+		let meta_desc = world.opts.desc;
 		if(!world.name) {
 			meta_desc = "";
 		}
-		var csrftoken = createCSRF(user.id, 0);
-		var data = {
+		let csrftoken = createCSRF(user.id, 0);
+		let data = {
 			state: JSON.stringify(state),
 			page_title,
 			nsfw: world.opts.nsfw,
@@ -216,6 +224,12 @@ module.exports.POST = async function(req, write, server, ctx) {
 	if(!read_permission) {
 		// no permission to view world?
 		return write(null, 403);
+	}
+
+	var captchaToken = post_data.captcha;
+	var captchaTest = captchaToken && captcha.reserveClientCaptchaToken(captchaToken, ctx.ipAddress);
+	if(!captchaTest && await captcha.isRequired(server, user, ctx.ipAddress, world.name)) {
+		return write("Captcha required", 429);
 	}
 
 	// TODO: relocate these declarations
