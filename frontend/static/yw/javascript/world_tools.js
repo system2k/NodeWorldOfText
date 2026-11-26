@@ -232,8 +232,8 @@ class WTWTracker {
 	isVisible = false;
 	hasInitiallyOpened = false;
 	dataTable = null;
-	totalLog = {};
-	worldRecord = {};
+	totalLog = new Map();
+	worldRecord = new Map();
 	rollbackRecord = {};
 	rollbackMaxDepth = 90;
 	linkRecord = {};
@@ -276,7 +276,7 @@ class WTWTracker {
 			if(!this.doAutoselect) return;
 			let idx = charY * tileC + charX;
 			let tilePos = tileY + "," + tileX;
-			let rec = this.worldRecord[tilePos]?.[idx];
+			let rec = this.worldRecord.get(tilePos)?.[idx];
 			if(rec != null) {
 				let ipAddr = this.seqLookup[rec];
 				// ip addresses are also IDs in the table
@@ -441,17 +441,16 @@ class WTWTracker {
 			obj[charIdx] = colorRef.seq;
 		}
 
-		let log = this.totalLog[clientIp];
+		let log = this.totalLog.get(clientIp);
 		if(!log) {
 			log = {
 				editCount: 0,
 				linkCount: 0,
-				tiles: {},
-				reg4x4: {},
-				reg25x25: {},
-				tileRecord: {}
+				tiles: new Set(),
+				reg4x4: new Set(),
+				reg25x25: new Set()
 			};
-			this.totalLog[clientIp] = log;
+			this.totalLog.set(clientIp, log);
 
 			let ipAddrTextContainer = document.createElement("div");
 			ipAddrTextContainer.style.display = "flex";
@@ -485,7 +484,14 @@ class WTWTracker {
 
 		
 		if(inRangeForColor) {
-			(this.worldRecord[tilePos] ??= {})[charIdx] = colorRef.seq;
+			let rec;
+			if(!this.worldRecord.has(tilePos)) {
+				rec = {};
+				this.worldRecord.set(tilePos, rec);
+			} else {
+				rec = this.worldRecord.get(tilePos);
+			}
+			rec[charIdx] = colorRef.seq;
 		}
 
 		if(type == "write") {
@@ -493,15 +499,15 @@ class WTWTracker {
 		} else if(type == "link") {
 			log.linkCount++;
 		}
-		log.tiles[tilePos] = 1;
-		log.reg4x4[Math.floor(tileY / 4) + "," + Math.floor(tileX / 4)] = 1;
-		log.reg25x25[Math.floor(tileY / 25) + "," + Math.floor(tileX / 25)] = 1;
+		log.tiles.add(tilePos);
+		log.reg4x4.add(Math.floor(tileY / 4) + "," + Math.floor(tileX / 4));
+		log.reg25x25.add(Math.floor(tileY / 25) + "," + Math.floor(tileX / 25));
 
 		this.dataTable.updateRowValue(clientIp, "edits", log.editCount);
 		this.dataTable.updateRowValue(clientIp, "links", log.linkCount);
-		this.dataTable.updateRowValue(clientIp, "tiles", Object.keys(log.tiles).length);
-		this.dataTable.updateRowValue(clientIp, "distinct4x4", Object.keys(log.reg4x4).length);
-		this.dataTable.updateRowValue(clientIp, "distinct25x25", Object.keys(log.reg25x25).length);
+		this.dataTable.updateRowValue(clientIp, "tiles", log.tiles.size);
+		this.dataTable.updateRowValue(clientIp, "distinct4x4", log.reg4x4.size);
+		this.dataTable.updateRowValue(clientIp, "distinct25x25", log.reg25x25.size);
 	}
 
 	handleUpdate(data) {
@@ -554,14 +560,13 @@ class WTWTracker {
 
 	clearColors() {
 		coloredChars = {};
-		this.worldRecord = {};
+		this.worldRecord.clear();
 		this.world.redraw();
 	}
 
 	recreateColors() {
-		for(let pos in this.worldRecord) {
+		for(let [pos, rec] of this.worldRecord) {
 			let obj = {};
-			let rec = this.worldRecord[pos];
 			for(let str in rec) {
 				let idx = parseInt(str);
 				let charX = idx % tileC;

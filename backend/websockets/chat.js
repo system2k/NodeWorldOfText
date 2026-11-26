@@ -960,6 +960,9 @@ module.exports = async function(ws, data, send, broadcast, server, ctx) {
 					id: clientId
 				}
 			});
+			if (check instanceof Promise) {
+				check = await check;
+			}
 		} catch(e) {
 			check = false;
 		}

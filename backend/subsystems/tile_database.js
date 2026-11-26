@@ -720,6 +720,11 @@ function tileWriteEdits(callID, tile, options, editData) {
 			}
 		}
 	}
+	if(plugin && plugin.writeUpdates) {
+		try {
+			plugin.writeUpdates(options, tile, editData, sharedData);
+		} catch(e) {}
+	}
 	IOProgress(callID);
 }
 

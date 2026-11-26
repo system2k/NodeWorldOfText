@@ -119,6 +119,7 @@ var tellEdit               = [];
 var autoTotal              = 0;
 var timesConnected         = 0;
 var receivedChatHistory    = false;
+var isRootPage             = state.worldModel.name == "";
 var homeX                  = 0;
 var homeY                  = 0;
 
@@ -1934,10 +1935,21 @@ function setupImageChecker() {
 				let byte = idx >> 3;
 				let bit = 1 << (idx & 7);
 
-				if(hasFg && fgFreq.count > 5) {
+				let exceedColThresh = hasFg && fgFreq.count > 5;
+				let exceedBgColThresh = hasBg && bgFreq.count > 5;
+
+				if(exceedColThresh || exceedBgColThresh) {
+					let prot = getCharProtection(tileX, tileY, cx, cy);
+					if(isRootPage && (prot == 1 || prot == 2)) {
+						exceedColThresh = false;
+						exceedBgColThresh = false;
+					}
+				}
+
+				if(exceedColThresh) {
 					colorBitmap[byte] |= bit;
 				}
-				if(hasBg && bgFreq.count > 5) {
+				if(exceedBgColThresh) {
 					bgcolorBitmap[byte] |= bit;
 				}
 
@@ -8146,6 +8158,8 @@ function reapplyProperties(props) {
 		state.worldModel.char_rate = props.opts.charRate.split("/").map(Number);
 	}
 
+	isRootPage = state.worldModel.name == "";
+
 	updateScaleConsts();
 	resetColorModalVisibility();
 	updateColorModalPalette();
@@ -8502,6 +8516,7 @@ var ws_functions = {
 					break;
 				case "name":
 					state.worldModel.name = value;
+					isRootPage = state.worldModel.name == "";
 					state.worldModel.pathname = value ? "/" + value : "";
 					ws_path = createWsPath();
 					updateWorldName();
